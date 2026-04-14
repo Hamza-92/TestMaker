@@ -25,7 +25,7 @@ export function NavUser() {
     }
 
     return (
-        <SidebarMenu>
+        <SidebarMenu className='bg-sidebar-accent rounded-md'>
             <SidebarMenuItem>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
