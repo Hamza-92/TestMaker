@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     ChevronLeftIcon,
     ChevronRightIcon,
@@ -167,10 +167,13 @@ export default function Customers() {
                             )}
                         </p>
                     </div>
-                    <button className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors">
+                    <Link
+                        href="/superadmin/customers/add"
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+                    >
                         <PlusIcon size={16} color="currentColor" />
                         <span className="hidden sm:inline">Add Customer</span>
-                    </button>
+                    </Link>
                 </div>
 
                 {/* ── Filter Container ────────────────────────────────────── */}
