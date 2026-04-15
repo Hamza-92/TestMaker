@@ -15,7 +15,7 @@ class CustomerController extends Controller
     {
         $customers = User::where('user_type', UserType::Customer)
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'school_name', 'city', 'province', 'status', 'created_at']);
+            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'created_at']);
 
         return Inertia::render('superadmin/customers', [
             'customers' => $customers,

@@ -38,6 +38,7 @@ interface Customer {
     name: string;
     email: string;
     school_name: string | null;
+    logo: string | null;
     city: string | null;
     province: string | null;
     status: Status;
@@ -293,6 +294,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                         const avatarColor = AVATAR_COLORS[customer.id % AVATAR_COLORS.length];
                                         const statusCfg   = STATUS_CONFIG[customer.status];
                                         const location    = [customer.city, customer.province].filter(Boolean).join(', ');
+                                        const logoUrl     = customer.logo ? `/storage/${customer.logo}` : null;
                                         return (
                                             <tr
                                                 key={customer.id}
@@ -306,20 +308,25 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                 </td>
                                                 {visibleCols.customer && (
                                                     <td className="px-4 py-3">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`${avatarColor} flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white`}>
-                                                                {initials(customer.name)}
-                                                            </div>
-                                                            <span className="font-medium">{customer.name}</span>
-                                                        </div>
+                                                        <span className="font-medium">{customer.name}</span>
                                                     </td>
                                                 )}
                                                 {visibleCols.email && (
                                                     <td className="text-muted-foreground px-4 py-3">{customer.email}</td>
                                                 )}
                                                 {visibleCols.school && (
-                                                    <td className="px-4 py-3 font-medium">
-                                                        {customer.school_name ?? <span className="text-muted-foreground italic">—</span>}
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className={`${!logoUrl ? avatarColor : ''} flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white`}>
+                                                                {logoUrl
+                                                                    ? <img src={logoUrl} alt={customer.school_name ?? ''} className="size-full object-cover" />
+                                                                    : initials(customer.school_name ?? customer.name)
+                                                                }
+                                                            </div>
+                                                            <span className="font-medium">
+                                                                {customer.school_name ?? <span className="text-muted-foreground italic">—</span>}
+                                                            </span>
+                                                        </div>
                                                     </td>
                                                 )}
                                                 {visibleCols.location && (
