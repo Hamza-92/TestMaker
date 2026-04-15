@@ -151,7 +151,6 @@ export default function AddCustomer() {
                             <Field label="Full Name" required error={errors.name}>
                                 <InputWithIcon
                                     icon={<UserIcon />}
-                                    placeholder="John Doe"
                                     value={data.name}
                                     onChange={(e) => setData('name', e.target.value)}
                                 />
@@ -160,7 +159,6 @@ export default function AddCustomer() {
                                 <InputWithIcon
                                     icon={<MailIcon />}
                                     type="email"
-                                    placeholder="john@example.com"
                                     value={data.email}
                                     onChange={(e) => setData('email', e.target.value)}
                                 />
@@ -176,7 +174,6 @@ export default function AddCustomer() {
                                     </div>
                                     <Input
                                         type={showPassword ? 'text' : 'password'}
-                                        placeholder="Min. 8 characters"
                                         className="px-9"
                                         value={data.password}
                                         onChange={(e) => setData('password', e.target.value)}
@@ -197,7 +194,6 @@ export default function AddCustomer() {
                                     </div>
                                     <Input
                                         type={showConfirm ? 'text' : 'password'}
-                                        placeholder="Re-enter password"
                                         className="px-9"
                                         value={data.password_confirmation}
                                         onChange={(e) => setData('password_confirmation', e.target.value)}
@@ -214,7 +210,7 @@ export default function AddCustomer() {
                             <Field label="Status" required error={errors.status}>
                                 <Select value={data.status} onValueChange={(v) => setData('status', v)}>
                                     <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select status" />
+                                        <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="active">
@@ -247,95 +243,88 @@ export default function AddCustomer() {
                         />
                         <Separator />
 
-                        {/* Row 1: School name + Logo upload side by side */}
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                            {/* Logo */}
-                            <div className="space-y-1.5">
-                                <Label>School Logo</Label>
-                                <div className="flex items-center gap-3">
-                                    <div
+                        {/* Row 1: Logo full width */}
+                        <div className="space-y-1.5">
+                            <Label>School Logo</Label>
+                            <div className="flex items-center gap-3">
+                                <div
+                                    onClick={() => logoRef.current?.click()}
+                                    className="border-input bg-muted/30 hover:bg-muted/60 flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors"
+                                >
+                                    {logoPreview ? (
+                                        <img src={logoPreview} alt="Logo" className="size-full object-cover" />
+                                    ) : (
+                                        <ImageIcon className="text-muted-foreground size-6" />
+                                    )}
+                                </div>
+                                <div className="space-y-1">
+                                    <button
+                                        type="button"
                                         onClick={() => logoRef.current?.click()}
-                                        className="border-input bg-muted/30 hover:bg-muted/60 flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors"
+                                        className="border-input hover:bg-accent flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors"
                                     >
-                                        {logoPreview ? (
-                                            <img src={logoPreview} alt="Logo" className="size-full object-cover" />
-                                        ) : (
-                                            <ImageIcon className="text-muted-foreground size-6" />
-                                        )}
-                                    </div>
-                                    <div className="space-y-1">
+                                        {logoPreview ? 'Change' : 'Upload'}
+                                    </button>
+                                    <p className="text-muted-foreground text-xs">PNG, JPG · max 2MB</p>
+                                    {logoPreview && (
                                         <button
                                             type="button"
-                                            onClick={() => logoRef.current?.click()}
-                                            className="border-input hover:bg-accent flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors"
+                                            onClick={() => { setLogoPreview(null); setData('logo', null); }}
+                                            className="text-destructive text-xs hover:underline"
                                         >
-                                            {logoPreview ? 'Change' : 'Upload'}
+                                            Remove
                                         </button>
-                                        <p className="text-muted-foreground text-xs">PNG, JPG · max 2MB</p>
-                                        {logoPreview && (
-                                            <button
-                                                type="button"
-                                                onClick={() => { setLogoPreview(null); setData('logo', null); }}
-                                                className="text-destructive text-xs hover:underline"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
+                                    )}
                                 </div>
-                                {errors.logo && <p className="text-destructive text-xs">{errors.logo as string}</p>}
-                                <input ref={logoRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleLogoChange} />
                             </div>
-
-                            {/* School name fills remaining space */}
-                            <div className="flex-1">
-                                <Field label="School Name" error={errors.school_name}>
-                                    <InputWithIcon
-                                        icon={<SchoolIcon />}
-                                        placeholder="Greenwood High School"
-                                        value={data.school_name}
-                                        onChange={(e) => setData('school_name', e.target.value)}
-                                    />
-                                </Field>
-                            </div>
+                            {errors.logo && <p className="text-destructive text-xs">{errors.logo as string}</p>}
+                            <input ref={logoRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleLogoChange} />
                         </div>
 
-                        {/* Row 2: City + Province + Address */}
-                        <FieldGroup cols={3}>
+                        {/* Row 2: School Name full width */}
+                        <Field label="School Name" error={errors.school_name}>
+                            <InputWithIcon
+                                icon={<SchoolIcon />}
+                                value={data.school_name}
+                                onChange={(e) => setData('school_name', e.target.value)}
+                            />
+                        </Field>
+
+                        {/* Row 3: Address full width */}
+                        <Field label="Address" error={errors.address}>
+                            <InputWithIcon
+                                icon={<MapPinIcon />}
+                                value={data.address}
+                                onChange={(e) => setData('address', e.target.value)}
+                            />
+                        </Field>
+
+                        {/* Row 4: City + Province + Show Address */}
+                        <div className="grid gap-4 sm:grid-cols-3">
                             <Field label="City" error={errors.city}>
                                 <Input
-                                    placeholder="Karachi"
                                     value={data.city}
                                     onChange={(e) => setData('city', e.target.value)}
                                 />
                             </Field>
                             <Field label="Province" error={errors.province}>
                                 <Input
-                                    placeholder="Sindh"
                                     value={data.province}
                                     onChange={(e) => setData('province', e.target.value)}
                                 />
                             </Field>
-                            <Field label="Address" error={errors.address}>
-                                <InputWithIcon
-                                    icon={<MapPinIcon />}
-                                    placeholder="123 Main Street"
-                                    value={data.address}
-                                    onChange={(e) => setData('address', e.target.value)}
-                                />
-                            </Field>
-                        </FieldGroup>
-
-                        {/* Show address toggle */}
-                        <div className="flex items-center gap-2.5">
-                            <Checkbox
-                                id="is_show_address"
-                                checked={data.is_show_address}
-                                onCheckedChange={(checked) => setData('is_show_address', Boolean(checked))}
-                            />
-                            <label htmlFor="is_show_address" className="cursor-pointer select-none text-sm">
-                                Show address publicly on profile
-                            </label>
+                            <div className="flex items-end pb-1">
+                                <div className="flex items-center gap-2.5">
+                                    <Checkbox
+                                        id="is_show_address"
+                                        checked={data.is_show_address}
+                                        onCheckedChange={(checked) => setData('is_show_address', Boolean(checked))}
+                                    />
+                                    <label htmlFor="is_show_address" className="cursor-pointer select-none text-sm">
+                                        Show address publicly
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
