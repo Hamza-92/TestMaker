@@ -217,7 +217,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                             </SelectTrigger>
                             <SelectContent>
                                 {PAGE_SIZE_OPTIONS.map((n) => (
-                                    <SelectItem key={n} value={String(n)}>{n} / pg</SelectItem>
+                                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

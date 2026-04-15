@@ -34,37 +34,54 @@ interface Pattern {
     id: number;
     name: string;
     short_name: string | null;
+}
+
+interface SchoolClass {
+    id: number;
+    name: string;
     status: number;
     created_at: string;
+    patterns: Pattern[];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
+const PATTERN_COLORS = [
+    'bg-blue-100 text-blue-700 border-blue-200',
+    'bg-violet-100 text-violet-700 border-violet-200',
+    'bg-amber-100 text-amber-700 border-amber-200',
+    'bg-rose-100 text-rose-700 border-rose-200',
+    'bg-cyan-100 text-cyan-700 border-cyan-200',
+    'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
+    'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'bg-teal-100 text-teal-700 border-teal-200',
+];
+
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function Patterns({ patterns }: { patterns: Pattern[] }) {
-    const [search, setSearch]           = useState('');
+export default function Classes({ classes }: { classes: SchoolClass[] }) {
+    const [search, setSearch]             = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [pageSize, setPageSize]       = useState(10);
-    const [page, setPage]               = useState(1);
-    const [deleteTarget, setDeleteTarget] = useState<Pattern | null>(null);
-    const [deleting, setDeleting]       = useState(false);
+    const [pageSize, setPageSize]         = useState(10);
+    const [page, setPage]                 = useState(1);
+    const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null);
+    const [deleting, setDeleting]         = useState(false);
 
     // ── Filter + Search ──────────────────────────────────────────────────────
     const filtered = useMemo(() => {
         const q = search.toLowerCase();
-        return patterns.filter((p) => {
+        return classes.filter((c) => {
             const matchesSearch =
                 !q ||
-                p.name.toLowerCase().includes(q) ||
-                (p.short_name ?? '').toLowerCase().includes(q);
+                c.name.toLowerCase().includes(q) ||
+                c.patterns.some((p) => p.name.toLowerCase().includes(q));
             const matchesStatus =
                 statusFilter === 'all' ||
-                (statusFilter === 'active' && p.status === 1) ||
-                (statusFilter === 'inactive' && p.status === 0);
+                (statusFilter === 'active' && c.status === 1) ||
+                (statusFilter === 'inactive' && c.status === 0);
             return matchesSearch && matchesStatus;
         });
-    }, [patterns, search, statusFilter]);
+    }, [classes, search, statusFilter]);
 
     // ── Pagination ───────────────────────────────────────────────────────────
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -73,34 +90,34 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
 
     const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
 
-    const handleStatusChange = (val: string) => { setStatusFilter(val); setPage(1); };
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); };
+    const handleStatusChange = (val: string) => { setStatusFilter(val); setPage(1); };
 
     const confirmDelete = () => {
         if (!deleteTarget) return;
         setDeleting(true);
-        router.delete(`/superadmin/patterns/${deleteTarget.id}`, {
+        router.delete(`/superadmin/classes/${deleteTarget.id}`, {
             onFinish: () => { setDeleting(false); setDeleteTarget(null); },
         });
     };
 
     return (
         <>
-            <Head title="Patterns" />
+            <Head title="Classes" />
             <div className="space-y-5 p-4 md:p-6">
 
                 {/* ── Page Header ─────────────────────────────────────────── */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="h1-semibold">Patterns</h1>
+                        <h1 className="h1-semibold">Classes</h1>
                         <p className="text-muted-foreground mt-0.5 text-sm">{filtered.length} total</p>
                     </div>
                     <Link
-                        href="/superadmin/patterns/add"
+                        href="/superadmin/classes/add"
                         className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                     >
                         <PlusIcon size={16} color="currentColor" />
-                        <span className="hidden sm:inline">Add Pattern</span>
+                        <span className="hidden sm:inline">Add Class</span>
                     </Link>
                 </div>
 
@@ -109,7 +126,7 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                     <div className="relative min-w-[200px] flex-1">
                         <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                         <Input
-                            placeholder="Search patterns…"
+                            placeholder="Search classes or patterns…"
                             value={search}
                             onChange={handleSearch}
                             className="pl-9"
@@ -146,8 +163,8 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-muted/40 border-b">
-                                    <th className="text-muted-foreground px-4 py-3 text-left font-medium">Name</th>
-                                    <th className="text-muted-foreground px-4 py-3 text-left font-medium">Short Name</th>
+                                    <th className="text-muted-foreground px-4 py-3 text-left font-medium">Class</th>
+                                    <th className="text-muted-foreground px-4 py-3 text-left font-medium">Patterns</th>
                                     <th className="text-muted-foreground px-4 py-3 text-left font-medium">Status</th>
                                     <th className="text-muted-foreground px-4 py-3 text-left font-medium">Created</th>
                                     <th className="text-muted-foreground w-16 px-4 py-3 text-center font-medium"></th>
@@ -158,21 +175,35 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                                     <tr>
                                         <td colSpan={5} className="text-muted-foreground py-16 text-center">
                                             <SearchIcon className="mx-auto mb-2 size-8 opacity-30" />
-                                            No patterns found
+                                            No classes found
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginated.map((pattern, idx) => (
+                                    paginated.map((cls, idx) => (
                                         <tr
-                                            key={pattern.id}
+                                            key={cls.id}
                                             className={`transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
                                         >
-                                            <td className="px-4 py-3 font-medium">{pattern.name}</td>
-                                            <td className="text-muted-foreground px-4 py-3">
-                                                {pattern.short_name ?? <span className="italic">—</span>}
+                                            <td className="px-4 py-3 font-medium">{cls.name}</td>
+                                            <td className="px-4 py-3">
+                                                {cls.patterns.length === 0 ? (
+                                                    <span className="text-muted-foreground italic">—</span>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {cls.patterns.map((p) => (
+                                                            <Badge
+                                                                key={p.id}
+                                                                variant="outline"
+                                                                className={`${PATTERN_COLORS[p.id % PATTERN_COLORS.length]} text-xs font-medium`}
+                                                            >
+                                                                {p.short_name ?? p.name}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
-                                                {pattern.status === 1 ? (
+                                                {cls.status === 1 ? (
                                                     <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium">
                                                         <span className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />
                                                         Active
@@ -185,7 +216,7 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                                                 )}
                                             </td>
                                             <td className="text-muted-foreground px-4 py-3 tabular-nums">
-                                                {new Date(pattern.created_at).toLocaleDateString('en-US', {
+                                                {new Date(cls.created_at).toLocaleDateString('en-US', {
                                                     month: 'short', day: 'numeric', year: 'numeric',
                                                 })}
                                             </td>
@@ -198,14 +229,14 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="w-36">
                                                         <DropdownMenuItem asChild className="gap-2">
-                                                            <Link href={`/superadmin/patterns/${pattern.id}/edit`}>
+                                                            <Link href={`/superadmin/classes/${cls.id}/edit`}>
                                                                 <PencilIcon className="size-3.5" /> Edit
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             className="text-destructive gap-2 focus:text-destructive"
-                                                            onSelect={() => setDeleteTarget(pattern)}
+                                                            onSelect={() => setDeleteTarget(cls)}
                                                         >
                                                             <Trash2Icon className="size-3.5" /> Delete
                                                         </DropdownMenuItem>
@@ -233,7 +264,6 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                             <button onClick={() => goTo(safePage - 1)} disabled={safePage === 1} className="hover:bg-accent rounded p-1.5 transition-colors disabled:opacity-30" title="Previous">
                                 <ChevronLeftIcon className="size-4" />
                             </button>
-
                             <div className="flex items-center gap-1 px-1">
                                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                                     .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
@@ -256,7 +286,6 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                                         ),
                                     )}
                             </div>
-
                             <button onClick={() => goTo(safePage + 1)} disabled={safePage === totalPages} className="hover:bg-accent rounded p-1.5 transition-colors disabled:opacity-30" title="Next">
                                 <ChevronRightIcon className="size-4" />
                             </button>
@@ -271,7 +300,7 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
             {/* ── Delete Confirmation Dialog ───────────────────────────────── */}
             <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
                 <DialogContent>
-                    <DialogTitle>Delete Pattern</DialogTitle>
+                    <DialogTitle>Delete Class</DialogTitle>
                     <DialogDescription>
                         Are you sure you want to delete <span className="text-foreground font-medium">"{deleteTarget?.name}"</span>?
                         This action cannot be undone.
@@ -300,9 +329,9 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
     );
 }
 
-Patterns.layout = {
+Classes.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Patterns', href: '/superadmin/patterns' },
+        { title: 'Classes', href: '/superadmin/classes' },
     ],
 };

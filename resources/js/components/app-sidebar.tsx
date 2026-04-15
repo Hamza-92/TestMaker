@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid, TagIcon, Users } from 'lucide-react';
+import { BookOpen, FolderGit2, LayoutGrid, SchoolIcon, TagIcon, Users } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -31,6 +31,11 @@ const mainNavItems: NavItem[] = [
         title: 'Patterns',
         href: '/superadmin/patterns',
         icon: TagIcon,
+    },
+    {
+        title: 'Classes',
+        href: '/superadmin/classes',
+        icon: SchoolIcon,
     },
 ];
 
