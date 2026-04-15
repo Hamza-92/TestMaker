@@ -2,9 +2,9 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     CalendarIcon,
+    CreditCardIcon,
     FileTextIcon,
     HashIcon,
-    IndianRupeeIcon,
     SaveIcon,
     SchoolIcon,
 } from 'lucide-react';
@@ -27,6 +27,8 @@ interface FormData {
     started_at: string;
     duration: string;
     status: string;
+    payment_method: string;
+    account_number: string;
     [key: string]: string;
 }
 
@@ -88,6 +90,8 @@ export default function AddCustomerSubscription({ customer }: { customer: Custom
         started_at: today,
         duration: '30',
         status: 'active',
+        payment_method: 'cash',
+        account_number: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -140,14 +144,19 @@ export default function AddCustomerSubscription({ customer }: { customer: Custom
                             </Field>
 
                             <Field label="Amount" required error={errors.amount}>
-                                <InputWithIcon
-                                    icon={<IndianRupeeIcon />}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={data.amount}
-                                    onChange={(e) => setData('amount', e.target.value)}
-                                />
+                                <div className="relative">
+                                    <div className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium">
+                                        Rs.
+                                    </div>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        className="pl-11"
+                                        value={data.amount}
+                                        onChange={(e) => setData('amount', e.target.value)}
+                                    />
+                                </div>
                             </Field>
 
                             <Field label="Allowed Questions" required error={errors.allowed_questions}>
@@ -189,6 +198,28 @@ export default function AddCustomerSubscription({ customer }: { customer: Custom
                                         <SelectItem value="cancelled">Cancelled</SelectItem>
                                     </SelectContent>
                                 </Select>
+                            </Field>
+
+                            <Field label="Payment Method" required error={errors.payment_method}>
+                                <Select value={data.payment_method} onValueChange={(value) => setData('payment_method', value)}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="cash">Cash</SelectItem>
+                                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                        <SelectItem value="online">Online</SelectItem>
+                                        <SelectItem value="cheque">Cheque</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+
+                            <Field label="Account Number" error={errors.account_number}>
+                                <InputWithIcon
+                                    icon={<CreditCardIcon />}
+                                    value={data.account_number}
+                                    onChange={(e) => setData('account_number', e.target.value)}
+                                />
                             </Field>
                         </div>
                     </div>
