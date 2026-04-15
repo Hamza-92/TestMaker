@@ -6,8 +6,9 @@ import {
     ChevronsRightIcon,
     EllipsisIcon,
     MailIcon,
+    MapPinIcon,
     PencilIcon,
-    PhoneIcon,
+    SchoolIcon,
     SearchIcon,
     SlidersHorizontalIcon,
     Trash2Icon,
@@ -30,55 +31,24 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Status = 'active' | 'inactive' | 'pending' | 'banned';
+type Status = 'active' | 'inactive' | 'suspended';
 
 interface Customer {
     id: number;
     name: string;
     email: string;
-    phone: string;
+    school_name: string | null;
+    city: string | null;
+    province: string | null;
     status: Status;
-    plan: string;
-    joinedAt: string;
-    avatar: string;
+    created_at: string;
 }
-
-// ─── Dummy Data ───────────────────────────────────────────────────────────────
-const CUSTOMERS: Customer[] = [
-    { id: 1,  name: 'Alice Johnson',   email: 'alice@example.com',   phone: '+1 555-0101', status: 'active',   plan: 'Pro',      joinedAt: '2024-01-15', avatar: 'AJ' },
-    { id: 2,  name: 'Bob Martinez',    email: 'bob@example.com',     phone: '+1 555-0102', status: 'inactive', plan: 'Basic',    joinedAt: '2024-02-03', avatar: 'BM' },
-    { id: 3,  name: 'Carol White',     email: 'carol@example.com',   phone: '+1 555-0103', status: 'active',   plan: 'Enterprise', joinedAt: '2024-02-18', avatar: 'CW' },
-    { id: 4,  name: 'David Brown',     email: 'david@example.com',   phone: '+1 555-0104', status: 'pending',  plan: 'Pro',      joinedAt: '2024-03-07', avatar: 'DB' },
-    { id: 5,  name: 'Eva Garcia',      email: 'eva@example.com',     phone: '+1 555-0105', status: 'active',   plan: 'Basic',    joinedAt: '2024-03-22', avatar: 'EG' },
-    { id: 6,  name: 'Frank Lee',       email: 'frank@example.com',   phone: '+1 555-0106', status: 'banned',   plan: 'Basic',    joinedAt: '2024-04-01', avatar: 'FL' },
-    { id: 7,  name: 'Grace Kim',       email: 'grace@example.com',   phone: '+1 555-0107', status: 'active',   plan: 'Enterprise', joinedAt: '2024-04-14', avatar: 'GK' },
-    { id: 8,  name: 'Hank Wilson',     email: 'hank@example.com',    phone: '+1 555-0108', status: 'inactive', plan: 'Pro',      joinedAt: '2024-05-05', avatar: 'HW' },
-    { id: 9,  name: 'Iris Taylor',     email: 'iris@example.com',    phone: '+1 555-0109', status: 'active',   plan: 'Pro',      joinedAt: '2024-05-19', avatar: 'IT' },
-    { id: 10, name: 'Jake Anderson',   email: 'jake@example.com',    phone: '+1 555-0110', status: 'pending',  plan: 'Basic',    joinedAt: '2024-06-02', avatar: 'JA' },
-    { id: 11, name: 'Karen Thomas',    email: 'karen@example.com',   phone: '+1 555-0111', status: 'active',   plan: 'Enterprise', joinedAt: '2024-06-15', avatar: 'KT' },
-    { id: 12, name: 'Leo Harris',      email: 'leo@example.com',     phone: '+1 555-0112', status: 'active',   plan: 'Pro',      joinedAt: '2024-07-01', avatar: 'LH' },
-    { id: 13, name: 'Mia Clark',       email: 'mia@example.com',     phone: '+1 555-0113', status: 'inactive', plan: 'Basic',    joinedAt: '2024-07-20', avatar: 'MC' },
-    { id: 14, name: 'Noah Lewis',      email: 'noah@example.com',    phone: '+1 555-0114', status: 'active',   plan: 'Pro',      joinedAt: '2024-08-08', avatar: 'NL' },
-    { id: 15, name: 'Olivia Walker',   email: 'olivia@example.com',  phone: '+1 555-0115', status: 'banned',   plan: 'Basic',    joinedAt: '2024-08-25', avatar: 'OW' },
-    { id: 16, name: 'Paul Hall',       email: 'paul@example.com',    phone: '+1 555-0116', status: 'active',   plan: 'Enterprise', joinedAt: '2024-09-10', avatar: 'PH' },
-    { id: 17, name: 'Quinn Young',     email: 'quinn@example.com',   phone: '+1 555-0117', status: 'pending',  plan: 'Pro',      joinedAt: '2024-09-28', avatar: 'QY' },
-    { id: 18, name: 'Rachel Allen',    email: 'rachel@example.com',  phone: '+1 555-0118', status: 'active',   plan: 'Basic',    joinedAt: '2024-10-15', avatar: 'RA' },
-    { id: 19, name: 'Sam Scott',       email: 'sam@example.com',     phone: '+1 555-0119', status: 'inactive', plan: 'Enterprise', joinedAt: '2024-11-02', avatar: 'SS' },
-    { id: 20, name: 'Tina Adams',      email: 'tina@example.com',    phone: '+1 555-0120', status: 'active',   plan: 'Pro',      joinedAt: '2024-11-18', avatar: 'TA' },
-];
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<Status, { label: string; className: string }> = {
-    active:   { label: 'Active',   className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    inactive: { label: 'Inactive', className: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400' },
-    pending:  { label: 'Pending',  className: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
-    banned:   { label: 'Banned',   className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' },
-};
-
-const PLAN_COLORS: Record<string, string> = {
-    Basic:      'bg-slate-100 text-slate-600 border-slate-200',
-    Pro:        'bg-blue-100 text-blue-700 border-blue-200',
-    Enterprise: 'bg-purple-100 text-purple-700 border-purple-200',
+    active:    { label: 'Active',    className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
+    inactive:  { label: 'Inactive',  className: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400' },
+    suspended: { label: 'Suspended', className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' },
 };
 
 const AVATAR_COLORS = [
@@ -88,44 +58,54 @@ const AVATAR_COLORS = [
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
-const ALL_COLUMNS = ['customer', 'email', 'phone', 'plan', 'status', 'joined', 'actions'] as const;
+const ALL_COLUMNS = ['customer', 'email', 'school', 'location', 'status', 'joined', 'actions'] as const;
 type ColumnKey = (typeof ALL_COLUMNS)[number];
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
     customer: 'Customer',
     email:    'Email',
-    phone:    'Phone',
-    plan:     'Plan',
+    school:   'School',
+    location: 'Location',
     status:   'Status',
     joined:   'Joined',
     actions:  'Actions',
 };
 
+function initials(name: string): string {
+    return name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0].toUpperCase())
+        .join('');
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function Customers() {
-    const [search, setSearch]           = useState('');
+export default function Customers({ customers }: { customers: Customer[] }) {
+    const [search, setSearch]             = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [pageSize, setPageSize]       = useState(10);
-    const [page, setPage]               = useState(1);
-    const [selected, setSelected]       = useState<number[]>([]);
-    const [visibleCols, setVisibleCols] = useState<Record<ColumnKey, boolean>>({
-        customer: true, email: true, phone: true, plan: true,
+    const [pageSize, setPageSize]         = useState(10);
+    const [page, setPage]                 = useState(1);
+    const [selected, setSelected]         = useState<number[]>([]);
+    const [visibleCols, setVisibleCols]   = useState<Record<ColumnKey, boolean>>({
+        customer: true, email: true, school: true, location: true,
         status: true, joined: true, actions: true,
     });
 
     // ── Filter + Search ──────────────────────────────────────────────────────
     const filtered = useMemo(() => {
         const q = search.toLowerCase();
-        return CUSTOMERS.filter((c) => {
+        return customers.filter((c) => {
             const matchesSearch =
                 !q ||
                 c.name.toLowerCase().includes(q) ||
                 c.email.toLowerCase().includes(q) ||
-                c.phone.includes(q);
+                (c.school_name ?? '').toLowerCase().includes(q) ||
+                (c.city ?? '').toLowerCase().includes(q);
             const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-    }, [search, statusFilter]);
+    }, [customers, search, statusFilter]);
 
     // ── Pagination ───────────────────────────────────────────────────────────
     const totalPages   = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -200,8 +180,7 @@ export default function Customers() {
                                 <SelectItem value="all">All statuses</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="inactive">Inactive</SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="banned">Banned</SelectItem>
+                                <SelectItem value="suspended">Suspended</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -273,16 +252,21 @@ export default function Customers() {
                                             </div>
                                         </th>
                                     )}
-                                    {visibleCols.phone && (
+                                    {visibleCols.school && (
                                         <th className="text-muted-foreground px-4 py-3 text-left font-medium">
                                             <div className="flex items-center gap-1.5">
-                                                <PhoneIcon className="size-3.5" />
-                                                Phone
+                                                <SchoolIcon className="size-3.5" />
+                                                School
                                             </div>
                                         </th>
                                     )}
-                                    {visibleCols.plan && (
-                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">Plan</th>
+                                    {visibleCols.location && (
+                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">
+                                            <div className="flex items-center gap-1.5">
+                                                <MapPinIcon className="size-3.5" />
+                                                Location
+                                            </div>
+                                        </th>
                                     )}
                                     {visibleCols.status && (
                                         <th className="text-muted-foreground px-4 py-3 text-left font-medium">Status</th>
@@ -305,9 +289,10 @@ export default function Customers() {
                                     </tr>
                                 ) : (
                                     paginated.map((customer, idx) => {
-                                        const isSelected = selected.includes(customer.id);
+                                        const isSelected  = selected.includes(customer.id);
                                         const avatarColor = AVATAR_COLORS[customer.id % AVATAR_COLORS.length];
-                                        const statusCfg = STATUS_CONFIG[customer.status];
+                                        const statusCfg   = STATUS_CONFIG[customer.status];
+                                        const location    = [customer.city, customer.province].filter(Boolean).join(', ');
                                         return (
                                             <tr
                                                 key={customer.id}
@@ -323,7 +308,7 @@ export default function Customers() {
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center gap-3">
                                                             <div className={`${avatarColor} flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white`}>
-                                                                {customer.avatar}
+                                                                {initials(customer.name)}
                                                             </div>
                                                             <span className="font-medium">{customer.name}</span>
                                                         </div>
@@ -332,27 +317,27 @@ export default function Customers() {
                                                 {visibleCols.email && (
                                                     <td className="text-muted-foreground px-4 py-3">{customer.email}</td>
                                                 )}
-                                                {visibleCols.phone && (
-                                                    <td className="text-muted-foreground px-4 py-3 tabular-nums">{customer.phone}</td>
+                                                {visibleCols.school && (
+                                                    <td className="px-4 py-3 font-medium">
+                                                        {customer.school_name ?? <span className="text-muted-foreground italic">—</span>}
+                                                    </td>
                                                 )}
-                                                {visibleCols.plan && (
-                                                    <td className="px-4 py-3">
-                                                        <Badge className={`${PLAN_COLORS[customer.plan]} font-medium`} variant="outline">
-                                                            {customer.plan}
-                                                        </Badge>
+                                                {visibleCols.location && (
+                                                    <td className="text-muted-foreground px-4 py-3">
+                                                        {location || <span className="italic">—</span>}
                                                     </td>
                                                 )}
                                                 {visibleCols.status && (
                                                     <td className="px-4 py-3">
                                                         <Badge className={`${statusCfg.className} font-medium`} variant="outline">
-                                                            <span className={`mr-1 inline-block size-1.5 rounded-full ${customer.status === 'active' ? 'bg-emerald-500' : customer.status === 'pending' ? 'bg-amber-500' : customer.status === 'banned' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                                                            <span className={`mr-1 inline-block size-1.5 rounded-full ${customer.status === 'active' ? 'bg-emerald-500' : customer.status === 'suspended' ? 'bg-red-500' : 'bg-gray-400'}`} />
                                                             {statusCfg.label}
                                                         </Badge>
                                                     </td>
                                                 )}
                                                 {visibleCols.joined && (
                                                     <td className="text-muted-foreground px-4 py-3 tabular-nums">
-                                                        {new Date(customer.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        {new Date(customer.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                                     </td>
                                                 )}
                                                 {visibleCols.actions && (
