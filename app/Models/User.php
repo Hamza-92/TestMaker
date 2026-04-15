@@ -17,7 +17,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 #[Fillable([
-    'name', 'email', 'password',
+    'name', 'email', 'phone', 'password',
     'address', 'city', 'province', 'is_show_address',
     'school_name', 'logo',
     'user_type', 'school_id', 'status', 'created_by',

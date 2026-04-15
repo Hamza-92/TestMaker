@@ -31,7 +31,7 @@ class CustomerController extends Controller
 
         return Inertia::render('superadmin/customers/show', [
             'customer' => $customer->only([
-                'id', 'name', 'email',
+                'id', 'name', 'email', 'phone',
                 'school_name', 'logo',
                 'address', 'city', 'province', 'is_show_address',
                 'status', 'created_at',
@@ -50,6 +50,7 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'name'                  => ['required', 'string', 'max:255'],
             'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
+            'phone'                 => ['required', 'string', 'max:30'],
             'password'              => ['required', 'string', 'min:8', 'confirmed'],
             'status'                => ['required', 'in:active,inactive,suspended'],
             'school_name'           => ['nullable', 'string', 'max:255'],

@@ -8,6 +8,7 @@ import {
     LockIcon,
     MailIcon,
     MapPinIcon,
+    PhoneIcon,
     SaveIcon,
     SchoolIcon,
     UserIcon,
@@ -23,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 interface FormData {
     name: string;
     email: string;
+    phone: string;
     password: string;
     password_confirmation: string;
     status: string;
@@ -94,6 +96,7 @@ export default function AddCustomer() {
     const { data, setData, post, processing, errors } = useForm<FormData>({
         name:                  '',
         email:                 '',
+        phone:                 '',
         password:              '',
         password_confirmation: '',
         status:                'active',
@@ -146,8 +149,8 @@ export default function AddCustomer() {
                         />
                         <Separator />
 
-                        {/* Row 1: Name + Email */}
-                        <FieldGroup cols={2}>
+                        {/* Row 1: Name + Email + Phone */}
+                        <FieldGroup cols={3}>
                             <Field label="Full Name" required error={errors.name}>
                                 <InputWithIcon
                                     icon={<UserIcon />}
@@ -161,6 +164,14 @@ export default function AddCustomer() {
                                     type="email"
                                     value={data.email}
                                     onChange={(e) => setData('email', e.target.value)}
+                                />
+                            </Field>
+                            <Field label="Phone Number" required error={errors.phone}>
+                                <InputWithIcon
+                                    icon={<PhoneIcon />}
+                                    type="tel"
+                                    value={data.phone}
+                                    onChange={(e) => setData('phone', e.target.value)}
                                 />
                             </Field>
                         </FieldGroup>
