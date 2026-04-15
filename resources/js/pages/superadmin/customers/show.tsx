@@ -138,7 +138,7 @@ export default function ShowCustomer({ customer }: { customer: Customer }) {
 
                 <div className="overflow-hidden rounded-xl border shadow-sm">
                     <div className="bg-muted/20 border-b p-5 md:p-6">
-                        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
                             <div className="bg-muted flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border md:size-32">
                                 {logoUrl ? (
                                     <img src={logoUrl} alt={customer.school_name ?? customer.name} className="size-full object-cover" />
