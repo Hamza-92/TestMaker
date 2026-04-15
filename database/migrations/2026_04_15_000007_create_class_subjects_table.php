@@ -16,6 +16,10 @@ return new class extends Migration
             $table->foreignId('medium_id')->nullable()->constrained('mediums')->nullOnDelete();
 
             $table->unique(['class_id', 'subject_id', 'medium_id']);
+
+            $table->index('class_id');
+            $table->index('subject_id');
+            $table->index('medium_id');
         });
     }
 

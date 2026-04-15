@@ -24,13 +24,6 @@ class SchoolClass extends Model
         return $this->belongsToMany(Pattern::class, 'pattern_classes', 'class_id', 'pattern_id');
     }
 
-    public function subjects(): BelongsToMany
-    {
-        return $this->belongsToMany(Subject::class, 'class_subjects', 'class_id', 'subject_id')
-                    ->withPivot('medium_id')
-                    ->using(ClassSubject::class);
-    }
-
     public function classSubjects(): HasMany
     {
         return $this->hasMany(ClassSubject::class, 'class_id');

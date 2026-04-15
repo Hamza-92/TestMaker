@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subject extends Model
@@ -18,13 +17,6 @@ class Subject extends Model
     ];
 
     // ── Relationships ─────────────────────────────────────────────────────────
-
-    public function classes(): BelongsToMany
-    {
-        return $this->belongsToMany(SchoolClass::class, 'class_subjects', 'subject_id', 'class_id')
-                    ->withPivot('medium_id')
-                    ->using(ClassSubject::class);
-    }
 
     public function classSubjects(): HasMany
     {

@@ -4,6 +4,7 @@ use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\PatternController;
+use App\Http\Controllers\Superadmin\SubjectController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -39,6 +40,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('superadmin/classes/{class}/edit', [ClassController::class, 'edit'])->name('superadmin.classes.edit');
     Route::put('superadmin/classes/{class}', [ClassController::class, 'update'])->name('superadmin.classes.update');
     Route::delete('superadmin/classes/{class}', [ClassController::class, 'destroy'])->name('superadmin.classes.destroy');
+
+    Route::get('superadmin/subjects', [SubjectController::class, 'index'])->name('superadmin.subjects');
+    Route::get('superadmin/subjects/add', [SubjectController::class, 'create'])->name('superadmin.subjects.add');
+    Route::post('superadmin/subjects', [SubjectController::class, 'store'])->name('superadmin.subjects.store');
+    Route::get('superadmin/subjects/{subject}/edit', [SubjectController::class, 'edit'])->name('superadmin.subjects.edit');
+    Route::put('superadmin/subjects/{subject}', [SubjectController::class, 'update'])->name('superadmin.subjects.update');
+    Route::delete('superadmin/subjects/{subject}', [SubjectController::class, 'destroy'])->name('superadmin.subjects.destroy');
 });
 
 require __DIR__.'/settings.php';
