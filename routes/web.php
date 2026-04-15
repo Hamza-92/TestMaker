@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
+use App\Http\Controllers\Superadmin\PatternController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -23,6 +24,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('superadmin.customers.subscriptions.add');
     Route::post('superadmin/customers/{customer}/subscriptions', [CustomerSubscriptionController::class, 'store'])
         ->name('superadmin.customers.subscriptions.store');
+
+    Route::get('superadmin/patterns', [PatternController::class, 'index'])->name('superadmin.patterns');
+    Route::get('superadmin/patterns/add', [PatternController::class, 'create'])->name('superadmin.patterns.add');
+    Route::post('superadmin/patterns', [PatternController::class, 'store'])->name('superadmin.patterns.store');
+    Route::get('superadmin/patterns/{pattern}/edit', [PatternController::class, 'edit'])->name('superadmin.patterns.edit');
+    Route::put('superadmin/patterns/{pattern}', [PatternController::class, 'update'])->name('superadmin.patterns.update');
+    Route::delete('superadmin/patterns/{pattern}', [PatternController::class, 'destroy'])->name('superadmin.patterns.destroy');
 });
 
 require __DIR__.'/settings.php';
