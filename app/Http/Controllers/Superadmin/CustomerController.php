@@ -22,6 +22,24 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function show(User $customer)
+    {
+        $customer->load([
+            'subscriptions' => fn ($q) => $q->latest('started_at')
+                ->select(['id', 'user_id', 'name', 'amount', 'allowed_questions', 'started_at', 'expired_at', 'duration', 'status']),
+        ]);
+
+        return Inertia::render('superadmin/customers/show', [
+            'customer' => $customer->only([
+                'id', 'name', 'email',
+                'school_name', 'logo',
+                'address', 'city', 'province', 'is_show_address',
+                'status', 'created_at',
+                'subscriptions',
+            ]),
+        ]);
+    }
+
     public function create()
     {
         return Inertia::render('superadmin/customers/add');

@@ -308,7 +308,12 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                 </td>
                                                 {visibleCols.customer && (
                                                     <td className="px-4 py-3">
-                                                        <span className="font-medium">{customer.name}</span>
+                                                        <Link
+                                                            href={`/superadmin/customers/${customer.id}`}
+                                                            className="hover:text-primary font-medium transition-colors"
+                                                        >
+                                                            {customer.name}
+                                                        </Link>
                                                     </td>
                                                 )}
                                                 {visibleCols.email && (

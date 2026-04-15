@@ -14,6 +14,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('superadmin/customers', [CustomerController::class, 'index'])->name('superadmin.customers');
     Route::get('superadmin/customers/add', [CustomerController::class, 'create'])->name('superadmin.customers.add');
     Route::post('superadmin/customers', [CustomerController::class, 'store'])->name('superadmin.customers.store');
+    Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show');
 });
 
 require __DIR__.'/settings.php';
