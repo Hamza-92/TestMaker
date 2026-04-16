@@ -16,6 +16,8 @@ class Subscription extends Model
         'pattern_access',
         'class_access',
         'subject_access',
+        'allow_teachers',
+        'max_teachers',
         'allowed_questions',
         'amount',
         'started_at',
@@ -28,10 +30,11 @@ class Subscription extends Model
     protected function casts(): array
     {
         return [
-            'pattern_access' => 'array',
-            'class_access'   => 'array',
-            'subject_access' => 'array',
-            'amount'         => 'decimal:2',
+            'pattern_access'  => 'array',
+            'class_access'    => 'array',
+            'subject_access'  => 'array',
+            'allow_teachers'  => 'boolean',
+            'amount'          => 'decimal:2',
             'started_at'     => 'datetime',
             'expired_at'     => 'datetime',
             'status'         => SubscriptionStatus::class,
