@@ -5,6 +5,7 @@ import {
     ChevronsLeftIcon,
     ChevronsRightIcon,
     EllipsisIcon,
+    EyeIcon,
     PencilIcon,
     SearchIcon,
     Trash2Icon,
@@ -228,6 +229,11 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
                                                         </button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="w-36">
+                                                        <DropdownMenuItem asChild className="gap-2">
+                                                            <Link href={`/superadmin/classes/${cls.id}`}>
+                                                                <EyeIcon className="size-3.5" /> View
+                                                            </Link>
+                                                        </DropdownMenuItem>
                                                         <DropdownMenuItem asChild className="gap-2">
                                                             <Link href={`/superadmin/classes/${cls.id}/edit`}>
                                                                 <PencilIcon className="size-3.5" /> Edit

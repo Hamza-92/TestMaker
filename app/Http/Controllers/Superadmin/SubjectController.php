@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Superadmin;
 
+use App\Enums\AuditEvent;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
 use App\Models\Subject;
@@ -26,9 +28,46 @@ class SubjectController extends Controller
         ]);
     }
 
+    public function show(Subject $subject)
+    {
+        $subject->load([
+            'classSubjects.schoolClass:id,name,status',
+            'classSubjects.pattern:id,name,short_name',
+            'auditLogs.changedBy:id,name',
+        ]);
+
+        // Group class links by pattern
+        $linksByPattern = $subject->classSubjects
+            ->groupBy('pattern_id')
+            ->map(fn ($items) => [
+                'pattern' => $items->first()->pattern,
+                'classes' => $items->map(fn ($cs) => $cs->schoolClass)->filter()->values(),
+            ])
+            ->values();
+
+        return Inertia::render('superadmin/subjects/show', [
+            'subject' => [
+                'id'              => $subject->id,
+                'name_eng'        => $subject->name_eng,
+                'name_ur'         => $subject->name_ur,
+                'subject_type'    => $subject->subject_type,
+                'status'          => $subject->status,
+                'created_at'      => $subject->created_at?->toISOString(),
+                'links_by_pattern' => $linksByPattern,
+                'audit_logs'      => $subject->auditLogs->map(fn ($log) => [
+                    'id'         => $log->id,
+                    'event'      => $log->event?->value,
+                    'old_values' => $log->old_values ?? [],
+                    'new_values' => $log->new_values ?? [],
+                    'changed_by' => $log->changedBy?->name ?? 'System',
+                    'created_at' => $log->created_at?->toISOString(),
+                ]),
+            ],
+        ]);
+    }
+
     public function create()
     {
-        // Patterns with only their classes that are actually linked via pattern_classes
         $patterns = Pattern::where('status', 1)
             ->with(['classes' => fn ($q) => $q->where('status', 1)->orderBy('name')->select('classes.id', 'classes.name')])
             ->orderBy('name')
@@ -63,6 +102,19 @@ class SubjectController extends Controller
 
         $this->syncLinks($subject, $validated['links'] ?? []);
 
+        AuditLog::record(
+            model:     $subject,
+            event:     AuditEvent::Created,
+            newValues: [
+                'name_eng'     => $subject->name_eng,
+                'name_ur'      => $subject->name_ur,
+                'subject_type' => $subject->subject_type,
+                'status'       => $subject->status,
+                'links'        => $validated['links'] ?? [],
+            ],
+            notes: 'Subject created.',
+        );
+
         return redirect()->route('superadmin.subjects')
             ->with('success', 'Subject created successfully.');
     }
@@ -81,8 +133,8 @@ class SubjectController extends Controller
             ->map(fn ($cs) => ['class_id' => $cs->class_id, 'pattern_id' => $cs->pattern_id]);
 
         return Inertia::render('superadmin/subjects/edit', [
-            'subject' => $subject->only(['id', 'name_eng', 'name_ur', 'subject_type', 'status']),
-            'patterns' => $patterns,
+            'subject'       => $subject->only(['id', 'name_eng', 'name_ur', 'subject_type', 'status']),
+            'patterns'      => $patterns,
             'existingLinks' => $existingLinks,
         ]);
     }
@@ -99,6 +151,7 @@ class SubjectController extends Controller
             'links.*.pattern_id'    => ['required', 'integer', 'exists:patterns,id'],
         ]);
 
+        $oldValues = $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']);
         $subject->update([
             'name_eng'     => $validated['name_eng'],
             'name_ur'      => $validated['name_ur'] ?? null,
@@ -108,12 +161,27 @@ class SubjectController extends Controller
 
         $this->syncLinks($subject, $validated['links'] ?? []);
 
-        return redirect()->route('superadmin.subjects')
+        AuditLog::record(
+            model:     $subject,
+            event:     AuditEvent::Updated,
+            oldValues: $oldValues,
+            newValues: $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']),
+            notes:     'Subject updated.',
+        );
+
+        return redirect()->route('superadmin.subjects.show', $subject)
             ->with('success', 'Subject updated successfully.');
     }
 
     public function destroy(Subject $subject)
     {
+        AuditLog::record(
+            model:     $subject,
+            event:     AuditEvent::Deleted,
+            oldValues: ['name_eng' => $subject->name_eng],
+            notes:     'Subject deleted.',
+        );
+
         $subject->delete();
 
         return redirect()->route('superadmin.subjects')
@@ -124,7 +192,6 @@ class SubjectController extends Controller
 
     private function syncLinks(Subject $subject, array $links): void
     {
-        // Remove all existing links then insert the new set
         $subject->classSubjects()->delete();
 
         $rows = collect($links)->unique(fn ($l) => $l['class_id'].'-'.$l['pattern_id']);

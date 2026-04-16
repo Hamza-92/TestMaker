@@ -5,6 +5,7 @@ import {
     ChevronsLeftIcon,
     ChevronsRightIcon,
     EllipsisIcon,
+    EyeIcon,
     PencilIcon,
     SearchIcon,
     Trash2Icon,
@@ -243,6 +244,11 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                                             </button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" className="w-36">
+                                                            <DropdownMenuItem asChild className="gap-2">
+                                                                <Link href={`/superadmin/subjects/${subject.id}`}>
+                                                                    <EyeIcon className="size-3.5" /> View
+                                                                </Link>
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuItem asChild className="gap-2">
                                                                 <Link href={`/superadmin/subjects/${subject.id}/edit`}>
                                                                     <PencilIcon className="size-3.5" /> Edit
