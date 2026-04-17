@@ -601,7 +601,7 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
                                     value={pForm.payment_method}
                                     onValueChange={(v) => setPForm((f) => ({ ...f, payment_method: v }))}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Select" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -633,7 +633,7 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
                                     value={pForm.status}
                                     onValueChange={(v) => setPForm((f) => ({ ...f, status: v }))}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -662,12 +662,12 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
                         <div className="space-y-1.5">
                             <Label>Receipt / Screenshot</Label>
                             <div
-                                className="border-input hover:border-ring/50 flex cursor-pointer items-center gap-3 rounded-md border border-dashed px-4 py-3 transition-colors"
+                                className="border-input hover:border-ring/50 flex cursor-pointer items-center gap-3 overflow-hidden rounded-md border border-dashed px-4 py-3 transition-colors"
                                 onClick={() => fileRef.current?.click()}
                             >
                                 <PaperclipIcon className="text-muted-foreground size-4 shrink-0" />
-                                <div className="min-w-0">
-                                    <p className="text-sm truncate">
+                                <div className="min-w-0 flex-1 overflow-hidden">
+                                    <p className="truncate text-sm">
                                         {pForm.receipt ? pForm.receipt.name : 'Click to upload receipt'}
                                     </p>
                                     <p className="text-muted-foreground text-xs">JPG, PNG, PDF, WebP · max 5 MB</p>

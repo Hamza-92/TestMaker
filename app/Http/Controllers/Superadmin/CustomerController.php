@@ -45,19 +45,20 @@ class CustomerController extends Controller
             ->latest()
             ->get()
             ->map(fn (PaymentLog $log) => [
-                'id' => $log->id,
-                'subscription_name' => $log->subscription?->name,
-                'amount' => (string) $log->amount,
-                'payment_method' => $log->payment_method?->value,
+                'id'                   => $log->id,
+                'subscription_id'      => $log->subscription_id,
+                'subscription_name'    => $log->subscription?->name,
+                'amount'               => (string) $log->amount,
+                'payment_method'       => $log->payment_method?->value,
                 'payment_method_label' => $log->payment_method?->label(),
-                'status' => $log->status?->value,
-                'status_label' => $log->status?->label(),
-                'account_number' => $log->account_number,
-                'notes' => $log->notes,
-                'created_at' => $log->created_at?->toISOString(),
-                'creator_name' => $log->creator?->name,
-                'reviewed_at' => $log->reviewed_at?->toISOString(),
-                'reviewer_name' => $log->reviewer?->name,
+                'status'               => $log->status?->value,
+                'status_label'         => $log->status?->label(),
+                'account_number'       => $log->account_number,
+                'notes'                => $log->notes,
+                'created_at'           => $log->created_at?->toISOString(),
+                'creator_name'         => $log->creator?->name,
+                'reviewed_at'          => $log->reviewed_at?->toISOString(),
+                'reviewer_name'        => $log->reviewer?->name,
             ]);
 
         $customerLogs = $customer->auditLogs
