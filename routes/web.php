@@ -26,6 +26,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('superadmin.customers.subscriptions.add');
     Route::post('superadmin/customers/{customer}/subscriptions', [CustomerSubscriptionController::class, 'store'])
         ->name('superadmin.customers.subscriptions.store');
+    Route::get('superadmin/customers/{customer}/subscriptions/{subscription}', [CustomerSubscriptionController::class, 'show'])
+        ->name('superadmin.customers.subscriptions.show');
+    Route::post('superadmin/customers/{customer}/subscriptions/{subscription}/payment-logs', [CustomerSubscriptionController::class, 'storePaymentLog'])
+        ->name('superadmin.customers.subscriptions.payment-logs.store');
+    Route::put('superadmin/customers/{customer}/subscriptions/{subscription}/payment-logs/{paymentLog}', [CustomerSubscriptionController::class, 'updatePaymentLog'])
+        ->name('superadmin.customers.subscriptions.payment-logs.update');
+    Route::patch('superadmin/customers/{customer}/subscriptions/{subscription}/payment-logs/{paymentLog}/review', [CustomerSubscriptionController::class, 'reviewPaymentLog'])
+        ->name('superadmin.customers.subscriptions.payment-logs.review');
 
     Route::get('superadmin/patterns', [PatternController::class, 'index'])->name('superadmin.patterns');
     Route::get('superadmin/patterns/add', [PatternController::class, 'create'])->name('superadmin.patterns.add');

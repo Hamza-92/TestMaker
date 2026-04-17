@@ -381,8 +381,19 @@ export default function ShowCustomer({
                                         const cfg = SUB_STATUS_CONFIG[sub.status];
 
                                         return (
-                                            <tr key={sub.id} className="hover:bg-muted/30 transition-colors">
-                                                <td className="px-3 py-2.5 font-medium">{sub.name}</td>
+                                            <tr
+                                                key={sub.id}
+                                                className="hover:bg-muted/30 cursor-pointer transition-colors"
+                                                onClick={() => window.location.href = `/superadmin/customers/${customer.id}/subscriptions/${sub.id}`}
+                                            >
+                                                <td className="px-3 py-2.5 font-medium">
+                                                    <Link
+                                                        href={`/superadmin/customers/${customer.id}/subscriptions/${sub.id}`}
+                                                        className="hover:text-primary transition-colors"
+                                                    >
+                                                        {sub.name}
+                                                    </Link>
+                                                </td>
                                                 <td className="text-muted-foreground px-3 py-2.5">
                                                     Rs. {Number(sub.amount).toLocaleString()}
                                                 </td>
