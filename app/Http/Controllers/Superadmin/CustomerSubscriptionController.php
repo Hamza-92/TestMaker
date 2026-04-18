@@ -11,6 +11,7 @@ use App\Models\PaymentLog;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Subscription;
+use App\Support\SubscriptionAccess;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,9 +31,12 @@ class CustomerSubscriptionController extends Controller
             'auditLogs'   => fn ($q) => $q->with('changedBy:id,name')->latest('created_at'),
         ]);
 
-        $patternNames = $this->resolveNames(Pattern::class, $subscription->pattern_access, 'name');
-        $classNames   = $this->resolveNames(SchoolClass::class, $subscription->class_access, 'name');
-        $subjectNames = $this->resolveNames(Subject::class, $subscription->subject_access, 'name_eng');
+        $resources = $this->accessResources();
+        $accessScope = SubscriptionAccess::resolveScope($subscription, $resources);
+        $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
+        $patternNames = $this->resolveNames(Pattern::class, $summaryIds['pattern_access'], 'name');
+        $classNames   = $this->resolveNames(SchoolClass::class, $summaryIds['class_access'], 'name');
+        $subjectNames = $this->resolveNames(Subject::class, $summaryIds['subject_access'], 'name_eng');
 
         $paymentLogs = $subscription->paymentLogs->map(fn (PaymentLog $log) => [
             'id'                   => $log->id,
@@ -73,9 +77,17 @@ class CustomerSubscriptionController extends Controller
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
                 'max_teachers'      => $subscription->max_teachers,
-                'pattern_access'    => $subscription->pattern_access,
-                'class_access'      => $subscription->class_access,
-                'subject_access'    => $subscription->subject_access,
+                'pattern_access'    => $summaryIds['pattern_access'],
+                'class_access'      => $summaryIds['class_access'],
+                'subject_access'    => $summaryIds['subject_access'],
+                'access_scope'      => $accessScope,
+                'access_overview'   => SubscriptionAccess::overview(
+                    $accessScope,
+                    $resources['patterns'],
+                    $resources['classes'],
+                    $resources['subjects'],
+                    $resources,
+                ),
                 'pattern_names'     => $patternNames,
                 'class_names'       => $classNames,
                 'subject_names'     => $subjectNames,
@@ -213,29 +225,14 @@ class CustomerSubscriptionController extends Controller
         return back()->with('success', 'Payment status updated.');
     }
 
-    private function buildAccessMaps(): array
+    private function accessResources(): array
     {
-        $patternClassMap = DB::table('pattern_classes')
-            ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
-            ->where('classes.status', 1)
-            ->select('pattern_classes.pattern_id', 'pattern_classes.class_id')
-            ->get()
-            ->groupBy('pattern_id')
-            ->map(fn ($rows) => $rows->pluck('class_id')->values()->all())
-            ->toArray();
-
-        $classSubjectMap = [];
-        DB::table('class_subjects')
-            ->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
-            ->where('subjects.status', 1)
-            ->select('class_subjects.pattern_id', 'class_subjects.class_id', 'class_subjects.subject_id')
-            ->get()
-            ->each(function ($row) use (&$classSubjectMap) {
-                $key = "{$row->pattern_id}:{$row->class_id}";
-                $classSubjectMap[$key][] = $row->subject_id;
-            });
-
-        return compact('patternClassMap', 'classSubjectMap');
+        return [
+            'patterns' => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
+            'classes'  => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
+            'subjects' => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
+            ...SubscriptionAccess::buildMaps(),
+        ];
     }
 
     private function resolveNames(string $model, ?array $ids, string $column): array|null
@@ -249,7 +246,7 @@ class CustomerSubscriptionController extends Controller
     {
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
 
-        $maps = $this->buildAccessMaps();
+        $resources = $this->accessResources();
 
         return Inertia::render('superadmin/customers/subscriptions/edit', [
             'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
@@ -263,21 +260,21 @@ class CustomerSubscriptionController extends Controller
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
                 'max_teachers'      => $subscription->max_teachers,
-                'pattern_access'    => $subscription->pattern_access,
-                'class_access'      => $subscription->class_access,
-                'subject_access'    => $subscription->subject_access,
+                'access_scope'      => SubscriptionAccess::resolveScope($subscription, $resources),
             ],
-            'patterns'        => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
-            'classes'         => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
-            'subjects'        => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
-            'patternClassMap' => $maps['patternClassMap'],
-            'classSubjectMap' => $maps['classSubjectMap'],
+            'patterns'        => $resources['patterns'],
+            'classes'         => $resources['classes'],
+            'subjects'        => $resources['subjects'],
+            'patternClassMap' => $resources['patternClassMap'],
+            'classSubjectMap' => $resources['classSubjectMap'],
         ]);
     }
 
     public function update(Request $request, User $customer, Subscription $subscription)
     {
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
+
+        $resources = $this->accessResources();
 
         $validated = $request->validate([
             'name'               => ['required', 'string', 'max:255'],
@@ -286,33 +283,34 @@ class CustomerSubscriptionController extends Controller
             'started_at'         => ['required', 'date'],
             'duration'           => ['required', 'integer', 'min:1'],
             'status'             => ['required', 'in:active,expired,cancelled'],
-            'pattern_access'     => ['nullable', 'array'],
-            'pattern_access.*'   => ['integer'],
-            'class_access'       => ['nullable', 'array'],
-            'class_access.*'     => ['integer'],
-            'subject_access'     => ['nullable', 'array'],
-            'subject_access.*'   => ['integer'],
+            'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
             'max_teachers'       => ['nullable', 'integer', 'min:1'],
         ]);
 
         $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
+        $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
+        $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
+        $oldAccessScope = SubscriptionAccess::resolveScope($subscription, $resources);
+        $oldSummaryIds = SubscriptionAccess::summaryIds($oldAccessScope, $resources);
 
         $oldValues = [
             'name'           => $subscription->name,
             'amount'         => (string) $subscription->amount,
             'status'         => $subscription->status?->value,
-            'pattern_access' => $subscription->pattern_access,
-            'class_access'   => $subscription->class_access,
-            'subject_access' => $subscription->subject_access,
+            'pattern_access' => $oldSummaryIds['pattern_access'],
+            'class_access'   => $oldSummaryIds['class_access'],
+            'subject_access' => $oldSummaryIds['subject_access'],
+            'access_scope'   => $oldAccessScope,
         ];
 
-        DB::transaction(function () use ($validated, $startedAt, $subscription, $oldValues) {
+        DB::transaction(function () use ($validated, $startedAt, $subscription, $oldValues, $accessScope, $summaryIds) {
             $subscription->update([
                 'name'              => $validated['name'],
-                'pattern_access'    => $validated['pattern_access'] ?? null,
-                'class_access'      => $validated['class_access'] ?? null,
-                'subject_access'    => $validated['subject_access'] ?? null,
+                'pattern_access'    => $summaryIds['pattern_access'],
+                'class_access'      => $summaryIds['class_access'],
+                'subject_access'    => $summaryIds['subject_access'],
+                'access_scope'      => $accessScope,
                 'allow_teachers'    => $validated['allow_teachers'] ?? false,
                 'max_teachers'      => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'allowed_questions' => $validated['allowed_questions'],
@@ -334,6 +332,7 @@ class CustomerSubscriptionController extends Controller
                     'pattern_access' => $subscription->pattern_access,
                     'class_access'   => $subscription->class_access,
                     'subject_access' => $subscription->subject_access,
+                    'access_scope'   => $subscription->access_scope,
                 ],
                 actor: auth()->user(),
                 notes: 'Subscription updated.',
@@ -347,22 +346,22 @@ class CustomerSubscriptionController extends Controller
 
     public function create(User $customer)
     {
-        $maps = $this->buildAccessMaps();
-        $patternClassMap = $maps['patternClassMap'];
-        $classSubjectMap = $maps['classSubjectMap'];
+        $resources = $this->accessResources();
 
         return Inertia::render('superadmin/customers/subscriptions/add', [
             'customer'        => $customer->only(['id', 'name', 'email', 'school_name']),
-            'patterns'        => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
-            'classes'         => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
-            'subjects'        => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
-            'patternClassMap' => $patternClassMap,
-            'classSubjectMap' => $classSubjectMap,
+            'patterns'        => $resources['patterns'],
+            'classes'         => $resources['classes'],
+            'subjects'        => $resources['subjects'],
+            'patternClassMap' => $resources['patternClassMap'],
+            'classSubjectMap' => $resources['classSubjectMap'],
         ]);
     }
 
     public function store(Request $request, User $customer)
     {
+        $resources = $this->accessResources();
+
         $validated = $request->validate([
             'name'               => ['required', 'string', 'max:255'],
             'amount'             => ['required', 'numeric', 'min:0'],
@@ -372,25 +371,23 @@ class CustomerSubscriptionController extends Controller
             'status'             => ['required', 'in:active,expired,cancelled'],
             'payment_method'     => ['required', 'in:cash,bank_transfer,online,cheque'],
             'account_number'     => ['nullable', 'string', 'max:100'],
-            'pattern_access'     => ['nullable', 'array'],
-            'pattern_access.*'   => ['integer'],
-            'class_access'       => ['nullable', 'array'],
-            'class_access.*'     => ['integer'],
-            'subject_access'     => ['nullable', 'array'],
-            'subject_access.*'   => ['integer'],
+            'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
             'max_teachers'       => ['nullable', 'integer', 'min:1'],
         ]);
 
         $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
+        $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
+        $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
 
-        DB::transaction(function () use ($validated, $startedAt, $customer) {
+        DB::transaction(function () use ($validated, $startedAt, $customer, $accessScope, $summaryIds) {
             $subscription = Subscription::create([
                 'user_id'           => $customer->id,
                 'name'              => $validated['name'],
-                'pattern_access'    => $validated['pattern_access'] ?? null,
-                'class_access'      => $validated['class_access'] ?? null,
-                'subject_access'    => $validated['subject_access'] ?? null,
+                'pattern_access'    => $summaryIds['pattern_access'],
+                'class_access'      => $summaryIds['class_access'],
+                'subject_access'    => $summaryIds['subject_access'],
+                'access_scope'      => $accessScope,
                 'allow_teachers'    => $validated['allow_teachers'] ?? false,
                 'max_teachers'      => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'allowed_questions' => $validated['allowed_questions'],
@@ -418,9 +415,13 @@ class CustomerSubscriptionController extends Controller
                 model: $subscription,
                 event: AuditEvent::Created,
                 newValues: [
-                    'name'   => $subscription->name,
-                    'amount' => $subscription->amount,
-                    'status' => $subscription->status->value,
+                    'name'           => $subscription->name,
+                    'amount'         => $subscription->amount,
+                    'status'         => $subscription->status->value,
+                    'pattern_access' => $subscription->pattern_access,
+                    'class_access'   => $subscription->class_access,
+                    'subject_access' => $subscription->subject_access,
+                    'access_scope'   => $subscription->access_scope,
                 ],
                 actor: auth()->user(),
                 notes: 'Subscription created for customer.',

@@ -10,12 +10,20 @@ import {
     SchoolIcon,
     UsersIcon,
 } from 'lucide-react';
+import { HierarchicalAccessControl } from '@/components/subscription-access-control';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { HierarchicalAccessControl } from '@/components/subscription-access-control';
+import type {
+    AccessClass,
+    AccessPattern,
+    AccessSubject,
+    ClassSubjectMap,
+    PatternClassMap,
+    SubscriptionAccessScope,
+} from '@/lib/subscription-access';
 
 interface Customer {
     id: number;
@@ -24,30 +32,13 @@ interface Customer {
     school_name: string | null;
 }
 
-interface Pattern {
-    id: number;
-    name: string;
-    short_name: string;
-}
-
-interface SchoolClass {
-    id: number;
-    name: string;
-}
-
-interface Subject {
-    id: number;
-    name_eng: string;
-    name_ur: string;
-}
-
 interface Props {
     customer: Customer;
-    patterns: Pattern[];
-    classes: SchoolClass[];
-    subjects: Subject[];
-    patternClassMap: Record<string, number[]>;
-    classSubjectMap: Record<string, number[]>;
+    patterns: AccessPattern[];
+    classes: AccessClass[];
+    subjects: AccessSubject[];
+    patternClassMap: PatternClassMap;
+    classSubjectMap: ClassSubjectMap;
 }
 
 interface FormData {
@@ -59,15 +50,12 @@ interface FormData {
     status: string;
     payment_method: string;
     account_number: string;
-    pattern_access: number[] | null;
-    class_access: number[] | null;
-    subject_access: number[] | null;
+    access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
     max_teachers: string;
-    [key: string]: string | boolean | number[] | null;
 }
 
-function SectionHeader({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+function SectionHeader({ icon, title, description }: { icon: React.ReactNode; title: string; description?: string }) {
     return (
         <div className="flex items-start gap-3">
             <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
@@ -75,7 +63,7 @@ function SectionHeader({ icon, title, description }: { icon: React.ReactNode; ti
             </div>
             <div>
                 <p className="text-sm font-medium">{title}</p>
-                <p className="text-muted-foreground text-xs">{description}</p>
+                {description && <p className="text-muted-foreground text-xs">{description}</p>}
             </div>
         </div>
     );
@@ -115,8 +103,6 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
-
-
 export default function AddCustomerSubscription({ customer, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
     const today = new Date().toISOString().slice(0, 10);
 
@@ -129,9 +115,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
         status: 'active',
         payment_method: 'cash',
         account_number: '',
-        pattern_access: null,
-        class_access: null,
-        subject_access: null,
+        access_scope: null,
         allow_teachers: false,
         max_teachers: '',
     });
@@ -288,7 +272,10 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                     checked={data.allow_teachers}
                                     onCheckedChange={(checked) => {
                                         setData('allow_teachers', checked);
-                                        if (!checked) setData('max_teachers', '');
+
+                                        if (!checked) {
+                                            setData('max_teachers', '');
+                                        }
                                     }}
                                 />
                             </div>
@@ -317,7 +304,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                         <SectionHeader
                             icon={<LockIcon className="size-4" />}
                             title="Access Control"
-                            description="Define which patterns, classes, and subjects this plan grants access to"
                         />
 
                         <HierarchicalAccessControl
@@ -326,12 +312,9 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                             subjects={subjects}
                             patternClassMap={patternClassMap}
                             classSubjectMap={classSubjectMap}
-                            patternAccess={data.pattern_access as number[] | null}
-                            classAccess={data.class_access as number[] | null}
-                            subjectAccess={data.subject_access as number[] | null}
-                            onPatternChange={(val) => setData('pattern_access', val)}
-                            onClassChange={(val) => setData('class_access', val)}
-                            onSubjectChange={(val) => setData('subject_access', val)}
+                            value={data.access_scope}
+                            onChange={(val) => setData('access_scope', val)}
+                            error={errors.access_scope}
                         />
                     </div>
 

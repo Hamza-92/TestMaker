@@ -1,10 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
-import { useRef, useState } from 'react';
 import {
     ArrowLeftIcon,
     BadgeCheckIcon,
-    BookOpenIcon,
     CalendarIcon,
     CheckCircle2Icon,
     CheckIcon,
@@ -12,17 +10,15 @@ import {
     CreditCardIcon,
     ExternalLinkIcon,
     FileTextIcon,
-    GraduationCapIcon,
     HashIcon,
     LayoutGridIcon,
     LogsIcon,
     PaperclipIcon,
     PencilIcon,
     PlusIcon,
-    SchoolIcon,
-    UsersIcon,
     XCircleIcon,
 } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -30,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import type { SubscriptionAccessScope } from '@/lib/subscription-access';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +50,8 @@ interface Subscription {
     status: SubscriptionStatus;
     allow_teachers: boolean;
     max_teachers: number | null;
+    access_scope: SubscriptionAccessScope | null;
+    access_overview: AccessOverviewPattern[];
     pattern_access: number[] | null;
     class_access: number[] | null;
     subject_access: number[] | null;
@@ -61,6 +60,30 @@ interface Subscription {
     subject_names: string[] | null;
     creator_name: string | null;
     created_at: string | null;
+}
+
+interface AccessOverviewSubject {
+    id: number;
+    name_eng: string;
+    name_ur: string | null;
+}
+
+interface AccessOverviewClass {
+    id: number;
+    name: string;
+    subject_mode: 'all' | 'selected' | 'none';
+    subjects: AccessOverviewSubject[];
+    selected_subject_count: number;
+    available_subject_count: number;
+}
+
+interface AccessOverviewPattern {
+    id: number;
+    name: string;
+    short_name: string | null;
+    classes: AccessOverviewClass[];
+    selected_class_count: number;
+    available_class_count: number;
 }
 
 interface PaymentLog {
@@ -139,12 +162,18 @@ const INIT_PFORM: PFormState = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(date: string | null) {
-    if (!date) return '—';
+    if (!date) {
+return '—';
+}
+
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtDt(date: string | null) {
-    if (!date) return '—';
+    if (!date) {
+return '—';
+}
+
     return new Date(date).toLocaleString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric',
         hour: 'numeric', minute: '2-digit',
@@ -188,40 +217,110 @@ function InfoCell({ label, value, highlight }: { label: string; value: React.Rea
     );
 }
 
-function AccessPanel({ icon, label, names }: { icon: React.ReactNode; label: string; names: string[] | null }) {
-    const isAll   = names === null;
-    const isEmpty = !isAll && names!.length === 0;
+function AccessOverviewPanel({ subscription }: { subscription: Subscription }) {
+    if (subscription.access_scope === null) {
+        return (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="border-emerald-200 bg-emerald-100 text-emerald-700 text-xs">
+                        All Access
+                    </Badge>
+                    <p className="text-sm font-semibold text-emerald-800">Every active pattern, class, and subject is available.</p>
+                </div>
+                <p className="mt-2 text-xs text-emerald-700">
+                    This plan is not restricted. Any new active class or subject linked through the hierarchy will remain accessible.
+                </p>
+            </div>
+        );
+    }
+
+    if (subscription.access_overview.length === 0) {
+        return (
+            <div className="rounded-lg border border-dashed p-4">
+                <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-500 text-xs">No Access</Badge>
+                <p className="text-muted-foreground mt-2 text-sm">
+                    This plan does not currently grant access to any pattern, class, or subject.
+                </p>
+            </div>
+        );
+    }
 
     return (
-        <div className="rounded-lg border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{icon}</span>
-                    <p className="text-sm font-semibold">{label}</p>
+        <div className="space-y-4">
+            {subscription.access_overview.map((pattern) => (
+                <div key={pattern.id} className="rounded-lg border p-4 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-semibold">{pattern.name}</p>
+                                {pattern.short_name && (
+                                    <Badge variant="outline" className="text-[11px]">{pattern.short_name}</Badge>
+                                )}
+                            </div>
+                            <p className="text-muted-foreground mt-1 text-xs">
+                                {pattern.selected_class_count} / {pattern.available_class_count} classes enabled
+                            </p>
+                        </div>
+                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-xs">
+                            Pattern Access
+                        </Badge>
+                    </div>
+
+                    {pattern.classes.length === 0 ? (
+                        <p className="text-muted-foreground text-xs italic">
+                            Pattern selected, but no classes are enabled inside it.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {pattern.classes.map((schoolClass) => (
+                                <div key={schoolClass.id} className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div>
+                                            <p className="text-sm font-medium">{schoolClass.name}</p>
+                                            <p className="text-muted-foreground text-xs">
+                                                {schoolClass.subject_mode === 'all'
+                                                    ? `All ${schoolClass.available_subject_count} subjects are available`
+                                                    : schoolClass.subject_mode === 'none'
+                                                      ? 'No subjects selected'
+                                                      : `${schoolClass.selected_subject_count} / ${schoolClass.available_subject_count} subjects selected`}
+                                            </p>
+                                        </div>
+                                        <Badge
+                                            variant="outline"
+                                            className={
+                                                schoolClass.subject_mode === 'all'
+                                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 text-xs'
+                                                    : schoolClass.subject_mode === 'none'
+                                                      ? 'border-gray-200 bg-gray-50 text-gray-500 text-xs'
+                                                      : 'border-amber-200 bg-amber-50 text-amber-700 text-xs'
+                                            }
+                                        >
+                                            {schoolClass.subject_mode === 'all'
+                                                ? 'All Subjects'
+                                                : schoolClass.subject_mode === 'none'
+                                                  ? 'No Subjects'
+                                                  : 'Custom Subjects'}
+                                        </Badge>
+                                    </div>
+
+                                    {schoolClass.subject_mode === 'selected' && schoolClass.subjects.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {schoolClass.subjects.map((subject) => (
+                                                <span
+                                                    key={subject.id}
+                                                    className="bg-primary/10 text-primary rounded-md px-2.5 py-1 text-xs font-medium"
+                                                >
+                                                    {subject.name_eng}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
-                {isAll ? (
-                    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-xs">All Access</Badge>
-                ) : isEmpty ? (
-                    <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-500 text-xs">No Access</Badge>
-                ) : (
-                    <span className="text-muted-foreground text-xs">{names!.length} selected</span>
-                )}
-            </div>
-            {isAll && (
-                <p className="text-muted-foreground text-xs">All {label.toLowerCase()} are accessible in this plan.</p>
-            )}
-            {isEmpty && (
-                <p className="text-muted-foreground text-xs">No {label.toLowerCase()} assigned to this plan.</p>
-            )}
-            {!isAll && !isEmpty && (
-                <div className="flex flex-wrap gap-1.5">
-                    {names!.map((name) => (
-                        <span key={name} className="bg-primary/10 text-primary rounded-md px-2.5 py-1 text-xs font-medium">
-                            {name}
-                        </span>
-                    ))}
-                </div>
-            )}
+            ))}
         </div>
     );
 }
@@ -267,8 +366,14 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
         fd.append('account_number', pForm.account_number);
         fd.append('status', pForm.status);
         fd.append('notes', pForm.notes);
-        if (pForm.receipt) fd.append('receipt', pForm.receipt);
-        if (editingLog) fd.append('_method', 'PUT');
+
+        if (pForm.receipt) {
+fd.append('receipt', pForm.receipt);
+}
+
+        if (editingLog) {
+fd.append('_method', 'PUT');
+}
 
         const base = `/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/payment-logs`;
         const url  = editingLog ? `${base}/${editingLog.id}` : base;
@@ -399,24 +504,10 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
                 <SectionCard
                     icon={<LayoutGridIcon className="size-4" />}
                     title="Access Control"
-                    description="Patterns, classes, and subjects included in this plan"
+                    description="Pattern-specific classes and class-specific subjects included in this plan"
                 >
-                    <div className="grid gap-4 p-5 sm:grid-cols-3">
-                        <AccessPanel
-                            icon={<BookOpenIcon className="size-4" />}
-                            label="Patterns"
-                            names={subscription.pattern_names}
-                        />
-                        <AccessPanel
-                            icon={<GraduationCapIcon className="size-4" />}
-                            label="Classes"
-                            names={subscription.class_names}
-                        />
-                        <AccessPanel
-                            icon={<LayoutGridIcon className="size-4" />}
-                            label="Subjects"
-                            names={subscription.subject_names}
-                        />
+                    <div className="p-5">
+                        <AccessOverviewPanel subscription={subscription} />
                     </div>
                 </SectionCard>
 
@@ -461,6 +552,7 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
                                             className: 'bg-gray-100 text-gray-500 border-gray-200',
                                         };
                                         const canApprove = log.status === 'pending_review' || log.status === 'reviewed';
+
                                         return (
                                             <tr key={log.id} className="hover:bg-muted/25 align-top transition-colors">
                                                 <td className="px-4 py-3">
@@ -556,6 +648,7 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
                                     dot: 'bg-gray-400',
                                     label: log.event ?? 'Unknown',
                                 };
+
                                 return (
                                     <div key={log.id} className="flex items-center gap-3 px-5 py-3">
                                         <div className={`size-2 shrink-0 rounded-full ${evt.dot}`} />

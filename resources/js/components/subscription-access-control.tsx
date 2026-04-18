@@ -1,288 +1,593 @@
-import { BookOpenIcon, GraduationCapIcon, LayoutGridIcon } from 'lucide-react';
+import { BookOpenIcon, ChevronDownIcon, GraduationCapIcon, LayoutGridIcon, LockIcon } from 'lucide-react';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-
-export interface AccessPattern { id: number; name: string; short_name: string; }
-export interface AccessClass   { id: number; name: string; }
-export interface AccessSubject { id: number; name_eng: string; name_ur: string; }
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    getAvailableClassIds,
+    getAvailableSubjectIds,
+    getSelectedClassIds,
+    getSelectedSubjectIds,
+    sortIds,
+    summarizeScope,
+} from '@/lib/subscription-access';
+import type {
+    AccessClass,
+    AccessPattern,
+    AccessSubject,
+    ClassSubjectMap,
+    PatternClassMap,
+    SubscriptionAccessScope,
+} from '@/lib/subscription-access';
+import { cn } from '@/lib/utils';
 
 interface Props {
-    patterns:        AccessPattern[];
-    classes:         AccessClass[];
-    subjects:        AccessSubject[];
-    patternClassMap: Record<string, number[]>;  // patternId → classIds
-    classSubjectMap: Record<string, number[]>;  // "patternId:classId" → subjectIds
-    patternAccess:   number[] | null;
-    classAccess:     number[] | null;
-    subjectAccess:   number[] | null;
-    onPatternChange: (v: number[] | null) => void;
-    onClassChange:   (v: number[] | null) => void;
-    onSubjectChange: (v: number[] | null) => void;
+    patterns: AccessPattern[];
+    classes: AccessClass[];
+    subjects: AccessSubject[];
+    patternClassMap: PatternClassMap;
+    classSubjectMap: ClassSubjectMap;
+    value: SubscriptionAccessScope | null;
+    onChange: (value: SubscriptionAccessScope | null) => void;
+    error?: string;
 }
 
 export function HierarchicalAccessControl({
-    patterns, classes, subjects,
-    patternClassMap, classSubjectMap,
-    patternAccess, classAccess, subjectAccess,
-    onPatternChange, onClassChange, onSubjectChange,
+    patterns,
+    classes,
+    subjects,
+    patternClassMap,
+    classSubjectMap,
+    value,
+    onChange,
+    error,
 }: Props) {
+    const [openPatterns, setOpenPatterns] = useState<Record<string, boolean>>({});
+    const [openClasses, setOpenClasses] = useState<Record<string, boolean>>({});
 
-    // ── Derived available sets ────────────────────────────────────────────────
+    const classLookup = Object.fromEntries(classes.map((schoolClass) => [schoolClass.id, schoolClass]));
+    const subjectLookup = Object.fromEntries(subjects.map((subject) => [subject.id, subject]));
 
-    const effectivePatternIds = patternAccess === null ? patterns.map(p => p.id) : patternAccess;
+    const totalClassCount = new Set(Object.values(patternClassMap).flat()).size;
+    const totalSubjectCount = new Set(Object.values(classSubjectMap).flat()).size;
+    const summary = summarizeScope(value, patternClassMap, classSubjectMap);
 
-    const availableClassIdSet = new Set<number>(
-        effectivePatternIds.flatMap(pid => patternClassMap[String(pid)] ?? [])
-    );
-    const availableClasses = classes.filter(c => availableClassIdSet.has(c.id));
-
-    const effectiveClassIds = classAccess === null
-        ? availableClasses.map(c => c.id)
-        : classAccess.filter(id => availableClassIdSet.has(id));
-
-    const availableSubjectIdSet = new Set<number>(
-        effectivePatternIds.flatMap(pid =>
-            effectiveClassIds.flatMap(cid => classSubjectMap[`${pid}:${cid}`] ?? [])
-        )
-    );
-    const availableSubjects = subjects.filter(s => availableSubjectIdSet.has(s.id));
-
-    // ── Cascade helpers ───────────────────────────────────────────────────────
-
-    function cascadeSubjects(pids: number[], cids: number[]) {
-        if (subjectAccess === null) return;
-        const valid = new Set<number>(
-            pids.flatMap(pid => cids.flatMap(cid => classSubjectMap[`${pid}:${cid}`] ?? []))
+    function cloneScope(scope: SubscriptionAccessScope): SubscriptionAccessScope {
+        return Object.fromEntries(
+            Object.entries(scope).map(([patternId, patternRule]) => [
+                patternId,
+                {
+                    classes: Object.fromEntries(
+                        Object.entries(patternRule.classes).map(([classId, classRule]) => [
+                            classId,
+                            { subjects: classRule.subjects === null ? null : [...classRule.subjects] },
+                        ]),
+                    ),
+                },
+            ]),
         );
-        onSubjectChange(subjectAccess.filter(id => valid.has(id)));
     }
 
-    function cascadeClasses(pids: number[], currentClassAccess: number[] | null) {
-        if (currentClassAccess === null) return;
-        const valid = new Set<number>(pids.flatMap(pid => patternClassMap[String(pid)] ?? []));
-        const filtered = currentClassAccess.filter(id => valid.has(id));
-        onClassChange(filtered);
-        cascadeSubjects(pids, filtered);
+    function buildClassRule(patternId: number, classId: number) {
+        const availableSubjectIds = getAvailableSubjectIds(patternId, classId, classSubjectMap);
+
+        return {
+            subjects: availableSubjectIds.length === 0 ? [] : null,
+        };
     }
 
-    // ── Pattern handlers ──────────────────────────────────────────────────────
-
-    function handlePatternToggleAll(allAccess: boolean) {
-        onPatternChange(allAccess ? null : patterns.map(p => p.id));
+    function buildPatternRule(patternId: number) {
+        return {
+            classes: Object.fromEntries(
+                getAvailableClassIds(patternId, patternClassMap).map((classId) => [
+                    String(classId),
+                    buildClassRule(patternId, classId),
+                ]),
+            ),
+        };
     }
 
-    function handlePatternToggleItem(id: number, checked: boolean) {
-        const current = patternAccess ?? patterns.map(p => p.id);
-        const next = checked ? [...new Set([...current, id])] : current.filter(v => v !== id);
-        const normalized: number[] | null = next.length === patterns.length ? null : next;
-        onPatternChange(normalized);
-        cascadeClasses(normalized === null ? patterns.map(p => p.id) : next, classAccess);
+    function buildFullScope(): SubscriptionAccessScope {
+        return Object.fromEntries(
+            patterns.map((pattern) => [
+                String(pattern.id),
+                buildPatternRule(pattern.id),
+            ]),
+        );
     }
 
-    // ── Class handlers ────────────────────────────────────────────────────────
+    function arraysMatch(left: number[], right: number[]) {
+        if (left.length !== right.length) {
+            return false;
+        }
 
-    function handleClassToggleAll(allAccess: boolean) {
-        onClassChange(allAccess ? null : availableClasses.map(c => c.id));
+        return left.every((item, index) => item === right[index]);
     }
 
-    function handleClassToggleItem(id: number, checked: boolean) {
-        const current = classAccess ?? availableClasses.map(c => c.id);
-        const next = checked ? [...new Set([...current, id])] : current.filter(v => v !== id);
-        const normalized: number[] | null = next.length === availableClasses.length ? null : next;
-        onClassChange(normalized);
-        cascadeSubjects(effectivePatternIds, normalized === null ? effectiveClassIds : next);
+    function isFullScope(scope: SubscriptionAccessScope) {
+        if (Object.keys(scope).length !== patterns.length) {
+            return false;
+        }
+
+        return patterns.every((pattern) => {
+            const availableClassIds = getAvailableClassIds(pattern.id, patternClassMap);
+            const selectedClassIds = getSelectedClassIds(scope, pattern.id);
+
+            if (!arraysMatch(availableClassIds, selectedClassIds)) {
+                return false;
+            }
+
+            return availableClassIds.every((classId) => {
+                const availableSubjectIds = getAvailableSubjectIds(pattern.id, classId, classSubjectMap);
+                const classRule = scope[String(pattern.id)]?.classes[String(classId)];
+
+                if (!classRule) {
+                    return false;
+                }
+
+                if (availableSubjectIds.length === 0 || classRule.subjects === null) {
+                    return true;
+                }
+
+                return arraysMatch(sortIds(classRule.subjects), availableSubjectIds);
+            });
+        });
     }
 
-    // ── Subject handlers ──────────────────────────────────────────────────────
-
-    function handleSubjectToggleAll(allAccess: boolean) {
-        onSubjectChange(allAccess ? null : availableSubjects.map(s => s.id));
+    function commitScope(nextScope: SubscriptionAccessScope) {
+        onChange(isFullScope(nextScope) ? null : nextScope);
     }
 
-    function handleSubjectToggleItem(id: number, checked: boolean) {
-        const current = subjectAccess ?? availableSubjects.map(s => s.id);
-        const next = checked ? [...new Set([...current, id])] : current.filter(v => v !== id);
-        onSubjectChange(next.length === availableSubjects.length ? null : next);
+    function updateScope(mutator: (scope: SubscriptionAccessScope) => void) {
+        const currentScope = value === null ? buildFullScope() : value;
+        const nextScope = cloneScope(currentScope);
+        mutator(nextScope);
+        commitScope(nextScope);
     }
 
-    // ── Render ────────────────────────────────────────────────────────────────
-
-    function badge(access: number[] | null, total: number) {
-        if (access === null) return 'All access';
-        if (access.length === 0) return 'None selected';
-        return `${access.length} / ${total}`;
+    function patternOpenKey(patternId: number) {
+        return String(patternId);
     }
+
+    function classOpenKey(patternId: number, classId: number) {
+        return `${patternId}:${classId}`;
+    }
+
+    function isPatternOpen(patternId: number) {
+        return openPatterns[patternOpenKey(patternId)] ?? false;
+    }
+
+    function isClassOpen(patternId: number, classId: number) {
+        return openClasses[classOpenKey(patternId, classId)] ?? false;
+    }
+
+    function setPatternOpen(patternId: number, nextOpen: boolean) {
+        setOpenPatterns((current) => ({
+            ...current,
+            [patternOpenKey(patternId)]: nextOpen,
+        }));
+    }
+
+    function setClassOpen(patternId: number, classId: number, nextOpen: boolean) {
+        setOpenClasses((current) => ({
+            ...current,
+            [classOpenKey(patternId, classId)]: nextOpen,
+        }));
+    }
+
+    function handleFullAccessToggle(checked: boolean) {
+        onChange(checked ? null : buildFullScope());
+    }
+
+    function handlePatternToggle(patternId: number, checked: boolean) {
+        updateScope((scope) => {
+            if (checked) {
+                scope[String(patternId)] = buildPatternRule(patternId);
+
+                return;
+            }
+
+            delete scope[String(patternId)];
+        });
+
+        if (checked) {
+            setPatternOpen(patternId, true);
+        }
+    }
+
+    function handlePatternSelectAllClasses(patternId: number, checked: boolean) {
+        updateScope((scope) => {
+            const patternRule = scope[String(patternId)];
+
+            if (!patternRule) {
+                return;
+            }
+
+            patternRule.classes = checked ? buildPatternRule(patternId).classes : {};
+        });
+
+        if (checked) {
+            setPatternOpen(patternId, true);
+        }
+    }
+
+    function handleClassToggle(patternId: number, classId: number, checked: boolean) {
+        updateScope((scope) => {
+            const patternRule = scope[String(patternId)];
+
+            if (!patternRule) {
+                return;
+            }
+
+            if (checked) {
+                patternRule.classes[String(classId)] = buildClassRule(patternId, classId);
+
+                return;
+            }
+
+            delete patternRule.classes[String(classId)];
+        });
+
+        if (checked) {
+            setPatternOpen(patternId, true);
+            setClassOpen(patternId, classId, true);
+        }
+    }
+
+    function handleSubjectSelectAll(patternId: number, classId: number, checked: boolean) {
+        updateScope((scope) => {
+            const classRule = scope[String(patternId)]?.classes[String(classId)];
+
+            if (!classRule) {
+                return;
+            }
+
+            classRule.subjects = checked
+                ? getAvailableSubjectIds(patternId, classId, classSubjectMap).length === 0
+                    ? []
+                    : null
+                : [];
+        });
+
+        if (checked) {
+            setPatternOpen(patternId, true);
+            setClassOpen(patternId, classId, true);
+        }
+    }
+
+    function handleSubjectToggle(patternId: number, classId: number, subjectId: number, checked: boolean) {
+        updateScope((scope) => {
+            const availableSubjectIds = getAvailableSubjectIds(patternId, classId, classSubjectMap);
+            const classRule = scope[String(patternId)]?.classes[String(classId)];
+
+            if (!classRule) {
+                return;
+            }
+
+            const currentSubjectIds = classRule.subjects === null ? availableSubjectIds : sortIds(classRule.subjects);
+            const nextSubjectIds = checked
+                ? sortIds([...currentSubjectIds, subjectId])
+                : currentSubjectIds.filter((currentId) => currentId !== subjectId);
+
+            classRule.subjects = arraysMatch(nextSubjectIds, availableSubjectIds) ? null : nextSubjectIds;
+        });
+    }
+
+    const effectiveScope = value ?? buildFullScope();
 
     return (
         <div className="space-y-4">
+            <div className="rounded-xl border bg-card shadow-sm">
+                <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <span className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-lg">
+                                <LockIcon className="size-4" />
+                            </span>
+                            <p className="text-sm font-semibold">Access Scope</p>
+                        </div>
 
-            {/* ── Patterns ── */}
-            <SectionBox
-                icon={<BookOpenIcon className="size-4" />}
-                label="Patterns"
-                isAll={patternAccess === null}
-                onToggleAll={handlePatternToggleAll}
-                badge={badge(patternAccess, patterns.length)}
-            >
-                <div className="grid gap-px p-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {patterns.map(p => (
-                        <CheckRow
-                            key={p.id}
-                            label={p.short_name ? `${p.name} (${p.short_name})` : p.name}
-                            checked={(patternAccess ?? patterns.map(x => x.id)).includes(p.id)}
-                            onChange={checked => handlePatternToggleItem(p.id, checked)}
+                        <div className="flex flex-wrap gap-2">
+                            <SummaryBadge
+                                icon={<BookOpenIcon className="size-3.5" />}
+                                label="Patterns"
+                                value={summary.patternCount}
+                                total={patterns.length}
+                            />
+                            <SummaryBadge
+                                icon={<GraduationCapIcon className="size-3.5" />}
+                                label="Classes"
+                                value={summary.classCount}
+                                total={totalClassCount}
+                            />
+                            <SummaryBadge
+                                icon={<LayoutGridIcon className="size-3.5" />}
+                                label="Subjects"
+                                value={summary.subjectCount}
+                                total={totalSubjectCount}
+                            />
+                        </div>
+                    </div>
+
+                    <label className="bg-muted/40 flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3">
+                        <Checkbox
+                            checked={value === null}
+                            onCheckedChange={(checked) => handleFullAccessToggle(checked === true)}
                         />
-                    ))}
+                        <span className="text-sm font-medium">Full access</span>
+                    </label>
                 </div>
-            </SectionBox>
 
-            {/* ── Classes ── */}
-            <SectionBox
-                icon={<GraduationCapIcon className="size-4" />}
-                label="Classes"
-                isAll={classAccess === null}
-                onToggleAll={handleClassToggleAll}
-                badge={badge(classAccess, availableClasses.length)}
-            >
-                {availableClasses.length === 0 ? (
-                    <p className="text-muted-foreground px-3 py-3 text-xs italic">
-                        No classes linked to the selected patterns.
-                    </p>
-                ) : patternAccess === null ? (
-                    <div className="grid gap-px p-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {availableClasses.map(c => (
-                            <CheckRow
-                                key={c.id}
-                                label={c.name}
-                                checked={(classAccess ?? availableClasses.map(x => x.id)).includes(c.id)}
-                                onChange={checked => handleClassToggleItem(c.id, checked)}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="divide-y">
-                        {patternAccess.map(pid => {
-                            const pattern = patterns.find(p => p.id === pid);
-                            if (!pattern) return null;
-                            const pClasses = classes.filter(c =>
-                                (patternClassMap[String(pid)] ?? []).includes(c.id)
-                            );
-                            if (pClasses.length === 0) return null;
-                            return (
-                                <div key={pid} className="px-3 py-3">
-                                    <p className="text-muted-foreground mb-1.5 text-xs font-semibold uppercase tracking-wide">
-                                        {pattern.short_name ?? pattern.name}
-                                    </p>
-                                    <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3">
-                                        {pClasses.map(c => (
-                                            <CheckRow
-                                                key={c.id}
-                                                label={c.name}
-                                                checked={(classAccess ?? availableClasses.map(x => x.id)).includes(c.id)}
-                                                onChange={checked => handleClassToggleItem(c.id, checked)}
+                <div className="space-y-3 p-4">
+                    {patterns.map((pattern) => {
+                        const patternRule = effectiveScope[String(pattern.id)];
+                        const patternSelected = Boolean(patternRule);
+                        const patternIsOpen = isPatternOpen(pattern.id);
+                        const availableClassIds = getAvailableClassIds(pattern.id, patternClassMap);
+                        const selectedClassIds = getSelectedClassIds(effectiveScope, pattern.id);
+                        const allClassesSelected =
+                            availableClassIds.length > 0 && selectedClassIds.length === availableClassIds.length;
+
+                        return (
+                            <Collapsible
+                                key={pattern.id}
+                                open={patternIsOpen}
+                                onOpenChange={(nextOpen) => setPatternOpen(pattern.id, nextOpen)}
+                            >
+                                <div
+                                    className={cn(
+                                        'rounded-xl border transition-colors',
+                                        patternSelected ? 'border-primary/25 bg-card' : 'border-dashed bg-muted/10',
+                                    )}
+                                >
+                                    <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+                                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                                            <Checkbox
+                                                checked={patternSelected}
+                                                onCheckedChange={(checked) => handlePatternToggle(pattern.id, checked === true)}
                                             />
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </SectionBox>
 
-            {/* ── Subjects ── */}
-            <SectionBox
-                icon={<LayoutGridIcon className="size-4" />}
-                label="Subjects"
-                isAll={subjectAccess === null}
-                onToggleAll={handleSubjectToggleAll}
-                badge={badge(subjectAccess, availableSubjects.length)}
-            >
-                {availableSubjects.length === 0 ? (
-                    <p className="text-muted-foreground px-3 py-3 text-xs italic">
-                        No subjects linked to the selected patterns and classes.
-                    </p>
-                ) : classAccess === null && patternAccess === null ? (
-                    <div className="grid gap-px p-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {availableSubjects.map(s => (
-                            <CheckRow
-                                key={s.id}
-                                label={s.name_eng}
-                                checked={(subjectAccess ?? availableSubjects.map(x => x.id)).includes(s.id)}
-                                onChange={checked => handleSubjectToggleItem(s.id, checked)}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="divide-y">
-                        {effectiveClassIds.map(cid => {
-                            const cls = classes.find(c => c.id === cid);
-                            if (!cls) return null;
-                            const subjectIdsForClass = new Set<number>(
-                                effectivePatternIds.flatMap(pid => classSubjectMap[`${pid}:${cid}`] ?? [])
-                            );
-                            const classSubs = subjects.filter(s => subjectIdsForClass.has(s.id));
-                            if (classSubs.length === 0) return null;
-                            return (
-                                <div key={cid} className="px-3 py-3">
-                                    <p className="text-muted-foreground mb-1.5 text-xs font-semibold uppercase tracking-wide">
-                                        {cls.name}
-                                    </p>
-                                    <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3">
-                                        {classSubs.map(s => (
-                                            <CheckRow
-                                                key={s.id}
-                                                label={s.name_eng}
-                                                checked={(subjectAccess ?? availableSubjects.map(x => x.id)).includes(s.id)}
-                                                onChange={checked => handleSubjectToggleItem(s.id, checked)}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </SectionBox>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="truncate text-sm font-semibold">{pattern.name}</p>
+                                                    {pattern.short_name && (
+                                                        <Badge variant="outline" className="text-[11px]">
+                                                            {pattern.short_name}
+                                                        </Badge>
+                                                    )}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-blue-200 bg-blue-50 text-[11px] text-blue-700"
+                                                    >
+                                                        {selectedClassIds.length} / {availableClassIds.length}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        </div>
 
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium">
+                                                <Checkbox
+                                                    checked={allClassesSelected}
+                                                    disabled={!patternSelected || availableClassIds.length === 0}
+                                                    onCheckedChange={(checked) =>
+                                                        handlePatternSelectAllClasses(pattern.id, checked === true)
+                                                    }
+                                                />
+                                                <span>All classes</span>
+                                            </label>
+
+                                            <CollapsibleTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    className="hover:bg-accent inline-flex size-8 items-center justify-center rounded-md border"
+                                                >
+                                                    <ChevronDownIcon
+                                                        className={cn(
+                                                            'size-4 transition-transform',
+                                                            patternIsOpen && 'rotate-180',
+                                                        )}
+                                                    />
+                                                </button>
+                                            </CollapsibleTrigger>
+                                        </div>
+                                    </div>
+
+                                    <CollapsibleContent>
+                                        <div className="border-t px-4 py-4">
+                                            {availableClassIds.length === 0 ? (
+                                                <p className="text-muted-foreground text-xs italic">No classes</p>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {availableClassIds.map((classId) => {
+                                                        const schoolClass = classLookup[classId];
+                                                        const classSelected = Boolean(patternRule?.classes[String(classId)]);
+                                                        const classIsOpen = isClassOpen(pattern.id, classId);
+                                                        const availableSubjectIds = getAvailableSubjectIds(
+                                                            pattern.id,
+                                                            classId,
+                                                            classSubjectMap,
+                                                        );
+                                                        const selectedSubjectIds = getSelectedSubjectIds(
+                                                            effectiveScope,
+                                                            pattern.id,
+                                                            classId,
+                                                            classSubjectMap,
+                                                        );
+                                                        const allSubjectsSelected =
+                                                            availableSubjectIds.length > 0 &&
+                                                            selectedSubjectIds.length === availableSubjectIds.length;
+
+                                                        return (
+                                                            <Collapsible
+                                                                key={classId}
+                                                                open={classIsOpen}
+                                                                onOpenChange={(nextOpen) =>
+                                                                    setClassOpen(pattern.id, classId, nextOpen)
+                                                                }
+                                                            >
+                                                                <div
+                                                                    className={cn(
+                                                                        'rounded-lg border transition-colors',
+                                                                        classSelected
+                                                                            ? 'border-primary/20 bg-muted/20'
+                                                                            : 'border-dashed bg-background',
+                                                                    )}
+                                                                >
+                                                                    <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
+                                                                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                                                                            <Checkbox
+                                                                                checked={classSelected}
+                                                                                disabled={!patternSelected}
+                                                                                onCheckedChange={(checked) =>
+                                                                                    handleClassToggle(
+                                                                                        pattern.id,
+                                                                                        classId,
+                                                                                        checked === true,
+                                                                                    )
+                                                                                }
+                                                                            />
+
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                                    <p className="truncate text-sm font-medium">
+                                                                                        {schoolClass?.name ?? `Class #${classId}`}
+                                                                                    </p>
+                                                                                    <Badge
+                                                                                        variant="outline"
+                                                                                        className={cn(
+                                                                                            'text-[11px]',
+                                                                                            classSelected
+                                                                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                                                                : 'border-muted bg-background text-muted-foreground',
+                                                                                        )}
+                                                                                    >
+                                                                                        {selectedSubjectIds.length} / {availableSubjectIds.length}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="flex items-center gap-2">
+                                                                            <label className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium">
+                                                                                <Checkbox
+                                                                                    checked={allSubjectsSelected}
+                                                                                    disabled={!classSelected || availableSubjectIds.length === 0}
+                                                                                    onCheckedChange={(checked) =>
+                                                                                        handleSubjectSelectAll(
+                                                                                            pattern.id,
+                                                                                            classId,
+                                                                                            checked === true,
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                                <span>All subjects</span>
+                                                                            </label>
+
+                                                                            <CollapsibleTrigger asChild>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="hover:bg-accent inline-flex size-8 items-center justify-center rounded-md border"
+                                                                                >
+                                                                                    <ChevronDownIcon
+                                                                                        className={cn(
+                                                                                            'size-4 transition-transform',
+                                                                                            classIsOpen && 'rotate-180',
+                                                                                        )}
+                                                                                    />
+                                                                                </button>
+                                                                            </CollapsibleTrigger>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <CollapsibleContent>
+                                                                        <div className="border-t px-3 py-3">
+                                                                            {availableSubjectIds.length === 0 ? (
+                                                                                <p className="text-muted-foreground text-xs italic">
+                                                                                    No subjects
+                                                                                </p>
+                                                                            ) : (
+                                                                                <div
+                                                                                    className={cn(
+                                                                                        'grid gap-2 sm:grid-cols-2 xl:grid-cols-3',
+                                                                                        !classSelected && 'opacity-60',
+                                                                                    )}
+                                                                                >
+                                                                                    {availableSubjectIds.map((subjectId) => {
+                                                                                        const subject = subjectLookup[subjectId];
+                                                                                        const checked = selectedSubjectIds.includes(subjectId);
+
+                                                                                        return (
+                                                                                            <label
+                                                                                                key={subjectId}
+                                                                                                className="hover:bg-accent flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 transition-colors"
+                                                                                            >
+                                                                                                <Checkbox
+                                                                                                    checked={checked}
+                                                                                                    disabled={!classSelected}
+                                                                                                    onCheckedChange={(nextChecked) =>
+                                                                                                        handleSubjectToggle(
+                                                                                                            pattern.id,
+                                                                                                            classId,
+                                                                                                            subjectId,
+                                                                                                            nextChecked === true,
+                                                                                                        )
+                                                                                                    }
+                                                                                                />
+
+                                                                                                <div className="min-w-0">
+                                                                                                    <p className="truncate text-sm font-medium">
+                                                                                                        {subject?.name_eng ?? `Subject #${subjectId}`}
+                                                                                                    </p>
+                                                                                                    {subject?.name_ur && (
+                                                                                                        <p className="text-muted-foreground truncate text-xs">
+                                                                                                            {subject.name_ur}
+                                                                                                        </p>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            </label>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </CollapsibleContent>
+                                                                </div>
+                                                            </Collapsible>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CollapsibleContent>
+                                </div>
+                            </Collapsible>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {error && <p className="text-destructive text-xs">{error}</p>}
         </div>
     );
 }
 
-// ── Internal sub-components ───────────────────────────────────────────────────
-
-function SectionBox({ icon, label, isAll, onToggleAll, badge, children }: {
+function SummaryBadge({
+    icon,
+    label,
+    value,
+    total,
+}: {
     icon: React.ReactNode;
     label: string;
-    isAll: boolean;
-    onToggleAll: (v: boolean) => void;
-    badge: string;
-    children: React.ReactNode;
+    value: number | null;
+    total: number;
 }) {
     return (
-        <div className="border-input rounded-lg border">
-            <label className="bg-muted/40 flex cursor-pointer items-center gap-2.5 rounded-t-lg border-b px-3 py-2.5">
-                <Checkbox
-                    checked={isAll}
-                    onCheckedChange={checked => onToggleAll(!!checked)}
-                />
-                <span className="text-muted-foreground flex items-center gap-1.5">{icon}</span>
-                <span className="text-sm font-medium">{label}</span>
-                <span className="text-muted-foreground ml-auto text-xs tabular-nums">{badge}</span>
-            </label>
-            {children}
-        </div>
-    );
-}
-
-function CheckRow({ label, checked, onChange }: {
-    label: string;
-    checked: boolean;
-    onChange: (v: boolean) => void;
-}) {
-    return (
-        <label className="hover:bg-accent flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors">
-            <Checkbox checked={checked} onCheckedChange={v => onChange(!!v)} />
-            <span className="min-w-0 truncate">{label}</span>
-        </label>
+        <Badge variant="outline" className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium">
+            <span className="text-muted-foreground">{icon}</span>
+            <span>{label}</span>
+            <span className="text-muted-foreground">{value === null ? `All ${total}` : `${value} / ${total}`}</span>
+        </Badge>
     );
 }
