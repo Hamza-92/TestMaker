@@ -7,11 +7,19 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE users MODIFY COLUMN user_type ENUM('super_admin', 'staff', 'teacher', 'customer') DEFAULT 'teacher'");
     }
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("ALTER TABLE users MODIFY COLUMN user_type ENUM('super_admin', 'staff', 'teacher') DEFAULT 'teacher'");
     }
 };

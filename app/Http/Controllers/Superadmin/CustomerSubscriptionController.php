@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CustomerSubscriptionController extends Controller
@@ -47,12 +48,16 @@ class CustomerSubscriptionController extends Controller
             'status'               => $log->status?->value,
             'status_label'         => $log->status?->label(),
             'notes'                => $log->notes,
+            'rejection_reason'     => $log->rejection_reason,
             'attachments'          => collect($log->attachments ?? [])->map(fn ($p) => Storage::url($p))->all(),
             'created_at'           => $log->created_at?->toISOString(),
             'reviewed_at'          => $log->reviewed_at?->toISOString(),
             'creator_name'         => $log->creator?->name,
             'reviewer_name'        => $log->reviewer?->name,
+            'is_editable'          => $log->isEditable(),
         ]);
+
+        $paymentSummary = $this->buildPaymentSummary($subscription);
 
         $auditLogs = $subscription->auditLogs->map(fn (AuditLog $log) => [
             'id'              => $log->id,
@@ -94,8 +99,9 @@ class CustomerSubscriptionController extends Controller
                 'creator_name'      => $subscription->creator?->name,
                 'created_at'        => $subscription->created_at?->toISOString(),
             ],
-            'paymentLogs' => $paymentLogs,
-            'auditLogs'   => $auditLogs,
+            'paymentLogs'    => $paymentLogs,
+            'paymentSummary' => $paymentSummary,
+            'auditLogs'      => $auditLogs,
         ]);
     }
 
@@ -103,33 +109,23 @@ class CustomerSubscriptionController extends Controller
     {
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
 
-        $validated = $request->validate([
-            'amount'         => ['required', 'numeric', 'min:0'],
-            'payment_method' => ['required', 'in:cash,bank_transfer,online,cheque'],
-            'account_number' => ['nullable', 'string', 'max:100'],
-            'status'         => ['required', 'in:pending_review,reviewed,approved,rejected'],
-            'notes'          => ['nullable', 'string', 'max:1000'],
-            'receipt'        => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
-        ]);
+        $validated = $this->validatePaymentPayload($request);
+        $this->ensurePaymentFitsSubscription($subscription, (float) $validated['amount']);
 
         $attachments = [];
         if ($request->hasFile('receipt') && $request->file('receipt')->isValid()) {
             $attachments[] = $request->file('receipt')->store('payment-receipts', 'public');
         }
 
-        $isReviewed = in_array($validated['status'], ['reviewed', 'approved', 'rejected']);
-
-        DB::transaction(function () use ($validated, $attachments, $subscription, $isReviewed) {
+        DB::transaction(function () use ($validated, $attachments, $subscription) {
             $log = PaymentLog::create([
                 'subscription_id' => $subscription->id,
                 'amount'          => $validated['amount'],
                 'payment_method'  => $validated['payment_method'],
                 'account_number'  => $validated['account_number'] ?: null,
-                'status'          => $validated['status'],
+                'status'          => PaymentStatus::PendingReview->value,
                 'attachments'     => $attachments ?: null,
                 'notes'           => $validated['notes'] ?: null,
-                'reviewed_by'     => $isReviewed ? auth()->id() : null,
-                'reviewed_at'     => $isReviewed ? now() : null,
                 'created_by'      => auth()->id(),
             ]);
 
@@ -142,11 +138,11 @@ class CustomerSubscriptionController extends Controller
                     'status'         => $log->status->value,
                 ],
                 actor: auth()->user(),
-                notes: $validated['notes'] ?? 'Payment log added.',
+                notes: 'Payment added.',
             );
         });
 
-        return back()->with('success', 'Payment log added.');
+        return back()->with('success', 'Payment recorded.');
     }
 
     public function updatePaymentLog(Request $request, User $customer, Subscription $subscription, PaymentLog $paymentLog)
@@ -154,14 +150,14 @@ class CustomerSubscriptionController extends Controller
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
         abort_unless((int) $paymentLog->subscription_id === (int) $subscription->id, 404);
 
-        $validated = $request->validate([
-            'amount'         => ['required', 'numeric', 'min:0'],
-            'payment_method' => ['required', 'in:cash,bank_transfer,online,cheque'],
-            'account_number' => ['nullable', 'string', 'max:100'],
-            'status'         => ['required', 'in:pending_review,reviewed,approved,rejected'],
-            'notes'          => ['nullable', 'string', 'max:1000'],
-            'receipt'        => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
-        ]);
+        if (! $paymentLog->isEditable()) {
+            throw ValidationException::withMessages([
+                'payment' => 'Only pending payments can be edited.',
+            ]);
+        }
+
+        $validated = $this->validatePaymentPayload($request);
+        $this->ensurePaymentFitsSubscription($subscription, (float) $validated['amount'], $paymentLog);
 
         $attachments = $paymentLog->attachments ?? [];
         if ($request->hasFile('receipt') && $request->file('receipt')->isValid()) {
@@ -174,19 +170,13 @@ class CustomerSubscriptionController extends Controller
             'status'         => $paymentLog->status?->value,
         ];
 
-        $newStatus  = $validated['status'];
-        $isReviewed = in_array($newStatus, ['reviewed', 'approved', 'rejected']);
-
-        DB::transaction(function () use ($validated, $attachments, $paymentLog, $oldValues, $newStatus, $isReviewed) {
+        DB::transaction(function () use ($validated, $attachments, $paymentLog, $oldValues) {
             $paymentLog->update([
                 'amount'         => $validated['amount'],
                 'payment_method' => $validated['payment_method'],
                 'account_number' => $validated['account_number'] ?: null,
-                'status'         => $newStatus,
                 'attachments'    => $attachments ?: null,
                 'notes'          => $validated['notes'] ?: null,
-                'reviewed_by'    => $isReviewed ? auth()->id() : $paymentLog->reviewed_by,
-                'reviewed_at'    => $isReviewed ? now() : $paymentLog->reviewed_at,
             ]);
 
             AuditLog::record(
@@ -196,14 +186,14 @@ class CustomerSubscriptionController extends Controller
                 newValues: [
                     'amount'         => $validated['amount'],
                     'payment_method' => $validated['payment_method'],
-                    'status'         => $newStatus,
+                    'status'         => $paymentLog->status?->value,
                 ],
                 actor: auth()->user(),
-                notes: $validated['notes'] ?? 'Payment log updated.',
+                notes: 'Payment updated.',
             );
         });
 
-        return back()->with('success', 'Payment log updated.');
+        return back()->with('success', 'Payment updated.');
     }
 
     public function reviewPaymentLog(Request $request, User $customer, Subscription $subscription, PaymentLog $paymentLog)
@@ -214,12 +204,28 @@ class CustomerSubscriptionController extends Controller
         $validated = $request->validate([
             'status' => ['required', 'in:reviewed,approved,rejected'],
             'notes'  => ['nullable', 'string', 'max:1000'],
+            'rejection_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $nextStatus = PaymentStatus::from($validated['status']);
+
+        if (! $paymentLog->canTransitionTo($nextStatus)) {
+            throw ValidationException::withMessages([
+                'status' => 'Invalid payment status transition.',
+            ]);
+        }
+
+        if ($nextStatus === PaymentStatus::Rejected && blank($validated['rejection_reason'] ?? null)) {
+            throw ValidationException::withMessages([
+                'rejection_reason' => 'Rejection reason is required.',
+            ]);
+        }
+
         $paymentLog->transitionTo(
-            PaymentStatus::from($validated['status']),
+            $nextStatus,
             $validated['notes'] ?? null,
             auth()->user(),
+            $validated['rejection_reason'] ?? null,
         );
 
         return back()->with('success', 'Payment status updated.');
@@ -369,8 +375,6 @@ class CustomerSubscriptionController extends Controller
             'started_at'         => ['required', 'date'],
             'duration'           => ['required', 'integer', 'min:1'],
             'status'             => ['required', 'in:active,expired,cancelled'],
-            'payment_method'     => ['required', 'in:cash,bank_transfer,online,cheque'],
-            'account_number'     => ['nullable', 'string', 'max:100'],
             'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
             'max_teachers'       => ['nullable', 'integer', 'min:1'],
@@ -379,9 +383,10 @@ class CustomerSubscriptionController extends Controller
         $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
         $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
         $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
+        $createdSubscription = null;
 
-        DB::transaction(function () use ($validated, $startedAt, $customer, $accessScope, $summaryIds) {
-            $subscription = Subscription::create([
+        DB::transaction(function () use ($validated, $startedAt, $customer, $accessScope, $summaryIds, &$createdSubscription) {
+            $createdSubscription = Subscription::create([
                 'user_id'           => $customer->id,
                 'name'              => $validated['name'],
                 'pattern_access'    => $summaryIds['pattern_access'],
@@ -399,55 +404,30 @@ class CustomerSubscriptionController extends Controller
                 'created_by'        => auth()->id(),
             ]);
 
-            $paymentLog = PaymentLog::create([
-                'subscription_id' => $subscription->id,
-                'amount'          => $validated['amount'],
-                'payment_method'  => $validated['payment_method'],
-                'account_number'  => $validated['account_number'] ?: null,
-                'status'          => PaymentStatus::Approved->value,
-                'reviewed_by'     => auth()->id(),
-                'reviewed_at'     => now(),
-                'notes'           => 'Payment recorded while creating subscription.',
-                'created_by'      => auth()->id(),
-            ]);
-
             AuditLog::record(
-                model: $subscription,
+                model: $createdSubscription,
                 event: AuditEvent::Created,
                 newValues: [
-                    'name'           => $subscription->name,
-                    'amount'         => $subscription->amount,
-                    'status'         => $subscription->status->value,
-                    'pattern_access' => $subscription->pattern_access,
-                    'class_access'   => $subscription->class_access,
-                    'subject_access' => $subscription->subject_access,
-                    'access_scope'   => $subscription->access_scope,
+                    'name'           => $createdSubscription->name,
+                    'amount'         => $createdSubscription->amount,
+                    'status'         => $createdSubscription->status->value,
+                    'pattern_access' => $createdSubscription->pattern_access,
+                    'class_access'   => $createdSubscription->class_access,
+                    'subject_access' => $createdSubscription->subject_access,
+                    'access_scope'   => $createdSubscription->access_scope,
                 ],
                 actor: auth()->user(),
                 notes: 'Subscription created for customer.',
             );
 
             AuditLog::record(
-                model: $paymentLog,
-                event: AuditEvent::Created,
-                newValues: [
-                    'amount'         => $paymentLog->amount,
-                    'payment_method' => $paymentLog->payment_method->value,
-                    'status'         => $paymentLog->status->value,
-                ],
-                actor: auth()->user(),
-                notes: 'Payment log created during subscription creation.',
-            );
-
-            AuditLog::record(
                 model: $customer,
                 event: AuditEvent::Updated,
                 newValues: [
-                    'subscription_id'     => $subscription->id,
-                    'subscription_name'   => $subscription->name,
-                    'subscription_amount' => (string) $subscription->amount,
-                    'subscription_status' => $subscription->status->value,
-                    'payment_log_id'      => $paymentLog->id,
+                    'subscription_id'     => $createdSubscription->id,
+                    'subscription_name'   => $createdSubscription->name,
+                    'subscription_amount' => (string) $createdSubscription->amount,
+                    'subscription_status' => $createdSubscription->status->value,
                 ],
                 actor: auth()->user(),
                 notes: 'A new subscription was added for this customer.',
@@ -455,7 +435,62 @@ class CustomerSubscriptionController extends Controller
         });
 
         return redirect()
-            ->route('superadmin.customers.show', $customer)
+            ->route('superadmin.customers.subscriptions.show', [$customer, $createdSubscription])
             ->with('success', 'Subscription added successfully.');
+    }
+
+    private function validatePaymentPayload(Request $request): array
+    {
+        return $request->validate([
+            'amount'         => ['required', 'numeric', 'min:0.01'],
+            'payment_method' => ['required', 'in:cash,bank_transfer,online,cheque'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'notes'          => ['nullable', 'string', 'max:1000'],
+            'receipt'        => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
+        ]);
+    }
+
+    private function ensurePaymentFitsSubscription(
+        Subscription $subscription,
+        float $amount,
+        ?PaymentLog $ignoredLog = null,
+    ): void {
+        $remainingTrackableAmount = (float) $this->buildPaymentSummary($subscription, $ignoredLog)['remaining_trackable_amount'];
+
+        if ($amount - $remainingTrackableAmount > 0.00001) {
+            throw ValidationException::withMessages([
+                'amount' => 'Payment amount exceeds the remaining balance for this subscription.',
+            ]);
+        }
+    }
+
+    private function buildPaymentSummary(Subscription $subscription, ?PaymentLog $ignoredLog = null): array
+    {
+        $logs = $subscription->relationLoaded('paymentLogs')
+            ? $subscription->paymentLogs
+            : $subscription->paymentLogs()->get();
+
+        if ($ignoredLog) {
+            $logs = $logs->reject(fn (PaymentLog $log) => (int) $log->id === (int) $ignoredLog->id)->values();
+        }
+
+        $subscriptionAmount = (float) $subscription->amount;
+        $receivedAmount = (float) $logs
+            ->filter(fn (PaymentLog $log) => $log->status === PaymentStatus::Approved)
+            ->sum('amount');
+        $underReviewAmount = (float) $logs
+            ->filter(fn (PaymentLog $log) => in_array($log->status, [PaymentStatus::PendingReview, PaymentStatus::Reviewed], true))
+            ->sum('amount');
+        $trackedAmount = (float) $logs
+            ->filter(fn (PaymentLog $log) => $log->status !== PaymentStatus::Rejected)
+            ->sum('amount');
+
+        return [
+            'subscription_amount'       => number_format($subscriptionAmount, 2, '.', ''),
+            'received_amount'           => number_format($receivedAmount, 2, '.', ''),
+            'under_review_amount'       => number_format($underReviewAmount, 2, '.', ''),
+            'pending_amount'            => number_format(max($subscriptionAmount - $receivedAmount, 0), 2, '.', ''),
+            'remaining_trackable_amount'=> number_format(max($subscriptionAmount - $trackedAmount, 0), 2, '.', ''),
+        ];
     }
 }

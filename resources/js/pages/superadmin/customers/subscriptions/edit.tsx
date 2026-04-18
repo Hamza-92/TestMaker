@@ -146,7 +146,6 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     </Link>
                     <div>
                         <h1 className="h1-semibold">Edit Subscription</h1>
-                        <p className="text-muted-foreground text-sm">{subscription.name}</p>
                     </div>
                 </div>
 
@@ -164,8 +163,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     <div className="space-y-5 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<FileTextIcon className="size-4" />}
-                            title="Subscription Details"
-                            description="Plan name, billing, duration, status, and teacher permissions"
+                            title="Subscription"
                         />
                         <Separator />
 
@@ -244,12 +242,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                     <div className="bg-primary/10 text-primary flex size-8 items-center justify-center rounded-md">
                                         <UsersIcon className="size-4" />
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Allow Adding Teachers</p>
-                                        <p className="text-muted-foreground text-xs">
-                                            Enable this to let the customer manage teacher accounts
-                                        </p>
-                                    </div>
+                                    <p className="text-sm font-medium">Allow Adding Teachers</p>
                                 </div>
                                 <Switch
                                     checked={data.allow_teachers}
@@ -269,13 +262,9 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                         icon={<UsersIcon />}
                                         type="number"
                                         min="1"
-                                        placeholder="Blank = unlimited"
                                         value={data.max_teachers}
                                         onChange={(e) => setData('max_teachers', e.target.value)}
                                     />
-                                    <p className="text-muted-foreground text-xs">
-                                        Leave blank to allow unlimited teachers.
-                                    </p>
                                 </Field>
                             )}
                         </div>
@@ -285,7 +274,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     <div className="space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<LockIcon className="size-4" />}
-                            title="Access Control"
+                            title="Access"
                         />
 
                         <HierarchicalAccessControl

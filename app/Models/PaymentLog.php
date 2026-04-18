@@ -20,6 +20,7 @@ class PaymentLog extends Model
         'reviewed_by',
         'reviewed_at',
         'notes',
+        'rejection_reason',
         'created_by',
     ];
 
@@ -46,25 +47,65 @@ class PaymentLog extends Model
         return $this->status === PaymentStatus::Approved;
     }
 
+    public function isEditable(): bool
+    {
+        return $this->status === PaymentStatus::PendingReview;
+    }
+
+    /** @return array<int, string> */
+    public function allowedTransitionValues(): array
+    {
+        return match ($this->status) {
+            PaymentStatus::PendingReview => [PaymentStatus::Reviewed->value],
+            PaymentStatus::Reviewed => [PaymentStatus::Approved->value, PaymentStatus::Rejected->value],
+            default => [],
+        };
+    }
+
+    public function canTransitionTo(PaymentStatus $newStatus): bool
+    {
+        return in_array($newStatus->value, $this->allowedTransitionValues(), true);
+    }
+
     /**
      * Transition status and record the change in audit_logs.
      * Usage: $payment->transitionTo(PaymentStatus::Approved, 'Proof verified', auth()->user());
      */
-    public function transitionTo(PaymentStatus $newStatus, ?string $notes = null, ?User $actor = null): static
+    public function transitionTo(
+        PaymentStatus $newStatus,
+        ?string $notes = null,
+        ?User $actor = null,
+        ?string $rejectionReason = null,
+    ): static
     {
         $oldStatus = $this->status;
+        $oldRejectionReason = $this->rejection_reason;
 
-        $this->status      = $newStatus;
-        $this->reviewed_by = $actor?->id ?? $this->reviewed_by;
-        $this->reviewed_at = now();
-        $this->notes       = $notes ?? $this->notes;
+        $this->status = $newStatus;
+
+        if ($this->reviewed_by === null && $actor !== null) {
+            $this->reviewed_by = $actor->id;
+        }
+
+        if ($this->reviewed_at === null) {
+            $this->reviewed_at = now();
+        }
+
+        $this->notes = $notes ?? $this->notes;
+        $this->rejection_reason = $newStatus === PaymentStatus::Rejected ? $rejectionReason : null;
         $this->save();
 
         AuditLog::record(
             model:     $this,
             event:     \App\Enums\AuditEvent::Updated,
-            oldValues: ['status' => $oldStatus?->value],
-            newValues: ['status' => $newStatus->value],
+            oldValues: [
+                'status' => $oldStatus?->value,
+                'rejection_reason' => $oldRejectionReason,
+            ],
+            newValues: [
+                'status' => $newStatus->value,
+                'rejection_reason' => $this->rejection_reason,
+            ],
             actor:     $actor,
             notes:     $notes,
         );

@@ -2,7 +2,6 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     CalendarIcon,
-    CreditCardIcon,
     FileTextIcon,
     HashIcon,
     LockIcon,
@@ -48,8 +47,6 @@ interface FormData {
     started_at: string;
     duration: string;
     status: string;
-    payment_method: string;
-    account_number: string;
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
     max_teachers: string;
@@ -113,8 +110,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
         started_at: today,
         duration: '30',
         status: 'active',
-        payment_method: 'cash',
-        account_number: '',
         access_scope: null,
         allow_teachers: false,
         max_teachers: '',
@@ -139,7 +134,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                     </Link>
                     <div>
                         <h1 className="h1-semibold">Add Subscription</h1>
-                        <p className="text-muted-foreground text-sm">Create a new subscription for this customer</p>
                     </div>
                 </div>
 
@@ -157,8 +151,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                     <div className="space-y-5 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<FileTextIcon className="size-4" />}
-                            title="Subscription Details"
-                            description="Plan name, billing, duration, status, and teacher permissions"
+                            title="Subscription"
                         />
                         <Separator />
 
@@ -228,28 +221,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                 </Select>
                             </Field>
 
-                            <Field label="Payment Method" required error={errors.payment_method}>
-                                <Select value={data.payment_method} onValueChange={(value) => setData('payment_method', value)}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="cash">Cash</SelectItem>
-                                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                                        <SelectItem value="online">Online</SelectItem>
-                                        <SelectItem value="cheque">Cheque</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-
-                            <Field label="Account Number" error={errors.account_number}>
-                                <InputWithIcon
-                                    icon={<CreditCardIcon />}
-                                    value={data.account_number}
-                                    onChange={(e) => setData('account_number', e.target.value)}
-                                />
-                            </Field>
-
                             {/* ── Teacher Permissions ──────────────────────────── */}
                             <div className="col-span-full">
                                 <Separator />
@@ -261,12 +232,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                     <div className="bg-primary/10 text-primary flex size-8 items-center justify-center rounded-md">
                                         <UsersIcon className="size-4" />
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Allow Adding Teachers</p>
-                                        <p className="text-muted-foreground text-xs">
-                                            Enable this to let the customer manage teacher accounts
-                                        </p>
-                                    </div>
+                                    <p className="text-sm font-medium">Allow Adding Teachers</p>
                                 </div>
                                 <Switch
                                     checked={data.allow_teachers}
@@ -287,13 +253,9 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                         icon={<UsersIcon />}
                                         type="number"
                                         min="1"
-                                        placeholder="Blank = unlimited"
                                         value={data.max_teachers}
                                         onChange={(e) => setData('max_teachers', e.target.value)}
                                     />
-                                    <p className="text-muted-foreground text-xs">
-                                        Leave blank to allow unlimited teachers.
-                                    </p>
                                 </Field>
                             )}
                         </div>
@@ -303,7 +265,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                     <div className="space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<LockIcon className="size-4" />}
-                            title="Access Control"
+                            title="Access"
                         />
 
                         <HierarchicalAccessControl

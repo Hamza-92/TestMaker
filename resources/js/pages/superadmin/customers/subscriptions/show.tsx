@@ -1,5 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
-import { router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     BadgeCheckIcon,
@@ -9,6 +8,7 @@ import {
     ClockIcon,
     CreditCardIcon,
     ExternalLinkIcon,
+    EyeIcon,
     FileTextIcon,
     HashIcon,
     LayoutGridIcon,
@@ -16,50 +16,26 @@ import {
     PaperclipIcon,
     PencilIcon,
     PlusIcon,
+    WalletIcon,
     XCircleIcon,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import type { SubscriptionAccessScope } from '@/lib/subscription-access';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
+type PaymentWorkflowStatus = 'pending_review' | 'reviewed' | 'approved' | 'rejected';
 
 interface Customer {
     id: number;
     name: string;
     email: string;
     school_name: string | null;
-}
-
-interface Subscription {
-    id: number;
-    name: string;
-    amount: string;
-    allowed_questions: number;
-    started_at: string | null;
-    expired_at: string | null;
-    duration: number;
-    status: SubscriptionStatus;
-    allow_teachers: boolean;
-    max_teachers: number | null;
-    access_scope: SubscriptionAccessScope | null;
-    access_overview: AccessOverviewPattern[];
-    pattern_access: number[] | null;
-    class_access: number[] | null;
-    subject_access: number[] | null;
-    pattern_names: string[] | null;
-    class_names: string[] | null;
-    subject_names: string[] | null;
-    creator_name: string | null;
-    created_at: string | null;
 }
 
 interface AccessOverviewSubject {
@@ -86,20 +62,47 @@ interface AccessOverviewPattern {
     available_class_count: number;
 }
 
+interface Subscription {
+    id: number;
+    name: string;
+    amount: string;
+    allowed_questions: number;
+    started_at: string | null;
+    expired_at: string | null;
+    duration: number;
+    status: SubscriptionStatus;
+    allow_teachers: boolean;
+    max_teachers: number | null;
+    access_scope: SubscriptionAccessScope | null;
+    access_overview: AccessOverviewPattern[];
+    creator_name: string | null;
+    created_at: string | null;
+}
+
+interface PaymentSummary {
+    subscription_amount: string;
+    received_amount: string;
+    under_review_amount: string;
+    pending_amount: string;
+    remaining_trackable_amount: string;
+}
+
 interface PaymentLog {
     id: number;
     amount: string;
     payment_method: string | null;
     payment_method_label: string | null;
     account_number: string | null;
-    status: string | null;
+    status: PaymentWorkflowStatus | null;
     status_label: string | null;
     notes: string | null;
+    rejection_reason: string | null;
     attachments: string[];
     created_at: string | null;
     reviewed_at: string | null;
     creator_name: string | null;
     reviewer_name: string | null;
+    is_editable: boolean;
 }
 
 interface AuditLog {
@@ -116,76 +119,96 @@ interface Props {
     customer: Customer;
     subscription: Subscription;
     paymentLogs: PaymentLog[];
+    paymentSummary: PaymentSummary;
     auditLogs: AuditLog[];
 }
 
-interface PFormState {
+interface PaymentFormState {
     amount: string;
     payment_method: string;
     account_number: string;
-    status: string;
     notes: string;
     receipt: File | null;
 }
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
 const SUB_STATUS: Record<SubscriptionStatus, { label: string; className: string; icon: React.ReactNode }> = {
-    active:    { label: 'Active',    className: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: <CheckCircle2Icon className="size-3.5" /> },
-    expired:   { label: 'Expired',   className: 'bg-gray-100 text-gray-500 border-gray-200',          icon: <ClockIcon className="size-3.5" /> },
-    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-600 border-red-200',              icon: <XCircleIcon className="size-3.5" /> },
+    active: {
+        label: 'Active',
+        className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        icon: <CheckCircle2Icon className="size-3.5" />,
+    },
+    expired: {
+        label: 'Expired',
+        className: 'bg-gray-100 text-gray-500 border-gray-200',
+        icon: <ClockIcon className="size-3.5" />,
+    },
+    cancelled: {
+        label: 'Cancelled',
+        className: 'bg-red-100 text-red-600 border-red-200',
+        icon: <XCircleIcon className="size-3.5" />,
+    },
 };
 
-const PAYMENT_STATUS_CFG: Record<string, { label: string; className: string }> = {
+const PAYMENT_STATUS_CFG: Record<PaymentWorkflowStatus, { label: string; className: string }> = {
     pending_review: { label: 'Pending Review', className: 'bg-amber-100 text-amber-700 border-amber-200' },
-    reviewed:       { label: 'Reviewed',       className: 'bg-blue-100 text-blue-700 border-blue-200' },
-    approved:       { label: 'Approved',       className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-    rejected:       { label: 'Rejected',       className: 'bg-red-100 text-red-700 border-red-200' },
+    reviewed: { label: 'Reviewed', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+    approved: { label: 'Approved', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    rejected: { label: 'Rejected', className: 'bg-red-100 text-red-700 border-red-200' },
 };
 
 const AUDIT_EVENT_CFG: Record<string, { dot: string; label: string }> = {
-    created:  { dot: 'bg-emerald-500', label: 'Created' },
-    updated:  { dot: 'bg-blue-500',    label: 'Updated' },
-    deleted:  { dot: 'bg-red-500',     label: 'Deleted' },
-    restored: { dot: 'bg-violet-500',  label: 'Restored' },
+    created: { dot: 'bg-emerald-500', label: 'Created' },
+    updated: { dot: 'bg-blue-500', label: 'Updated' },
+    deleted: { dot: 'bg-red-500', label: 'Deleted' },
+    restored: { dot: 'bg-violet-500', label: 'Restored' },
 };
 
-const INIT_PFORM: PFormState = {
-    amount: '',
-    payment_method: 'cash',
-    account_number: '',
-    status: 'pending_review',
-    notes: '',
-    receipt: null,
-};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function buildPaymentForm(amount: string): PaymentFormState {
+    return {
+        amount,
+        payment_method: 'online',
+        account_number: '',
+        notes: '',
+        receipt: null,
+    };
+}
 
 function fmt(date: string | null) {
     if (!date) {
-return '—';
-}
+        return '—';
+    }
 
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtDt(date: string | null) {
     if (!date) {
-return '—';
-}
+        return '—';
+    }
 
     return new Date(date).toLocaleString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
-        hour: 'numeric', minute: '2-digit',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
     });
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+function money(amount: string) {
+    return `Rs. ${Number(amount).toLocaleString()}`;
+}
 
-function SectionCard({ icon, title, description, action, children }: {
+function SectionCard({
+    icon,
+    title,
+    description,
+    action,
+    children,
+}: {
     icon: React.ReactNode;
     title: string;
-    description: string;
+    description?: string;
     action?: React.ReactNode;
     children: React.ReactNode;
 }) {
@@ -198,7 +221,7 @@ function SectionCard({ icon, title, description, action, children }: {
                     </div>
                     <div>
                         <p className="text-sm font-semibold">{title}</p>
-                        <p className="text-muted-foreground text-xs">{description}</p>
+                        {description && <p className="text-muted-foreground text-xs">{description}</p>}
                     </div>
                 </div>
                 {action}
@@ -217,19 +240,56 @@ function InfoCell({ label, value, highlight }: { label: string; value: React.Rea
     );
 }
 
+function MetricCard({
+    icon,
+    label,
+    value,
+    tone,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    value: string;
+    tone?: 'default' | 'success' | 'warning';
+}) {
+    const toneClass =
+        tone === 'success'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : tone === 'warning'
+              ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : 'border-border bg-card text-foreground';
+
+    return (
+        <div className={`rounded-lg border p-4 ${toneClass}`}>
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide">
+                {icon}
+                <span>{label}</span>
+            </div>
+            <p className="mt-2 text-lg font-semibold">{value}</p>
+        </div>
+    );
+}
+
+function PaymentStatusBadge({ status }: { status: PaymentWorkflowStatus | null }) {
+    if (!status) {
+        return <Badge variant="outline" className="text-xs">—</Badge>;
+    }
+
+    const cfg = PAYMENT_STATUS_CFG[status];
+
+    return (
+        <Badge variant="outline" className={`${cfg.className} text-xs font-medium`}>
+            {cfg.label}
+        </Badge>
+    );
+}
+
 function AccessOverviewPanel({ subscription }: { subscription: Subscription }) {
     if (subscription.access_scope === null) {
         return (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="border-emerald-200 bg-emerald-100 text-emerald-700 text-xs">
-                        All Access
-                    </Badge>
-                    <p className="text-sm font-semibold text-emerald-800">Every active pattern, class, and subject is available.</p>
-                </div>
-                <p className="mt-2 text-xs text-emerald-700">
-                    This plan is not restricted. Any new active class or subject linked through the hierarchy will remain accessible.
-                </p>
+                <Badge variant="outline" className="border-emerald-200 bg-emerald-100 text-emerald-700 text-xs">
+                    All Access
+                </Badge>
             </div>
         );
     }
@@ -237,10 +297,9 @@ function AccessOverviewPanel({ subscription }: { subscription: Subscription }) {
     if (subscription.access_overview.length === 0) {
         return (
             <div className="rounded-lg border border-dashed p-4">
-                <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-500 text-xs">No Access</Badge>
-                <p className="text-muted-foreground mt-2 text-sm">
-                    This plan does not currently grant access to any pattern, class, or subject.
-                </p>
+                <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-500 text-xs">
+                    No Access
+                </Badge>
             </div>
         );
     }
@@ -248,41 +307,36 @@ function AccessOverviewPanel({ subscription }: { subscription: Subscription }) {
     return (
         <div className="space-y-4">
             {subscription.access_overview.map((pattern) => (
-                <div key={pattern.id} className="rounded-lg border p-4 space-y-3">
+                <div key={pattern.id} className="rounded-lg border p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-sm font-semibold">{pattern.name}</p>
                                 {pattern.short_name && (
-                                    <Badge variant="outline" className="text-[11px]">{pattern.short_name}</Badge>
+                                    <Badge variant="outline" className="text-[11px]">
+                                        {pattern.short_name}
+                                    </Badge>
                                 )}
                             </div>
                             <p className="text-muted-foreground mt-1 text-xs">
-                                {pattern.selected_class_count} / {pattern.available_class_count} classes enabled
+                                {pattern.selected_class_count} / {pattern.available_class_count} classes
                             </p>
                         </div>
-                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-xs">
-                            Pattern Access
-                        </Badge>
                     </div>
 
-                    {pattern.classes.length === 0 ? (
-                        <p className="text-muted-foreground text-xs italic">
-                            Pattern selected, but no classes are enabled inside it.
-                        </p>
-                    ) : (
-                        <div className="space-y-3">
+                    {pattern.classes.length > 0 && (
+                        <div className="mt-3 space-y-3">
                             {pattern.classes.map((schoolClass) => (
-                                <div key={schoolClass.id} className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                                <div key={schoolClass.id} className="rounded-lg border bg-muted/20 p-3">
                                     <div className="flex flex-wrap items-start justify-between gap-2">
                                         <div>
                                             <p className="text-sm font-medium">{schoolClass.name}</p>
                                             <p className="text-muted-foreground text-xs">
                                                 {schoolClass.subject_mode === 'all'
-                                                    ? `All ${schoolClass.available_subject_count} subjects are available`
+                                                    ? `All ${schoolClass.available_subject_count} subjects`
                                                     : schoolClass.subject_mode === 'none'
-                                                      ? 'No subjects selected'
-                                                      : `${schoolClass.selected_subject_count} / ${schoolClass.available_subject_count} subjects selected`}
+                                                      ? 'No subjects'
+                                                      : `${schoolClass.selected_subject_count} / ${schoolClass.available_subject_count} subjects`}
                                             </p>
                                         </div>
                                         <Badge
@@ -304,7 +358,7 @@ function AccessOverviewPanel({ subscription }: { subscription: Subscription }) {
                                     </div>
 
                                     {schoolClass.subject_mode === 'selected' && schoolClass.subjects.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5">
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
                                             {schoolClass.subjects.map((subject) => (
                                                 <span
                                                     key={subject.id}
@@ -325,71 +379,139 @@ function AccessOverviewPanel({ subscription }: { subscription: Subscription }) {
     );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+    return (
+        <div className="flex items-start gap-3 rounded-lg border p-3">
+            <span className="text-muted-foreground mt-0.5">{icon}</span>
+            <div className="min-w-0">
+                <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">{label}</p>
+                <div className="mt-1 text-sm font-medium">{value}</div>
+            </div>
+        </div>
+    );
+}
 
-export default function ShowSubscription({ customer, subscription, paymentLogs, auditLogs }: Props) {
+export default function ShowSubscription({
+    customer,
+    subscription,
+    paymentLogs,
+    paymentSummary,
+    auditLogs,
+}: Props) {
     const statusCfg = SUB_STATUS[subscription.status];
+    const defaultPaymentAmount = useMemo(() => {
+        const remainingTrackable = Number(paymentSummary.remaining_trackable_amount);
+
+        if (remainingTrackable > 0) {
+            return paymentSummary.remaining_trackable_amount;
+        }
+
+        return subscription.amount;
+    }, [paymentSummary.remaining_trackable_amount, subscription.amount]);
 
     const [paymentOpen, setPaymentOpen] = useState(false);
-    const [editingLog, setEditingLog]   = useState<PaymentLog | null>(null);
-    const [pForm, setPForm]             = useState<PFormState>(INIT_PFORM);
-    const [pErrors, setPErrors]         = useState<Record<string, string>>({});
-    const [pProcessing, setPProcessing] = useState(false);
+    const [paymentDetail, setPaymentDetail] = useState<PaymentLog | null>(null);
+    const [editingLog, setEditingLog] = useState<PaymentLog | null>(null);
+    const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>({});
+    const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
+    const [paymentProcessing, setPaymentProcessing] = useState(false);
+    const [detailProcessing, setDetailProcessing] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [paymentForm, setPaymentForm] = useState<PaymentFormState>(buildPaymentForm(defaultPaymentAmount));
     const fileRef = useRef<HTMLInputElement>(null);
+
+    const canAddPayment = Number(paymentSummary.remaining_trackable_amount) > 0;
 
     function openAdd() {
         setEditingLog(null);
-        setPForm(INIT_PFORM);
-        setPErrors({});
+        setPaymentErrors({});
+        setPaymentForm(buildPaymentForm(defaultPaymentAmount));
         setPaymentOpen(true);
     }
 
     function openEdit(log: PaymentLog) {
         setEditingLog(log);
-        setPForm({
-            amount:         log.amount,
-            payment_method: log.payment_method ?? 'cash',
+        setPaymentErrors({});
+        setPaymentForm({
+            amount: log.amount,
+            payment_method: log.payment_method ?? 'online',
             account_number: log.account_number ?? '',
-            status:         log.status ?? 'pending_review',
-            notes:          log.notes ?? '',
-            receipt:        null,
+            notes: log.notes ?? '',
+            receipt: null,
         });
-        setPErrors({});
         setPaymentOpen(true);
+    }
+
+    function openDetail(log: PaymentLog) {
+        setPaymentDetail(log);
+        setDetailErrors({});
+        setRejectionReason(log.rejection_reason ?? '');
+    }
+
+    function closePaymentModal(nextOpen: boolean) {
+        setPaymentOpen(nextOpen);
+
+        if (!nextOpen) {
+            setEditingLog(null);
+            setPaymentErrors({});
+            setPaymentForm(buildPaymentForm(defaultPaymentAmount));
+        }
+    }
+
+    function closeDetailModal(nextOpen: boolean) {
+        if (!nextOpen) {
+            setPaymentDetail(null);
+            setDetailErrors({});
+            setRejectionReason('');
+        }
     }
 
     function submitPayment(e: React.FormEvent) {
         e.preventDefault();
-        const fd = new FormData();
-        fd.append('amount', pForm.amount);
-        fd.append('payment_method', pForm.payment_method);
-        fd.append('account_number', pForm.account_number);
-        fd.append('status', pForm.status);
-        fd.append('notes', pForm.notes);
 
-        if (pForm.receipt) {
-fd.append('receipt', pForm.receipt);
-}
+        const fd = new FormData();
+        fd.append('amount', paymentForm.amount);
+        fd.append('payment_method', paymentForm.payment_method);
+        fd.append('account_number', paymentForm.account_number);
+        fd.append('notes', paymentForm.notes);
+
+        if (paymentForm.receipt) {
+            fd.append('receipt', paymentForm.receipt);
+        }
 
         if (editingLog) {
-fd.append('_method', 'PUT');
-}
+            fd.append('_method', 'PUT');
+        }
 
         const base = `/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/payment-logs`;
-        const url  = editingLog ? `${base}/${editingLog.id}` : base;
+        const url = editingLog ? `${base}/${editingLog.id}` : base;
 
-        setPProcessing(true);
+        setPaymentProcessing(true);
         router.post(url, fd, {
-            onFinish: () => setPProcessing(false),
-            onSuccess: () => setPaymentOpen(false),
-            onError: (errors) => setPErrors(errors as Record<string, string>),
+            preserveScroll: true,
+            onFinish: () => setPaymentProcessing(false),
+            onSuccess: () => closePaymentModal(false),
+            onError: (errors) => setPaymentErrors(errors as Record<string, string>),
         });
     }
 
-    function quickApprove(log: PaymentLog) {
+    function movePaymentStatus(log: PaymentLog, nextStatus: 'reviewed' | 'approved' | 'rejected') {
+        const payload: Record<string, string> = { status: nextStatus };
+
+        if (nextStatus === 'rejected') {
+            payload.rejection_reason = rejectionReason;
+        }
+
+        setDetailProcessing(true);
         router.patch(
             `/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/payment-logs/${log.id}/review`,
-            { status: 'approved', notes: 'Payment approved.' },
+            payload,
+            {
+                preserveScroll: true,
+                onFinish: () => setDetailProcessing(false),
+                onSuccess: () => closeDetailModal(false),
+                onError: (errors) => setDetailErrors(errors as Record<string, string>),
+            },
         );
     }
 
@@ -398,8 +520,6 @@ fd.append('_method', 'PUT');
             <Head title={`${subscription.name} — ${customer.name}`} />
 
             <div className="space-y-5 p-4 md:p-6">
-
-                {/* ── Header ── */}
                 <div className="flex items-start gap-3">
                     <Link
                         href={`/superadmin/customers/${customer.id}`}
@@ -411,39 +531,36 @@ fd.append('_method', 'PUT');
                         <div className="flex flex-wrap items-center gap-2">
                             <h1 className="text-xl font-semibold tracking-tight">{subscription.name}</h1>
                             <Badge className={`${statusCfg.className} gap-1 font-medium`} variant="outline">
-                                {statusCfg.icon}{statusCfg.label}
+                                {statusCfg.icon}
+                                {statusCfg.label}
                             </Badge>
                         </div>
                         <p className="text-muted-foreground mt-0.5 text-sm">
                             <Link href={`/superadmin/customers/${customer.id}`} className="hover:underline">
                                 {customer.school_name ?? customer.name}
                             </Link>
-                            {' · '}<span>{customer.email}</span>
+                            {' · '}
+                            <span>{customer.email}</span>
                         </p>
                     </div>
                 </div>
 
-                {/* ── Subscription Details ── */}
                 <SectionCard
                     icon={<FileTextIcon className="size-4" />}
-                    title="Subscription Details"
-                    description="Plan configuration, billing, and permissions"
+                    title="Subscription"
                     action={
                         <Link
                             href={`/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/edit`}
                             className="border-input hover:bg-accent flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors"
                         >
-                            <PencilIcon className="size-3.5" /> Edit
+                            <PencilIcon className="size-3.5" />
+                            Edit
                         </Link>
                     }
                 >
                     <div className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <InfoCell label="Plan Name" value={subscription.name} />
-                        <InfoCell
-                            label="Amount"
-                            highlight
-                            value={`Rs. ${Number(subscription.amount).toLocaleString()}`}
-                        />
+                        <InfoCell label="Amount" highlight value={money(subscription.amount)} />
                         <InfoCell
                             label="Allowed Questions"
                             value={
@@ -468,7 +585,8 @@ fd.append('_method', 'PUT');
                             label="Status"
                             value={
                                 <Badge className={`${statusCfg.className} gap-1 font-medium`} variant="outline">
-                                    {statusCfg.icon}{statusCfg.label}
+                                    {statusCfg.icon}
+                                    {statusCfg.label}
                                 </Badge>
                             }
                         />
@@ -478,10 +596,7 @@ fd.append('_method', 'PUT');
                                 subscription.allow_teachers ? (
                                     <span className="flex items-center gap-1.5 font-medium text-emerald-600">
                                         <BadgeCheckIcon className="size-4" />
-                                        Allowed
-                                        {subscription.max_teachers != null
-                                            ? ` · max ${subscription.max_teachers}`
-                                            : ' · Unlimited'}
+                                        {subscription.max_teachers != null ? `Max ${subscription.max_teachers}` : 'Unlimited'}
                                     </span>
                                 ) : (
                                     <span className="text-muted-foreground italic">Not allowed</span>
@@ -490,45 +605,63 @@ fd.append('_method', 'PUT');
                         />
                         <InfoCell
                             label="Created By"
-                            value={
-                                subscription.creator_name ?? (
-                                    <span className="text-muted-foreground italic">Unknown</span>
-                                )
-                            }
+                            value={subscription.creator_name ?? <span className="text-muted-foreground italic">Unknown</span>}
                         />
                         <InfoCell label="Created At" value={fmtDt(subscription.created_at)} />
                     </div>
                 </SectionCard>
 
-                {/* ── Access Control ── */}
-                <SectionCard
-                    icon={<LayoutGridIcon className="size-4" />}
-                    title="Access Control"
-                    description="Pattern-specific classes and class-specific subjects included in this plan"
-                >
+                <SectionCard icon={<LayoutGridIcon className="size-4" />} title="Access">
                     <div className="p-5">
                         <AccessOverviewPanel subscription={subscription} />
                     </div>
                 </SectionCard>
 
-                {/* ── Payment Logs ── */}
                 <SectionCard
                     icon={<CreditCardIcon className="size-4" />}
-                    title="Payment Logs"
-                    description={`${paymentLogs.length} record${paymentLogs.length !== 1 ? 's' : ''} · manage payments and receipts`}
+                    title="Payments"
                     action={
-                        <Button size="sm" onClick={openAdd} className="gap-1.5">
-                            <PlusIcon className="size-3.5" /> Add Payment
+                        <Button size="sm" onClick={openAdd} className="gap-1.5" disabled={!canAddPayment}>
+                            <PlusIcon className="size-3.5" />
+                            Add Payment
                         </Button>
                     }
                 >
+                    <div className="grid gap-3 border-b p-5 sm:grid-cols-2 xl:grid-cols-4">
+                        <MetricCard
+                            icon={<WalletIcon className="size-4" />}
+                            label="Plan Amount"
+                            value={money(paymentSummary.subscription_amount)}
+                        />
+                        <MetricCard
+                            icon={<CheckCircle2Icon className="size-4" />}
+                            label="Received"
+                            value={money(paymentSummary.received_amount)}
+                            tone="success"
+                        />
+                        <MetricCard
+                            icon={<ClockIcon className="size-4" />}
+                            label="Pending"
+                            value={money(paymentSummary.pending_amount)}
+                            tone="warning"
+                        />
+                        <MetricCard
+                            icon={<FileTextIcon className="size-4" />}
+                            label="Under Review"
+                            value={money(paymentSummary.under_review_amount)}
+                        />
+                    </div>
+
                     {paymentLogs.length === 0 ? (
                         <div className="text-muted-foreground flex flex-col items-center gap-3 py-10 text-center">
                             <CreditCardIcon className="size-8 opacity-20" />
-                            <p className="text-sm">No payment records yet</p>
-                            <Button size="sm" variant="outline" onClick={openAdd}>
-                                <PlusIcon className="size-3.5" /> Add First Payment
-                            </Button>
+                            <p className="text-sm">No payments yet</p>
+                            {canAddPayment && (
+                                <Button size="sm" variant="outline" onClick={openAdd}>
+                                    <PlusIcon className="size-3.5" />
+                                    Add Payment
+                                </Button>
+                            )}
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -538,108 +671,63 @@ fd.append('_method', 'PUT');
                                         <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Date</th>
                                         <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Amount</th>
                                         <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Method</th>
-                                        <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Account #</th>
                                         <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Status</th>
-                                        <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Receipt</th>
-                                        <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Notes</th>
                                         <th className="text-muted-foreground px-4 py-3 text-xs font-medium">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {paymentLogs.map((log) => {
-                                        const sc = PAYMENT_STATUS_CFG[log.status ?? ''] ?? {
-                                            label: log.status_label ?? '—',
-                                            className: 'bg-gray-100 text-gray-500 border-gray-200',
-                                        };
-                                        const canApprove = log.status === 'pending_review' || log.status === 'reviewed';
-
-                                        return (
-                                            <tr key={log.id} className="hover:bg-muted/25 align-top transition-colors">
-                                                <td className="px-4 py-3">
-                                                    <p className="text-xs font-medium whitespace-nowrap">{fmtDt(log.created_at)}</p>
-                                                    {log.creator_name && (
-                                                        <p className="text-muted-foreground text-xs">by {log.creator_name}</p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 font-semibold whitespace-nowrap">
-                                                    Rs. {Number(log.amount).toLocaleString()}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm">{log.payment_method_label ?? '—'}</td>
-                                                <td className="text-muted-foreground px-4 py-3 text-xs">{log.account_number ?? '—'}</td>
-                                                <td className="px-4 py-3">
-                                                    <Badge className={`${sc.className} gap-1 text-xs font-medium`} variant="outline">
-                                                        {sc.label}
-                                                    </Badge>
-                                                    {log.reviewer_name && (
-                                                        <p className="text-muted-foreground mt-0.5 text-xs">
-                                                            by {log.reviewer_name}
-                                                        </p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {log.attachments.length > 0 ? (
-                                                        <div className="flex flex-col gap-1">
-                                                            {log.attachments.map((url, i) => (
-                                                                <a
-                                                                    key={i}
-                                                                    href={url}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-primary flex items-center gap-1 text-xs hover:underline"
-                                                                >
-                                                                    <PaperclipIcon className="size-3" />
-                                                                    Receipt {i + 1}
-                                                                    <ExternalLinkIcon className="size-2.5 opacity-60" />
-                                                                </a>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-muted-foreground text-xs">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="text-muted-foreground max-w-40 px-4 py-3 break-words text-xs">
-                                                    {log.notes ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-1.5">
+                                    {paymentLogs.map((log) => (
+                                        <tr key={log.id} className="hover:bg-muted/25 transition-colors">
+                                            <td className="px-4 py-3 align-top">
+                                                <p className="text-xs font-medium whitespace-nowrap">{fmtDt(log.created_at)}</p>
+                                                {log.creator_name && (
+                                                    <p className="text-muted-foreground mt-0.5 text-xs">by {log.creator_name}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 align-top font-semibold whitespace-nowrap">
+                                                {money(log.amount)}
+                                            </td>
+                                            <td className="px-4 py-3 align-top text-sm">{log.payment_method_label ?? '—'}</td>
+                                            <td className="px-4 py-3 align-top">
+                                                <PaymentStatusBadge status={log.status} />
+                                            </td>
+                                            <td className="px-4 py-3 align-top">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-7 px-2.5 text-xs"
+                                                        onClick={() => openDetail(log)}
+                                                    >
+                                                        <EyeIcon className="size-3" />
+                                                        Details
+                                                    </Button>
+                                                    {log.is_editable && (
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
                                                             className="h-7 px-2.5 text-xs"
                                                             onClick={() => openEdit(log)}
                                                         >
-                                                            <PencilIcon className="size-3" /> Edit
+                                                            <PencilIcon className="size-3" />
+                                                            Edit
                                                         </Button>
-                                                        {canApprove && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="h-7 px-2.5 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                                                onClick={() => quickApprove(log)}
-                                                            >
-                                                                <CheckIcon className="size-3" /> Approve
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
                     )}
                 </SectionCard>
 
-                {/* ── Edit Logs ── */}
-                <SectionCard
-                    icon={<LogsIcon className="size-4" />}
-                    title="Edit Logs"
-                    description={`${auditLogs.length} change${auditLogs.length !== 1 ? 's' : ''} recorded`}
-                >
+                <SectionCard icon={<LogsIcon className="size-4" />} title="Logs">
                     {auditLogs.length === 0 ? (
                         <div className="text-muted-foreground flex items-center gap-2 px-5 py-6 text-sm">
-                            <LogsIcon className="size-4 opacity-20" /> No changes recorded yet
+                            <LogsIcon className="size-4 opacity-20" />
+                            No changes recorded yet
                         </div>
                     ) : (
                         <div className="divide-y">
@@ -670,82 +758,66 @@ fd.append('_method', 'PUT');
                         </div>
                     )}
                 </SectionCard>
-
             </div>
 
-            {/* ── Payment Dialog ── */}
-            <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+            <Dialog open={paymentOpen} onOpenChange={closePaymentModal}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{editingLog ? 'Edit Payment Log' : 'Add Payment Log'}</DialogTitle>
+                        <DialogTitle>{editingLog ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
                     </DialogHeader>
-                    <form onSubmit={submitPayment} className="space-y-4">
 
+                    <form onSubmit={submitPayment} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <Label htmlFor="p-amount">Amount *</Label>
+                                <Label htmlFor="p-amount">Amount</Label>
                                 <Input
                                     id="p-amount"
                                     type="number"
                                     step="0.01"
-                                    min="0"
-                                    placeholder="e.g. 5000"
-                                    value={pForm.amount}
-                                    onChange={(e) => setPForm((f) => ({ ...f, amount: e.target.value }))}
-                                    aria-invalid={!!pErrors.amount}
+                                    min="0.01"
+                                    value={paymentForm.amount}
+                                    onChange={(e) => setPaymentForm((current) => ({ ...current, amount: e.target.value }))}
+                                    aria-invalid={!!paymentErrors.amount}
                                 />
-                                {pErrors.amount && <p className="text-destructive text-xs">{pErrors.amount}</p>}
+                                {paymentErrors.amount && <p className="text-destructive text-xs">{paymentErrors.amount}</p>}
                             </div>
-                            <div className="space-y-1.5">
-                                <Label>Method *</Label>
-                                <Select
-                                    value={pForm.payment_method}
-                                    onValueChange={(v) => setPForm((f) => ({ ...f, payment_method: v }))}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="cash">Cash</SelectItem>
-                                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                                        <SelectItem value="online">Online</SelectItem>
-                                        <SelectItem value="cheque">Cheque</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {pErrors.payment_method && (
-                                    <p className="text-destructive text-xs">{pErrors.payment_method}</p>
-                                )}
-                            </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <Label htmlFor="p-account">Account / Ref #</Label>
-                                <Input
-                                    id="p-account"
-                                    placeholder="Optional"
-                                    value={pForm.account_number}
-                                    onChange={(e) => setPForm((f) => ({ ...f, account_number: e.target.value }))}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Status *</Label>
+                                <Label>Method</Label>
                                 <Select
-                                    value={pForm.status}
-                                    onValueChange={(v) => setPForm((f) => ({ ...f, status: v }))}
+                                    value={paymentForm.payment_method}
+                                    onValueChange={(value) =>
+                                        setPaymentForm((current) => ({ ...current, payment_method: value }))
+                                    }
                                 >
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="pending_review">Pending Review</SelectItem>
-                                        <SelectItem value="reviewed">Reviewed</SelectItem>
-                                        <SelectItem value="approved">Approved</SelectItem>
-                                        <SelectItem value="rejected">Rejected</SelectItem>
+                                        <SelectItem value="online">Online</SelectItem>
+                                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                        <SelectItem value="cash">Cash</SelectItem>
+                                        <SelectItem value="cheque">Cheque</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                {pErrors.status && <p className="text-destructive text-xs">{pErrors.status}</p>}
+                                {paymentErrors.payment_method && (
+                                    <p className="text-destructive text-xs">{paymentErrors.payment_method}</p>
+                                )}
                             </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="p-account">Account / Ref #</Label>
+                            <Input
+                                id="p-account"
+                                value={paymentForm.account_number}
+                                onChange={(e) =>
+                                    setPaymentForm((current) => ({ ...current, account_number: e.target.value }))
+                                }
+                            />
+                            {paymentErrors.account_number && (
+                                <p className="text-destructive text-xs">{paymentErrors.account_number}</p>
+                            )}
                         </div>
 
                         <div className="space-y-1.5">
@@ -753,25 +825,25 @@ fd.append('_method', 'PUT');
                             <textarea
                                 id="p-notes"
                                 rows={3}
-                                placeholder="Optional notes or remarks..."
-                                value={pForm.notes}
-                                onChange={(e) => setPForm((f) => ({ ...f, notes: e.target.value }))}
-                                className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[80px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                                value={paymentForm.notes}
+                                onChange={(e) => setPaymentForm((current) => ({ ...current, notes: e.target.value }))}
+                                className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[88px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
                             />
+                            {paymentErrors.notes && <p className="text-destructive text-xs">{paymentErrors.notes}</p>}
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>Receipt / Screenshot</Label>
+                            <Label>Receipt</Label>
                             <div
-                                className="border-input hover:border-ring/50 flex cursor-pointer items-center gap-3 overflow-hidden rounded-md border border-dashed px-4 py-3 transition-colors"
+                                className="border-input hover:border-ring/50 flex cursor-pointer items-center gap-3 rounded-md border border-dashed px-4 py-3 transition-colors"
                                 onClick={() => fileRef.current?.click()}
                             >
                                 <PaperclipIcon className="text-muted-foreground size-4 shrink-0" />
-                                <div className="min-w-0 flex-1 overflow-hidden">
+                                <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm">
-                                        {pForm.receipt ? pForm.receipt.name : 'Click to upload receipt'}
+                                        {paymentForm.receipt ? paymentForm.receipt.name : 'Upload receipt'}
                                     </p>
-                                    <p className="text-muted-foreground text-xs">JPG, PNG, PDF, WebP · max 5 MB</p>
+                                    <p className="text-muted-foreground text-xs">JPG, PNG, PDF, WebP</p>
                                 </div>
                             </div>
                             <input
@@ -781,42 +853,184 @@ fd.append('_method', 'PUT');
                                 className="hidden"
                                 onChange={(e) => {
                                     const file = e.target.files?.[0] ?? null;
-                                    setPForm((f) => ({ ...f, receipt: file }));
+                                    setPaymentForm((current) => ({ ...current, receipt: file }));
                                 }}
                             />
-                            {pErrors.receipt && <p className="text-destructive text-xs">{pErrors.receipt}</p>}
-
-                            {editingLog && editingLog.attachments.length > 0 && (
-                                <div className="flex flex-wrap gap-2 pt-1">
-                                    {editingLog.attachments.map((url, i) => (
-                                        <a
-                                            key={i}
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-primary flex items-center gap-1 text-xs hover:underline"
-                                        >
-                                            <PaperclipIcon className="size-3" />
-                                            Existing #{i + 1}
-                                            <ExternalLinkIcon className="size-2.5 opacity-60" />
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
+                            {paymentErrors.receipt && <p className="text-destructive text-xs">{paymentErrors.receipt}</p>}
                         </div>
 
-                        <Separator />
-
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setPaymentOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => closePaymentModal(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={pProcessing}>
-                                {pProcessing ? 'Saving…' : editingLog ? 'Update Payment' : 'Add Payment'}
+                            <Button type="submit" disabled={paymentProcessing}>
+                                {paymentProcessing ? 'Saving…' : editingLog ? 'Save' : 'Add Payment'}
                             </Button>
                         </DialogFooter>
-
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={paymentDetail !== null} onOpenChange={closeDetailModal}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Payment Details</DialogTitle>
+                    </DialogHeader>
+
+                    {paymentDetail && (
+                        <div className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <DetailRow
+                                    icon={<CreditCardIcon className="size-4" />}
+                                    label="Amount"
+                                    value={money(paymentDetail.amount)}
+                                />
+                                <DetailRow
+                                    icon={<CheckCircle2Icon className="size-4" />}
+                                    label="Status"
+                                    value={<PaymentStatusBadge status={paymentDetail.status} />}
+                                />
+                                <DetailRow
+                                    icon={<WalletIcon className="size-4" />}
+                                    label="Method"
+                                    value={paymentDetail.payment_method_label ?? '—'}
+                                />
+                                <DetailRow
+                                    icon={<HashIcon className="size-4" />}
+                                    label="Account / Ref #"
+                                    value={paymentDetail.account_number ?? '—'}
+                                />
+                                <DetailRow
+                                    icon={<CalendarIcon className="size-4" />}
+                                    label="Created"
+                                    value={
+                                        <div>
+                                            <p>{fmtDt(paymentDetail.created_at)}</p>
+                                            {paymentDetail.creator_name && (
+                                                <p className="text-muted-foreground text-xs">by {paymentDetail.creator_name}</p>
+                                            )}
+                                        </div>
+                                    }
+                                />
+                                <DetailRow
+                                    icon={<BadgeCheckIcon className="size-4" />}
+                                    label="Reviewed"
+                                    value={
+                                        paymentDetail.reviewed_at ? (
+                                            <div>
+                                                <p>{fmtDt(paymentDetail.reviewed_at)}</p>
+                                                {paymentDetail.reviewer_name && (
+                                                    <p className="text-muted-foreground text-xs">by {paymentDetail.reviewer_name}</p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            '—'
+                                        )
+                                    }
+                                />
+                            </div>
+
+                            {paymentDetail.notes && (
+                                <DetailRow
+                                    icon={<FileTextIcon className="size-4" />}
+                                    label="Notes"
+                                    value={<p className="whitespace-pre-wrap">{paymentDetail.notes}</p>}
+                                />
+                            )}
+
+                            {paymentDetail.rejection_reason && (
+                                <DetailRow
+                                    icon={<XCircleIcon className="size-4" />}
+                                    label="Rejection Reason"
+                                    value={<p className="whitespace-pre-wrap">{paymentDetail.rejection_reason}</p>}
+                                />
+                            )}
+
+                            <div className="rounded-lg border p-3">
+                                <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                                    Attachments
+                                </p>
+                                <div className="mt-2 flex flex-col gap-2">
+                                    {paymentDetail.attachments.length === 0 ? (
+                                        <span className="text-muted-foreground text-sm">No attachments</span>
+                                    ) : (
+                                        paymentDetail.attachments.map((url, index) => (
+                                            <a
+                                                key={url}
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary flex items-center gap-1.5 text-sm hover:underline"
+                                            >
+                                                <PaperclipIcon className="size-3.5" />
+                                                Receipt {index + 1}
+                                                <ExternalLinkIcon className="size-3 opacity-70" />
+                                            </a>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {paymentDetail.status === 'reviewed' && (
+                                <div className="space-y-2 rounded-lg border border-red-200 p-3">
+                                    <Label htmlFor="reject-reason">Rejection Reason</Label>
+                                    <textarea
+                                        id="reject-reason"
+                                        rows={3}
+                                        value={rejectionReason}
+                                        onChange={(e) => setRejectionReason(e.target.value)}
+                                        className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[88px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
+                                    />
+                                    {detailErrors.rejection_reason && (
+                                        <p className="text-destructive text-xs">{detailErrors.rejection_reason}</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {detailErrors.status && <p className="text-destructive text-xs">{detailErrors.status}</p>}
+
+                            <DialogFooter>
+                                {paymentDetail.status === 'pending_review' && (
+                                    <Button
+                                        type="button"
+                                        onClick={() => movePaymentStatus(paymentDetail, 'reviewed')}
+                                        disabled={detailProcessing}
+                                    >
+                                        <CheckIcon className="size-3.5" />
+                                        {detailProcessing ? 'Saving…' : 'Mark Reviewed'}
+                                    </Button>
+                                )}
+
+                                {paymentDetail.status === 'reviewed' && (
+                                    <>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => movePaymentStatus(paymentDetail, 'rejected')}
+                                            disabled={detailProcessing}
+                                        >
+                                            <XCircleIcon className="size-3.5" />
+                                            {detailProcessing ? 'Saving…' : 'Reject'}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => movePaymentStatus(paymentDetail, 'approved')}
+                                            disabled={detailProcessing}
+                                        >
+                                            <CheckCircle2Icon className="size-3.5" />
+                                            {detailProcessing ? 'Saving…' : 'Approve'}
+                                        </Button>
+                                    </>
+                                )}
+
+                                {paymentDetail.status !== 'pending_review' && paymentDetail.status !== 'reviewed' && (
+                                    <Button type="button" variant="outline" onClick={() => closeDetailModal(false)}>
+                                        Close
+                                    </Button>
+                                )}
+                            </DialogFooter>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </>
