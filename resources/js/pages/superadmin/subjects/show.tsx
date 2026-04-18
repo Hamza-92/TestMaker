@@ -567,7 +567,7 @@ function ChaptersTab({
                             </SelectContent>
                         </Select>
                     )}
-                    {patternFilter !== 'all' && classesForPatternFilter.length > 1 && (
+                    {patternFilter !== 'all' && classesForPatternFilter.length > 0 && (
                         <Select value={classFilter} onValueChange={setClassFilter}>
                             <SelectTrigger className="h-9 w-36 text-sm">
                                 <SelectValue placeholder="All classes" />

@@ -18,9 +18,69 @@ class CustomerController extends Controller
 {
     public function index()
     {
+        $today = now()->startOfDay();
+        $nearExpiryThresholdDays = 7;
+
         $customers = User::where('user_type', UserType::Customer)
+            ->with([
+                'subscriptions' => fn ($q) => $q->latest('started_at')->select([
+                    'id',
+                    'user_id',
+                    'name',
+                    'amount',
+                    'started_at',
+                    'expired_at',
+                    'duration',
+                    'status',
+                ]),
+            ])
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'created_at']);
+            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'created_at'])
+            ->map(function (User $customer) use ($today, $nearExpiryThresholdDays) {
+                $activeSubscription = $customer->subscriptions->first(
+                    fn ($subscription) => $subscription->status?->value === 'active'
+                );
+
+                $subscription = $activeSubscription ?? $customer->subscriptions->first();
+                $subscriptionStatus = $subscription?->status?->value;
+                $daysToExpiry = $subscription?->expired_at
+                    ? $today->diffInDays($subscription->expired_at->copy()->startOfDay(), false)
+                    : null;
+
+                $planState = match (true) {
+                    $subscription === null => 'no_plan',
+                    $subscriptionStatus === 'cancelled' => 'cancelled',
+                    $subscriptionStatus === 'expired' || ($daysToExpiry !== null && $daysToExpiry < 0) => 'expired',
+                    $subscriptionStatus === 'active' && $daysToExpiry !== null && $daysToExpiry <= $nearExpiryThresholdDays => 'near_expiry',
+                    $subscriptionStatus === 'active' => 'active',
+                    default => 'no_plan',
+                };
+
+                return [
+                    'id' => $customer->id,
+                    'name' => $customer->name,
+                    'email' => $customer->email,
+                    'school_name' => $customer->school_name,
+                    'logo' => $customer->logo,
+                    'city' => $customer->city,
+                    'province' => $customer->province,
+                    'status' => $customer->status?->value,
+                    'created_at' => $customer->created_at?->toISOString(),
+                    'subscription_count' => $customer->subscriptions->count(),
+                    'plan_state' => $planState,
+                    'subscription' => $subscription ? [
+                        'id' => $subscription->id,
+                        'name' => $subscription->name,
+                        'amount' => (string) $subscription->amount,
+                        'started_at' => $subscription->started_at?->toISOString(),
+                        'expired_at' => $subscription->expired_at?->toISOString(),
+                        'duration' => $subscription->duration,
+                        'status' => $subscription->status?->value,
+                        'days_to_expiry' => $daysToExpiry,
+                    ] : null,
+                ];
+            })
+            ->values();
 
         return Inertia::render('superadmin/customers', [
             'customers' => $customers,

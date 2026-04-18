@@ -1,35 +1,52 @@
 import { Head, Link } from '@inertiajs/react';
 import {
+    CalendarIcon,
+    CheckCircle2Icon,
     ChevronLeftIcon,
     ChevronRightIcon,
     ChevronsLeftIcon,
     ChevronsRightIcon,
+    Clock3Icon,
+    EyeIcon,
     MailIcon,
     MapPinIcon,
     PencilIcon,
     SchoolIcon,
     SearchIcon,
     SlidersHorizontalIcon,
-    Trash2Icon,
     UserIcon,
+    UsersIcon,
+    XCircleIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Status = 'active' | 'inactive' | 'suspended';
+type AccountStatus = 'active' | 'inactive' | 'suspended';
+type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
+type PlanState = 'active' | 'near_expiry' | 'expired' | 'cancelled' | 'no_plan';
+
+interface SubscriptionSummary {
+    id: number;
+    name: string;
+    amount: string;
+    started_at: string | null;
+    expired_at: string | null;
+    duration: number;
+    status: SubscriptionStatus;
+    days_to_expiry: number | null;
+}
 
 interface Customer {
     id: number;
@@ -39,113 +56,322 @@ interface Customer {
     logo: string | null;
     city: string | null;
     province: string | null;
-    status: Status;
+    status: AccountStatus;
     created_at: string;
+    subscription_count: number;
+    plan_state: PlanState;
+    subscription: SubscriptionSummary | null;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<Status, { label: string; className: string }> = {
-    active:    { label: 'Active',    className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    inactive:  { label: 'Inactive',  className: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400' },
-    suspended: { label: 'Suspended', className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' },
-};
+type ColumnKey =
+    | 'customer'
+    | 'email'
+    | 'school'
+    | 'location'
+    | 'account_status'
+    | 'plan'
+    | 'plan_status'
+    | 'expires'
+    | 'joined'
+    | 'actions';
 
-const AVATAR_COLORS = [
-    'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500',
-    'bg-rose-500', 'bg-cyan-500', 'bg-fuchsia-500', 'bg-indigo-500',
+const PAGE_SIZE_OPTIONS = [10, 20, 30];
+
+const ALL_COLUMNS: ColumnKey[] = [
+    'customer',
+    'email',
+    'school',
+    'location',
+    'account_status',
+    'plan',
+    'plan_status',
+    'expires',
+    'joined',
+    'actions',
 ];
-
-const PAGE_SIZE_OPTIONS = [5, 10, 20];
-
-const ALL_COLUMNS = ['customer', 'email', 'school', 'location', 'status', 'joined', 'actions'] as const;
-type ColumnKey = (typeof ALL_COLUMNS)[number];
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
     customer: 'Customer',
-    email:    'Email',
-    school:   'School',
+    email: 'Email',
+    school: 'School',
     location: 'Location',
-    status:   'Status',
-    joined:   'Joined',
-    actions:  'Actions',
+    account_status: 'Account Status',
+    plan: 'Plan',
+    plan_status: 'Plan Status',
+    expires: 'Expires',
+    joined: 'Joined',
+    actions: 'Actions',
 };
+
+const ACCOUNT_STATUS_CONFIG: Record<AccountStatus, { label: string; className: string }> = {
+    active: { label: 'Active', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+    inactive: { label: 'Inactive', className: 'border-gray-200 bg-gray-50 text-gray-600' },
+    suspended: { label: 'Suspended', className: 'border-red-200 bg-red-50 text-red-700' },
+};
+
+const PLAN_STATE_CONFIG: Record<PlanState, { label: string; className: string }> = {
+    active: { label: 'Active', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+    near_expiry: { label: 'Near Expiry', className: 'border-amber-200 bg-amber-50 text-amber-700' },
+    expired: { label: 'Expired', className: 'border-red-200 bg-red-50 text-red-700' },
+    cancelled: { label: 'Cancelled', className: 'border-slate-200 bg-slate-50 text-slate-700' },
+    no_plan: { label: 'No Plan', className: 'border-gray-200 bg-gray-50 text-gray-500' },
+};
+
+const SUMMARY_CARD_CONFIG: Array<{
+    key: 'total' | 'active' | 'near_expiry' | 'expired';
+    label: string;
+    icon: ReactNode;
+    iconClassName: string;
+    valueClassName: string;
+}> = [
+    {
+        key: 'total',
+        label: 'Total',
+        icon: <UsersIcon className="size-4" />,
+        iconClassName: 'bg-slate-100 text-slate-700',
+        valueClassName: 'text-slate-900',
+    },
+    {
+        key: 'active',
+        label: 'Active',
+        icon: <CheckCircle2Icon className="size-4" />,
+        iconClassName: 'bg-emerald-100 text-emerald-700',
+        valueClassName: 'text-emerald-700',
+    },
+    {
+        key: 'near_expiry',
+        label: 'Near Expiry',
+        icon: <Clock3Icon className="size-4" />,
+        iconClassName: 'bg-amber-100 text-amber-700',
+        valueClassName: 'text-amber-700',
+    },
+    {
+        key: 'expired',
+        label: 'Expired',
+        icon: <XCircleIcon className="size-4" />,
+        iconClassName: 'bg-red-100 text-red-700',
+        valueClassName: 'text-red-700',
+    },
+];
+
+const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
+    customer: true,
+    email: false,
+    school: true,
+    location: false,
+    account_status: false,
+    plan: true,
+    plan_status: true,
+    expires: true,
+    joined: false,
+    actions: true,
+};
+
+const ACTION_BUTTON_CLASS =
+    'text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors';
 
 function initials(name: string): string {
     return name
         .split(' ')
         .filter(Boolean)
         .slice(0, 2)
-        .map((w) => w[0].toUpperCase())
+        .map((word) => word[0]?.toUpperCase() ?? '')
         .join('');
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-export default function Customers({ customers }: { customers: Customer[] }) {
-    const [search, setSearch]             = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [pageSize, setPageSize]         = useState(10);
-    const [page, setPage]                 = useState(1);
-    const [selected, setSelected]         = useState<number[]>([]);
-    const [visibleCols, setVisibleCols]   = useState<Record<ColumnKey, boolean>>({
-        customer: true, email: true, school: true, location: true,
-        status: true, joined: true, actions: true,
+function fmt(date: string | null): string {
+    if (!date) {
+        return '-';
+    }
+
+    return new Date(date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
     });
+}
 
-    // ── Filter + Search ──────────────────────────────────────────────────────
+function money(amount: string | number): string {
+    return `Rs. ${Number(amount).toLocaleString()}`;
+}
+
+function expiryLabel(customer: Customer): string {
+    const subscription = customer.subscription;
+
+    if (!subscription?.expired_at) {
+        return customer.plan_state === 'no_plan' ? 'No plan' : '-';
+    }
+
+    const days = subscription.days_to_expiry;
+
+    if (customer.plan_state === 'cancelled') {
+        return 'Cancelled';
+    }
+
+    if (days === null) {
+        return fmt(subscription.expired_at);
+    }
+
+    if (days < 0) {
+        const expiredDays = Math.abs(days);
+
+        return expiredDays === 0 ? 'Expired today' : `Expired ${expiredDays}d ago`;
+    }
+
+    if (days === 0) {
+        return 'Expires today';
+    }
+
+    return `${days}d left`;
+}
+
+function ActionIconLink({
+    href,
+    icon,
+    label,
+    className,
+}: {
+    href: string;
+    icon: ReactNode;
+    label: string;
+    className?: string;
+}) {
+    return (
+        <Link href={href} className={cn(ACTION_BUTTON_CLASS, className)} aria-label={label} title={label}>
+            {icon}
+        </Link>
+    );
+}
+
+function SummaryCard({
+    label,
+    value,
+    icon,
+    iconClassName,
+    valueClassName,
+}: {
+    label: string;
+    value: number;
+    icon: ReactNode;
+    iconClassName: string;
+    valueClassName: string;
+}) {
+    return (
+        <div className="rounded-2xl border bg-card px-4 py-3 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <p className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.16em]">{label}</p>
+                    <p className={cn('mt-2 text-2xl font-semibold tracking-tight', valueClassName)}>{value}</p>
+                </div>
+                <div className={cn('flex size-9 items-center justify-center rounded-2xl', iconClassName)}>{icon}</div>
+            </div>
+        </div>
+    );
+}
+
+export default function Customers({
+    customers,
+}: {
+    customers: Customer[];
+}) {
+    const [search, setSearch] = useState('');
+    const [accountStatusFilter, setAccountStatusFilter] = useState<string>('all');
+    const [planFilter, setPlanFilter] = useState<string>('all');
+    const [joinedFrom, setJoinedFrom] = useState('');
+    const [joinedTo, setJoinedTo] = useState('');
+    const [pageSize, setPageSize] = useState(10);
+    const [page, setPage] = useState(1);
+    const [visibleCols, setVisibleCols] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE_COLUMNS);
+
+    const summary = useMemo(
+        () => ({
+            total: customers.length,
+            active: customers.filter((customer) => customer.plan_state === 'active').length,
+            near_expiry: customers.filter((customer) => customer.plan_state === 'near_expiry').length,
+            expired: customers.filter((customer) => customer.plan_state === 'expired').length,
+        }),
+        [customers],
+    );
+
     const filtered = useMemo(() => {
-        const q = search.toLowerCase();
-        return customers.filter((c) => {
+        const query = search.trim().toLowerCase();
+
+        return customers.filter((customer) => {
+            const location = [customer.city, customer.province].filter(Boolean).join(', ').toLowerCase();
+            const planName = customer.subscription?.name?.toLowerCase() ?? '';
+            const createdAt = customer.created_at.slice(0, 10);
+
             const matchesSearch =
-                !q ||
-                c.name.toLowerCase().includes(q) ||
-                c.email.toLowerCase().includes(q) ||
-                (c.school_name ?? '').toLowerCase().includes(q) ||
-                (c.city ?? '').toLowerCase().includes(q);
-            const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-            return matchesSearch && matchesStatus;
+                !query ||
+                customer.name.toLowerCase().includes(query) ||
+                customer.email.toLowerCase().includes(query) ||
+                (customer.school_name ?? '').toLowerCase().includes(query) ||
+                location.includes(query) ||
+                planName.includes(query);
+
+            const matchesAccountStatus =
+                accountStatusFilter === 'all' || customer.status === accountStatusFilter;
+
+            const matchesPlanState = planFilter === 'all' || customer.plan_state === planFilter;
+
+            const matchesJoinedFrom = !joinedFrom || createdAt >= joinedFrom;
+            const matchesJoinedTo = !joinedTo || createdAt <= joinedTo;
+
+            return (
+                matchesSearch &&
+                matchesAccountStatus &&
+                matchesPlanState &&
+                matchesJoinedFrom &&
+                matchesJoinedTo
+            );
         });
-    }, [customers, search, statusFilter]);
+    }, [customers, search, accountStatusFilter, planFilter, joinedFrom, joinedTo]);
 
-    // ── Pagination ───────────────────────────────────────────────────────────
-    const totalPages   = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const safePage     = Math.min(page, totalPages);
-    const paginated    = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-    const pageIds      = paginated.map((c) => c.id);
-    const allSelected  = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
-    const someSelected = pageIds.some((id) => selected.includes(id));
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-    const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
-
-    const toggleSelect = (id: number) =>
-        setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-
-    const toggleAll = () =>
-        setSelected((prev) =>
-            allSelected ? prev.filter((id) => !pageIds.includes(id)) : [...new Set([...prev, ...pageIds])],
-        );
+    const goTo = (nextPage: number) => setPage(Math.min(Math.max(1, nextPage), totalPages));
 
     const toggleCol = (col: ColumnKey) =>
-        setVisibleCols((prev) => ({ ...prev, [col]: !prev[col] }));
+        setVisibleCols((current) => ({ ...current, [col]: !current[col] }));
 
-    const handleStatusChange = (val: string) => { setStatusFilter(val); setPage(1); };
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); };
+    const handleSearch = (value: string) => {
+        setSearch(value);
+        setPage(1);
+    };
+
+    const clearFilters = () => {
+        setSearch('');
+        setAccountStatusFilter('all');
+        setPlanFilter('all');
+        setJoinedFrom('');
+        setJoinedTo('');
+        setPage(1);
+    };
+
+    const hasActiveFilters =
+        search !== '' ||
+        accountStatusFilter !== 'all' ||
+        planFilter !== 'all' ||
+        joinedFrom !== '' ||
+        joinedTo !== '';
 
     return (
         <>
             <Head title="Customers" />
-            <div className="space-y-5 p-4 md:p-6">
 
-                {/* ── Page Header ─────────────────────────────────────────── */}
-                <div className="flex items-center justify-between">
+            <div className="space-y-5 p-4 md:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h1 className="h1-semibold">Customers</h1>
                         <p className="text-muted-foreground mt-0.5 text-sm">
-                            {filtered.length} total
-                            {selected.length > 0 && (
-                                <span className="text-primary ml-1 font-medium">· {selected.length} selected</span>
-                            )}
+                            {filtered.length} shown
+                            <span className="mx-1">/</span>
+                            {customers.length} total
                         </p>
                     </div>
+
                     <Link
                         href="/superadmin/customers/add"
                         className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
@@ -155,210 +381,354 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                     </Link>
                 </div>
 
-                {/* ── Filter Container ────────────────────────────────────── */}
-                <div className="flex flex-wrap items-center gap-2">
-
-                    {/* Search */}
-                    <div className="relative min-w-[200px] flex-1">
-                        <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                        <Input
-                            placeholder="Search customers…"
-                            value={search}
-                            onChange={handleSearch}
-                            className="pl-9"
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {SUMMARY_CARD_CONFIG.map((card) => (
+                        <SummaryCard
+                            key={card.key}
+                            label={card.label}
+                            value={summary[card.key]}
+                            icon={card.icon}
+                            iconClassName={card.iconClassName}
+                            valueClassName={card.valueClassName}
                         />
-                    </div>
+                    ))}
+                </div>
 
-                    <div className="flex items-center gap-2">
-                        {/* Status Filter */}
-                        <Select value={statusFilter} onValueChange={handleStatusChange}>
-                            <SelectTrigger className="w-36 gap-1.5">
-                                <SelectValue placeholder="Status" />
+                <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[220px] flex-1">
+                            <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                            <Input
+                                placeholder="Search customer, school, email, plan"
+                                value={search}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+
+                        <Select
+                            value={accountStatusFilter}
+                            onValueChange={(value) => {
+                                setAccountStatusFilter(value);
+                                setPage(1);
+                            }}
+                        >
+                            <SelectTrigger className="w-40">
+                                <SelectValue placeholder="Account" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All statuses</SelectItem>
+                                <SelectItem value="all">All Accounts</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="inactive">Inactive</SelectItem>
                                 <SelectItem value="suspended">Suspended</SelectItem>
                             </SelectContent>
                         </Select>
 
-                        {/* Column Visibility */}
+                        <Select
+                            value={planFilter}
+                            onValueChange={(value) => {
+                                setPlanFilter(value);
+                                setPage(1);
+                            }}
+                        >
+                            <SelectTrigger className="w-44">
+                                <SelectValue placeholder="Plan" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Plans</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="near_expiry">Near Expiry</SelectItem>
+                                <SelectItem value="expired">Expired</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                <SelectItem value="no_plan">No Plan</SelectItem>
+                            </SelectContent>
+                        </Select>
+
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="border-input bg-background hover:bg-accent flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm shadow-xs transition-colors">
+                                <Button type="button" variant="outline" className="gap-1.5">
                                     <SlidersHorizontalIcon className="size-4" />
-                                    <span className="hidden sm:inline">Columns</span>
-                                </button>
+                                    Columns
+                                </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuLabel className="text-muted-foreground text-xs uppercase tracking-wide">
-                                    Toggle columns
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                {(ALL_COLUMNS.filter((c) => c !== 'actions') as ColumnKey[]).map((col) => (
+                            <DropdownMenuContent align="end" className="w-48">
+                                {ALL_COLUMNS.filter((column) => column !== 'actions').map((column) => (
                                     <DropdownMenuCheckboxItem
-                                        key={col}
-                                        checked={visibleCols[col]}
-                                        onCheckedChange={() => toggleCol(col)}
+                                        key={column}
+                                        checked={visibleCols[column]}
+                                        onCheckedChange={() => toggleCol(column)}
                                     >
-                                        {COLUMN_LABELS[col]}
+                                        {COLUMN_LABELS[column]}
                                     </DropdownMenuCheckboxItem>
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
+                    </div>
 
-                        {/* Page Size */}
-                        <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-                            <SelectTrigger className="w-20">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {PAGE_SIZE_OPTIONS.map((n) => (
-                                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                    <div className="flex flex-wrap items-end gap-2">
+                        <div className="w-full sm:w-auto">
+                            <p className="text-muted-foreground mb-1 text-xs font-medium">Joined From</p>
+                            <Input
+                                type="date"
+                                value={joinedFrom}
+                                onChange={(e) => {
+                                    setJoinedFrom(e.target.value);
+                                    setPage(1);
+                                }}
+                                className="w-full sm:w-40"
+                            />
+                        </div>
+
+                        <div className="w-full sm:w-auto">
+                            <p className="text-muted-foreground mb-1 text-xs font-medium">Joined To</p>
+                            <Input
+                                type="date"
+                                value={joinedTo}
+                                onChange={(e) => {
+                                    setJoinedTo(e.target.value);
+                                    setPage(1);
+                                }}
+                                className="w-full sm:w-40"
+                            />
+                        </div>
+
+                        <div className="w-full sm:w-auto">
+                            <p className="text-muted-foreground mb-1 text-xs font-medium">Rows</p>
+                            <Select
+                                value={String(pageSize)}
+                                onValueChange={(value) => {
+                                    setPageSize(Number(value));
+                                    setPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-full sm:w-24">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PAGE_SIZE_OPTIONS.map((option) => (
+                                        <SelectItem key={option} value={String(option)}>
+                                            {option}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                            {hasActiveFilters && (
+                                <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* ── Table ───────────────────────────────────────────────── */}
-                <div className="overflow-hidden rounded-xl border shadow-sm">
+                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-muted/40 border-b">
-                                    <th className="w-10 px-4 py-3">
-                                        <Checkbox
-                                            checked={allSelected}
-                                            data-state={someSelected && !allSelected ? 'indeterminate' : undefined}
-                                            onCheckedChange={toggleAll}
-                                        />
-                                    </th>
+                                <tr className="bg-muted/40 border-b text-left">
                                     {visibleCols.customer && (
-                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">
-                                            <div className="flex items-center gap-1.5">
+                                        <th className="px-4 py-3 font-medium">
+                                            <div className="text-muted-foreground flex items-center gap-1.5">
                                                 <UserIcon className="size-3.5" />
                                                 Customer
                                             </div>
                                         </th>
                                     )}
                                     {visibleCols.email && (
-                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">
-                                            <div className="flex items-center gap-1.5">
+                                        <th className="px-4 py-3 font-medium">
+                                            <div className="text-muted-foreground flex items-center gap-1.5">
                                                 <MailIcon className="size-3.5" />
                                                 Email
                                             </div>
                                         </th>
                                     )}
                                     {visibleCols.school && (
-                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">
-                                            <div className="flex items-center gap-1.5">
+                                        <th className="px-4 py-3 font-medium">
+                                            <div className="text-muted-foreground flex items-center gap-1.5">
                                                 <SchoolIcon className="size-3.5" />
                                                 School
                                             </div>
                                         </th>
                                     )}
                                     {visibleCols.location && (
-                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">
-                                            <div className="flex items-center gap-1.5">
+                                        <th className="px-4 py-3 font-medium">
+                                            <div className="text-muted-foreground flex items-center gap-1.5">
                                                 <MapPinIcon className="size-3.5" />
                                                 Location
                                             </div>
                                         </th>
                                     )}
-                                    {visibleCols.status && (
-                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">Status</th>
+                                    {visibleCols.account_status && (
+                                        <th className="text-muted-foreground px-4 py-3 font-medium">Account</th>
+                                    )}
+                                    {visibleCols.plan && <th className="text-muted-foreground px-4 py-3 font-medium">Plan</th>}
+                                    {visibleCols.plan_status && (
+                                        <th className="text-muted-foreground px-4 py-3 font-medium">Plan Status</th>
+                                    )}
+                                    {visibleCols.expires && (
+                                        <th className="px-4 py-3 font-medium">
+                                            <div className="text-muted-foreground flex items-center gap-1.5">
+                                                <Clock3Icon className="size-3.5" />
+                                                Expiry
+                                            </div>
+                                        </th>
                                     )}
                                     {visibleCols.joined && (
-                                        <th className="text-muted-foreground px-4 py-3 text-left font-medium">Joined</th>
+                                        <th className="px-4 py-3 font-medium">
+                                            <div className="text-muted-foreground flex items-center gap-1.5">
+                                                <CalendarIcon className="size-3.5" />
+                                                Joined
+                                            </div>
+                                        </th>
                                     )}
-                                    {visibleCols.actions && (
-                                        <th className="text-muted-foreground w-16 px-4 py-3 text-center font-medium"></th>
-                                    )}
+                                    {visibleCols.actions && <th className="px-4 py-3 font-medium" />}
                                 </tr>
                             </thead>
+
                             <tbody className="divide-y">
                                 {paginated.length === 0 ? (
                                     <tr>
-                                        <td colSpan={Object.values(visibleCols).filter(Boolean).length + 1} className="text-muted-foreground py-16 text-center">
-                                            <SearchIcon className="mx-auto mb-2 size-8 opacity-30" />
+                                        <td
+                                            colSpan={ALL_COLUMNS.filter((column) => visibleCols[column]).length}
+                                            className="text-muted-foreground px-4 py-16 text-center"
+                                        >
+                                            <SearchIcon className="mx-auto mb-3 size-8 opacity-30" />
                                             No customers found
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginated.map((customer, idx) => {
-                                        const isSelected  = selected.includes(customer.id);
-                                        const avatarColor = AVATAR_COLORS[customer.id % AVATAR_COLORS.length];
-                                        const statusCfg   = STATUS_CONFIG[customer.status];
-                                        const location    = [customer.city, customer.province].filter(Boolean).join(', ');
-                                        const logoUrl     = customer.logo ? `/storage/${customer.logo}` : null;
+                                    paginated.map((customer) => {
+                                        const location = [customer.city, customer.province].filter(Boolean).join(', ');
+                                        const logoUrl = customer.logo ? `/storage/${customer.logo}` : null;
+                                        const accountStatus = ACCOUNT_STATUS_CONFIG[customer.status];
+                                        const planState = PLAN_STATE_CONFIG[customer.plan_state];
+                                        const subscription = customer.subscription;
+                                        const joinedAt = fmt(customer.created_at);
+                                        const expiryText = expiryLabel(customer);
+
                                         return (
-                                            <tr
-                                                key={customer.id}
-                                                className={`transition-colors ${isSelected ? 'bg-primary/5' : idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
-                                            >
-                                                <td className="px-4 py-3">
-                                                    <Checkbox
-                                                        checked={isSelected}
-                                                        onCheckedChange={() => toggleSelect(customer.id)}
-                                                    />
-                                                </td>
+                                            <tr key={customer.id} className="hover:bg-muted/20 transition-colors">
                                                 {visibleCols.customer && (
                                                     <td className="px-4 py-3">
-                                                        <Link
-                                                            href={`/superadmin/customers/${customer.id}`}
-                                                            className="hover:text-primary font-medium transition-colors"
-                                                        >
-                                                            {customer.name}
-                                                        </Link>
-                                                    </td>
-                                                )}
-                                                {visibleCols.email && (
-                                                    <td className="text-muted-foreground px-4 py-3">{customer.email}</td>
-                                                )}
-                                                {visibleCols.school && (
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className={`${!logoUrl ? avatarColor : ''} flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-semibold text-white`}>
-                                                                {logoUrl
-                                                                    ? <img src={logoUrl} alt={customer.school_name ?? ''} className="size-full object-cover" />
-                                                                    : initials(customer.school_name ?? customer.name)
-                                                                }
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="bg-muted flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border">
+                                                                {logoUrl ? (
+                                                                    <img
+                                                                        src={logoUrl}
+                                                                        alt={customer.school_name ?? customer.name}
+                                                                        className="size-full object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-xs font-semibold">
+                                                                        {initials(customer.school_name ?? customer.name)}
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                            <span className="font-medium">
-                                                                {customer.school_name ?? <span className="text-muted-foreground italic">—</span>}
-                                                            </span>
+                                                            <div className="min-w-0">
+                                                                <Link
+                                                                    href={`/superadmin/customers/${customer.id}`}
+                                                                    className="hover:text-primary font-medium transition-colors"
+                                                                >
+                                                                    {customer.name}
+                                                                </Link>
+                                                                <p className="text-muted-foreground text-xs">
+                                                                    {customer.subscription_count} plan{customer.subscription_count !== 1 ? 's' : ''}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                 )}
-                                                {visibleCols.location && (
-                                                    <td className="text-muted-foreground px-4 py-3">
-                                                        {location || <span className="italic">—</span>}
+
+                                                {visibleCols.email && (
+                                                    <td className="text-muted-foreground px-4 py-3">{customer.email}</td>
+                                                )}
+
+                                                {visibleCols.school && (
+                                                    <td className="px-4 py-3">
+                                                        <span className="font-medium">
+                                                            {customer.school_name ?? <span className="text-muted-foreground italic">-</span>}
+                                                        </span>
                                                     </td>
                                                 )}
-                                                {visibleCols.status && (
+
+                                                {visibleCols.location && (
+                                                    <td className="text-muted-foreground px-4 py-3">
+                                                        {location || <span className="italic">-</span>}
+                                                    </td>
+                                                )}
+
+                                                {visibleCols.account_status && (
                                                     <td className="px-4 py-3">
-                                                        <Badge className={`${statusCfg.className} font-medium`} variant="outline">
-                                                            <span className={`mr-1 inline-block size-1.5 rounded-full ${customer.status === 'active' ? 'bg-emerald-500' : customer.status === 'suspended' ? 'bg-red-500' : 'bg-gray-400'}`} />
-                                                            {statusCfg.label}
+                                                        <Badge variant="outline" className={cn('font-medium', accountStatus.className)}>
+                                                            {accountStatus.label}
                                                         </Badge>
                                                     </td>
                                                 )}
-                                                {visibleCols.joined && (
-                                                    <td className="text-muted-foreground px-4 py-3 tabular-nums">
-                                                        {new Date(customer.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+
+                                                {visibleCols.plan && (
+                                                    <td className="px-4 py-3">
+                                                        {subscription ? (
+                                                            <div>
+                                                                <p className="font-medium">{subscription.name}</p>
+                                                                <p className="text-muted-foreground text-xs">{money(subscription.amount)}</p>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic">No plan</span>
+                                                        )}
                                                     </td>
                                                 )}
+
+                                                {visibleCols.plan_status && (
+                                                    <td className="px-4 py-3">
+                                                        <Badge variant="outline" className={cn('font-medium', planState.className)}>
+                                                            {planState.label}
+                                                        </Badge>
+                                                    </td>
+                                                )}
+
+                                                {visibleCols.expires && (
+                                                    <td className="px-4 py-3">
+                                                        {subscription?.expired_at ? (
+                                                            <div>
+                                                                <p
+                                                                    className={cn(
+                                                                        'font-medium',
+                                                                        customer.plan_state === 'expired' && 'text-red-600',
+                                                                        customer.plan_state === 'near_expiry' && 'text-amber-700',
+                                                                    )}
+                                                                >
+                                                                    {expiryText}
+                                                                </p>
+                                                                <p className="text-muted-foreground text-xs">
+                                                                    {fmt(subscription.expired_at)}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic">-</span>
+                                                        )}
+                                                    </td>
+                                                )}
+
+                                                {visibleCols.joined && (
+                                                    <td className="text-muted-foreground px-4 py-3">{joinedAt}</td>
+                                                )}
+
                                                 {visibleCols.actions && (
                                                     <td className="px-4 py-3">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <button className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
-                                                                <PencilIcon className="size-4" />
-                                                            </button>
-                                                            <button className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors">
-                                                                <Trash2Icon className="size-4" />
-                                                            </button>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <ActionIconLink
+                                                                href={`/superadmin/customers/${customer.id}`}
+                                                                icon={<EyeIcon className="size-4" />}
+                                                                label="View customer"
+                                                            />
+                                                            <ActionIconLink
+                                                                href={`/superadmin/customers/${customer.id}/edit`}
+                                                                icon={<PencilIcon className="size-4" />}
+                                                                label="Edit customer"
+                                                            />
                                                         </div>
                                                     </td>
                                                 )}
@@ -370,13 +740,13 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                         </table>
                     </div>
 
-                    {/* ── Pagination ──────────────────────────────────────── */}
                     <div className="bg-muted/20 flex items-center justify-between border-t px-4 py-3">
                         <p className="text-muted-foreground text-xs">
                             {filtered.length === 0
                                 ? 'No results'
-                                : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
+                                : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
                         </p>
+
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => goTo(1)}
@@ -395,25 +765,35 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                 <ChevronLeftIcon className="size-4" />
                             </button>
 
-                            {/* Page number pills */}
                             <div className="flex items-center gap-1 px-1">
-                                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
-                                    .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
-                                        acc.push(p);
+                                {Array.from({ length: totalPages }, (_, index) => index + 1)
+                                    .filter((item) => item === 1 || item === totalPages || Math.abs(item - safePage) <= 1)
+                                    .reduce<(number | 'ellipsis')[]>((acc, item, index, arr) => {
+                                        if (index > 0 && item - (arr[index - 1] as number) > 1) {
+                                            acc.push('ellipsis');
+                                        }
+
+                                        acc.push(item);
+
                                         return acc;
                                     }, [])
-                                    .map((p, i) =>
-                                        p === 'ellipsis' ? (
-                                            <span key={`e${i}`} className="text-muted-foreground px-1 text-xs">…</span>
+                                    .map((item, index) =>
+                                        item === 'ellipsis' ? (
+                                            <span key={`ellipsis-${index}`} className="text-muted-foreground px-1 text-xs">
+                                                ...
+                                            </span>
                                         ) : (
                                             <button
-                                                key={p}
-                                                onClick={() => goTo(p as number)}
-                                                className={`min-w-[28px] rounded px-2 py-1 text-xs font-medium transition-colors ${safePage === p ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+                                                key={item}
+                                                onClick={() => goTo(item as number)}
+                                                className={cn(
+                                                    'min-w-[28px] rounded px-2 py-1 text-xs font-medium transition-colors',
+                                                    safePage === item
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'hover:bg-accent',
+                                                )}
                                             >
-                                                {p}
+                                                {item}
                                             </button>
                                         ),
                                     )}
@@ -438,7 +818,6 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                         </div>
                     </div>
                 </div>
-
             </div>
         </>
     );
