@@ -30,13 +30,20 @@ class SubjectController extends Controller
 
     public function show(Subject $subject)
     {
+        $chaptersWith = ['schoolClass:id,name', 'pattern:id,name,short_name'];
+        if ($subject->subject_type === 'topic-wise') {
+            $chaptersWith['topics'] = fn ($q) => $q->orderBy('sort_id')->orderBy('name');
+        }
+
         $subject->load([
             'classSubjects.schoolClass:id,name,status',
             'classSubjects.pattern:id,name,short_name',
             'auditLogs.changedBy:id,name',
+            'chapters' => fn ($q) => $q->with($chaptersWith)
+                ->orderBy('pattern_id')->orderBy('class_id')
+                ->orderBy('chapter_number')->orderBy('sort_id'),
         ]);
 
-        // Group class links by pattern
         $linksByPattern = $subject->classSubjects
             ->groupBy('pattern_id')
             ->map(fn ($items) => [
@@ -45,16 +52,39 @@ class SubjectController extends Controller
             ])
             ->values();
 
+        $chapters = $subject->chapters->map(fn ($ch) => [
+            'id'             => $ch->id,
+            'name'           => $ch->name,
+            'name_ur'        => $ch->name_ur,
+            'chapter_number' => $ch->chapter_number,
+            'sort_id'        => $ch->sort_id,
+            'status'         => $ch->status,
+            'class_id'       => $ch->class_id,
+            'pattern_id'     => $ch->pattern_id,
+            'class'          => $ch->schoolClass ? ['id' => $ch->schoolClass->id, 'name' => $ch->schoolClass->name] : null,
+            'pattern'        => $ch->pattern    ? ['id' => $ch->pattern->id,    'name' => $ch->pattern->name]    : null,
+            'topics'         => $subject->subject_type === 'topic-wise'
+                ? $ch->topics->map(fn ($t) => [
+                    'id'      => $t->id,
+                    'name'    => $t->name,
+                    'name_ur' => $t->name_ur,
+                    'sort_id' => $t->sort_id,
+                    'status'  => $t->status,
+                ])->values()
+                : [],
+        ])->values();
+
         return Inertia::render('superadmin/subjects/show', [
             'subject' => [
-                'id'              => $subject->id,
-                'name_eng'        => $subject->name_eng,
-                'name_ur'         => $subject->name_ur,
-                'subject_type'    => $subject->subject_type,
-                'status'          => $subject->status,
-                'created_at'      => $subject->created_at?->toISOString(),
+                'id'               => $subject->id,
+                'name_eng'         => $subject->name_eng,
+                'name_ur'          => $subject->name_ur,
+                'subject_type'     => $subject->subject_type,
+                'status'           => $subject->status,
+                'created_at'       => $subject->created_at?->toISOString(),
                 'links_by_pattern' => $linksByPattern,
-                'audit_logs'      => $subject->auditLogs->map(fn ($log) => [
+                'chapters'         => $chapters,
+                'audit_logs'       => $subject->auditLogs->map(fn ($log) => [
                     'id'         => $log->id,
                     'event'      => $log->event?->value,
                     'old_values' => $log->old_values ?? [],
