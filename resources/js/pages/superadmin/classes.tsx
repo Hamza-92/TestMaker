@@ -4,7 +4,6 @@ import {
     ChevronRightIcon,
     ChevronsLeftIcon,
     ChevronsRightIcon,
-    EllipsisIcon,
     EyeIcon,
     PencilIcon,
     SearchIcon,
@@ -20,13 +19,6 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -221,33 +213,18 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
                                                     month: 'short', day: 'numeric', year: 'numeric',
                                                 })}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <button className="hover:bg-accent rounded-md p-1.5 transition-colors">
-                                                            <EllipsisIcon className="size-4" />
-                                                        </button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-36">
-                                                        <DropdownMenuItem asChild className="gap-2">
-                                                            <Link href={`/superadmin/classes/${cls.id}`}>
-                                                                <EyeIcon className="size-3.5" /> View
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem asChild className="gap-2">
-                                                            <Link href={`/superadmin/classes/${cls.id}/edit`}>
-                                                                <PencilIcon className="size-3.5" /> Edit
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            className="text-destructive gap-2 focus:text-destructive"
-                                                            onSelect={() => setDeleteTarget(cls)}
-                                                        >
-                                                            <Trash2Icon className="size-3.5" /> Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <Link href={`/superadmin/classes/${cls.id}`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
+                                                        <EyeIcon className="size-4" />
+                                                    </Link>
+                                                    <Link href={`/superadmin/classes/${cls.id}/edit`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
+                                                        <PencilIcon className="size-4" />
+                                                    </Link>
+                                                    <button onClick={() => setDeleteTarget(cls)} className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors">
+                                                        <Trash2Icon className="size-4" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

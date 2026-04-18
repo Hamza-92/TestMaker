@@ -4,7 +4,6 @@ import {
     ChevronRightIcon,
     ChevronsLeftIcon,
     ChevronsRightIcon,
-    EllipsisIcon,
     MailIcon,
     MapPinIcon,
     PencilIcon,
@@ -22,7 +21,6 @@ import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
-    DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
@@ -353,23 +351,15 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                     </td>
                                                 )}
                                                 {visibleCols.actions && (
-                                                    <td className="px-4 py-3 text-center">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <button className="hover:bg-accent rounded-md p-1.5 transition-colors">
-                                                                    <EllipsisIcon className="size-4" />
-                                                                </button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="w-36">
-                                                                <DropdownMenuItem className="gap-2">
-                                                                    <PencilIcon className="size-3.5" /> Edit
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive gap-2 focus:text-destructive">
-                                                                    <Trash2Icon className="size-3.5" /> Delete
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <button className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
+                                                                <PencilIcon className="size-4" />
+                                                            </button>
+                                                            <button className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors">
+                                                                <Trash2Icon className="size-4" />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 )}
                                             </tr>
