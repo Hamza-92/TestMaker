@@ -5,7 +5,8 @@
       "Bash(npm install *)",
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(grep -E \"\\\\.\\(tsx|jsx|php\\)$\")"
     ]
   }
 }

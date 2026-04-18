@@ -30,6 +30,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('superadmin.customers.subscriptions.store');
     Route::get('superadmin/customers/{customer}/subscriptions/{subscription}', [CustomerSubscriptionController::class, 'show'])
         ->name('superadmin.customers.subscriptions.show');
+    Route::get('superadmin/customers/{customer}/subscriptions/{subscription}/edit', [CustomerSubscriptionController::class, 'edit'])
+        ->name('superadmin.customers.subscriptions.edit');
+    Route::put('superadmin/customers/{customer}/subscriptions/{subscription}', [CustomerSubscriptionController::class, 'update'])
+        ->name('superadmin.customers.subscriptions.update');
     Route::post('superadmin/customers/{customer}/subscriptions/{subscription}/payment-logs', [CustomerSubscriptionController::class, 'storePaymentLog'])
         ->name('superadmin.customers.subscriptions.payment-logs.store');
     Route::put('superadmin/customers/{customer}/subscriptions/{subscription}/payment-logs/{paymentLog}', [CustomerSubscriptionController::class, 'updatePaymentLog'])

@@ -220,6 +220,102 @@ class CustomerSubscriptionController extends Controller
         return $model::whereIn('id', $ids)->pluck($column)->all();
     }
 
+    public function edit(User $customer, Subscription $subscription)
+    {
+        abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
+
+        return Inertia::render('superadmin/customers/subscriptions/edit', [
+            'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
+            'subscription' => [
+                'id'                => $subscription->id,
+                'name'              => $subscription->name,
+                'amount'            => (string) $subscription->amount,
+                'allowed_questions' => $subscription->allowed_questions,
+                'started_at'        => $subscription->started_at?->toDateString(),
+                'duration'          => $subscription->duration,
+                'status'            => $subscription->status?->value,
+                'allow_teachers'    => $subscription->allow_teachers,
+                'max_teachers'      => $subscription->max_teachers,
+                'pattern_access'    => $subscription->pattern_access,
+                'class_access'      => $subscription->class_access,
+                'subject_access'    => $subscription->subject_access,
+            ],
+            'patterns' => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
+            'classes'  => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
+            'subjects' => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
+        ]);
+    }
+
+    public function update(Request $request, User $customer, Subscription $subscription)
+    {
+        abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
+
+        $validated = $request->validate([
+            'name'               => ['required', 'string', 'max:255'],
+            'amount'             => ['required', 'numeric', 'min:0'],
+            'allowed_questions'  => ['required', 'integer', 'min:0'],
+            'started_at'         => ['required', 'date'],
+            'duration'           => ['required', 'integer', 'min:1'],
+            'status'             => ['required', 'in:active,expired,cancelled'],
+            'pattern_access'     => ['nullable', 'array'],
+            'pattern_access.*'   => ['integer'],
+            'class_access'       => ['nullable', 'array'],
+            'class_access.*'     => ['integer'],
+            'subject_access'     => ['nullable', 'array'],
+            'subject_access.*'   => ['integer'],
+            'allow_teachers'     => ['boolean'],
+            'max_teachers'       => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
+
+        $oldValues = [
+            'name'           => $subscription->name,
+            'amount'         => (string) $subscription->amount,
+            'status'         => $subscription->status?->value,
+            'pattern_access' => $subscription->pattern_access,
+            'class_access'   => $subscription->class_access,
+            'subject_access' => $subscription->subject_access,
+        ];
+
+        DB::transaction(function () use ($validated, $startedAt, $subscription, $oldValues) {
+            $subscription->update([
+                'name'              => $validated['name'],
+                'pattern_access'    => $validated['pattern_access'] ?? null,
+                'class_access'      => $validated['class_access'] ?? null,
+                'subject_access'    => $validated['subject_access'] ?? null,
+                'allow_teachers'    => $validated['allow_teachers'] ?? false,
+                'max_teachers'      => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
+                'allowed_questions' => $validated['allowed_questions'],
+                'amount'            => $validated['amount'],
+                'started_at'        => $startedAt,
+                'duration'          => $validated['duration'],
+                'expired_at'        => $startedAt->copy()->addDays((int) $validated['duration']),
+                'status'            => $validated['status'],
+            ]);
+
+            AuditLog::record(
+                model: $subscription,
+                event: AuditEvent::Updated,
+                oldValues: $oldValues,
+                newValues: [
+                    'name'           => $subscription->name,
+                    'amount'         => (string) $subscription->amount,
+                    'status'         => $subscription->status->value,
+                    'pattern_access' => $subscription->pattern_access,
+                    'class_access'   => $subscription->class_access,
+                    'subject_access' => $subscription->subject_access,
+                ],
+                actor: auth()->user(),
+                notes: 'Subscription updated.',
+            );
+        });
+
+        return redirect()
+            ->route('superadmin.customers.subscriptions.show', [$customer, $subscription])
+            ->with('success', 'Subscription updated successfully.');
+    }
+
     public function create(User $customer)
     {
         return Inertia::render('superadmin/customers/subscriptions/add', [

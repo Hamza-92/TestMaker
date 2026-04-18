@@ -323,6 +323,14 @@ export default function ShowSubscription({ customer, subscription, paymentLogs, 
                     icon={<FileTextIcon className="size-4" />}
                     title="Subscription Details"
                     description="Plan configuration, billing, and permissions"
+                    action={
+                        <Link
+                            href={`/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/edit`}
+                            className="border-input hover:bg-accent flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors"
+                        >
+                            <PencilIcon className="size-3.5" /> Edit
+                        </Link>
+                    }
                 >
                     <div className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <InfoCell label="Plan Name" value={subscription.name} />
