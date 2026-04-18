@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
+import { HierarchicalAccessControl } from '@/components/subscription-access-control';
 
 interface Customer {
     id: number;
@@ -61,6 +61,8 @@ interface Props {
     patterns: Pattern[];
     classes: SchoolClass[];
     subjects: Subject[];
+    patternClassMap: Record<string, number[]>;
+    classSubjectMap: Record<string, number[]>;
 }
 
 interface FormData {
@@ -126,81 +128,8 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
-function AccessSelector<T extends { id: number }>({
-    label,
-    items,
-    renderLabel,
-    value,
-    onChange,
-    error,
-}: {
-    label: string;
-    items: T[];
-    renderLabel: (item: T) => string;
-    value: number[] | null;
-    onChange: (val: number[] | null) => void;
-    error?: string;
-}) {
-    const isAll = value === null;
-    const selected = value ?? [];
-    const allChecked = isAll || selected.length === items.length;
-    const someChecked = !isAll && selected.length > 0 && selected.length < items.length;
 
-    function toggleSelectAll(checked: boolean) {
-        onChange(checked ? null : []);
-    }
-
-    function toggleItem(id: number, checked: boolean) {
-        if (isAll) {
-            onChange(checked ? items.map((i) => i.id) : items.map((i) => i.id).filter((v) => v !== id));
-        } else {
-            const next = checked ? [...selected, id] : selected.filter((v) => v !== id);
-            onChange(next.length === items.length ? null : next);
-        }
-    }
-
-    return (
-        <div className="space-y-2">
-            <div className="border-input rounded-lg border">
-                <label className="bg-muted/40 flex cursor-pointer items-center gap-2.5 rounded-t-lg border-b px-3 py-2.5">
-                    <Checkbox
-                        checked={allChecked}
-                        data-state={someChecked ? 'indeterminate' : allChecked ? 'checked' : 'unchecked'}
-                        onCheckedChange={(checked) => toggleSelectAll(!!checked)}
-                        className={someChecked ? 'opacity-60' : ''}
-                    />
-                    <span className="text-sm font-medium">{label}</span>
-                    <span className="text-muted-foreground ml-auto text-xs">
-                        {isAll ? 'All access' : selected.length === 0 ? 'None selected' : `${selected.length} of ${items.length} selected`}
-                    </span>
-                </label>
-
-                {items.length === 0 ? (
-                    <p className="text-muted-foreground px-3 py-3 text-xs">No items available.</p>
-                ) : (
-                    <div className="grid gap-px p-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {items.map((item) => (
-                            <label
-                                key={item.id}
-                                className="hover:bg-accent flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
-                            >
-                                <Checkbox
-                                    checked={isAll || selected.includes(item.id)}
-                                    onCheckedChange={(checked) => toggleItem(item.id, !!checked)}
-                                />
-                                <span>{renderLabel(item)}</span>
-                            </label>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {error && <p className="text-destructive text-xs">{error}</p>}
-        </div>
-    );
-}
-
-export default function EditCustomerSubscription({ customer, subscription, patterns, classes, subjects }: Props) {
+export default function EditCustomerSubscription({ customer, subscription, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
     const { data, setData, put, processing, errors } = useForm<FormData>({
         name: subscription.name,
         amount: subscription.amount,
@@ -367,43 +296,25 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     </div>
 
                     {/* ── Access Control ─────────────────────────────────────── */}
-                    <div className="space-y-6 rounded-xl border p-5 shadow-sm">
+                    <div className="space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<LockIcon className="size-4" />}
                             title="Access Control"
                             description="Define which patterns, classes, and subjects this plan grants access to"
                         />
-                        <Separator />
 
-                        <AccessSelector
-                            label="Patterns"
-                            items={patterns}
-                            renderLabel={(p) => p.short_name ? `${p.name} (${p.short_name})` : p.name}
-                            value={data.pattern_access as number[] | null}
-                            onChange={(val) => setData('pattern_access', val)}
-                            error={errors.pattern_access}
-                        />
-
-                        <Separator />
-
-                        <AccessSelector
-                            label="Classes"
-                            items={classes}
-                            renderLabel={(c) => c.name}
-                            value={data.class_access as number[] | null}
-                            onChange={(val) => setData('class_access', val)}
-                            error={errors.class_access}
-                        />
-
-                        <Separator />
-
-                        <AccessSelector
-                            label="Subjects"
-                            items={subjects}
-                            renderLabel={(s) => s.name_eng}
-                            value={data.subject_access as number[] | null}
-                            onChange={(val) => setData('subject_access', val)}
-                            error={errors.subject_access}
+                        <HierarchicalAccessControl
+                            patterns={patterns}
+                            classes={classes}
+                            subjects={subjects}
+                            patternClassMap={patternClassMap}
+                            classSubjectMap={classSubjectMap}
+                            patternAccess={data.pattern_access as number[] | null}
+                            classAccess={data.class_access as number[] | null}
+                            subjectAccess={data.subject_access as number[] | null}
+                            onPatternChange={(val) => setData('pattern_access', val)}
+                            onClassChange={(val) => setData('class_access', val)}
+                            onSubjectChange={(val) => setData('subject_access', val)}
                         />
                     </div>
 

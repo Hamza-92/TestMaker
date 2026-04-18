@@ -213,6 +213,31 @@ class CustomerSubscriptionController extends Controller
         return back()->with('success', 'Payment status updated.');
     }
 
+    private function buildAccessMaps(): array
+    {
+        $patternClassMap = DB::table('pattern_classes')
+            ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
+            ->where('classes.status', 1)
+            ->select('pattern_classes.pattern_id', 'pattern_classes.class_id')
+            ->get()
+            ->groupBy('pattern_id')
+            ->map(fn ($rows) => $rows->pluck('class_id')->values()->all())
+            ->toArray();
+
+        $classSubjectMap = [];
+        DB::table('class_subjects')
+            ->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
+            ->where('subjects.status', 1)
+            ->select('class_subjects.pattern_id', 'class_subjects.class_id', 'class_subjects.subject_id')
+            ->get()
+            ->each(function ($row) use (&$classSubjectMap) {
+                $key = "{$row->pattern_id}:{$row->class_id}";
+                $classSubjectMap[$key][] = $row->subject_id;
+            });
+
+        return compact('patternClassMap', 'classSubjectMap');
+    }
+
     private function resolveNames(string $model, ?array $ids, string $column): array|null
     {
         if ($ids === null) return null;
@@ -223,6 +248,8 @@ class CustomerSubscriptionController extends Controller
     public function edit(User $customer, Subscription $subscription)
     {
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
+
+        $maps = $this->buildAccessMaps();
 
         return Inertia::render('superadmin/customers/subscriptions/edit', [
             'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
@@ -240,9 +267,11 @@ class CustomerSubscriptionController extends Controller
                 'class_access'      => $subscription->class_access,
                 'subject_access'    => $subscription->subject_access,
             ],
-            'patterns' => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
-            'classes'  => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
-            'subjects' => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
+            'patterns'        => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
+            'classes'         => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
+            'subjects'        => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
+            'patternClassMap' => $maps['patternClassMap'],
+            'classSubjectMap' => $maps['classSubjectMap'],
         ]);
     }
 
@@ -318,11 +347,17 @@ class CustomerSubscriptionController extends Controller
 
     public function create(User $customer)
     {
+        $maps = $this->buildAccessMaps();
+        $patternClassMap = $maps['patternClassMap'];
+        $classSubjectMap = $maps['classSubjectMap'];
+
         return Inertia::render('superadmin/customers/subscriptions/add', [
-            'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
-            'patterns' => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
-            'classes'  => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
-            'subjects' => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
+            'customer'        => $customer->only(['id', 'name', 'email', 'school_name']),
+            'patterns'        => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
+            'classes'         => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
+            'subjects'        => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
+            'patternClassMap' => $patternClassMap,
+            'classSubjectMap' => $classSubjectMap,
         ]);
     }
 
