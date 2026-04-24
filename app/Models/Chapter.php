@@ -42,6 +42,11 @@ class Chapter extends Model
         return $this->hasMany(Topic::class);
     }
 
+    public function questions(): HasMany
+    {
+        return $this->hasMany(Question::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

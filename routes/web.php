@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Superadmin\ChapterController;
+use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
-use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\PatternController;
-use App\Http\Controllers\Superadmin\ChapterController;
+use App\Http\Controllers\Superadmin\QuestionController;
+use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\TopicController;
 use Illuminate\Support\Facades\Route;
@@ -72,6 +74,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('superadmin/subjects/{subject}/chapters/{chapter}/topics', [TopicController::class, 'store'])->name('superadmin.subjects.chapters.topics.store');
     Route::put('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}', [TopicController::class, 'update'])->name('superadmin.subjects.chapters.topics.update');
     Route::delete('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}', [TopicController::class, 'destroy'])->name('superadmin.subjects.chapters.topics.destroy');
+
+    Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types');
+    Route::get('superadmin/question-types/add', [QuestionTypeController::class, 'create'])->name('superadmin.question-types.add');
+    Route::post('superadmin/question-types', [QuestionTypeController::class, 'store'])->name('superadmin.question-types.store');
+    Route::get('superadmin/question-types/{questionType}', [QuestionTypeController::class, 'show'])->name('superadmin.question-types.show');
+    Route::get('superadmin/question-types/{questionType}/edit', [QuestionTypeController::class, 'edit'])->name('superadmin.question-types.edit');
+    Route::put('superadmin/question-types/{questionType}', [QuestionTypeController::class, 'update'])->name('superadmin.question-types.update');
+    Route::delete('superadmin/question-types/{questionType}', [QuestionTypeController::class, 'destroy'])->name('superadmin.question-types.destroy');
+
+    Route::get('superadmin/questions', [QuestionController::class, 'index'])->name('superadmin.questions');
+    Route::get('superadmin/questions/add', [QuestionController::class, 'create'])->name('superadmin.questions.add');
+    Route::get('superadmin/questions/import', [QuestionController::class, 'import'])->name('superadmin.questions.import');
+    Route::post('superadmin/questions/import/preview', [QuestionController::class, 'previewImport'])->name('superadmin.questions.import.preview');
+    Route::post('superadmin/questions/import', [QuestionController::class, 'storeImport'])->name('superadmin.questions.import.store');
+    Route::get('superadmin/questions/import/template', [QuestionController::class, 'downloadImportTemplate'])->name('superadmin.questions.import.template');
+    Route::post('superadmin/questions', [QuestionController::class, 'store'])->name('superadmin.questions.store');
+    Route::get('superadmin/questions/{question}', [QuestionController::class, 'show'])->name('superadmin.questions.show');
+    Route::get('superadmin/questions/{question}/edit', [QuestionController::class, 'edit'])->name('superadmin.questions.edit');
+    Route::put('superadmin/questions/{question}', [QuestionController::class, 'update'])->name('superadmin.questions.update');
+    Route::delete('superadmin/questions/{question}', [QuestionController::class, 'destroy'])->name('superadmin.questions.destroy');
 });
 
 require __DIR__.'/settings.php';

@@ -1,7 +1,14 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, BookOpenIcon, FolderGit2, LayoutGrid, SchoolIcon, TagIcon, Users } from 'lucide-react';
+import {
+    BookOpenIcon,
+    LayoutGrid,
+    ListChecksIcon,
+    SchoolIcon,
+    ShapesIcon,
+    TagIcon,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -42,18 +49,15 @@ const mainNavItems: NavItem[] = [
         href: '/superadmin/subjects',
         icon: BookOpenIcon,
     },
-];
-
-const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
+        title: 'Question Types',
+        href: '/superadmin/question-types',
+        icon: ShapesIcon,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
+        title: 'Questions',
+        href: '/superadmin/questions',
+        icon: ListChecksIcon,
     },
 ];
 
@@ -77,7 +81,6 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                {/* <NavFooter items={footerNavItems} className="mt-auto" /> */}
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
