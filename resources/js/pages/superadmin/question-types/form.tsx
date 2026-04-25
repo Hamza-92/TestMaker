@@ -8,7 +8,6 @@ import {
     TargetIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,9 +57,6 @@ interface QuestionTypeFormProps {
     onSubmit: (event: React.FormEvent) => void;
 }
 
-const textareaClassName =
-    'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[108px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]';
-
 function SectionCard({
     children,
     icon,
@@ -71,7 +67,7 @@ function SectionCard({
     title: string;
 }) {
     return (
-        <section className="space-y-4 rounded-2xl border border-primary/10 bg-card p-5 shadow-sm">
+        <section className="w-full min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-card p-5 shadow-sm">
             <div className="flex items-center gap-3">
                 <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     {icon}
@@ -96,7 +92,7 @@ function Field({
     children: ReactNode;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
                 {required ? (
@@ -181,8 +177,8 @@ export function QuestionTypeForm({
         null;
 
     return (
-        <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-            <div className="flex items-center gap-4">
+        <div className="mx-auto w-full max-w-5xl min-w-0 space-y-6 p-4 md:p-6">
+            <div className="flex min-w-0 items-center gap-4">
                 <Link
                     href={backHref}
                     className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
@@ -194,7 +190,7 @@ export function QuestionTypeForm({
                 </div>
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-5">
+            <form onSubmit={onSubmit} className="w-full min-w-0 space-y-5">
                 <SectionCard
                     icon={<FileTextIcon className="size-4" />}
                     title="Details"
@@ -246,59 +242,25 @@ export function QuestionTypeForm({
                         </Field>
 
                         <Field
-                            label="Description (English)"
-                            error={form.errors.description_en}
+                            label="Status"
+                            required
+                            error={form.errors.status}
                         >
-                            <textarea
-                                rows={4}
-                                value={form.data.description_en}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'description_en',
-                                        event.target.value,
-                                    )
+                            <Select
+                                value={form.data.status}
+                                onValueChange={(value) =>
+                                    form.setData('status', value)
                                 }
-                                className={textareaClassName}
-                            />
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="1">Active</SelectItem>
+                                    <SelectItem value="0">Inactive</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </Field>
-
-                        <Field
-                            label="Description (Urdu)"
-                            error={form.errors.description_ur}
-                        >
-                            <textarea
-                                dir="rtl"
-                                rows={4}
-                                value={form.data.description_ur}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'description_ur',
-                                        event.target.value,
-                                    )
-                                }
-                                className={textareaClassName}
-                            />
-                        </Field>
-
-                        <div className="md:col-span-2">
-                            <div className="flex items-center justify-between gap-3 rounded-2xl border bg-muted/20 px-4 py-3">
-                                <p className="font-medium">Active</p>
-                                <Switch
-                                    checked={form.data.status === '1'}
-                                    onCheckedChange={(checked) =>
-                                        form.setData(
-                                            'status',
-                                            checked ? '1' : '0',
-                                        )
-                                    }
-                                />
-                            </div>
-                            {form.errors.status ? (
-                                <p className="mt-1.5 text-xs text-destructive">
-                                    {form.errors.status}
-                                </p>
-                            ) : null}
-                        </div>
                     </div>
                 </SectionCard>
 
@@ -341,7 +303,7 @@ export function QuestionTypeForm({
                         />
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                    <div>
                         <Field
                             label="Schema"
                             required
@@ -368,19 +330,6 @@ export function QuestionTypeForm({
                                 </SelectContent>
                             </Select>
                         </Field>
-
-                        <div className="flex flex-wrap gap-2 lg:justify-end hidden">
-                            {selectedSchema ? (
-                                <>
-                                    <Badge variant="outline">
-                                        {selectedSchema.label}
-                                    </Badge>
-                                    <Badge variant="outline">
-                                        {selectedSchema.kind}
-                                    </Badge>
-                                </>
-                            ) : null}
-                        </div>
                     </div>
 
                     {selectedSchema ? (
@@ -388,7 +337,7 @@ export function QuestionTypeForm({
                             {selectedSchema.settings.supports_answer_toggle ? (
                                 <SwitchRow
                                     checked={form.data.have_answer}
-                                    label="Has answer fields"
+                                    label="Answers"
                                     onCheckedChange={(checked) =>
                                         form.setData('have_answer', checked)
                                     }
@@ -398,7 +347,7 @@ export function QuestionTypeForm({
                             {selectedSchema.settings.supports_single_toggle ? (
                                 <SwitchRow
                                     checked={form.data.is_single}
-                                    label="Single correct answer"
+                                    label="Single correct"
                                     onCheckedChange={(checked) =>
                                         form.setData('is_single', checked)
                                     }

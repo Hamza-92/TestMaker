@@ -234,7 +234,7 @@ function Field({
     children: ReactNode;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
                 {required ? (
@@ -257,7 +257,7 @@ function SectionCard({
     title: string;
 }) {
     return (
-        <section className="space-y-4 rounded-2xl border border-primary/10 bg-card p-5 shadow-sm">
+        <section className="w-full min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-card p-5 shadow-sm">
             <div className="flex items-center gap-3">
                 <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     {icon}
@@ -280,7 +280,7 @@ function BuilderCard({
     title: string;
 }) {
     return (
-        <div className="space-y-4 rounded-2xl border p-4">
+        <div className="w-full min-w-0 space-y-4 rounded-2xl border p-4">
             <div className="flex items-center justify-between gap-3">
                 <p className="font-semibold">{title}</p>
                 {actions}
@@ -652,6 +652,7 @@ export function QuestionForm({
         englishKey: keyof QuestionContentFormData,
         urduKey: keyof QuestionContentFormData,
         required = false,
+        control: 'textarea' | 'input' = 'textarea',
     ) => (
         <BuilderCard title={title}>
             <div className="grid gap-4 md:grid-cols-2">
@@ -660,29 +661,48 @@ export function QuestionForm({
                     required={required}
                     error={errorFor(`content.${String(englishKey)}`)}
                 >
-                    <textarea
-                        rows={4}
-                        value={String(form.data.content[englishKey] ?? '')}
-                        onChange={(event) =>
-                            setContentValue(englishKey, event.target.value)
-                        }
-                        className={textareaClassName}
-                    />
+                    {control === 'input' ? (
+                        <Input
+                            value={String(form.data.content[englishKey] ?? '')}
+                            onChange={(event) =>
+                                setContentValue(englishKey, event.target.value)
+                            }
+                        />
+                    ) : (
+                        <textarea
+                            rows={4}
+                            value={String(form.data.content[englishKey] ?? '')}
+                            onChange={(event) =>
+                                setContentValue(englishKey, event.target.value)
+                            }
+                            className={textareaClassName}
+                        />
+                    )}
                 </Field>
 
                 <Field
                     label="Urdu"
                     error={errorFor(`content.${String(urduKey)}`)}
                 >
-                    <textarea
-                        dir="rtl"
-                        rows={4}
-                        value={String(form.data.content[urduKey] ?? '')}
-                        onChange={(event) =>
-                            setContentValue(urduKey, event.target.value)
-                        }
-                        className={textareaClassName}
-                    />
+                    {control === 'input' ? (
+                        <Input
+                            dir="rtl"
+                            value={String(form.data.content[urduKey] ?? '')}
+                            onChange={(event) =>
+                                setContentValue(urduKey, event.target.value)
+                            }
+                        />
+                    ) : (
+                        <textarea
+                            dir="rtl"
+                            rows={4}
+                            value={String(form.data.content[urduKey] ?? '')}
+                            onChange={(event) =>
+                                setContentValue(urduKey, event.target.value)
+                            }
+                            className={textareaClassName}
+                        />
+                    )}
                 </Field>
             </div>
         </BuilderCard>
@@ -745,8 +765,7 @@ export function QuestionForm({
                                 label="English"
                                 error={errorFor(`${prefix}.${index}.text_en`)}
                             >
-                                <textarea
-                                    rows={3}
+                                <Input
                                     value={option.text_en}
                                     onChange={(event) =>
                                         onOptionValue(
@@ -755,16 +774,14 @@ export function QuestionForm({
                                             event.target.value,
                                         )
                                     }
-                                    className={textareaClassName}
                                 />
                             </Field>
                             <Field
                                 label="Urdu"
                                 error={errorFor(`${prefix}.${index}.text_ur`)}
                             >
-                                <textarea
+                                <Input
                                     dir="rtl"
-                                    rows={3}
                                     value={option.text_ur}
                                     onChange={(event) =>
                                         onOptionValue(
@@ -773,7 +790,6 @@ export function QuestionForm({
                                             event.target.value,
                                         )
                                     }
-                                    className={textareaClassName}
                                 />
                             </Field>
                         </div>
@@ -959,15 +975,13 @@ export function QuestionForm({
                                         `content.items.${itemIndex}.answer_en`,
                                     )}
                                 >
-                                    <textarea
-                                        rows={3}
+                                    <Input
                                         value={item.answer_en}
                                         onChange={(event) =>
                                             updateItem(itemIndex, {
                                                 answer_en: event.target.value,
                                             })
                                         }
-                                        className={textareaClassName}
                                     />
                                 </Field>
                                 <Field
@@ -976,16 +990,14 @@ export function QuestionForm({
                                         `content.items.${itemIndex}.answer_ur`,
                                     )}
                                 >
-                                    <textarea
+                                    <Input
                                         dir="rtl"
-                                        rows={3}
                                         value={item.answer_ur}
                                         onChange={(event) =>
                                             updateItem(itemIndex, {
                                                 answer_ur: event.target.value,
                                             })
                                         }
-                                        className={textareaClassName}
                                     />
                                 </Field>
                             </div>
@@ -1106,11 +1118,7 @@ export function QuestionForm({
 
     const renderSchemaBuilder = () => {
         if (!selectedSchema) {
-            return (
-                <div className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">
-                    Select a question type.
-                </div>
-            );
+            return null;
         }
 
         switch (selectedSchema.key) {
@@ -1190,6 +1198,7 @@ export function QuestionForm({
                             'answer_en',
                             'answer_ur',
                             true,
+                            'input',
                         )}
                     </div>
                 );
@@ -1233,16 +1242,10 @@ export function QuestionForm({
                 return (
                     <div className="space-y-5">
                         {renderLocalizedEditor(
-                            'Prompt',
+                            'Question',
                             'prompt_en',
                             'prompt_ur',
                             true,
-                        )}
-                        {renderLocalizedEditor(
-                            'Guidance / Notes',
-                            'guidance_en',
-                            'guidance_ur',
-                            false,
                         )}
                         {selectedType?.have_answer
                             ? renderLocalizedEditor(
@@ -1258,8 +1261,8 @@ export function QuestionForm({
     };
 
     return (
-        <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
-            <div className="flex items-center gap-4">
+        <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 p-4 md:p-6">
+            <div className="flex min-w-0 items-center gap-4">
                 <Link
                     href={backHref}
                     className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
@@ -1271,7 +1274,7 @@ export function QuestionForm({
                 </div>
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-5">
+            <form onSubmit={onSubmit} className="w-full min-w-0 space-y-5">
                 <SectionCard
                     icon={<FileQuestionIcon className="size-4" />}
                     title="Setup"
@@ -1306,6 +1309,27 @@ export function QuestionForm({
                                             {item.name}
                                         </SelectItem>
                                     ))}
+                                </SelectContent>
+                            </Select>
+                        </Field>
+
+                        <Field
+                            label="Status"
+                            required
+                            error={form.errors.status}
+                        >
+                            <Select
+                                value={form.data.status}
+                                onValueChange={(value) =>
+                                    form.setData('status', value)
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="1">Active</SelectItem>
+                                    <SelectItem value="0">Inactive</SelectItem>
                                 </SelectContent>
                             </Select>
                         </Field>
@@ -1492,82 +1516,17 @@ export function QuestionForm({
                                 </Select>
                             </Field>
                         </div>
-
-                        <div className="md:col-span-2 xl:col-span-3">
-                            <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-muted/20 px-4 py-3">
-                                {selectedType ? (
-                                    <>
-                                        <Badge
-                                            variant="outline"
-                                            className="bg-background"
-                                        >
-                                            {selectedType.is_objective
-                                                ? 'Objective'
-                                                : 'Subjective'}
-                                        </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            className="bg-background"
-                                        >
-                                            {selectedType.schema.label}
-                                        </Badge>
-                                        {selectedType.have_answer ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="bg-background"
-                                            >
-                                                Answer fields
-                                            </Badge>
-                                        ) : null}
-                                        {selectedType.is_objective &&
-                                        selectedType.schema.settings
-                                            .supports_single_toggle ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="bg-background"
-                                            >
-                                                {selectedType.is_single
-                                                    ? 'Single correct'
-                                                    : 'Multiple correct'}
-                                            </Badge>
-                                        ) : null}
-                                    </>
-                                ) : (
-                                    <span className="text-sm text-muted-foreground">
-                                        Choose a type to load its fields.
-                                    </span>
-                                )}
-
-                                <div className="ml-auto flex items-center gap-3">
-                                    <Label className="font-medium">
-                                        Active
-                                    </Label>
-                                    <Switch
-                                        checked={form.data.status === '1'}
-                                        onCheckedChange={(checked) =>
-                                            form.setData(
-                                                'status',
-                                                checked ? '1' : '0',
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            {form.errors.status ? (
-                                <p className="mt-1.5 text-xs text-destructive">
-                                    {form.errors.status}
-                                </p>
-                            ) : null}
-                        </div>
                     </div>
                 </SectionCard>
 
-                <SectionCard
-                    icon={<ScrollTextIcon className="size-4" />}
-                    title="Builder"
-                >
-                    {renderSchemaBuilder()}
-                </SectionCard>
+                {selectedType ? (
+                    <SectionCard
+                        icon={<ScrollTextIcon className="size-4" />}
+                        title="Builder"
+                    >
+                        {renderSchemaBuilder()}
+                    </SectionCard>
+                ) : null}
 
                 <div className="flex flex-col gap-3 pb-2 sm:flex-row sm:justify-end">
                     <Button asChild variant="outline">

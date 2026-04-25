@@ -106,7 +106,7 @@ function Field({
     children: ReactNode;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
                 {required ? (
@@ -129,7 +129,7 @@ function SectionCard({
     title: string;
 }) {
     return (
-        <section className="space-y-4 rounded-xl border p-5 shadow-sm">
+        <section className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
             <div className="flex items-center gap-3">
                 <span className="inline-flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     {icon}
@@ -447,16 +447,16 @@ export default function ImportQuestions({
         <>
             <Head title="Bulk Import Questions" />
 
-            <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-4">
+            <div className="mx-auto w-full max-w-5xl min-w-0 space-y-6 p-4 md:p-6">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-4">
                         <Link
                             href="/superadmin/questions"
                             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
                         >
                             <ArrowLeftIcon className="size-4" />
                         </Link>
-                        <div className="space-y-2">
+                        <div className="min-w-0 space-y-2">
                             <h1 className="h1-semibold">
                                 Bulk Import Questions
                             </h1>
@@ -721,7 +721,7 @@ export default function ImportQuestions({
                     </div>
                 ) : null}
 
-                <form onSubmit={handlePreviewSubmit} className="space-y-5">
+                <form onSubmit={handlePreviewSubmit} className="w-full min-w-0 space-y-5">
                     <SectionCard
                         icon={<UploadIcon className="size-4" />}
                         title="Import"

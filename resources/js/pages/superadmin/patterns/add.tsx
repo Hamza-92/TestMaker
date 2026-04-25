@@ -21,7 +21,7 @@ function Field({ label, required, error, children }: {
     children: React.ReactNode;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
                 {required && <span className="text-destructive text-xs">*</span>}
@@ -48,10 +48,10 @@ export default function AddPattern() {
     return (
         <>
             <Head title="Add Pattern" />
-            <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
+            <div className="mx-auto w-full max-w-2xl min-w-0 space-y-6 p-4 md:p-6">
 
                 {/* ── Header ──────────────────────────────────────────────── */}
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-4">
                     <Link
                         href="/superadmin/patterns"
                         className="hover:bg-accent border-input flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors"
@@ -64,8 +64,8 @@ export default function AddPattern() {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="space-y-5 rounded-xl border p-5 shadow-sm">
+                <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">
+                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
 
                         {/* Section Header */}
                         <div className="flex items-start gap-3">
@@ -98,7 +98,7 @@ export default function AddPattern() {
 
                         <Field label="Status" required error={errors.status}>
                             <Select value={data.status} onValueChange={(v) => setData('status', v)}>
-                                <SelectTrigger className="w-full sm:w-48">
+                                <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

@@ -28,7 +28,7 @@ function Field({ label, required, error, children }: {
     children: React.ReactNode;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
                 {required && <span className="text-destructive text-xs">*</span>}
@@ -70,10 +70,10 @@ export default function AddClass({ patterns }: { patterns: Pattern[] }) {
     return (
         <>
             <Head title="Add Class" />
-            <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
+            <div className="mx-auto w-full max-w-2xl min-w-0 space-y-6 p-4 md:p-6">
 
                 {/* ── Header ──────────────────────────────────────────────── */}
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-4">
                     <Link
                         href="/superadmin/classes"
                         className="hover:bg-accent border-input flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors"
@@ -86,10 +86,10 @@ export default function AddClass({ patterns }: { patterns: Pattern[] }) {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">
 
                     {/* ── Section 1: Class Details ─────────────────────────── */}
-                    <div className="space-y-5 rounded-xl border p-5 shadow-sm">
+                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
                         <div className="flex items-start gap-3">
                             <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
                                 <SchoolIcon className="size-4" />
@@ -132,7 +132,7 @@ export default function AddClass({ patterns }: { patterns: Pattern[] }) {
                     </div>
 
                     {/* ── Section 2: Pattern Selection ─────────────────────── */}
-                    <div className="space-y-5 rounded-xl border p-5 shadow-sm">
+                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
                         <div className="flex items-start gap-3">
                             <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
                                 <CheckSquareIcon className="size-4" />
@@ -175,6 +175,7 @@ export default function AddClass({ patterns }: { patterns: Pattern[] }) {
                                 <div className="grid gap-2 sm:grid-cols-2">
                                     {patterns.map((pattern) => {
                                         const checked = data.pattern_ids.includes(pattern.id);
+
                                         return (
                                             <label
                                                 key={pattern.id}

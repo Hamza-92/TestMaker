@@ -68,11 +68,11 @@ interface FormData {
 
 function SectionHeader({ icon, title, description }: { icon: React.ReactNode; title: string; description?: string }) {
     return (
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3">
             <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
                 {icon}
             </div>
-            <div>
+            <div className="min-w-0">
                 <p className="text-sm font-medium">{title}</p>
                 {description && <p className="text-muted-foreground text-xs">{description}</p>}
             </div>
@@ -92,7 +92,7 @@ function Field({
     children: React.ReactNode;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
                 {required && <span className="text-destructive text-xs">*</span>}
@@ -105,7 +105,7 @@ function Field({
 
 function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { icon: React.ReactNode }) {
     return (
-        <div className="relative">
+        <div className="relative min-w-0">
             <div className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 [&_svg]:size-4">
                 {icon}
             </div>
@@ -136,8 +136,8 @@ export default function EditCustomerSubscription({ customer, subscription, patte
         <>
             <Head title={`Edit Subscription — ${subscription.name}`} />
 
-            <div className="space-y-6 p-4 md:p-6">
-                <div className="flex items-center gap-4">
+            <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 p-4 md:p-6">
+                <div className="flex min-w-0 items-center gap-4">
                     <Link
                         href={`/superadmin/customers/${customer.id}/subscriptions/${subscription.id}`}
                         className="hover:bg-accent border-input flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors"
@@ -149,7 +149,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     </div>
                 </div>
 
-                <div className="rounded-xl border p-5 shadow-sm">
+                <div className="w-full min-w-0 rounded-xl border p-5 shadow-sm">
                     <SectionHeader
                         icon={<SchoolIcon className="size-4" />}
                         title={customer.name}
@@ -157,10 +157,10 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     />
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">
 
                     {/* ── Subscription Details ───────────────────────────────── */}
-                    <div className="space-y-5 rounded-xl border p-5 shadow-sm">
+                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<FileTextIcon className="size-4" />}
                             title="Subscription"
@@ -271,7 +271,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     </div>
 
                     {/* ── Access Control ─────────────────────────────────────── */}
-                    <div className="space-y-4 rounded-xl border p-5 shadow-sm">
+                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<LockIcon className="size-4" />}
                             title="Access"

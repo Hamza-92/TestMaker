@@ -766,7 +766,7 @@ class QuestionTypeSchemaRegistry
         bool $collectAnswers,
     ): void {
         if (! self::hasLocalizedValue($content, 'prompt')) {
-            $validator->errors()->add('content.prompt_en', 'Prompt is required.');
+            $validator->errors()->add('content.prompt_en', 'Question is required.');
         }
 
         if ($collectAnswers && ! self::hasLocalizedValue($content, 'answer')) {

@@ -253,13 +253,10 @@ export default function QuestionTypes({
                                         Heading
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Schema
+                                        Structure
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Behavior
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Usage
+                                        Questions
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                                         Status
@@ -271,7 +268,7 @@ export default function QuestionTypes({
                                 {paginated.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={6}
                                             className="py-16 text-center text-muted-foreground"
                                         >
                                             <SearchIcon className="mx-auto mb-2 size-8 opacity-30" />
@@ -311,68 +308,19 @@ export default function QuestionTypes({
                                                 ) : null}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="space-y-1">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="bg-muted"
-                                                    >
-                                                        {questionType.schema.label}
-                                                    </Badge>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {
-                                                            questionType.schema
-                                                                .description
-                                                        }
-                                                    </p>
-                                                </div>
+                                                <p className="font-medium">
+                                                    {questionType.is_objective
+                                                        ? 'Objective'
+                                                        : 'Subjective'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {questionType.schema.label}
+                                                </p>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="bg-muted"
-                                                    >
-                                                        {questionType.is_objective
-                                                            ? 'Objective'
-                                                            : 'Subjective'}
-                                                    </Badge>
-                                                    {questionType.have_answer ? (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="bg-muted"
-                                                        >
-                                                            Answers
-                                                        </Badge>
-                                                    ) : null}
-                                                    {questionType.is_objective &&
-                                                    questionType.schema.settings
-                                                        .supports_single_toggle ? (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="bg-muted"
-                                                        >
-                                                            {questionType.is_single
-                                                                ? 'Single correct'
-                                                                : 'Multi correct'}
-                                                        </Badge>
-                                                    ) : null}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="space-y-1 text-sm">
-                                                    <p className="font-medium">
-                                                        {
-                                                            questionType.questions_count
-                                                        }{' '}
-                                                        questions
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {
-                                                            questionType.objective_children_count
-                                                        }{' '}
-                                                        linked types
-                                                    </p>
-                                                </div>
+                                                <p className="font-medium">
+                                                    {questionType.questions_count}
+                                                </p>
                                             </td>
                                             <td className="px-4 py-3">
                                                 {statusBadge(

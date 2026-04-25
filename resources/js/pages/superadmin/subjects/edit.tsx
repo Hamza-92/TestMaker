@@ -47,7 +47,7 @@ function Field({ label, required, error, children }: {
     label: string; required?: boolean; error?: string; children: React.ReactNode;
 }) {
     return (
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
                 {required && <span className="text-destructive text-xs">*</span>}
@@ -114,10 +114,10 @@ export default function EditSubject({
     return (
         <>
             <Head title={`Edit Subject - ${subject.name_eng}`} />
-            <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
+            <div className="mx-auto w-full max-w-2xl min-w-0 space-y-6 p-4 md:p-6">
 
                 {/* ── Header ──────────────────────────────────────────────── */}
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-4">
                     <Link
                         href="/superadmin/subjects"
                         className="hover:bg-accent border-input flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors"
@@ -130,10 +130,10 @@ export default function EditSubject({
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">
 
                     {/* ── Section 1: Subject Details ───────────────────────── */}
-                    <div className="space-y-5 rounded-xl border p-5 shadow-sm">
+                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
                         <div className="flex items-start gap-3">
                             <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
                                 <BookOpenIcon className="size-4" />
@@ -198,7 +198,7 @@ export default function EditSubject({
                     </div>
 
                     {/* ── Section 2: Class–Pattern Links ───────────────────── */}
-                    <div className="space-y-5 rounded-xl border p-5 shadow-sm">
+                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex items-start gap-3">
                                 <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
@@ -227,6 +227,7 @@ export default function EditSubject({
                                 {patterns.map((pattern) => {
                                     const allSel  = isPatternAllSelected(pattern);
                                     const someSel = isPatternSomeSelected(pattern);
+
                                     return (
                                         <div key={pattern.id} className="rounded-lg border overflow-hidden">
                                             {/* Pattern header row */}
@@ -249,6 +250,7 @@ export default function EditSubject({
                                             <div className="grid gap-px bg-border sm:grid-cols-2">
                                                 {pattern.classes.map((cls) => {
                                                     const checked = isLinked(cls.id, pattern.id);
+
                                                     return (
                                                         <label
                                                             key={cls.id}
