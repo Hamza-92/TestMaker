@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
@@ -94,6 +95,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('superadmin/questions/{question}/edit', [QuestionController::class, 'edit'])->name('superadmin.questions.edit');
     Route::put('superadmin/questions/{question}', [QuestionController::class, 'update'])->name('superadmin.questions.update');
     Route::delete('superadmin/questions/{question}', [QuestionController::class, 'destroy'])->name('superadmin.questions.destroy');
+});
+
+// this route will be just kept until the app is fully developed and live, after it, this route will be deleted
+Route::get('/run-migrate', function () {
+    Artisan::call('migrate');
+    return Artisan::output();
 });
 
 require __DIR__.'/settings.php';
