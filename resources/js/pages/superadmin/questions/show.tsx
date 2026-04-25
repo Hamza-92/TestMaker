@@ -3,11 +3,9 @@ import {
     ArrowLeftIcon,
     CalendarIcon,
     FileQuestionIcon,
-    LanguagesIcon,
-    ListChecksIcon,
     LogsIcon,
     PencilIcon,
-    ShieldCheckIcon,
+    SparklesIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,32 +22,60 @@ interface AuditLogEntry {
 
 interface QuestionData {
     id: number;
-    statement_en: string | null;
-    statement_ur: string | null;
-    description_en: string | null;
-    description_ur: string | null;
-    answer_en: string | null;
-    answer_ur: string | null;
+    summary_text: string;
     source: string | null;
     source_label?: string | null;
     status: number;
     created_at: string | null;
     updated_at: string | null;
+    content: {
+        prompt_en?: string;
+        prompt_ur?: string;
+        guidance_en?: string;
+        guidance_ur?: string;
+        answer_en?: string;
+        answer_ur?: string;
+        passage_en?: string;
+        passage_ur?: string;
+        intro_en?: string;
+        intro_ur?: string;
+        correct_boolean?: string;
+        options?: Array<{
+            text_en?: string | null;
+            text_ur?: string | null;
+            is_correct: boolean;
+        }>;
+        items?: Array<{
+            prompt_en?: string | null;
+            prompt_ur?: string | null;
+            answer_en?: string | null;
+            answer_ur?: string | null;
+            options?: Array<{
+                text_en?: string | null;
+                text_ur?: string | null;
+                is_correct: boolean;
+            }>;
+        }>;
+        pairs?: Array<{
+            left_en?: string | null;
+            left_ur?: string | null;
+            right_en?: string | null;
+            right_ur?: string | null;
+        }>;
+    };
     question_type: {
         id: number;
         name: string;
         is_objective: boolean;
         is_single: boolean;
-        have_statement: boolean;
-        statement_label: string | null;
-        have_description: boolean;
-        description_label: string | null;
         have_answer: boolean;
-        column_per_row: number;
-        objective_type: {
-            id: number;
-            name: string;
-        } | null;
+        schema_key: string;
+        schema: {
+            key: string;
+            kind: 'objective' | 'subjective';
+            label: string;
+            description: string;
+        };
     };
     chapter: {
         id: number;
@@ -79,6 +105,7 @@ interface QuestionData {
     } | null;
     options_count: number;
     correct_options_count: number;
+    items_count: number;
     options: Array<{
         id: number;
         text_en: string | null;
@@ -181,14 +208,318 @@ function chapterLabel(chapter: QuestionData['chapter']) {
     ].join(' / ');
 }
 
-export default function ShowQuestion({ question }: { question: QuestionData }) {
-    const title =
-        question.statement_en ||
-        question.statement_ur ||
-        question.description_en ||
-        question.description_ur ||
-        `Question #${question.id}`;
+function TextPanel({
+    english,
+    urdu,
+    title,
+}: {
+    english?: string | null;
+    urdu?: string | null;
+    title: string;
+}) {
+    return (
+        <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
+            <SectionHeader icon={<SparklesIcon className="size-4" />} title={title} />
+            <Separator />
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border p-4">
+                    <p className="text-xs text-muted-foreground">English</p>
+                    <p className="mt-2 text-sm whitespace-pre-wrap">
+                        {english || '-'}
+                    </p>
+                </div>
+                <div className="rounded-xl border p-4">
+                    <p className="text-xs text-muted-foreground">Urdu</p>
+                    <p className="mt-2 text-sm whitespace-pre-wrap" dir="rtl">
+                        {urdu || '-'}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
 
+function AuditLogCard({ log }: { log: AuditLogEntry }) {
+    const key = (log.event ?? '').toLowerCase();
+    const dotClass = EVENT_DOT[key] ?? 'bg-gray-400';
+    const label = EVENT_LABEL[key] ?? log.event ?? 'Activity';
+
+    return (
+        <div className="rounded-xl border p-4">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <span className={`inline-block size-2 rounded-full ${dotClass}`} />
+                    <p className="font-medium">{label}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    {fmtDateTime(log.created_at)}
+                </p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+                {log.changed_by}
+            </p>
+        </div>
+    );
+}
+
+function renderContent(question: QuestionData) {
+    const { content, question_type: questionType } = question;
+
+    switch (questionType.schema.key) {
+        case 'objective_mcq':
+        case 'objective_blank_choice':
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Statement"
+                        english={content.prompt_en}
+                        urdu={content.prompt_ur}
+                    />
+                    <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
+                        <SectionHeader
+                            icon={<SparklesIcon className="size-4" />}
+                            title="Options"
+                        />
+                        <Separator />
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {(content.options ?? []).map((option, index) => (
+                                <div
+                                    key={`option-${index}`}
+                                    className="rounded-xl border p-4"
+                                >
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <Badge variant="outline">
+                                            Option {index + 1}
+                                        </Badge>
+                                        {option.is_correct ? (
+                                            <Badge>Correct</Badge>
+                                        ) : null}
+                                    </div>
+                                    <p className="text-sm whitespace-pre-wrap">
+                                        {option.text_en || option.text_ur || '-'}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        case 'objective_true_false':
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Statement"
+                        english={content.prompt_en}
+                        urdu={content.prompt_ur}
+                    />
+                    <div className="rounded-xl border p-5 shadow-sm md:p-6">
+                        <SectionHeader
+                            icon={<SparklesIcon className="size-4" />}
+                            title="Correct Answer"
+                        />
+                        <Separator />
+                        <Badge className="mt-1">
+                            {content.correct_boolean === 'false'
+                                ? 'False'
+                                : 'True'}
+                        </Badge>
+                    </div>
+                </div>
+            );
+        case 'objective_blank_open':
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Blank Statement"
+                        english={content.prompt_en}
+                        urdu={content.prompt_ur}
+                    />
+                    <TextPanel
+                        title="Correct Answer"
+                        english={content.answer_en}
+                        urdu={content.answer_ur}
+                    />
+                </div>
+            );
+        case 'objective_passage_mcq':
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Passage"
+                        english={content.passage_en}
+                        urdu={content.passage_ur}
+                    />
+                    <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
+                        <SectionHeader
+                            icon={<SparklesIcon className="size-4" />}
+                            title="Passage Questions"
+                        />
+                        <Separator />
+                        <div className="space-y-4">
+                            {(content.items ?? []).map((item, itemIndex) => (
+                                <div
+                                    key={`item-${itemIndex}`}
+                                    className="rounded-xl border p-4"
+                                >
+                                    <div className="mb-3 flex items-center gap-2">
+                                        <Badge variant="outline">
+                                            Question {itemIndex + 1}
+                                        </Badge>
+                                    </div>
+                                    <p className="mb-4 text-sm whitespace-pre-wrap">
+                                        {item.prompt_en ||
+                                            item.prompt_ur ||
+                                            '-'}
+                                    </p>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        {(item.options ?? []).map(
+                                            (option, optionIndex) => (
+                                                <div
+                                                    key={`item-${itemIndex}-option-${optionIndex}`}
+                                                    className="rounded-xl border p-3"
+                                                >
+                                                    <div className="mb-2 flex items-center gap-2">
+                                                        <Badge variant="outline">
+                                                            Option{' '}
+                                                            {optionIndex + 1}
+                                                        </Badge>
+                                                        {option.is_correct ? (
+                                                            <Badge>
+                                                                Correct
+                                                            </Badge>
+                                                        ) : null}
+                                                    </div>
+                                                    <p className="text-sm whitespace-pre-wrap">
+                                                        {option.text_en ||
+                                                            option.text_ur ||
+                                                            '-'}
+                                                    </p>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        case 'subjective_grouped':
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Instructions"
+                        english={content.intro_en}
+                        urdu={content.intro_ur}
+                    />
+                    <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
+                        <SectionHeader
+                            icon={<SparklesIcon className="size-4" />}
+                            title="Question Items"
+                        />
+                        <Separator />
+                        <div className="space-y-4">
+                            {(content.items ?? []).map((item, itemIndex) => (
+                                <div
+                                    key={`subjective-item-${itemIndex}`}
+                                    className="rounded-xl border p-4"
+                                >
+                                    <div className="mb-3 flex items-center gap-2">
+                                        <Badge variant="outline">
+                                            Item {itemIndex + 1}
+                                        </Badge>
+                                    </div>
+                                    <p className="text-sm whitespace-pre-wrap">
+                                        {item.prompt_en ||
+                                            item.prompt_ur ||
+                                            '-'}
+                                    </p>
+                                    {questionType.have_answer ? (
+                                        <div className="mt-4 rounded-xl border bg-muted/20 p-3">
+                                            <p className="text-xs text-muted-foreground">
+                                                Answer
+                                            </p>
+                                            <p className="mt-1 text-sm whitespace-pre-wrap">
+                                                {item.answer_en ||
+                                                    item.answer_ur ||
+                                                    '-'}
+                                            </p>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        case 'subjective_pairs':
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Instructions"
+                        english={content.prompt_en}
+                        urdu={content.prompt_ur}
+                    />
+                    <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
+                        <SectionHeader
+                            icon={<SparklesIcon className="size-4" />}
+                            title="Pairs"
+                        />
+                        <Separator />
+                        <div className="space-y-3">
+                            {(content.pairs ?? []).map((pair, pairIndex) => (
+                                <div
+                                    key={`pair-${pairIndex}`}
+                                    className="grid gap-3 rounded-xl border p-4 md:grid-cols-2"
+                                >
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Left
+                                        </p>
+                                        <p className="mt-1 text-sm whitespace-pre-wrap">
+                                            {pair.left_en || pair.left_ur || '-'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Right
+                                        </p>
+                                        <p className="mt-1 text-sm whitespace-pre-wrap">
+                                            {pair.right_en || pair.right_ur || '-'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        default:
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Prompt"
+                        english={content.prompt_en}
+                        urdu={content.prompt_ur}
+                    />
+                    <TextPanel
+                        title="Guidance"
+                        english={content.guidance_en}
+                        urdu={content.guidance_ur}
+                    />
+                    {questionType.have_answer ? (
+                        <TextPanel
+                            title="Answer"
+                            english={content.answer_en}
+                            urdu={content.answer_ur}
+                        />
+                    ) : null}
+                </div>
+            );
+    }
+}
+
+export default function ShowQuestion({ question }: { question: QuestionData }) {
     return (
         <>
             <Head title={`Question #${question.id}`} />
@@ -203,7 +534,9 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                             <ArrowLeftIcon className="size-4" />
                         </Link>
                         <div>
-                            <h1 className="h1-semibold">{title}</h1>
+                            <h1 className="h1-semibold">
+                                {question.summary_text || `Question #${question.id}`}
+                            </h1>
                             <p className="text-sm text-muted-foreground">
                                 {question.question_type.name}
                             </p>
@@ -227,17 +560,12 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                         <div className="space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <h2 className="text-xl font-semibold">
-                                    {question.question_type.name}
+                                    {question.question_type.schema.label}
                                 </h2>
                                 <Badge variant="outline" className="bg-muted">
                                     {question.question_type.is_objective
                                         ? 'Objective'
                                         : 'Subjective'}
-                                </Badge>
-                                <Badge variant="outline" className="bg-muted">
-                                    {question.question_type.is_single
-                                        ? 'Single'
-                                        : 'Multi'}
                                 </Badge>
                                 {statusBadge(question.status)}
                             </div>
@@ -277,9 +605,7 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                                 Source
                             </p>
                             <p className="mt-1 font-semibold">
-                                {question.source_label ||
-                                    question.source ||
-                                    '-'}
+                                {question.source_label || question.source || '-'}
                             </p>
                         </div>
                         <div className="p-5 text-center">
@@ -292,227 +618,19 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                         </div>
                         <div className="p-5 text-center">
                             <p className="text-xs text-muted-foreground">
-                                Correct
+                                Items
                             </p>
                             <p className="mt-1 font-semibold">
-                                {question.correct_options_count}
+                                {question.items_count}
                             </p>
                         </div>
                     </div>
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-                    <div className="space-y-6">
-                        {question.question_type.have_statement ? (
-                            <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                                <SectionHeader
-                                    icon={<LanguagesIcon className="size-4" />}
-                                    title={
-                                        question.question_type
-                                            .statement_label ?? 'Statement'
-                                    }
-                                />
-                                <Separator />
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="rounded-xl border p-4">
-                                        <p className="text-xs text-muted-foreground">
-                                            English
-                                        </p>
-                                        <p className="mt-2 text-sm whitespace-pre-wrap">
-                                            {question.statement_en || '-'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border p-4">
-                                        <p className="text-xs text-muted-foreground">
-                                            Urdu
-                                        </p>
-                                        <p
-                                            className="mt-2 text-sm whitespace-pre-wrap"
-                                            dir="rtl"
-                                        >
-                                            {question.statement_ur || '-'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {question.question_type.have_description ? (
-                            <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                                <SectionHeader
-                                    icon={<LanguagesIcon className="size-4" />}
-                                    title={
-                                        question.question_type
-                                            .description_label ?? 'Description'
-                                    }
-                                />
-                                <Separator />
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="rounded-xl border p-4">
-                                        <p className="text-xs text-muted-foreground">
-                                            English
-                                        </p>
-                                        <p className="mt-2 text-sm whitespace-pre-wrap">
-                                            {question.description_en || '-'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border p-4">
-                                        <p className="text-xs text-muted-foreground">
-                                            Urdu
-                                        </p>
-                                        <p
-                                            className="mt-2 text-sm whitespace-pre-wrap"
-                                            dir="rtl"
-                                        >
-                                            {question.description_ur || '-'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {!question.question_type.is_objective &&
-                        question.question_type.have_answer ? (
-                            <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                                <SectionHeader
-                                    icon={
-                                        <ShieldCheckIcon className="size-4" />
-                                    }
-                                    title="Answer"
-                                />
-                                <Separator />
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="rounded-xl border p-4">
-                                        <p className="text-xs text-muted-foreground">
-                                            English
-                                        </p>
-                                        <p className="mt-2 text-sm whitespace-pre-wrap">
-                                            {question.answer_en || '-'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border p-4">
-                                        <p className="text-xs text-muted-foreground">
-                                            Urdu
-                                        </p>
-                                        <p
-                                            className="mt-2 text-sm whitespace-pre-wrap"
-                                            dir="rtl"
-                                        >
-                                            {question.answer_ur || '-'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {question.question_type.is_objective ? (
-                            <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                                <SectionHeader
-                                    icon={<ListChecksIcon className="size-4" />}
-                                    title="Options"
-                                />
-                                <Separator />
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    {question.options.map((option, index) => (
-                                        <div
-                                            key={option.id}
-                                            className="rounded-xl border p-4"
-                                        >
-                                            <div className="mb-3 flex items-center justify-between gap-3">
-                                                <span className="inline-flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                                                    {String.fromCharCode(
-                                                        65 + index,
-                                                    )}
-                                                </span>
-                                                {option.is_correct ? (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-emerald-200 bg-emerald-100 text-emerald-700"
-                                                    >
-                                                        Correct
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="bg-muted"
-                                                    >
-                                                        Option
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        English
-                                                    </p>
-                                                    <p className="mt-1 text-sm">
-                                                        {option.text_en || '-'}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Urdu
-                                                    </p>
-                                                    <p
-                                                        className="mt-1 text-sm"
-                                                        dir="rtl"
-                                                    >
-                                                        {option.text_ur || '-'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : null}
-                    </div>
+                    <div className="space-y-6">{renderContent(question)}</div>
 
                     <div className="space-y-6">
-                        <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                            <SectionHeader
-                                icon={<FileQuestionIcon className="size-4" />}
-                                title="Context"
-                            />
-                            <Separator />
-
-                            <div className="space-y-3 text-sm">
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Chapter
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {chapterLabel(question.chapter)}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Topic
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {question.topic?.name || '-'}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Objective Type
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {question.question_type.objective_type
-                                            ?.name || '-'}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Updated
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {fmtDateTime(question.updated_at)}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
                         <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
                             <SectionHeader
                                 icon={<LogsIcon className="size-4" />}
@@ -538,72 +656,3 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
         </>
     );
 }
-
-function AuditLogCard({ log }: { log: AuditLogEntry }) {
-    const dot = EVENT_DOT[log.event ?? ''] ?? 'bg-gray-400';
-    const label = EVENT_LABEL[log.event ?? ''] ?? log.event ?? 'Changed';
-    const hasChanges = Object.keys(log.new_values).length > 0;
-
-    return (
-        <div className="rounded-xl border p-4">
-            <div className="flex items-start gap-3">
-                <div
-                    className={`mt-1.5 size-2.5 shrink-0 rounded-full ${dot}`}
-                />
-                <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{label}</span>
-                            <span className="text-xs text-muted-foreground">
-                                by {log.changed_by}
-                            </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                            {fmtDateTime(log.created_at)}
-                        </span>
-                    </div>
-
-                    {hasChanges ? (
-                        <div className="space-y-1 rounded-lg border bg-muted/40 p-3 text-xs">
-                            {Object.entries(log.new_values).map(
-                                ([key, value]) => (
-                                    <div
-                                        key={key}
-                                        className="flex flex-wrap items-baseline gap-1.5"
-                                    >
-                                        <span className="text-muted-foreground capitalize">
-                                            {key.replace(/_/g, ' ')}:
-                                        </span>
-                                        {log.old_values[key] !== undefined ? (
-                                            <>
-                                                <span className="line-through opacity-50">
-                                                    {String(
-                                                        log.old_values[key],
-                                                    )}
-                                                </span>
-                                                <span className="text-muted-foreground">
-                                                    {'->'}
-                                                </span>
-                                            </>
-                                        ) : null}
-                                        <span className="font-medium">
-                                            {String(value)}
-                                        </span>
-                                    </div>
-                                ),
-                            )}
-                        </div>
-                    ) : null}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-ShowQuestion.layout = {
-    breadcrumbs: [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Questions', href: '/superadmin/questions' },
-        { title: 'View Question' },
-    ],
-};

@@ -80,6 +80,7 @@ function makeObjectiveQuestionTypeForManagement(User $creator, array $overrides 
         'have_answer' => false,
         'is_single' => true,
         'is_objective' => true,
+        'schema_key' => 'objective_mcq',
         'objective_type_id' => null,
         'column_per_row' => 1,
         'status' => 1,
@@ -98,18 +99,16 @@ it('creates an objective question with options', function () {
             'question_type_id' => $questionType->id,
             'chapter_id' => $context['chapter']->id,
             'topic_id' => null,
-            'statement_en' => 'Choose the correct option',
-            'statement_ur' => null,
-            'description_en' => null,
-            'description_ur' => null,
-            'answer_en' => null,
-            'answer_ur' => null,
             'source' => 'exercise',
             'status' => true,
-            'options' => [
-                ['text_en' => 'Option A', 'text_ur' => null, 'is_correct' => true],
-                ['text_en' => 'Option B', 'text_ur' => null, 'is_correct' => false],
-                ['text_en' => 'Option C', 'text_ur' => null, 'is_correct' => false],
+            'content' => [
+                'prompt_en' => 'Choose the correct option',
+                'prompt_ur' => null,
+                'options' => [
+                    ['text_en' => 'Option A', 'text_ur' => null, 'is_correct' => true],
+                    ['text_en' => 'Option B', 'text_ur' => null, 'is_correct' => false],
+                    ['text_en' => 'Option C', 'text_ur' => null, 'is_correct' => false],
+                ],
             ],
         ]);
 
@@ -160,19 +159,17 @@ it('updates an objective question and replaces its options', function () {
             'question_type_id' => $questionType->id,
             'chapter_id' => $context['chapter']->id,
             'topic_id' => null,
-            'statement_en' => 'Updated prompt',
-            'statement_ur' => null,
-            'description_en' => null,
-            'description_ur' => null,
-            'answer_en' => null,
-            'answer_ur' => null,
             'source' => 'past paper',
             'status' => false,
-            'options' => [
-                ['text_en' => 'New A', 'text_ur' => null, 'is_correct' => false],
-                ['text_en' => 'New B', 'text_ur' => null, 'is_correct' => true],
-                ['text_en' => 'New C', 'text_ur' => null, 'is_correct' => false],
-                ['text_en' => 'New D', 'text_ur' => null, 'is_correct' => false],
+            'content' => [
+                'prompt_en' => 'Updated prompt',
+                'prompt_ur' => null,
+                'options' => [
+                    ['text_en' => 'New A', 'text_ur' => null, 'is_correct' => false],
+                    ['text_en' => 'New B', 'text_ur' => null, 'is_correct' => true],
+                    ['text_en' => 'New C', 'text_ur' => null, 'is_correct' => false],
+                    ['text_en' => 'New D', 'text_ur' => null, 'is_correct' => false],
+                ],
             ],
         ]);
 

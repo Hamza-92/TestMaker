@@ -32,29 +32,12 @@ import type { ChapterOption, QuestionTypeOption } from './questions/form';
 
 interface QuestionRow {
     id: number;
-    statement_en: string | null;
-    statement_ur: string | null;
-    description_en: string | null;
-    description_ur: string | null;
-    answer_en: string | null;
-    answer_ur: string | null;
+    summary_text: string;
     source: string | null;
     source_label?: string | null;
     status: number;
     created_at: string | null;
-    question_type: {
-        id: number;
-        name: string;
-        is_objective: boolean;
-        is_single: boolean;
-        have_statement: boolean;
-        statement_label: string | null;
-        have_description: boolean;
-        description_label: string | null;
-        have_answer: boolean;
-        column_per_row: number;
-        objective_type: { id: number; name: string } | null;
-    };
+    question_type: QuestionTypeOption;
     chapter: {
         id: number;
         name: string;
@@ -83,6 +66,7 @@ interface QuestionRow {
     } | null;
     options_count: number;
     correct_options_count: number;
+    items_count: number;
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
@@ -104,18 +88,6 @@ function statusBadge(status: number) {
             <span className="mr-1 inline-block size-1.5 rounded-full bg-gray-400" />
             Inactive
         </Badge>
-    );
-}
-
-function questionPreview(question: QuestionRow) {
-    return (
-        question.statement_en ||
-        question.statement_ur ||
-        question.description_en ||
-        question.description_ur ||
-        question.answer_en ||
-        question.answer_ur ||
-        'No content'
     );
 }
 
@@ -164,13 +136,16 @@ export default function Questions({
             const matchesSearch =
                 query === '' ||
                 question.question_type.name.toLowerCase().includes(query) ||
+                question.question_type.schema.label
+                    .toLowerCase()
+                    .includes(query) ||
                 (question.topic?.name ?? '').toLowerCase().includes(query) ||
                 question.chapter.subject.name_eng
                     .toLowerCase()
                     .includes(query) ||
                 question.chapter.name.toLowerCase().includes(query) ||
                 (question.source ?? '').toLowerCase().includes(query) ||
-                questionPreview(question).toLowerCase().includes(query);
+                question.summary_text.toLowerCase().includes(query);
 
             const matchesStatus =
                 statusFilter === 'all' ||
@@ -451,32 +426,30 @@ export default function Questions({
                                             <td className="px-4 py-3">
                                                 <p className="font-medium">
                                                     {truncateText(
-                                                        questionPreview(
-                                                            question,
-                                                        ),
+                                                        question.summary_text,
                                                     )}
                                                 </p>
-                                                {question.question_type
-                                                    .is_objective ? (
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {
-                                                            question.correct_options_count
-                                                        }{' '}
-                                                        /{' '}
-                                                        {question.options_count}{' '}
-                                                        correct
-                                                    </p>
-                                                ) : question.answer_en ||
-                                                  question.answer_ur ? (
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {truncateText(
-                                                            question.answer_en ||
-                                                                question.answer_ur ||
-                                                                '',
-                                                            52,
-                                                        )}
-                                                    </p>
-                                                ) : null}
+                                                <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+                                                    {question.question_type
+                                                        .is_objective ? (
+                                                        <span>
+                                                            {
+                                                                question.correct_options_count
+                                                            }{' '}
+                                                            /{' '}
+                                                            {
+                                                                question.options_count
+                                                            }{' '}
+                                                            correct
+                                                        </span>
+                                                    ) : null}
+                                                    {question.items_count > 1 ? (
+                                                        <span>
+                                                            {question.items_count}{' '}
+                                                            items
+                                                        </span>
+                                                    ) : null}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex flex-wrap gap-1.5">
@@ -492,12 +465,13 @@ export default function Questions({
                                                     </Badge>
                                                     <Badge
                                                         variant="outline"
-                                                        className="bg-muted font-medium"
+                                                        className="bg-muted"
                                                     >
-                                                        {question.question_type
-                                                            .is_objective
-                                                            ? 'Objective'
-                                                            : 'Subjective'}
+                                                        {
+                                                            question
+                                                                .question_type
+                                                                .schema.label
+                                                        }
                                                     </Badge>
                                                 </div>
                                             </td>

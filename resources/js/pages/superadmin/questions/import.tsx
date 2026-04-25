@@ -243,6 +243,9 @@ export default function ImportQuestions({
             ) ?? null,
         [form.data.question_type_id, questionTypes],
     );
+    const importUnsupported =
+        selectedQuestionType !== null &&
+        !selectedQuestionType.supports_simple_import;
 
     const [patternFilter, setPatternFilter] = useState(() =>
         selectedChapter ? String(selectedChapter.pattern.id) : 'all',
@@ -729,33 +732,55 @@ export default function ImportQuestions({
                                 required
                                 error={form.errors.question_type_id}
                             >
-                                <Select
-                                    value={form.data.question_type_id || 'none'}
-                                    onValueChange={(value) => {
-                                        clearPreview();
-                                        form.setData(
-                                            'question_type_id',
-                                            value === 'none' ? '' : value,
-                                        );
-                                    }}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">
-                                            Select type
-                                        </SelectItem>
-                                        {questionTypes.map((item) => (
-                                            <SelectItem
-                                                key={item.id}
-                                                value={String(item.id)}
-                                            >
-                                                {item.name}
+                                <div className="space-y-2">
+                                    <Select
+                                        value={
+                                            form.data.question_type_id ||
+                                            'none'
+                                        }
+                                        onValueChange={(value) => {
+                                            clearPreview();
+                                            form.setData(
+                                                'question_type_id',
+                                                value === 'none' ? '' : value,
+                                            );
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                Select type
                                             </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                            {questionTypes.map((item) => (
+                                                <SelectItem
+                                                    key={item.id}
+                                                    value={String(item.id)}
+                                                    disabled={
+                                                        !item.supports_simple_import
+                                                    }
+                                                >
+                                                    {item.supports_simple_import
+                                                        ? item.name
+                                                        : `${item.name} (manual only)`}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        Flat bulk import currently supports
+                                        standard MCQ, true/false, blank without
+                                        options, and standard subjective
+                                        questions.
+                                    </p>
+                                    {importUnsupported ? (
+                                        <p className="text-xs text-destructive">
+                                            This question type needs the manual
+                                            schema-driven form.
+                                        </p>
+                                    ) : null}
+                                </div>
                             </Field>
 
                             <Field label="Pattern">
@@ -1001,6 +1026,7 @@ export default function ImportQuestions({
                             type="submit"
                             disabled={
                                 form.processing ||
+                                importUnsupported ||
                                 !form.data.question_type_id ||
                                 !form.data.chapter_id ||
                                 !form.data.file
@@ -1019,7 +1045,7 @@ export default function ImportQuestions({
                         activePreview?.status === 'success' ? (
                             <Button
                                 type="button"
-                                disabled={isImporting}
+                                disabled={isImporting || importUnsupported}
                                 onClick={handleImport}
                             >
                                 <FileUpIcon className="size-4" />

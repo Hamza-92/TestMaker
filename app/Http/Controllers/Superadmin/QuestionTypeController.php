@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Superadmin\QuestionTypeUpsertRequest;
 use App\Models\AuditLog;
 use App\Models\QuestionType;
-use Illuminate\Support\Collection;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Inertia\Inertia;
 
 class QuestionTypeController extends Controller
@@ -22,12 +22,16 @@ class QuestionTypeController extends Controller
                 'name',
                 'name_ur',
                 'heading_en',
+                'heading_ur',
+                'description_en',
+                'description_ur',
                 'have_exercise',
                 'have_statement',
                 'have_description',
                 'have_answer',
                 'is_single',
                 'is_objective',
+                'schema_key',
                 'objective_type_id',
                 'column_per_row',
                 'status',
@@ -35,26 +39,9 @@ class QuestionTypeController extends Controller
             ]);
 
         return Inertia::render('superadmin/question-types', [
-            'questionTypes' => $questionTypes->map(fn (QuestionType $questionType) => [
-                'id' => $questionType->id,
-                'name' => $questionType->name,
-                'name_ur' => $questionType->name_ur,
-                'heading_en' => $questionType->heading_en,
-                'have_exercise' => $questionType->have_exercise,
-                'have_statement' => $questionType->have_statement,
-                'have_description' => $questionType->have_description,
-                'have_answer' => $questionType->have_answer,
-                'is_single' => $questionType->is_single,
-                'is_objective' => $questionType->is_objective,
-                'column_per_row' => $questionType->column_per_row,
-                'status' => $questionType->status,
-                'created_at' => $questionType->created_at?->toISOString(),
-                'questions_count' => $questionType->questions_count,
-                'objective_children_count' => $questionType->objective_children_count,
-                'objective_type' => $questionType->objectiveType
-                    ? ['id' => $questionType->objectiveType->id, 'name' => $questionType->objectiveType->name]
-                    : null,
-            ])->values(),
+            'questionTypes' => $questionTypes
+                ->map(fn (QuestionType $questionType) => $this->transformQuestionType($questionType))
+                ->values(),
         ]);
     }
 
@@ -67,33 +54,7 @@ class QuestionTypeController extends Controller
 
         return Inertia::render('superadmin/question-types/show', [
             'questionType' => [
-                'id' => $questionType->id,
-                'name' => $questionType->name,
-                'name_ur' => $questionType->name_ur,
-                'heading_en' => $questionType->heading_en,
-                'heading_ur' => $questionType->heading_ur,
-                'description_en' => $questionType->description_en,
-                'description_ur' => $questionType->description_ur,
-                'have_exercise' => $questionType->have_exercise,
-                'have_statement' => $questionType->have_statement,
-                'statement_label' => $questionType->statement_label,
-                'have_description' => $questionType->have_description,
-                'description_label' => $questionType->description_label,
-                'have_answer' => $questionType->have_answer,
-                'is_single' => $questionType->is_single,
-                'is_objective' => $questionType->is_objective,
-                'column_per_row' => $questionType->column_per_row,
-                'status' => $questionType->status,
-                'created_at' => $questionType->created_at?->toISOString(),
-                'questions_count' => $questionType->questions_count,
-                'objective_children_count' => $questionType->objective_children_count,
-                'objective_type' => $questionType->objectiveType
-                    ? [
-                        'id' => $questionType->objectiveType->id,
-                        'name' => $questionType->objectiveType->name,
-                        'heading_en' => $questionType->objectiveType->heading_en,
-                    ]
-                    : null,
+                ...$this->transformQuestionType($questionType),
                 'audit_logs' => $questionType->auditLogs->map(fn ($log) => [
                     'id' => $log->id,
                     'event' => $log->event?->value,
@@ -109,7 +70,7 @@ class QuestionTypeController extends Controller
     public function create()
     {
         return Inertia::render('superadmin/question-types/add', [
-            'objectiveTypes' => $this->objectiveTypeOptions(),
+            'questionSchemas' => QuestionTypeSchemaRegistry::options(),
         ]);
     }
 
@@ -142,19 +103,21 @@ class QuestionTypeController extends Controller
                 'heading_ur' => $questionType->heading_ur,
                 'description_en' => $questionType->description_en,
                 'description_ur' => $questionType->description_ur,
-                'have_exercise' => $questionType->have_exercise,
-                'have_statement' => $questionType->have_statement,
-                'statement_label' => $questionType->statement_label,
-                'have_description' => $questionType->have_description,
-                'description_label' => $questionType->description_label,
                 'have_answer' => $questionType->have_answer,
                 'is_single' => $questionType->is_single,
                 'is_objective' => $questionType->is_objective,
-                'objective_type_id' => $questionType->objective_type_id,
-                'column_per_row' => $questionType->column_per_row,
+                'schema_key' => QuestionTypeSchemaRegistry::resolve(
+                    $questionType->schema_key,
+                    $questionType->is_objective,
+                    [
+                        'objective_type_id' => $questionType->objective_type_id,
+                        'have_description' => $questionType->have_description,
+                        'have_answer' => $questionType->have_answer,
+                    ],
+                )['key'],
                 'status' => $questionType->status,
             ],
-            'objectiveTypes' => $this->objectiveTypeOptions($questionType->id),
+            'questionSchemas' => QuestionTypeSchemaRegistry::options(),
         ]);
     }
 
@@ -214,9 +177,16 @@ class QuestionTypeController extends Controller
 
     private function buildPayload(array $validated, ?int $creatorId): array
     {
-        $hasStatement = (bool) ($validated['have_statement'] ?? false);
-        $hasDescription = (bool) ($validated['have_description'] ?? false);
         $isObjective = (bool) ($validated['is_objective'] ?? false);
+        $schema = QuestionTypeSchemaRegistry::resolve(
+            $validated['schema_key'] ?? null,
+            $isObjective,
+        );
+        $legacy = QuestionTypeSchemaRegistry::legacyAttributes(
+            $schema['key'],
+            $isObjective,
+            $validated,
+        );
 
         return [
             'name' => $validated['name'],
@@ -225,40 +195,20 @@ class QuestionTypeController extends Controller
             'heading_ur' => $validated['heading_ur'] ?? null,
             'description_en' => $validated['description_en'] ?? null,
             'description_ur' => $validated['description_ur'] ?? null,
-            'have_exercise' => $validated['have_exercise'],
-            'have_statement' => $hasStatement,
-            'statement_label' => $hasStatement
-                ? ($validated['statement_label'] ?? 'Statement')
-                : null,
-            'have_description' => $hasDescription,
-            'description_label' => $hasDescription
-                ? ($validated['description_label'] ?? 'Description')
-                : null,
-            'have_answer' => $validated['have_answer'],
-            'is_single' => $validated['is_single'],
+            'have_exercise' => $legacy['have_exercise'],
+            'have_statement' => $legacy['have_statement'],
+            'statement_label' => $legacy['statement_label'],
+            'have_description' => $legacy['have_description'],
+            'description_label' => $legacy['description_label'],
+            'have_answer' => $legacy['have_answer'],
+            'is_single' => $legacy['is_single'],
             'is_objective' => $isObjective,
-            'objective_type_id' => $isObjective
-                ? ($validated['objective_type_id'] ?? null)
-                : null,
-            'column_per_row' => $validated['column_per_row'],
+            'schema_key' => $schema['key'],
+            'objective_type_id' => $legacy['objective_type_id'],
+            'column_per_row' => $legacy['column_per_row'],
             'status' => $validated['status'],
             'created_by' => $creatorId,
         ];
-    }
-
-    private function objectiveTypeOptions(?int $exceptId = null): Collection
-    {
-        return QuestionType::query()
-            ->where('is_objective', true)
-            ->when($exceptId, fn ($query) => $query->whereKeyNot($exceptId))
-            ->orderBy('name')
-            ->get(['id', 'name', 'heading_en'])
-            ->map(fn (QuestionType $questionType) => [
-                'id' => $questionType->id,
-                'name' => $questionType->name,
-                'heading_en' => $questionType->heading_en,
-            ])
-            ->values();
     }
 
     private function auditValues(QuestionType $questionType): array
@@ -268,17 +218,58 @@ class QuestionTypeController extends Controller
             'name_ur' => $questionType->name_ur,
             'heading_en' => $questionType->heading_en,
             'heading_ur' => $questionType->heading_ur,
-            'statement_label' => $questionType->statement_label,
-            'description_label' => $questionType->description_label,
-            'have_exercise' => $questionType->have_exercise,
-            'have_statement' => $questionType->have_statement,
-            'have_description' => $questionType->have_description,
             'have_answer' => $questionType->have_answer,
             'is_single' => $questionType->is_single,
             'is_objective' => $questionType->is_objective,
-            'objective_type' => $questionType->objectiveType?->name,
-            'column_per_row' => $questionType->column_per_row,
+            'schema' => QuestionTypeSchemaRegistry::resolve(
+                $questionType->schema_key,
+                $questionType->is_objective,
+                [
+                    'objective_type_id' => $questionType->objective_type_id,
+                    'have_description' => $questionType->have_description,
+                    'have_answer' => $questionType->have_answer,
+                ],
+            )['label'],
             'status' => $questionType->status,
+        ];
+    }
+
+    private function transformQuestionType(QuestionType $questionType): array
+    {
+        $schema = QuestionTypeSchemaRegistry::resolve(
+            $questionType->schema_key,
+            $questionType->is_objective,
+            [
+                'objective_type_id' => $questionType->objective_type_id,
+                'have_description' => $questionType->have_description,
+                'have_answer' => $questionType->have_answer,
+            ],
+        );
+
+        return [
+            'id' => $questionType->id,
+            'name' => $questionType->name,
+            'name_ur' => $questionType->name_ur,
+            'heading_en' => $questionType->heading_en,
+            'heading_ur' => $questionType->heading_ur,
+            'description_en' => $questionType->description_en,
+            'description_ur' => $questionType->description_ur,
+            'have_answer' => $questionType->have_answer,
+            'is_single' => $questionType->is_single,
+            'is_objective' => $questionType->is_objective,
+            'schema_key' => $schema['key'],
+            'schema' => $schema,
+            'status' => $questionType->status,
+            'created_at' => $questionType->created_at?->toISOString(),
+            'questions_count' => $questionType->questions_count,
+            'objective_children_count' => $questionType->objective_children_count,
+            'objective_type' => $questionType->objectiveType
+                ? [
+                    'id' => $questionType->objectiveType->id,
+                    'name' => $questionType->objectiveType->name,
+                    'heading_en' => $questionType->objectiveType->heading_en,
+                ]
+                : null,
         ];
     }
 }

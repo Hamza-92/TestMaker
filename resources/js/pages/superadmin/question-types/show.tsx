@@ -3,10 +3,9 @@ import {
     ArrowLeftIcon,
     CalendarIcon,
     FileQuestionIcon,
-    LayersIcon,
-    ListChecksIcon,
     LogsIcon,
     PencilIcon,
+    SparklesIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,20 +28,24 @@ interface QuestionTypeData {
     heading_ur: string | null;
     description_en: string | null;
     description_ur: string | null;
-    have_exercise: boolean;
-    have_statement: boolean;
-    statement_label: string | null;
-    have_description: boolean;
-    description_label: string | null;
     have_answer: boolean;
     is_single: boolean;
     is_objective: boolean;
-    column_per_row: number;
+    schema_key: string;
+    schema: {
+        key: string;
+        kind: 'objective' | 'subjective';
+        label: string;
+        description: string;
+        settings: {
+            supports_answer_toggle: boolean;
+            supports_single_toggle: boolean;
+        };
+    };
     status: number;
     created_at: string | null;
     questions_count: number;
     objective_children_count: number;
-    objective_type: { id: number; name: string; heading_en: string } | null;
     audit_logs: AuditLogEntry[];
 }
 
@@ -106,38 +109,27 @@ function statusBadge(status: number) {
     );
 }
 
-function SectionHeader({
-    icon,
-    title,
-}: {
-    icon: React.ReactNode;
-    title: string;
-}) {
+function AuditLogCard({ log }: { log: AuditLogEntry }) {
+    const key = (log.event ?? '').toLowerCase();
+    const dotClass = EVENT_DOT[key] ?? 'bg-gray-400';
+    const label = EVENT_LABEL[key] ?? log.event ?? 'Activity';
+
     return (
-        <div className="flex items-start gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                {icon}
+        <div className="rounded-xl border p-4">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <span className={`inline-block size-2 rounded-full ${dotClass}`} />
+                    <p className="font-medium">{label}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    {fmtDateTime(log.created_at)}
+                </p>
             </div>
-            <div>
-                <p className="text-sm font-medium">{title}</p>
-            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+                {log.changed_by}
+            </p>
         </div>
     );
-}
-
-function featurePills(questionType: QuestionTypeData) {
-    return [
-        questionType.have_exercise ? 'Exercise' : null,
-        questionType.have_statement
-            ? (questionType.statement_label ?? 'Statement')
-            : null,
-        questionType.have_description
-            ? (questionType.description_label ?? 'Description')
-            : null,
-        questionType.have_answer ? 'Answer' : null,
-        questionType.is_objective ? 'Objective' : 'Subjective',
-        questionType.is_single ? 'Single' : 'Multi',
-    ].filter(Boolean) as string[];
 }
 
 export default function ShowQuestionType({
@@ -160,14 +152,14 @@ export default function ShowQuestionType({
                         </Link>
                         <div>
                             <h1 className="h1-semibold">{questionType.name}</h1>
-                            {questionType.name_ur && (
+                            {questionType.name_ur ? (
                                 <p
                                     className="text-sm text-muted-foreground"
                                     dir="rtl"
                                 >
                                     {questionType.name_ur}
                                 </p>
-                            )}
+                            ) : null}
                         </div>
                     </div>
                     <Button asChild variant="outline" className="sm:shrink-0">
@@ -190,18 +182,19 @@ export default function ShowQuestionType({
                                 <h2 className="text-xl font-semibold">
                                     {questionType.heading_en}
                                 </h2>
+                                <Badge variant="outline" className="bg-muted">
+                                    {questionType.is_objective
+                                        ? 'Objective'
+                                        : 'Subjective'}
+                                </Badge>
+                                <Badge variant="outline" className="bg-muted">
+                                    {questionType.schema.label}
+                                </Badge>
                                 {statusBadge(questionType.status)}
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {featurePills(questionType).map((pill) => (
-                                    <span
-                                        key={pill}
-                                        className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                                    >
-                                        {pill}
-                                    </span>
-                                ))}
-                            </div>
+                            <p className="max-w-3xl text-sm text-muted-foreground">
+                                {questionType.schema.description}
+                            </p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <CalendarIcon className="size-3.5" />
                                 <span>
@@ -211,21 +204,13 @@ export default function ShowQuestionType({
                         </div>
                     </div>
 
-                    <div className="grid divide-y sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+                    <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                         <div className="p-5 text-center">
                             <p className="text-xs text-muted-foreground">
                                 Questions
                             </p>
                             <p className="mt-1 font-semibold">
                                 {questionType.questions_count}
-                            </p>
-                        </div>
-                        <div className="p-5 text-center">
-                            <p className="text-xs text-muted-foreground">
-                                Columns / Row
-                            </p>
-                            <p className="mt-1 font-semibold">
-                                {questionType.column_per_row}
                             </p>
                         </div>
                         <div className="p-5 text-center">
@@ -238,10 +223,12 @@ export default function ShowQuestionType({
                         </div>
                         <div className="p-5 text-center">
                             <p className="text-xs text-muted-foreground">
-                                Objective Type
+                                Builder Behavior
                             </p>
                             <p className="mt-1 font-semibold">
-                                {questionType.objective_type?.name ?? '-'}
+                                {questionType.have_answer
+                                    ? 'Answer fields enabled'
+                                    : 'Answer fields hidden'}
                             </p>
                         </div>
                     </div>
@@ -250,11 +237,51 @@ export default function ShowQuestionType({
                 <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                     <div className="space-y-6">
                         <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                            <SectionHeader
-                                icon={<LayersIcon className="size-4" />}
-                                title="Content"
-                            />
+                            <div className="flex items-center gap-3">
+                                <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <SparklesIcon className="size-4" />
+                                </div>
+                                <p className="text-sm font-medium">
+                                    Builder Schema
+                                </p>
+                            </div>
                             <Separator />
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="rounded-xl border p-4">
+                                    <p className="text-xs text-muted-foreground">
+                                        Schema
+                                    </p>
+                                    <p className="mt-1 font-medium">
+                                        {questionType.schema.label}
+                                    </p>
+                                </div>
+                                <div className="rounded-xl border p-4">
+                                    <p className="text-xs text-muted-foreground">
+                                        Correct Answer Mode
+                                    </p>
+                                    <p className="mt-1 font-medium">
+                                        {questionType.is_objective &&
+                                        questionType.schema.settings
+                                            .supports_single_toggle
+                                            ? questionType.is_single
+                                                ? 'Single correct answer'
+                                                : 'Multiple correct answers'
+                                            : 'Not applicable'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border p-4">
+                                <p className="text-xs text-muted-foreground">
+                                    Description
+                                </p>
+                                <p className="mt-2 text-sm whitespace-pre-wrap">
+                                    {questionType.description_en ||
+                                        questionType.description_ur ||
+                                        '-'}
+                                </p>
+                            </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="rounded-xl border p-4">
@@ -269,62 +296,25 @@ export default function ShowQuestionType({
                                     <p className="text-xs text-muted-foreground">
                                         Heading (Urdu)
                                     </p>
-                                    <p className="mt-1 font-medium" dir="rtl">
-                                        {questionType.heading_ur ?? '-'}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Statement Label
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {questionType.have_statement
-                                            ? (questionType.statement_label ??
-                                              'Statement')
-                                            : '-'}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Description Label
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {questionType.have_description
-                                            ? (questionType.description_label ??
-                                              'Description')
-                                            : '-'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 lg:grid-cols-2">
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Description (English)
-                                    </p>
-                                    <p className="mt-2 text-sm whitespace-pre-wrap">
-                                        {questionType.description_en || '-'}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Description (Urdu)
-                                    </p>
                                     <p
-                                        className="mt-2 text-sm whitespace-pre-wrap"
+                                        className="mt-1 font-medium"
                                         dir="rtl"
                                     >
-                                        {questionType.description_ur || '-'}
+                                        {questionType.heading_ur ?? '-'}
                                     </p>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
+                    <div className="space-y-6">
                         <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                            <SectionHeader
-                                icon={<LogsIcon className="size-4" />}
-                                title="Activity"
-                            />
+                            <div className="flex items-center gap-3">
+                                <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <LogsIcon className="size-4" />
+                                </div>
+                                <p className="text-sm font-medium">Activity</p>
+                            </div>
                             <Separator />
 
                             {questionType.audit_logs.length === 0 ? (
@@ -340,177 +330,8 @@ export default function ShowQuestionType({
                             )}
                         </div>
                     </div>
-
-                    <div className="space-y-6">
-                        <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                            <SectionHeader
-                                icon={<ListChecksIcon className="size-4" />}
-                                title="Blocks"
-                            />
-                            <Separator />
-
-                            <div className="grid gap-3">
-                                {[
-                                    {
-                                        label: 'Exercise',
-                                        enabled: questionType.have_exercise,
-                                    },
-                                    {
-                                        label: 'Statement',
-                                        enabled: questionType.have_statement,
-                                    },
-                                    {
-                                        label: 'Description',
-                                        enabled: questionType.have_description,
-                                    },
-                                    {
-                                        label: 'Answer',
-                                        enabled: questionType.have_answer,
-                                    },
-                                    {
-                                        label: 'Single',
-                                        enabled: questionType.is_single,
-                                    },
-                                    {
-                                        label: 'Objective',
-                                        enabled: questionType.is_objective,
-                                    },
-                                ].map((item) => (
-                                    <div
-                                        key={item.label}
-                                        className="flex items-center justify-between rounded-xl border px-4 py-3"
-                                    >
-                                        <span className="text-sm font-medium">
-                                            {item.label}
-                                        </span>
-                                        {item.enabled ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="border-emerald-200 bg-emerald-100 text-emerald-700"
-                                            >
-                                                Enabled
-                                            </Badge>
-                                        ) : (
-                                            <Badge
-                                                variant="outline"
-                                                className="border-gray-200 bg-gray-100 text-gray-600"
-                                            >
-                                                Disabled
-                                            </Badge>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-                            <SectionHeader
-                                icon={<FileQuestionIcon className="size-4" />}
-                                title="Links"
-                            />
-                            <Separator />
-
-                            <div className="space-y-3 text-sm">
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Objective Type
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {questionType.objective_type?.name ??
-                                            '-'}
-                                    </p>
-                                    {questionType.objective_type
-                                        ?.heading_en && (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {
-                                                questionType.objective_type
-                                                    .heading_en
-                                            }
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="rounded-xl border p-4">
-                                    <p className="text-xs text-muted-foreground">
-                                        Created
-                                    </p>
-                                    <p className="mt-1 font-medium">
-                                        {fmtDateTime(questionType.created_at)}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </>
     );
 }
-
-function AuditLogCard({ log }: { log: AuditLogEntry }) {
-    const dot = EVENT_DOT[log.event ?? ''] ?? 'bg-gray-400';
-    const label = EVENT_LABEL[log.event ?? ''] ?? log.event ?? 'Changed';
-    const hasChanges = Object.keys(log.new_values).length > 0;
-
-    return (
-        <div className="rounded-xl border p-4">
-            <div className="flex items-start gap-3">
-                <div
-                    className={`mt-1.5 size-2.5 shrink-0 rounded-full ${dot}`}
-                />
-                <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{label}</span>
-                            <span className="text-xs text-muted-foreground">
-                                by {log.changed_by}
-                            </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                            {fmtDateTime(log.created_at)}
-                        </span>
-                    </div>
-
-                    {hasChanges && (
-                        <div className="space-y-1 rounded-lg border bg-muted/40 p-3 text-xs">
-                            {Object.entries(log.new_values).map(
-                                ([key, value]) => (
-                                    <div
-                                        key={key}
-                                        className="flex flex-wrap items-baseline gap-1.5"
-                                    >
-                                        <span className="text-muted-foreground capitalize">
-                                            {key.replace(/_/g, ' ')}:
-                                        </span>
-                                        {log.old_values[key] !== undefined && (
-                                            <>
-                                                <span className="line-through opacity-50">
-                                                    {String(
-                                                        log.old_values[key],
-                                                    )}
-                                                </span>
-                                                <span className="text-muted-foreground">
-                                                    {'->'}
-                                                </span>
-                                            </>
-                                        )}
-                                        <span className="font-medium">
-                                            {String(value)}
-                                        </span>
-                                    </div>
-                                ),
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-ShowQuestionType.layout = {
-    breadcrumbs: [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Question Types', href: '/superadmin/question-types' },
-        { title: 'View Question Type' },
-    ],
-};

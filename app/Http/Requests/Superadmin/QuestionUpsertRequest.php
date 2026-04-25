@@ -6,6 +6,7 @@ use App\Models\Chapter;
 use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\Topic;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -23,18 +24,9 @@ class QuestionUpsertRequest extends FormRequest
             'question_type_id' => ['required', 'integer', Rule::exists('question_types', 'id')],
             'chapter_id' => ['required', 'integer', Rule::exists('chapters', 'id')],
             'topic_id' => ['nullable', 'integer', Rule::exists('topics', 'id')],
-            'statement_en' => ['nullable', 'string'],
-            'statement_ur' => ['nullable', 'string'],
-            'description_en' => ['nullable', 'string'],
-            'description_ur' => ['nullable', 'string'],
-            'answer_en' => ['nullable', 'string'],
-            'answer_ur' => ['nullable', 'string'],
+            'content' => ['required', 'array'],
             'source' => ['nullable', 'string', 'max:100', Rule::in(Question::sourceValues())],
             'status' => ['required', 'boolean'],
-            'options' => ['nullable', 'array'],
-            'options.*.text_en' => ['nullable', 'string'],
-            'options.*.text_ur' => ['nullable', 'string'],
-            'options.*.is_correct' => ['required', 'boolean'],
         ];
     }
 
@@ -52,20 +44,7 @@ class QuestionUpsertRequest extends FormRequest
             }
 
             $topicId = $this->input('topic_id');
-            $statementEn = $this->normalizeNullableString($this->input('statement_en'));
-            $statementUr = $this->normalizeNullableString($this->input('statement_ur'));
-            $descriptionEn = $this->normalizeNullableString($this->input('description_en'));
-            $descriptionUr = $this->normalizeNullableString($this->input('description_ur'));
-            $answerEn = $this->normalizeNullableString($this->input('answer_en'));
-            $answerUr = $this->normalizeNullableString($this->input('answer_ur'));
-            $options = collect($this->input('options', []))
-                ->map(fn ($option) => [
-                    'text_en' => $this->normalizeNullableString($option['text_en'] ?? null),
-                    'text_ur' => $this->normalizeNullableString($option['text_ur'] ?? null),
-                    'is_correct' => filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                ])
-                ->filter(fn (array $option) => $option['text_en'] !== null || $option['text_ur'] !== null)
-                ->values();
+            $content = is_array($this->input('content')) ? $this->input('content') : [];
 
             if ($topicId) {
                 $topic = Topic::query()->find($topicId);
@@ -87,37 +66,11 @@ class QuestionUpsertRequest extends FormRequest
                 $validator->errors()->add('topic_id', 'Topic is required.');
             }
 
-            if ($questionType->have_statement && $statementEn === null && $statementUr === null) {
-                $validator->errors()->add('statement_en', 'Statement is required.');
-            }
-
-            if ($questionType->have_description && $descriptionEn === null && $descriptionUr === null) {
-                $validator->errors()->add('description_en', 'Description is required.');
-            }
-
-            if (! $questionType->is_objective && $questionType->have_answer && $answerEn === null && $answerUr === null) {
-                $validator->errors()->add('answer_en', 'Answer is required.');
-            }
-
-            if (! $questionType->is_objective) {
-                return;
-            }
-
-            if ($options->count() < 2) {
-                $validator->errors()->add('options', 'At least two options are required.');
-
-                return;
-            }
-
-            $correctCount = $options->where('is_correct', true)->count();
-
-            if ($correctCount < 1) {
-                $validator->errors()->add('options', 'Select at least one correct option.');
-            }
-
-            if ($questionType->is_single && $correctCount !== 1) {
-                $validator->errors()->add('options', 'Single objective questions require exactly one correct option.');
-            }
+            QuestionTypeSchemaRegistry::validateQuestionContent(
+                $questionType,
+                $content,
+                $validator,
+            );
         });
     }
 
@@ -131,21 +84,9 @@ class QuestionUpsertRequest extends FormRequest
                 ? (int) $this->input('chapter_id')
                 : null,
             'topic_id' => filled($this->input('topic_id')) ? (int) $this->input('topic_id') : null,
-            'statement_en' => $this->normalizeNullableString($this->input('statement_en')),
-            'statement_ur' => $this->normalizeNullableString($this->input('statement_ur')),
-            'description_en' => $this->normalizeNullableString($this->input('description_en')),
-            'description_ur' => $this->normalizeNullableString($this->input('description_ur')),
-            'answer_en' => $this->normalizeNullableString($this->input('answer_en')),
-            'answer_ur' => $this->normalizeNullableString($this->input('answer_ur')),
+            'content' => $this->normalizeContent($this->input('content', [])),
             'source' => Question::normalizeSource($this->input('source')),
             'status' => $this->boolean('status'),
-            'options' => collect($this->input('options', []))
-                ->map(fn ($option) => [
-                    'text_en' => $this->normalizeNullableString($option['text_en'] ?? null),
-                    'text_ur' => $this->normalizeNullableString($option['text_ur'] ?? null),
-                    'is_correct' => filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                ])
-                ->all(),
         ]);
     }
 
@@ -154,5 +95,40 @@ class QuestionUpsertRequest extends FormRequest
         $normalized = trim((string) $value);
 
         return $normalized === '' ? null : $normalized;
+    }
+
+    private function normalizeContent(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $normalized[$key] = $this->normalizeContent($item);
+
+                continue;
+            }
+
+            if ($key === 'is_correct') {
+                $normalized[$key] = filter_var($item, FILTER_VALIDATE_BOOLEAN);
+
+                continue;
+            }
+
+            if ($key === 'correct_boolean') {
+                $normalized[$key] = in_array($item, ['true', 'false'], true)
+                    ? $item
+                    : '';
+
+                continue;
+            }
+
+            $normalized[$key] = $this->normalizeNullableString($item);
+        }
+
+        return $normalized;
     }
 }

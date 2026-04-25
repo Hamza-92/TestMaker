@@ -1,18 +1,14 @@
 import { Link } from '@inertiajs/react';
 import type { InertiaFormProps } from '@inertiajs/react';
 import {
-    AlignLeftIcon,
     ArrowLeftIcon,
-    CheckCircle2Icon,
-    Columns3Icon,
-    LanguagesIcon,
+    FileTextIcon,
     Layers3Icon,
     SaveIcon,
-    ScanTextIcon,
     TargetIcon,
-    TextCursorInputIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,12 +20,18 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
-export interface ObjectiveTypeOption {
-    id: number;
-    name: string;
-    heading_en: string;
+export interface QuestionSchemaOption {
+    key: string;
+    kind: 'objective' | 'subjective';
+    label: string;
+    description: string;
+    settings: {
+        supports_answer_toggle: boolean;
+        supports_single_toggle: boolean;
+    };
 }
 
 export interface QuestionTypeFormData {
@@ -39,16 +41,10 @@ export interface QuestionTypeFormData {
     heading_ur: string;
     description_en: string;
     description_ur: string;
-    have_exercise: boolean;
-    have_statement: boolean;
-    statement_label: string;
-    have_description: boolean;
-    description_label: string;
     have_answer: boolean;
     is_single: boolean;
     is_objective: boolean;
-    objective_type_id: string;
-    column_per_row: string;
+    schema_key: string;
     status: string;
     [key: string]: boolean | string;
 }
@@ -58,7 +54,7 @@ interface QuestionTypeFormProps {
     submitLabel: string;
     backHref: string;
     form: InertiaFormProps<QuestionTypeFormData>;
-    objectiveTypes: ObjectiveTypeOption[];
+    questionSchemas: QuestionSchemaOption[];
     onSubmit: (event: React.FormEvent) => void;
 }
 
@@ -75,9 +71,9 @@ function SectionCard({
     title: string;
 }) {
     return (
-        <section className="space-y-4 rounded-xl border p-5 shadow-sm">
+        <section className="space-y-4 rounded-2xl border border-primary/10 bg-card p-5 shadow-sm">
             <div className="flex items-center gap-3">
-                <span className="bg-primary/10 text-primary inline-flex size-9 items-center justify-center rounded-lg">
+                <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     {icon}
                 </span>
                 <h3 className="text-sm font-semibold">{title}</h3>
@@ -113,13 +109,13 @@ function Field({
     );
 }
 
-function ToggleTile({
-    checked,
+function KindCard({
+    active,
     icon,
     label,
     onClick,
 }: {
-    checked: boolean;
+    active: boolean;
     icon: ReactNode;
     label: string;
     onClick: () => void;
@@ -129,37 +125,41 @@ function ToggleTile({
             type="button"
             onClick={onClick}
             className={cn(
-                'flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
-                checked
-                    ? 'border-primary/25 bg-primary/5 text-primary'
-                    : 'border-border bg-background text-muted-foreground hover:bg-muted/40',
+                'rounded-2xl border p-4 text-left transition-colors',
+                active
+                    ? 'border-primary/30 bg-primary/5 shadow-sm'
+                    : 'border-border bg-background hover:bg-muted/40',
             )}
         >
-            <span className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
                 <span
                     className={cn(
-                        'inline-flex size-9 items-center justify-center rounded-lg',
-                        checked ? 'bg-white/80' : 'bg-muted',
+                        'inline-flex size-10 items-center justify-center rounded-xl',
+                        active ? 'bg-primary text-primary-foreground' : 'bg-muted',
                     )}
                 >
                     {icon}
                 </span>
-                <span className="text-sm font-medium">{label}</span>
-            </span>
-            <span
-                className={cn(
-                    'inline-flex h-6 w-11 items-center rounded-full px-1 transition-colors',
-                    checked ? 'bg-primary' : 'bg-muted',
-                )}
-            >
-                <span
-                    className={cn(
-                        'size-4 rounded-full bg-white transition-transform',
-                        checked ? 'translate-x-5' : 'translate-x-0',
-                    )}
-                />
-            </span>
+                <p className="font-semibold">{label}</p>
+            </div>
         </button>
+    );
+}
+
+function SwitchRow({
+    checked,
+    label,
+    onCheckedChange,
+}: {
+    checked: boolean;
+    label: string;
+    onCheckedChange: (checked: boolean) => void;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border bg-muted/20 px-4 py-3">
+            <p className="font-medium">{label}</p>
+            <Switch checked={checked} onCheckedChange={onCheckedChange} />
+        </div>
     );
 }
 
@@ -168,28 +168,39 @@ export function QuestionTypeForm({
     submitLabel,
     backHref,
     form,
-    objectiveTypes,
+    questionSchemas,
     onSubmit,
 }: QuestionTypeFormProps) {
+    const filteredSchemas = questionSchemas.filter(
+        (schema) =>
+            schema.kind === (form.data.is_objective ? 'objective' : 'subjective'),
+    );
+    const selectedSchema =
+        filteredSchemas.find((schema) => schema.key === form.data.schema_key) ??
+        filteredSchemas[0] ??
+        null;
+
     return (
         <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
             <div className="flex items-center gap-4">
                 <Link
                     href={backHref}
-                    className="border-input hover:bg-accent flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
                 >
                     <ArrowLeftIcon className="size-4" />
                 </Link>
-                <h1 className="h1-semibold">{title}</h1>
+                <div>
+                    <h1 className="h1-semibold">{title}</h1>
+                </div>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-5">
                 <SectionCard
-                    icon={<TextCursorInputIcon className="size-4" />}
-                    title="Identity"
+                    icon={<FileTextIcon className="size-4" />}
+                    title="Details"
                 >
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Name" required error={form.errors.name}>
+                        <Field label="Type Name" required error={form.errors.name}>
                             <Input
                                 value={form.data.name}
                                 onChange={(event) =>
@@ -198,7 +209,7 @@ export function QuestionTypeForm({
                             />
                         </Field>
 
-                        <Field label="Name (Urdu)" error={form.errors.name_ur}>
+                        <Field label="Type Name (Urdu)" error={form.errors.name_ur}>
                             <Input
                                 dir="rtl"
                                 value={form.data.name_ur}
@@ -216,10 +227,7 @@ export function QuestionTypeForm({
                             <Input
                                 value={form.data.heading_en}
                                 onChange={(event) =>
-                                    form.setData(
-                                        'heading_en',
-                                        event.target.value,
-                                    )
+                                    form.setData('heading_en', event.target.value)
                                 }
                             />
                         </Field>
@@ -232,104 +240,11 @@ export function QuestionTypeForm({
                                 dir="rtl"
                                 value={form.data.heading_ur}
                                 onChange={(event) =>
-                                    form.setData(
-                                        'heading_ur',
-                                        event.target.value,
-                                    )
+                                    form.setData('heading_ur', event.target.value)
                                 }
                             />
                         </Field>
 
-                        <Field label="Status" required error={form.errors.status}>
-                            <Select
-                                value={form.data.status}
-                                onValueChange={(value) =>
-                                    form.setData('status', value)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">Active</SelectItem>
-                                    <SelectItem value="0">Inactive</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </Field>
-
-                        <Field
-                            label="Columns Per Row"
-                            required
-                            error={form.errors.column_per_row}
-                        >
-                            <Select
-                                value={form.data.column_per_row}
-                                onValueChange={(value) =>
-                                    form.setData('column_per_row', value)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {[1, 2, 3, 4, 5, 6].map((value) => (
-                                        <SelectItem
-                                            key={value}
-                                            value={String(value)}
-                                        >
-                                            {value}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-
-                        <div className="md:col-span-2">
-                            <Field
-                                label="Objective Type"
-                                error={form.errors.objective_type_id}
-                            >
-                                <Select
-                                    value={form.data.objective_type_id || 'none'}
-                                    disabled={!form.data.is_objective}
-                                    onValueChange={(value) =>
-                                        form.setData(
-                                            'objective_type_id',
-                                            value === 'none' ? '' : value,
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
-                                            placeholder={
-                                                form.data.is_objective
-                                                    ? 'Select type'
-                                                    : 'Enable objective'
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        {objectiveTypes.map((item) => (
-                                            <SelectItem
-                                                key={item.id}
-                                                value={String(item.id)}
-                                            >
-                                                {item.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        </div>
-                    </div>
-                </SectionCard>
-
-                <SectionCard
-                    icon={<LanguagesIcon className="size-4" />}
-                    title="Copy"
-                >
-                    <div className="grid gap-4 md:grid-cols-2">
                         <Field
                             label="Description (English)"
                             error={form.errors.description_en}
@@ -364,131 +279,130 @@ export function QuestionTypeForm({
                                 className={textareaClassName}
                             />
                         </Field>
+
+                        <div className="md:col-span-2">
+                            <div className="flex items-center justify-between gap-3 rounded-2xl border bg-muted/20 px-4 py-3">
+                                <p className="font-medium">Active</p>
+                                <Switch
+                                    checked={form.data.status === '1'}
+                                    onCheckedChange={(checked) =>
+                                        form.setData(
+                                            'status',
+                                            checked ? '1' : '0',
+                                        )
+                                    }
+                                />
+                            </div>
+                            {form.errors.status ? (
+                                <p className="mt-1.5 text-xs text-destructive">
+                                    {form.errors.status}
+                                </p>
+                            ) : null}
+                        </div>
                     </div>
                 </SectionCard>
 
                 <SectionCard
                     icon={<Layers3Icon className="size-4" />}
-                    title="Behaviour"
+                    title="Structure"
                 >
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        <ToggleTile
-                            checked={form.data.have_exercise}
-                            icon={<Columns3Icon className="size-4" />}
-                            label="Exercise"
-                            onClick={() =>
-                                form.setData(
-                                    'have_exercise',
-                                    !form.data.have_exercise,
-                                )
-                            }
-                        />
-
-                        <ToggleTile
-                            checked={form.data.have_statement}
-                            icon={<ScanTextIcon className="size-4" />}
-                            label="Statement"
-                            onClick={() =>
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <KindCard
+                            active={!form.data.is_objective}
+                            label="Subjective"
+                            icon={<FileTextIcon className="size-4" />}
+                            onClick={() => {
+                                const firstSchema = questionSchemas.find(
+                                    (schema) => schema.kind === 'subjective',
+                                );
                                 form.setData({
                                     ...form.data,
-                                    have_statement: !form.data.have_statement,
-                                    statement_label: form.data.have_statement
-                                        ? ''
-                                        : form.data.statement_label ||
-                                          'Statement',
-                                })
-                            }
+                                    is_objective: false,
+                                    schema_key: firstSchema?.key ?? '',
+                                    is_single: false,
+                                });
+                            }}
                         />
 
-                        <ToggleTile
-                            checked={form.data.have_description}
-                            icon={<AlignLeftIcon className="size-4" />}
-                            label="Description"
-                            onClick={() =>
-                                form.setData({
-                                    ...form.data,
-                                    have_description:
-                                        !form.data.have_description,
-                                    description_label:
-                                        form.data.have_description
-                                            ? ''
-                                            : form.data.description_label ||
-                                              'Description',
-                                })
-                            }
-                        />
-
-                        <ToggleTile
-                            checked={form.data.have_answer}
-                            icon={<CheckCircle2Icon className="size-4" />}
-                            label="Answer"
-                            onClick={() =>
-                                form.setData(
-                                    'have_answer',
-                                    !form.data.have_answer,
-                                )
-                            }
-                        />
-
-                        <ToggleTile
-                            checked={form.data.is_single}
-                            icon={<Columns3Icon className="size-4" />}
-                            label="Single"
-                            onClick={() =>
-                                form.setData('is_single', !form.data.is_single)
-                            }
-                        />
-
-                        <ToggleTile
-                            checked={form.data.is_objective}
-                            icon={<TargetIcon className="size-4" />}
+                        <KindCard
+                            active={form.data.is_objective}
                             label="Objective"
-                            onClick={() =>
+                            icon={<TargetIcon className="size-4" />}
+                            onClick={() => {
+                                const firstSchema = questionSchemas.find(
+                                    (schema) => schema.kind === 'objective',
+                                );
                                 form.setData({
                                     ...form.data,
-                                    is_objective: !form.data.is_objective,
-                                    objective_type_id: form.data.is_objective
-                                        ? ''
-                                        : form.data.objective_type_id,
-                                })
-                            }
+                                    is_objective: true,
+                                    schema_key: firstSchema?.key ?? '',
+                                });
+                            }}
                         />
                     </div>
 
-                    {form.data.have_statement || form.data.have_description ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {form.data.have_statement ? (
-                                <Field
-                                    label="Statement Label"
-                                    error={form.errors.statement_label}
-                                >
-                                    <Input
-                                        value={form.data.statement_label}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'statement_label',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </Field>
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                        <Field
+                            label="Schema"
+                            required
+                            error={form.errors.schema_key}
+                        >
+                            <Select
+                                value={form.data.schema_key}
+                                onValueChange={(value) =>
+                                    form.setData('schema_key', value)
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select schema" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {filteredSchemas.map((schema) => (
+                                        <SelectItem
+                                            key={schema.key}
+                                            value={schema.key}
+                                        >
+                                            {schema.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </Field>
+
+                        <div className="flex flex-wrap gap-2 lg:justify-end hidden">
+                            {selectedSchema ? (
+                                <>
+                                    <Badge variant="outline">
+                                        {selectedSchema.label}
+                                    </Badge>
+                                    <Badge variant="outline">
+                                        {selectedSchema.kind}
+                                    </Badge>
+                                </>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    {selectedSchema ? (
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {selectedSchema.settings.supports_answer_toggle ? (
+                                <SwitchRow
+                                    checked={form.data.have_answer}
+                                    label="Has answer fields"
+                                    onCheckedChange={(checked) =>
+                                        form.setData('have_answer', checked)
+                                    }
+                                />
                             ) : null}
 
-                            {form.data.have_description ? (
-                                <Field
-                                    label="Description Label"
-                                    error={form.errors.description_label}
-                                >
-                                    <Input
-                                        value={form.data.description_label}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'description_label',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </Field>
+                            {selectedSchema.settings.supports_single_toggle ? (
+                                <SwitchRow
+                                    checked={form.data.is_single}
+                                    label="Single correct answer"
+                                    onCheckedChange={(checked) =>
+                                        form.setData('is_single', checked)
+                                    }
+                                />
                             ) : null}
                         </div>
                     ) : null}

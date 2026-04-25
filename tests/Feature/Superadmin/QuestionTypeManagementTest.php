@@ -40,6 +40,7 @@ function makeQuestionType(User $creator, array $overrides = []): QuestionType
         'have_answer' => true,
         'is_single' => true,
         'is_objective' => false,
+        'schema_key' => 'subjective_standard',
         'objective_type_id' => null,
         'column_per_row' => 1,
         'status' => 1,
@@ -134,16 +135,10 @@ it('creates a question type and normalizes dependent fields', function () {
             'heading_ur' => null,
             'description_en' => null,
             'description_ur' => null,
-            'have_exercise' => true,
-            'have_statement' => true,
-            'statement_label' => '',
-            'have_description' => true,
-            'description_label' => '',
             'have_answer' => true,
-            'is_single' => true,
+            'is_single' => false,
             'is_objective' => false,
-            'objective_type_id' => $objectiveType->id,
-            'column_per_row' => 2,
+            'schema_key' => 'subjective_standard',
             'status' => true,
         ]);
 
@@ -153,10 +148,11 @@ it('creates a question type and normalizes dependent fields', function () {
         ->where('name', 'Short Question')
         ->sole();
 
-    expect($questionType->statement_label)->toBe('Statement')
-        ->and($questionType->description_label)->toBe('Description')
+    expect($questionType->schema_key)->toBe('subjective_standard')
+        ->and($questionType->statement_label)->toBe('Prompt')
+        ->and($questionType->description_label)->toBe('Guidance')
         ->and($questionType->objective_type_id)->toBeNull()
-        ->and($questionType->column_per_row)->toBe(2);
+        ->and($questionType->column_per_row)->toBe(1);
 });
 
 it('updates a question type', function () {
@@ -182,16 +178,10 @@ it('updates a question type', function () {
             'heading_ur' => null,
             'description_en' => 'Updated description.',
             'description_ur' => null,
-            'have_exercise' => true,
-            'have_statement' => true,
-            'statement_label' => 'Prompt',
-            'have_description' => true,
-            'description_label' => 'Guidance',
-            'have_answer' => true,
-            'is_single' => false,
+            'have_answer' => false,
+            'is_single' => true,
             'is_objective' => true,
-            'objective_type_id' => $objectiveType->id,
-            'column_per_row' => 3,
+            'schema_key' => 'objective_passage_mcq',
             'status' => false,
         ]);
 
@@ -201,10 +191,12 @@ it('updates a question type', function () {
 
     expect($questionType->name)->toBe('Structured Question')
         ->and($questionType->heading_en)->toBe('Structured Response')
-        ->and($questionType->description_label)->toBe('Guidance')
-        ->and($questionType->is_single)->toBeFalse()
+        ->and($questionType->schema_key)->toBe('objective_passage_mcq')
+        ->and($questionType->statement_label)->toBe('Passage')
+        ->and($questionType->description_label)->toBeNull()
+        ->and($questionType->is_single)->toBeTrue()
         ->and($questionType->is_objective)->toBeTrue()
-        ->and($questionType->objective_type_id)->toBe($objectiveType->id)
+        ->and($questionType->objective_type_id)->toBeNull()
         ->and($questionType->status)->toBe(0);
 });
 

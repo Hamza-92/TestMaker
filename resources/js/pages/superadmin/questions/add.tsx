@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { QuestionForm } from './form';
+import { createEmptyQuestionContent, QuestionForm } from './form';
 import type {
     ChapterOption,
     QuestionFormData,
@@ -20,15 +20,9 @@ export default function AddQuestion({
         question_type_id: '',
         chapter_id: '',
         topic_id: '',
-        statement_en: '',
-        statement_ur: '',
-        description_en: '',
-        description_ur: '',
-        answer_en: '',
-        answer_ur: '',
         source: '',
         status: '1',
-        options: [],
+        content: createEmptyQuestionContent(),
     });
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -56,15 +50,9 @@ export default function AddQuestion({
                         question_type_id: '',
                         chapter_id: chapterId,
                         topic_id: topicId,
-                        statement_en: '',
-                        statement_ur: '',
-                        description_en: '',
-                        description_ur: '',
-                        answer_en: '',
-                        answer_ur: '',
                         source: '',
                         status: '1',
-                        options: [],
+                        content: createEmptyQuestionContent(),
                     });
                 },
             },

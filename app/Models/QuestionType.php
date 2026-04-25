@@ -24,6 +24,7 @@ class QuestionType extends Model
         'have_answer',
         'is_single',
         'is_objective',
+        'schema_key',
         'objective_type_id',
         'column_per_row',
         'status',

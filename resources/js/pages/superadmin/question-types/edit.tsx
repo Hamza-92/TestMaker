@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import { QuestionTypeForm } from './form';
-import type { ObjectiveTypeOption, QuestionTypeFormData } from './form';
+import type { QuestionSchemaOption, QuestionTypeFormData } from './form';
 
 interface QuestionTypePayload {
     id: number;
@@ -10,25 +10,19 @@ interface QuestionTypePayload {
     heading_ur: string | null;
     description_en: string | null;
     description_ur: string | null;
-    have_exercise: boolean;
-    have_statement: boolean;
-    statement_label: string | null;
-    have_description: boolean;
-    description_label: string | null;
     have_answer: boolean;
     is_single: boolean;
     is_objective: boolean;
-    objective_type_id: number | null;
-    column_per_row: number;
+    schema_key: string;
     status: number;
 }
 
 export default function EditQuestionType({
     questionType,
-    objectiveTypes,
+    questionSchemas,
 }: {
     questionType: QuestionTypePayload;
-    objectiveTypes: ObjectiveTypeOption[];
+    questionSchemas: QuestionSchemaOption[];
 }) {
     const form = useForm<QuestionTypeFormData>({
         name: questionType.name,
@@ -37,18 +31,10 @@ export default function EditQuestionType({
         heading_ur: questionType.heading_ur ?? '',
         description_en: questionType.description_en ?? '',
         description_ur: questionType.description_ur ?? '',
-        have_exercise: questionType.have_exercise,
-        have_statement: questionType.have_statement,
-        statement_label: questionType.statement_label ?? 'Statement',
-        have_description: questionType.have_description,
-        description_label: questionType.description_label ?? 'Description',
         have_answer: questionType.have_answer,
         is_single: questionType.is_single,
         is_objective: questionType.is_objective,
-        objective_type_id: questionType.objective_type_id
-            ? String(questionType.objective_type_id)
-            : '',
-        column_per_row: String(questionType.column_per_row),
+        schema_key: questionType.schema_key,
         status: String(questionType.status),
     });
 
@@ -65,7 +51,7 @@ export default function EditQuestionType({
                 submitLabel="Save Changes"
                 backHref={`/superadmin/question-types/${questionType.id}`}
                 form={form}
-                objectiveTypes={objectiveTypes}
+                questionSchemas={questionSchemas}
                 onSubmit={handleSubmit}
             />
         </>

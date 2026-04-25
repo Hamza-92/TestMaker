@@ -3,8 +3,10 @@
 namespace App\Http\Requests\Superadmin;
 
 use App\Models\QuestionType;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class QuestionTypeUpsertRequest extends FormRequest
 {
@@ -32,14 +34,14 @@ class QuestionTypeUpsertRequest extends FormRequest
             'heading_ur' => ['nullable', 'string', 'max:150'],
             'description_en' => ['nullable', 'string'],
             'description_ur' => ['nullable', 'string'],
-            'have_exercise' => ['required', 'boolean'],
-            'have_statement' => ['required', 'boolean'],
-            'statement_label' => ['nullable', 'string', 'max:100'],
-            'have_description' => ['required', 'boolean'],
-            'description_label' => ['nullable', 'string', 'max:100'],
             'have_answer' => ['required', 'boolean'],
             'is_single' => ['required', 'boolean'],
             'is_objective' => ['required', 'boolean'],
+            'schema_key' => [
+                'required',
+                'string',
+                Rule::in(array_keys(QuestionTypeSchemaRegistry::definitions())),
+            ],
             'objective_type_id' => [
                 'nullable',
                 'integer',
@@ -48,7 +50,6 @@ class QuestionTypeUpsertRequest extends FormRequest
                 ),
                 Rule::notIn(array_filter([$questionTypeId])),
             ],
-            'column_per_row' => ['required', 'integer', 'min:1', 'max:6'],
             'status' => ['required', 'boolean'],
         ];
     }
@@ -62,22 +63,41 @@ class QuestionTypeUpsertRequest extends FormRequest
             'heading_ur' => $this->normalizeNullableString($this->input('heading_ur')),
             'description_en' => $this->normalizeNullableString($this->input('description_en')),
             'description_ur' => $this->normalizeNullableString($this->input('description_ur')),
-            'statement_label' => $this->normalizeNullableString($this->input('statement_label')),
-            'description_label' => $this->normalizeNullableString($this->input('description_label')),
-            'have_exercise' => $this->boolean('have_exercise'),
-            'have_statement' => $this->boolean('have_statement'),
-            'have_description' => $this->boolean('have_description'),
             'have_answer' => $this->boolean('have_answer'),
             'is_single' => $this->boolean('is_single'),
             'is_objective' => $this->boolean('is_objective'),
+            'schema_key' => $this->normalizeNullableString(
+                $this->input('schema_key'),
+            ) ?? QuestionTypeSchemaRegistry::infer(
+                $this->boolean('is_objective'),
+                [
+                    'objective_type_id' => $this->input('objective_type_id'),
+                    'have_description' => $this->boolean('have_description'),
+                    'have_answer' => $this->boolean('have_answer'),
+                ],
+            ),
             'objective_type_id' => filled($this->input('objective_type_id'))
                 ? (int) $this->input('objective_type_id')
                 : null,
-            'column_per_row' => filled($this->input('column_per_row'))
-                ? (int) $this->input('column_per_row')
-                : null,
             'status' => $this->boolean('status'),
         ]);
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $schema = QuestionTypeSchemaRegistry::resolve(
+                $this->input('schema_key'),
+                $this->boolean('is_objective'),
+            );
+
+            if ($schema['kind'] !== ($this->boolean('is_objective') ? 'objective' : 'subjective')) {
+                $validator->errors()->add(
+                    'schema_key',
+                    'Selected schema does not match the question type kind.',
+                );
+            }
+        });
     }
 
     private function normalizeString(mixed $value): string

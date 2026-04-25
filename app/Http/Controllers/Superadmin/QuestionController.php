@@ -11,6 +11,7 @@ use App\Models\Chapter;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\QuestionType;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use App\Models\Topic;
 use App\Support\Questions\QuestionBulkImporter;
 use Illuminate\Http\RedirectResponse;
@@ -194,7 +195,7 @@ class QuestionController extends Controller
 
             $question = Question::query()->create($payload);
 
-            if ($questionType->is_objective && $options !== []) {
+            if ($options !== []) {
                 $question->options()->createMany($options);
             }
 
@@ -242,7 +243,7 @@ class QuestionController extends Controller
     public function edit(Question $question)
     {
         $question->load([
-            'questionType:id,name,is_objective,is_single,have_statement,statement_label,have_description,description_label,have_answer,column_per_row,status',
+            'questionType:id,name,is_objective,is_single,have_statement,statement_label,have_description,description_label,have_answer,schema_key,objective_type_id,column_per_row,status',
             'chapter.subject:id,name_eng,name_ur,subject_type',
             'topic:id,name,name_ur,chapter_id',
             'options',
@@ -254,22 +255,12 @@ class QuestionController extends Controller
                 'question_type_id' => $question->question_type_id,
                 'chapter_id' => $question->chapter_id,
                 'topic_id' => $question->topic_id,
-                'statement_en' => $question->statement_en,
-                'statement_ur' => $question->statement_ur,
-                'description_en' => $question->description_en,
-                'description_ur' => $question->description_ur,
-                'answer_en' => $question->answer_en,
-                'answer_ur' => $question->answer_ur,
                 'source' => $question->source,
                 'status' => $question->status,
-                'options' => $question->options
-                    ->map(fn (QuestionOption $option) => [
-                        'id' => $option->id,
-                        'text_en' => $option->text_en,
-                        'text_ur' => $option->text_ur,
-                        'is_correct' => $option->is_correct,
-                    ])
-                    ->values(),
+                'content' => QuestionTypeSchemaRegistry::contentFromQuestion(
+                    $question,
+                    $question->questionType,
+                ),
             ],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
             'chapters' => $this->chapterFormOptions(includeInactive: true),
@@ -299,7 +290,7 @@ class QuestionController extends Controller
             $question->update($payload);
             $question->options()->delete();
 
-            if ($questionType->is_objective && $options !== []) {
+            if ($options !== []) {
                 $question->options()->createMany($options);
             }
 
@@ -356,20 +347,10 @@ class QuestionController extends Controller
 
     private function buildPayload(array $validated, QuestionType $questionType, Chapter $chapter): array
     {
-        $options = [];
-
-        if ($questionType->is_objective) {
-            $options = collect($validated['options'] ?? [])
-                ->filter(fn (array $option) => ($option['text_en'] ?? null) !== null || ($option['text_ur'] ?? null) !== null)
-                ->values()
-                ->map(fn (array $option, int $index) => [
-                    'text_en' => $option['text_en'] ?? null,
-                    'text_ur' => $option['text_ur'] ?? null,
-                    'is_correct' => (bool) ($option['is_correct'] ?? false),
-                    'sort_order' => $index + 1,
-                ])
-                ->all();
-        }
+        $questionPayload = QuestionTypeSchemaRegistry::buildQuestionPayload(
+            $questionType,
+            $validated['content'] ?? [],
+        );
 
         return [[
             'question_type_id' => $questionType->id,
@@ -377,19 +358,16 @@ class QuestionController extends Controller
             'topic_id' => $chapter->subject?->subject_type === 'topic-wise'
                 ? ($validated['topic_id'] ?? null)
                 : null,
-            'statement_en' => $questionType->have_statement ? ($validated['statement_en'] ?? null) : null,
-            'statement_ur' => $questionType->have_statement ? ($validated['statement_ur'] ?? null) : null,
-            'description_en' => $questionType->have_description ? ($validated['description_en'] ?? null) : null,
-            'description_ur' => $questionType->have_description ? ($validated['description_ur'] ?? null) : null,
-            'answer_en' => ! $questionType->is_objective && $questionType->have_answer
-                ? ($validated['answer_en'] ?? null)
-                : null,
-            'answer_ur' => ! $questionType->is_objective && $questionType->have_answer
-                ? ($validated['answer_ur'] ?? null)
-                : null,
+            'statement_en' => $questionPayload['statement_en'],
+            'statement_ur' => $questionPayload['statement_ur'],
+            'description_en' => $questionPayload['description_en'],
+            'description_ur' => $questionPayload['description_ur'],
+            'answer_en' => $questionPayload['answer_en'],
+            'answer_ur' => $questionPayload['answer_ur'],
+            'content' => $questionPayload['content'],
             'source' => $validated['source'] ?? null,
             'status' => $validated['status'],
-        ], $options];
+        ], $questionPayload['options']];
     }
 
     private function storeImportFromPreview(
@@ -512,29 +490,16 @@ class QuestionController extends Controller
             ->get([
                 'id',
                 'name',
+                'heading_en',
                 'is_objective',
                 'is_single',
-                'have_statement',
-                'statement_label',
-                'have_description',
-                'description_label',
                 'have_answer',
+                'schema_key',
+                'objective_type_id',
                 'column_per_row',
                 'status',
             ])
-            ->map(fn (QuestionType $questionType) => [
-                'id' => $questionType->id,
-                'name' => $questionType->name,
-                'is_objective' => $questionType->is_objective,
-                'is_single' => $questionType->is_single,
-                'have_statement' => $questionType->have_statement,
-                'statement_label' => $questionType->statement_label,
-                'have_description' => $questionType->have_description,
-                'description_label' => $questionType->description_label,
-                'have_answer' => $questionType->have_answer,
-                'column_per_row' => $questionType->column_per_row,
-                'status' => $questionType->status,
-            ])
+            ->map(fn (QuestionType $questionType) => $this->serializeQuestionType($questionType))
             ->values();
     }
 
@@ -622,36 +587,30 @@ class QuestionController extends Controller
 
     private function transformQuestionListItem(Question $question): array
     {
+        $schema = $this->resolvedQuestionSchema($question->questionType);
+        $content = QuestionTypeSchemaRegistry::contentFromQuestion(
+            $question,
+            $question->questionType,
+        );
+        $metrics = QuestionTypeSchemaRegistry::metrics(
+            $question->questionType,
+            $content,
+            $question->options,
+        );
+
         return [
             'id' => $question->id,
-            'statement_en' => $question->statement_en,
-            'statement_ur' => $question->statement_ur,
-            'description_en' => $question->description_en,
-            'description_ur' => $question->description_ur,
-            'answer_en' => $question->answer_en,
-            'answer_ur' => $question->answer_ur,
             'source' => $question->source,
             'source_label' => Question::sourceLabel($question->source),
             'status' => $question->status,
             'created_at' => $question->created_at?->toISOString(),
-            'question_type' => [
-                'id' => $question->questionType->id,
-                'name' => $question->questionType->name,
-                'is_objective' => $question->questionType->is_objective,
-                'is_single' => $question->questionType->is_single,
-                'have_statement' => $question->questionType->have_statement,
-                'statement_label' => $question->questionType->statement_label,
-                'have_description' => $question->questionType->have_description,
-                'description_label' => $question->questionType->description_label,
-                'have_answer' => $question->questionType->have_answer,
-                'column_per_row' => $question->questionType->column_per_row,
-                'objective_type' => $question->questionType->objectiveType
-                    ? [
-                        'id' => $question->questionType->objectiveType->id,
-                        'name' => $question->questionType->objectiveType->name,
-                    ]
-                    : null,
-            ],
+            'summary_text' => QuestionTypeSchemaRegistry::summarize(
+                $question->questionType,
+                $content,
+            ),
+            'content' => $content,
+            'question_type' => $this->serializeQuestionType($question->questionType),
+            'schema' => $schema,
             'chapter' => [
                 'id' => $question->chapter->id,
                 'name' => $question->chapter->name,
@@ -675,13 +634,14 @@ class QuestionController extends Controller
             ],
             'topic' => $question->topic
                 ? [
-                    'id' => $question->topic->id,
-                    'name' => $question->topic->name,
-                    'name_ur' => $question->topic->name_ur,
-                ]
+                'id' => $question->topic->id,
+                'name' => $question->topic->name,
+                'name_ur' => $question->topic->name_ur,
+            ]
                 : null,
-            'options_count' => $question->options->count(),
-            'correct_options_count' => $question->options->where('is_correct', true)->count(),
+            'options_count' => $metrics['options_count'],
+            'correct_options_count' => $metrics['correct_options_count'],
+            'items_count' => $metrics['items_count'],
         ];
     }
 
@@ -714,6 +674,11 @@ class QuestionController extends Controller
 
     private function auditValues(Question $question): array
     {
+        $content = QuestionTypeSchemaRegistry::contentFromQuestion(
+            $question,
+            $question->questionType,
+        );
+
         return [
             'question_type' => $question->questionType?->name,
             'chapter' => $question->chapter?->name,
@@ -721,7 +686,47 @@ class QuestionController extends Controller
             'topic' => $question->topic?->name,
             'source' => $question->source,
             'status' => $question->status,
-            'options_count' => $question->options->count(),
+            'schema' => $this->resolvedQuestionSchema($question->questionType)['label'],
+            'summary_text' => QuestionTypeSchemaRegistry::summarize(
+                $question->questionType,
+                $content,
+            ),
+            'options_count' => QuestionTypeSchemaRegistry::metrics(
+                $question->questionType,
+                $content,
+                $question->options,
+            )['options_count'],
+        ];
+    }
+
+    private function resolvedQuestionSchema(QuestionType $questionType): array
+    {
+        return QuestionTypeSchemaRegistry::resolve(
+            $questionType->schema_key,
+            $questionType->is_objective,
+            [
+                'objective_type_id' => $questionType->objective_type_id,
+                'have_description' => $questionType->have_description,
+                'have_answer' => $questionType->have_answer,
+            ],
+        );
+    }
+
+    private function serializeQuestionType(QuestionType $questionType): array
+    {
+        $schema = $this->resolvedQuestionSchema($questionType);
+
+        return [
+            'id' => $questionType->id,
+            'name' => $questionType->name,
+            'heading_en' => $questionType->heading_en,
+            'is_objective' => $questionType->is_objective,
+            'is_single' => $questionType->is_single,
+            'have_answer' => $questionType->have_answer,
+            'supports_simple_import' => QuestionTypeSchemaRegistry::supportsSimpleImport($questionType),
+            'schema_key' => $schema['key'],
+            'schema' => $schema,
+            'status' => $questionType->status,
         ];
     }
 }

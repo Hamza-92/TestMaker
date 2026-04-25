@@ -33,18 +33,27 @@ interface QuestionType {
     name: string;
     name_ur: string | null;
     heading_en: string;
-    have_exercise: boolean;
-    have_statement: boolean;
-    have_description: boolean;
+    heading_ur: string | null;
+    description_en: string | null;
+    description_ur: string | null;
     have_answer: boolean;
     is_single: boolean;
     is_objective: boolean;
-    column_per_row: number;
+    schema_key: string;
+    schema: {
+        key: string;
+        kind: 'objective' | 'subjective';
+        label: string;
+        description: string;
+        settings: {
+            supports_answer_toggle: boolean;
+            supports_single_toggle: boolean;
+        };
+    };
     status: number;
     created_at: string | null;
     questions_count: number;
     objective_children_count: number;
-    objective_type: { id: number; name: string } | null;
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
@@ -69,15 +78,6 @@ function statusBadge(status: number) {
     );
 }
 
-function enabledBlocks(questionType: QuestionType) {
-    return [
-        questionType.have_exercise ? 'Exercise' : null,
-        questionType.have_statement ? 'Statement' : null,
-        questionType.have_description ? 'Description' : null,
-        questionType.have_answer ? 'Answer' : null,
-    ].filter(Boolean) as string[];
-}
-
 export default function QuestionTypes({
     questionTypes,
 }: {
@@ -92,14 +92,15 @@ export default function QuestionTypes({
     const [deleting, setDeleting] = useState(false);
 
     const filtered = useMemo(() => {
-        const query = search.toLowerCase();
+        const query = search.toLowerCase().trim();
 
         return questionTypes.filter((questionType) => {
             const matchesSearch =
-                !query ||
+                query === '' ||
                 questionType.name.toLowerCase().includes(query) ||
                 (questionType.name_ur ?? '').toLowerCase().includes(query) ||
-                questionType.heading_en.toLowerCase().includes(query);
+                questionType.heading_en.toLowerCase().includes(query) ||
+                questionType.schema.label.toLowerCase().includes(query);
 
             const matchesStatus =
                 statusFilter === 'all' ||
@@ -252,10 +253,10 @@ export default function QuestionTypes({
                                         Heading
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Format
+                                        Schema
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Blocks
+                                        Behavior
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                                         Usage
@@ -287,93 +288,90 @@ export default function QuestionTypes({
                                                 <p className="font-medium">
                                                     {questionType.name}
                                                 </p>
-                                                {questionType.name_ur && (
+                                                {questionType.name_ur ? (
                                                     <p
                                                         className="text-xs text-muted-foreground"
                                                         dir="rtl"
                                                     >
                                                         {questionType.name_ur}
                                                     </p>
-                                                )}
+                                                ) : null}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <p className="font-medium">
                                                     {questionType.heading_en}
                                                 </p>
-                                                {questionType.objective_type && (
+                                                {questionType.heading_ur ? (
+                                                    <p
+                                                        className="text-xs text-muted-foreground"
+                                                        dir="rtl"
+                                                    >
+                                                        {questionType.heading_ur}
+                                                    </p>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="space-y-1">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="bg-muted"
+                                                    >
+                                                        {questionType.schema.label}
+                                                    </Badge>
                                                     <p className="text-xs text-muted-foreground">
                                                         {
-                                                            questionType
-                                                                .objective_type
-                                                                .name
+                                                            questionType.schema
+                                                                .description
                                                         }
                                                     </p>
-                                                )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex flex-wrap gap-1.5">
                                                     <Badge
                                                         variant="outline"
-                                                        className="bg-muted font-medium"
+                                                        className="bg-muted"
                                                     >
                                                         {questionType.is_objective
                                                             ? 'Objective'
                                                             : 'Subjective'}
                                                     </Badge>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="bg-muted font-medium"
-                                                    >
-                                                        {questionType.is_single
-                                                            ? 'Single'
-                                                            : 'Multi'}
-                                                    </Badge>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="bg-muted font-medium"
-                                                    >
-                                                        {
-                                                            questionType.column_per_row
-                                                        }{' '}
-                                                        / row
-                                                    </Badge>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {enabledBlocks(
-                                                        questionType,
-                                                    ).map((block) => (
-                                                        <span
-                                                            key={block}
-                                                            className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                                                    {questionType.have_answer ? (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="bg-muted"
                                                         >
-                                                            {block}
-                                                        </span>
-                                                    ))}
+                                                            Answers
+                                                        </Badge>
+                                                    ) : null}
+                                                    {questionType.is_objective &&
+                                                    questionType.schema.settings
+                                                        .supports_single_toggle ? (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="bg-muted"
+                                                        >
+                                                            {questionType.is_single
+                                                                ? 'Single correct'
+                                                                : 'Multi correct'}
+                                                        </Badge>
+                                                    ) : null}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="space-y-1 text-xs text-muted-foreground">
-                                                    <p>
-                                                        <span className="font-medium text-foreground">
-                                                            {
-                                                                questionType.questions_count
-                                                            }
-                                                        </span>{' '}
+                                                <div className="space-y-1 text-sm">
+                                                    <p className="font-medium">
+                                                        {
+                                                            questionType.questions_count
+                                                        }{' '}
                                                         questions
                                                     </p>
-                                                    {questionType.objective_children_count >
-                                                        0 && (
-                                                        <p>
-                                                            <span className="font-medium text-foreground">
-                                                                {
-                                                                    questionType.objective_children_count
-                                                                }
-                                                            </span>{' '}
-                                                            linked types
-                                                        </p>
-                                                    )}
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {
+                                                            questionType.objective_children_count
+                                                        }{' '}
+                                                        linked types
+                                                    </p>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
@@ -382,16 +380,16 @@ export default function QuestionTypes({
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <div className="flex items-center justify-center gap-1">
+                                                <div className="flex items-center justify-end gap-1">
                                                     <Link
                                                         href={`/superadmin/question-types/${questionType.id}`}
-                                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                                     >
                                                         <EyeIcon className="size-4" />
                                                     </Link>
                                                     <Link
                                                         href={`/superadmin/question-types/${questionType.id}/edit`}
-                                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                                     >
                                                         <PencilIcon className="size-4" />
                                                     </Link>
@@ -402,22 +400,7 @@ export default function QuestionTypes({
                                                                 questionType,
                                                             )
                                                         }
-                                                        disabled={
-                                                            questionType.questions_count >
-                                                                0 ||
-                                                            questionType.objective_children_count >
-                                                                0
-                                                        }
-                                                        title={
-                                                            questionType.questions_count >
-                                                                0
-                                                                ? 'Remove linked questions first'
-                                                                : questionType.objective_children_count >
-                                                                    0
-                                                                  ? 'Remove linked objective types first'
-                                                                : 'Delete'
-                                                        }
-                                                        className="rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-35"
+                                                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                                                     >
                                                         <Trash2Icon className="size-4" />
                                                     </button>
@@ -430,18 +413,23 @@ export default function QuestionTypes({
                         </table>
                     </div>
 
-                    <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-3">
-                        <p className="text-xs text-muted-foreground">
+                    <div className="flex flex-col gap-3 border-t bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            Showing{' '}
                             {filtered.length === 0
-                                ? 'No results'
-                                : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
+                                ? 0
+                                : (safePage - 1) * pageSize + 1}
+                            -
+                            {Math.min(safePage * pageSize, filtered.length)} of{' '}
+                            {filtered.length}
                         </p>
+
                         <div className="flex items-center gap-1">
                             <button
                                 type="button"
                                 onClick={() => goTo(1)}
                                 disabled={safePage === 1}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
+                                className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
                             >
                                 <ChevronsLeftIcon className="size-4" />
                             </button>
@@ -449,67 +437,18 @@ export default function QuestionTypes({
                                 type="button"
                                 onClick={() => goTo(safePage - 1)}
                                 disabled={safePage === 1}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
+                                className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
                             >
                                 <ChevronLeftIcon className="size-4" />
                             </button>
-                            <div className="flex items-center gap-1 px-1">
-                                {Array.from(
-                                    { length: totalPages },
-                                    (_, index) => index + 1,
-                                )
-                                    .filter(
-                                        (value) =>
-                                            value === 1 ||
-                                            value === totalPages ||
-                                            Math.abs(value - safePage) <= 1,
-                                    )
-                                    .reduce<(number | 'ellipsis')[]>(
-                                        (carry, value, index, array) => {
-                                            if (
-                                                index > 0 &&
-                                                value -
-                                                    (array[
-                                                        index - 1
-                                                    ] as number) >
-                                                    1
-                                            ) {
-                                                carry.push('ellipsis');
-                                            }
-
-                                            carry.push(value);
-
-                                            return carry;
-                                        },
-                                        [],
-                                    )
-                                    .map((value, index) =>
-                                        value === 'ellipsis' ? (
-                                            <span
-                                                key={`ellipsis-${index}`}
-                                                className="px-1 text-xs text-muted-foreground"
-                                            >
-                                                ...
-                                            </span>
-                                        ) : (
-                                            <button
-                                                key={value}
-                                                type="button"
-                                                onClick={() =>
-                                                    goTo(value as number)
-                                                }
-                                                className={`min-w-[28px] rounded px-2 py-1 text-xs font-medium transition-colors ${safePage === value ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                                            >
-                                                {value}
-                                            </button>
-                                        ),
-                                    )}
-                            </div>
+                            <span className="px-2 text-sm text-muted-foreground">
+                                Page {safePage} of {totalPages}
+                            </span>
                             <button
                                 type="button"
                                 onClick={() => goTo(safePage + 1)}
                                 disabled={safePage === totalPages}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
+                                className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
                             >
                                 <ChevronRightIcon className="size-4" />
                             </button>
@@ -517,7 +456,7 @@ export default function QuestionTypes({
                                 type="button"
                                 onClick={() => goTo(totalPages)}
                                 disabled={safePage === totalPages}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
+                                className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
                             >
                                 <ChevronsRightIcon className="size-4" />
                             </button>
@@ -527,23 +466,23 @@ export default function QuestionTypes({
             </div>
 
             <Dialog
-                open={!!deleteTarget}
+                open={deleteTarget !== null}
                 onOpenChange={(open) => !open && setDeleteTarget(null)}
             >
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogTitle>Delete Question Type</DialogTitle>
                     <DialogDescription>
-                        Are you sure you want to delete{' '}
+                        Delete{' '}
                         <span className="font-medium text-foreground">
-                            "{deleteTarget?.name}"
+                            {deleteTarget?.name}
                         </span>
-                        ?
+                        ? This cannot be undone.
                     </DialogDescription>
-                    <DialogFooter className="gap-2">
+                    <DialogFooter>
                         <button
                             type="button"
                             onClick={() => setDeleteTarget(null)}
-                            className="flex h-9 items-center rounded-lg border border-input px-4 text-sm font-medium transition-colors hover:bg-accent"
+                            className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
                         >
                             Cancel
                         </button>
@@ -551,9 +490,8 @@ export default function QuestionTypes({
                             type="button"
                             onClick={confirmDelete}
                             disabled={deleting}
-                            className="flex h-9 items-center gap-2 rounded-lg bg-destructive px-4 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                            className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
                         >
-                            <Trash2Icon className="size-4" />
                             {deleting ? 'Deleting...' : 'Delete'}
                         </button>
                     </DialogFooter>
@@ -562,10 +500,3 @@ export default function QuestionTypes({
         </>
     );
 }
-
-QuestionTypes.layout = {
-    breadcrumbs: [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Question Types', href: '/superadmin/question-types' },
-    ],
-};

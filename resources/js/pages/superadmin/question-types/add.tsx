@@ -1,11 +1,11 @@
 import { Head, useForm } from '@inertiajs/react';
 import { QuestionTypeForm } from './form';
-import type { ObjectiveTypeOption, QuestionTypeFormData } from './form';
+import type { QuestionSchemaOption, QuestionTypeFormData } from './form';
 
 export default function AddQuestionType({
-    objectiveTypes,
+    questionSchemas,
 }: {
-    objectiveTypes: ObjectiveTypeOption[];
+    questionSchemas: QuestionSchemaOption[];
 }) {
     const form = useForm<QuestionTypeFormData>({
         name: '',
@@ -14,16 +14,10 @@ export default function AddQuestionType({
         heading_ur: '',
         description_en: '',
         description_ur: '',
-        have_exercise: false,
-        have_statement: true,
-        statement_label: 'Statement',
-        have_description: false,
-        description_label: 'Description',
         have_answer: true,
-        is_single: true,
+        is_single: false,
         is_objective: false,
-        objective_type_id: '',
-        column_per_row: '1',
+        schema_key: 'subjective_standard',
         status: '1',
     });
 
@@ -40,7 +34,7 @@ export default function AddQuestionType({
                 submitLabel="Save Question Type"
                 backHref="/superadmin/question-types"
                 form={form}
-                objectiveTypes={objectiveTypes}
+                questionSchemas={questionSchemas}
                 onSubmit={handleSubmit}
             />
         </>

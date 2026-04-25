@@ -3,12 +3,9 @@ import type { InertiaFormProps } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     CheckCircle2Icon,
-    CircleIcon,
     CirclePlusIcon,
     FileQuestionIcon,
-    LanguagesIcon,
-    ListChecksIcon,
-    ShieldCheckIcon,
+    ScrollTextIcon,
     Trash2Icon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,19 +22,29 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+
+export interface QuestionSchemaOption {
+    key: string;
+    kind: 'objective' | 'subjective';
+    label: string;
+    description: string;
+    settings: {
+        supports_answer_toggle: boolean;
+        supports_single_toggle: boolean;
+    };
+}
 
 export interface QuestionTypeOption {
     id: number;
     name: string;
+    heading_en: string;
     is_objective: boolean;
     is_single: boolean;
-    have_statement: boolean;
-    statement_label: string | null;
-    have_description: boolean;
-    description_label: string | null;
     have_answer: boolean;
-    column_per_row: number;
+    supports_simple_import: boolean;
+    schema_key: string;
+    schema: QuestionSchemaOption;
     status: number;
 }
 
@@ -79,6 +86,38 @@ export interface QuestionOptionFormData {
     is_correct: boolean;
 }
 
+export interface QuestionItemFormData {
+    prompt_en: string;
+    prompt_ur: string;
+    answer_en: string;
+    answer_ur: string;
+    options: QuestionOptionFormData[];
+}
+
+export interface QuestionPairFormData {
+    left_en: string;
+    left_ur: string;
+    right_en: string;
+    right_ur: string;
+}
+
+export interface QuestionContentFormData {
+    prompt_en: string;
+    prompt_ur: string;
+    guidance_en: string;
+    guidance_ur: string;
+    answer_en: string;
+    answer_ur: string;
+    passage_en: string;
+    passage_ur: string;
+    intro_en: string;
+    intro_ur: string;
+    correct_boolean: string;
+    options: QuestionOptionFormData[];
+    items: QuestionItemFormData[];
+    pairs: QuestionPairFormData[];
+}
+
 export interface SourceOption {
     value: string;
     label: string;
@@ -88,16 +127,10 @@ export interface QuestionFormData {
     question_type_id: string;
     chapter_id: string;
     topic_id: string;
-    statement_en: string;
-    statement_ur: string;
-    description_en: string;
-    description_ur: string;
-    answer_en: string;
-    answer_ur: string;
     source: string;
     status: string;
-    options: QuestionOptionFormData[];
-    [key: string]: string | QuestionOptionFormData[];
+    content: QuestionContentFormData;
+    [key: string]: QuestionContentFormData | string;
 }
 
 interface QuestionFormProps {
@@ -111,9 +144,6 @@ interface QuestionFormProps {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     secondarySubmitLabel?: string;
 }
-
-const textareaClassName =
-    'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[108px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]';
 
 interface PatternFilterOption {
     id: number;
@@ -132,6 +162,9 @@ interface SubjectFilterOption {
     name_ur: string | null;
 }
 
+const textareaClassName =
+    'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[108px] w-full rounded-xl border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]';
+
 function createEmptyOption(): QuestionOptionFormData {
     return {
         text_en: '',
@@ -142,6 +175,51 @@ function createEmptyOption(): QuestionOptionFormData {
 
 function createDefaultOptions(): QuestionOptionFormData[] {
     return Array.from({ length: 4 }, () => createEmptyOption());
+}
+
+function createEmptyItem(): QuestionItemFormData {
+    return {
+        prompt_en: '',
+        prompt_ur: '',
+        answer_en: '',
+        answer_ur: '',
+        options: createDefaultOptions(),
+    };
+}
+
+function createEmptyPair(): QuestionPairFormData {
+    return {
+        left_en: '',
+        left_ur: '',
+        right_en: '',
+        right_ur: '',
+    };
+}
+
+export function createEmptyQuestionContent(
+    schemaKey = 'subjective_standard',
+): QuestionContentFormData {
+    return {
+        prompt_en: '',
+        prompt_ur: '',
+        guidance_en: '',
+        guidance_ur: '',
+        answer_en: '',
+        answer_ur: '',
+        passage_en: '',
+        passage_ur: '',
+        intro_en: '',
+        intro_ur: '',
+        correct_boolean: '',
+        options:
+            schemaKey === 'objective_true_false' ? [] : createDefaultOptions(),
+        items:
+            schemaKey === 'objective_passage_mcq' ||
+            schemaKey === 'subjective_grouped'
+                ? [createEmptyItem()]
+                : [],
+        pairs: schemaKey === 'subjective_pairs' ? [createEmptyPair()] : [],
+    };
 }
 
 function Field({
@@ -179,9 +257,9 @@ function SectionCard({
     title: string;
 }) {
     return (
-        <section className="space-y-4 rounded-xl border p-5 shadow-sm">
+        <section className="space-y-4 rounded-2xl border border-primary/10 bg-card p-5 shadow-sm">
             <div className="flex items-center gap-3">
-                <span className="inline-flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     {icon}
                 </span>
                 <h3 className="text-sm font-semibold">{title}</h3>
@@ -189,6 +267,26 @@ function SectionCard({
             <Separator />
             {children}
         </section>
+    );
+}
+
+function BuilderCard({
+    actions,
+    children,
+    title,
+}: {
+    actions?: ReactNode;
+    children: ReactNode;
+    title: string;
+}) {
+    return (
+        <div className="space-y-4 rounded-2xl border p-4">
+            <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold">{title}</p>
+                {actions}
+            </div>
+            {children}
+        </div>
     );
 }
 
@@ -216,6 +314,7 @@ export function QuestionForm({
             ) ?? null,
         [form.data.question_type_id, questionTypes],
     );
+    const selectedSchema = selectedType?.schema ?? null;
 
     const selectedChapter = useMemo(
         () =>
@@ -232,6 +331,9 @@ export function QuestionForm({
     );
     const [subjectFilter, setSubjectFilter] = useState(() =>
         selectedChapter ? String(selectedChapter.subject.id) : 'all',
+    );
+    const [lastSchemaKey, setLastSchemaKey] = useState(
+        selectedType?.schema_key ?? '',
     );
 
     const patternOptions = useMemo(() => {
@@ -328,39 +430,18 @@ export function QuestionForm({
         : [];
 
     useEffect(() => {
-        if (!selectedType?.is_objective || form.data.options.length > 0) {
+        if (!selectedType?.schema_key) {
             return;
         }
 
-        form.setData('options', createDefaultOptions());
+        if (selectedType.schema_key === lastSchemaKey) {
+            return;
+        }
+
+        form.setData('content', createEmptyQuestionContent(selectedType.schema_key));
+        setLastSchemaKey(selectedType.schema_key);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedType?.id, selectedType?.is_objective]);
-
-    useEffect(() => {
-        if (!selectedType?.is_objective || !selectedType.is_single) {
-            return;
-        }
-
-        const firstCorrectIndex = form.data.options.findIndex(
-            (option) => option.is_correct,
-        );
-        const correctCount = form.data.options.filter(
-            (option) => option.is_correct,
-        ).length;
-
-        if (correctCount <= 1) {
-            return;
-        }
-
-        form.setData(
-            'options',
-            form.data.options.map((option, index) => ({
-                ...option,
-                is_correct: index === firstCorrectIndex,
-            })),
-        );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedType?.id, selectedType?.is_single]);
+    }, [selectedType?.schema_key]);
 
     useEffect(() => {
         if (
@@ -410,23 +491,32 @@ export function QuestionForm({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filteredChapters, selectedChapter]);
 
+    const errorFor = (path: string) =>
+        form.errors[path as keyof typeof form.errors] as string | undefined;
+
+    const setContentValue = (key: keyof QuestionContentFormData, value: unknown) =>
+        form.setData('content', {
+            ...form.data.content,
+            [key]: value,
+        });
+
     const setOptionValue = (
         index: number,
         key: keyof QuestionOptionFormData,
         value: boolean | string,
     ) => {
-        form.setData(
+        setContentValue(
             'options',
-            form.data.options.map((option, optionIndex) =>
+            form.data.content.options.map((option, optionIndex) =>
                 optionIndex === index ? { ...option, [key]: value } : option,
             ),
         );
     };
 
-    const toggleCorrectOption = (index: number) => {
-        form.setData(
+    const toggleOptionCorrect = (index: number) => {
+        setContentValue(
             'options',
-            form.data.options.map((option, optionIndex) => ({
+            form.data.content.options.map((option, optionIndex) => ({
                 ...option,
                 is_correct: selectedType?.is_single
                     ? optionIndex === index
@@ -437,62 +527,754 @@ export function QuestionForm({
         );
     };
 
-    const addOption = () => {
-        form.setData('options', [...form.data.options, createEmptyOption()]);
-    };
+    const addOption = () =>
+        setContentValue('options', [
+            ...form.data.content.options,
+            createEmptyOption(),
+        ]);
 
     const removeOption = (index: number) => {
-        if (form.data.options.length <= 2) {
+        if (form.data.content.options.length <= 2) {
             return;
         }
 
-        form.setData(
+        setContentValue(
             'options',
-            form.data.options.filter((_, optionIndex) => optionIndex !== index),
+            form.data.content.options.filter((_, optionIndex) => optionIndex !== index),
         );
     };
 
-    return (
-        <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                    <Link
-                        href={backHref}
-                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
+    const updateItem = (
+        index: number,
+        value: Partial<QuestionItemFormData>,
+    ) => {
+        setContentValue(
+            'items',
+            form.data.content.items.map((item, itemIndex) =>
+                itemIndex === index ? { ...item, ...value } : item,
+            ),
+        );
+    };
+
+    const addItem = () =>
+        setContentValue('items', [...form.data.content.items, createEmptyItem()]);
+
+    const removeItem = (index: number) => {
+        if (form.data.content.items.length <= 1) {
+            return;
+        }
+
+        setContentValue(
+            'items',
+            form.data.content.items.filter((_, itemIndex) => itemIndex !== index),
+        );
+    };
+
+    const setItemOptionValue = (
+        itemIndex: number,
+        optionIndex: number,
+        key: keyof QuestionOptionFormData,
+        value: boolean | string,
+    ) => {
+        updateItem(itemIndex, {
+            options: form.data.content.items[itemIndex].options.map(
+                (option, currentIndex) =>
+                    currentIndex === optionIndex
+                        ? { ...option, [key]: value }
+                        : option,
+            ),
+        });
+    };
+
+    const toggleItemOptionCorrect = (itemIndex: number, optionIndex: number) => {
+        updateItem(itemIndex, {
+            options: form.data.content.items[itemIndex].options.map(
+                (option, currentIndex) => ({
+                    ...option,
+                    is_correct: selectedType?.is_single
+                        ? currentIndex === optionIndex
+                        : currentIndex === optionIndex
+                          ? !option.is_correct
+                          : option.is_correct,
+                }),
+            ),
+        });
+    };
+
+    const addItemOption = (itemIndex: number) =>
+        updateItem(itemIndex, {
+            options: [
+                ...form.data.content.items[itemIndex].options,
+                createEmptyOption(),
+            ],
+        });
+
+    const removeItemOption = (itemIndex: number, optionIndex: number) => {
+        if (form.data.content.items[itemIndex].options.length <= 2) {
+            return;
+        }
+
+        updateItem(itemIndex, {
+            options: form.data.content.items[itemIndex].options.filter(
+                (_, index) => index !== optionIndex,
+            ),
+        });
+    };
+
+    const updatePair = (
+        index: number,
+        value: Partial<QuestionPairFormData>,
+    ) => {
+        setContentValue(
+            'pairs',
+            form.data.content.pairs.map((pair, pairIndex) =>
+                pairIndex === index ? { ...pair, ...value } : pair,
+            ),
+        );
+    };
+
+    const addPair = () =>
+        setContentValue('pairs', [...form.data.content.pairs, createEmptyPair()]);
+
+    const removePair = (index: number) => {
+        if (form.data.content.pairs.length <= 1) {
+            return;
+        }
+
+        setContentValue(
+            'pairs',
+            form.data.content.pairs.filter((_, pairIndex) => pairIndex !== index),
+        );
+    };
+
+    const renderLocalizedEditor = (
+        title: string,
+        englishKey: keyof QuestionContentFormData,
+        urduKey: keyof QuestionContentFormData,
+        required = false,
+    ) => (
+        <BuilderCard title={title}>
+            <div className="grid gap-4 md:grid-cols-2">
+                <Field
+                    label="English"
+                    required={required}
+                    error={errorFor(`content.${String(englishKey)}`)}
+                >
+                    <textarea
+                        rows={4}
+                        value={String(form.data.content[englishKey] ?? '')}
+                        onChange={(event) =>
+                            setContentValue(englishKey, event.target.value)
+                        }
+                        className={textareaClassName}
+                    />
+                </Field>
+
+                <Field
+                    label="Urdu"
+                    error={errorFor(`content.${String(urduKey)}`)}
+                >
+                    <textarea
+                        dir="rtl"
+                        rows={4}
+                        value={String(form.data.content[urduKey] ?? '')}
+                        onChange={(event) =>
+                            setContentValue(urduKey, event.target.value)
+                        }
+                        className={textareaClassName}
+                    />
+                </Field>
+            </div>
+        </BuilderCard>
+    );
+
+    const renderOptionsEditor = (
+        options: QuestionOptionFormData[],
+        onOptionValue: (
+            index: number,
+            key: keyof QuestionOptionFormData,
+            value: boolean | string,
+        ) => void,
+        onToggleCorrect: (index: number) => void,
+        onAdd: () => void,
+        onRemove: (index: number) => void,
+        prefix = 'content.options',
+    ) => (
+        <BuilderCard
+            title="Answer Options"
+            actions={
+                <Button type="button" variant="outline" onClick={onAdd}>
+                    <CirclePlusIcon className="size-4" />
+                    Add option
+                </Button>
+            }
+        >
+            <div className="space-y-4">
+                {options.map((option, index) => (
+                    <div
+                        key={`${prefix}-${index}`}
+                        className="rounded-2xl border border-border/70 bg-muted/20 p-4"
                     >
-                        <ArrowLeftIcon className="size-4" />
-                    </Link>
-                    <div className="space-y-2">
-                        <h1 className="h1-semibold">{title}</h1>
-                        <div className="flex flex-wrap gap-2">
-                            {selectedType ? (
-                                <Badge variant="outline" className="bg-muted">
-                                    {selectedType.is_objective
-                                        ? 'Objective'
-                                        : 'Subjective'}
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <Badge variant="outline">
+                                    Option {index + 1}
                                 </Badge>
-                            ) : null}
-                            {selectedType?.is_objective ? (
-                                <Badge variant="outline" className="bg-muted">
-                                    {selectedType.is_single
-                                        ? 'Single'
-                                        : 'Multi'}
-                                </Badge>
-                            ) : null}
-                            {selectedChapter ? (
-                                <Badge variant="outline" className="bg-muted">
-                                    {selectedChapter.subject.name_eng}
-                                </Badge>
-                            ) : null}
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="font-medium">Correct</span>
+                                    <Switch
+                                        checked={option.is_correct}
+                                        onCheckedChange={() =>
+                                            onToggleCorrect(index)
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onRemove(index)}
+                            >
+                                <Trash2Icon className="size-4" />
+                            </Button>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Field
+                                label="English"
+                                error={errorFor(`${prefix}.${index}.text_en`)}
+                            >
+                                <textarea
+                                    rows={3}
+                                    value={option.text_en}
+                                    onChange={(event) =>
+                                        onOptionValue(
+                                            index,
+                                            'text_en',
+                                            event.target.value,
+                                        )
+                                    }
+                                    className={textareaClassName}
+                                />
+                            </Field>
+                            <Field
+                                label="Urdu"
+                                error={errorFor(`${prefix}.${index}.text_ur`)}
+                            >
+                                <textarea
+                                    dir="rtl"
+                                    rows={3}
+                                    value={option.text_ur}
+                                    onChange={(event) =>
+                                        onOptionValue(
+                                            index,
+                                            'text_ur',
+                                            event.target.value,
+                                        )
+                                    }
+                                    className={textareaClassName}
+                                />
+                            </Field>
                         </div>
                     </div>
+                ))}
+                {errorFor(prefix) ? (
+                    <p className="text-xs text-destructive">
+                        {errorFor(prefix)}
+                    </p>
+                ) : null}
+            </div>
+        </BuilderCard>
+    );
+
+    const renderPassageItems = () => (
+        <BuilderCard
+            title="Passage Questions"
+            actions={
+                <Button type="button" variant="outline" onClick={addItem}>
+                    <CirclePlusIcon className="size-4" />
+                    Add sub-question
+                </Button>
+            }
+        >
+            <div className="space-y-5">
+                {form.data.content.items.map((item, itemIndex) => (
+                    <div
+                        key={`passage-item-${itemIndex}`}
+                        className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <Badge variant="outline">
+                                Sub-question {itemIndex + 1}
+                            </Badge>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeItem(itemIndex)}
+                            >
+                                <Trash2Icon className="size-4" />
+                            </Button>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Field
+                                label="Question (English)"
+                                required
+                                error={errorFor(
+                                    `content.items.${itemIndex}.prompt_en`,
+                                )}
+                            >
+                                <textarea
+                                    rows={3}
+                                    value={item.prompt_en}
+                                    onChange={(event) =>
+                                        updateItem(itemIndex, {
+                                            prompt_en: event.target.value,
+                                        })
+                                    }
+                                    className={textareaClassName}
+                                />
+                            </Field>
+                            <Field
+                                label="Question (Urdu)"
+                                error={errorFor(
+                                    `content.items.${itemIndex}.prompt_ur`,
+                                )}
+                            >
+                                <textarea
+                                    dir="rtl"
+                                    rows={3}
+                                    value={item.prompt_ur}
+                                    onChange={(event) =>
+                                        updateItem(itemIndex, {
+                                            prompt_ur: event.target.value,
+                                        })
+                                    }
+                                    className={textareaClassName}
+                                />
+                            </Field>
+                        </div>
+
+                        {renderOptionsEditor(
+                            item.options,
+                            (optionIndex, key, value) =>
+                                setItemOptionValue(
+                                    itemIndex,
+                                    optionIndex,
+                                    key,
+                                    value,
+                                ),
+                            (optionIndex) =>
+                                toggleItemOptionCorrect(itemIndex, optionIndex),
+                            () => addItemOption(itemIndex),
+                            (optionIndex) =>
+                                removeItemOption(itemIndex, optionIndex),
+                            `content.items.${itemIndex}.options`,
+                        )}
+                    </div>
+                ))}
+                {errorFor('content.items') ? (
+                    <p className="text-xs text-destructive">
+                        {errorFor('content.items')}
+                    </p>
+                ) : null}
+            </div>
+        </BuilderCard>
+    );
+
+    const renderGroupedItems = () => (
+        <BuilderCard
+            title="Question Items"
+            actions={
+                <Button type="button" variant="outline" onClick={addItem}>
+                    <CirclePlusIcon className="size-4" />
+                    Add item
+                </Button>
+            }
+        >
+            <div className="space-y-5">
+                {form.data.content.items.map((item, itemIndex) => (
+                    <div
+                        key={`group-item-${itemIndex}`}
+                        className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <Badge variant="outline">Item {itemIndex + 1}</Badge>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeItem(itemIndex)}
+                            >
+                                <Trash2Icon className="size-4" />
+                            </Button>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Field
+                                label="Prompt (English)"
+                                required
+                                error={errorFor(
+                                    `content.items.${itemIndex}.prompt_en`,
+                                )}
+                            >
+                                <textarea
+                                    rows={3}
+                                    value={item.prompt_en}
+                                    onChange={(event) =>
+                                        updateItem(itemIndex, {
+                                            prompt_en: event.target.value,
+                                        })
+                                    }
+                                    className={textareaClassName}
+                                />
+                            </Field>
+                            <Field
+                                label="Prompt (Urdu)"
+                                error={errorFor(
+                                    `content.items.${itemIndex}.prompt_ur`,
+                                )}
+                            >
+                                <textarea
+                                    dir="rtl"
+                                    rows={3}
+                                    value={item.prompt_ur}
+                                    onChange={(event) =>
+                                        updateItem(itemIndex, {
+                                            prompt_ur: event.target.value,
+                                        })
+                                    }
+                                    className={textareaClassName}
+                                />
+                            </Field>
+                        </div>
+
+                        {selectedType?.have_answer ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <Field
+                                    label="Answer (English)"
+                                    error={errorFor(
+                                        `content.items.${itemIndex}.answer_en`,
+                                    )}
+                                >
+                                    <textarea
+                                        rows={3}
+                                        value={item.answer_en}
+                                        onChange={(event) =>
+                                            updateItem(itemIndex, {
+                                                answer_en: event.target.value,
+                                            })
+                                        }
+                                        className={textareaClassName}
+                                    />
+                                </Field>
+                                <Field
+                                    label="Answer (Urdu)"
+                                    error={errorFor(
+                                        `content.items.${itemIndex}.answer_ur`,
+                                    )}
+                                >
+                                    <textarea
+                                        dir="rtl"
+                                        rows={3}
+                                        value={item.answer_ur}
+                                        onChange={(event) =>
+                                            updateItem(itemIndex, {
+                                                answer_ur: event.target.value,
+                                            })
+                                        }
+                                        className={textareaClassName}
+                                    />
+                                </Field>
+                            </div>
+                        ) : null}
+                    </div>
+                ))}
+                {errorFor('content.items') ? (
+                    <p className="text-xs text-destructive">
+                        {errorFor('content.items')}
+                    </p>
+                ) : null}
+            </div>
+        </BuilderCard>
+    );
+
+    const renderPairs = () => (
+        <BuilderCard
+            title="Pair Rows"
+            actions={
+                <Button type="button" variant="outline" onClick={addPair}>
+                    <CirclePlusIcon className="size-4" />
+                    Add pair
+                </Button>
+            }
+        >
+            <div className="space-y-4">
+                {form.data.content.pairs.map((pair, pairIndex) => (
+                    <div
+                        key={`pair-${pairIndex}`}
+                        className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <Badge variant="outline">Pair {pairIndex + 1}</Badge>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removePair(pairIndex)}
+                            >
+                                <Trash2Icon className="size-4" />
+                            </Button>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Field
+                                label="Left (English)"
+                                error={errorFor(
+                                    `content.pairs.${pairIndex}.left_en`,
+                                )}
+                            >
+                                <Input
+                                    value={pair.left_en}
+                                    onChange={(event) =>
+                                        updatePair(pairIndex, {
+                                            left_en: event.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                            <Field
+                                label="Left (Urdu)"
+                                error={errorFor(
+                                    `content.pairs.${pairIndex}.left_ur`,
+                                )}
+                            >
+                                <Input
+                                    dir="rtl"
+                                    value={pair.left_ur}
+                                    onChange={(event) =>
+                                        updatePair(pairIndex, {
+                                            left_ur: event.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                            <Field
+                                label="Right (English)"
+                                error={errorFor(
+                                    `content.pairs.${pairIndex}.right_en`,
+                                )}
+                            >
+                                <Input
+                                    value={pair.right_en}
+                                    onChange={(event) =>
+                                        updatePair(pairIndex, {
+                                            right_en: event.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                            <Field
+                                label="Right (Urdu)"
+                                error={errorFor(
+                                    `content.pairs.${pairIndex}.right_ur`,
+                                )}
+                            >
+                                <Input
+                                    dir="rtl"
+                                    value={pair.right_ur}
+                                    onChange={(event) =>
+                                        updatePair(pairIndex, {
+                                            right_ur: event.target.value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                        </div>
+                    </div>
+                ))}
+                {errorFor('content.pairs') ? (
+                    <p className="text-xs text-destructive">
+                        {errorFor('content.pairs')}
+                    </p>
+                ) : null}
+            </div>
+        </BuilderCard>
+    );
+
+    const renderSchemaBuilder = () => {
+        if (!selectedSchema) {
+            return (
+                <div className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">
+                    Select a question type.
+                </div>
+            );
+        }
+
+        switch (selectedSchema.key) {
+            case 'objective_mcq':
+            case 'objective_blank_choice':
+                return (
+                    <div className="space-y-5">
+                        {renderLocalizedEditor(
+                            selectedSchema.key === 'objective_blank_choice'
+                                ? 'Blank Statement'
+                                : 'Question Statement',
+                            'prompt_en',
+                            'prompt_ur',
+                            true,
+                        )}
+                        {renderOptionsEditor(
+                            form.data.content.options,
+                            setOptionValue,
+                            toggleOptionCorrect,
+                            addOption,
+                            removeOption,
+                        )}
+                    </div>
+                );
+            case 'objective_true_false':
+                return (
+                    <div className="space-y-5">
+                        {renderLocalizedEditor(
+                            'Statement',
+                            'prompt_en',
+                            'prompt_ur',
+                            true,
+                        )}
+                        <BuilderCard title="Correct Answer">
+                            <Field
+                                label="Result"
+                                required
+                                error={errorFor('content.correct_boolean')}
+                            >
+                                <Select
+                                    value={
+                                        form.data.content.correct_boolean || 'none'
+                                    }
+                                    onValueChange={(value) =>
+                                        setContentValue(
+                                            'correct_boolean',
+                                            value === 'none' ? '' : value,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select answer" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Select answer
+                                        </SelectItem>
+                                        <SelectItem value="true">True</SelectItem>
+                                        <SelectItem value="false">False</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+                        </BuilderCard>
+                    </div>
+                );
+            case 'objective_blank_open':
+                return (
+                    <div className="space-y-5">
+                        {renderLocalizedEditor(
+                            'Blank Statement',
+                            'prompt_en',
+                            'prompt_ur',
+                            true,
+                        )}
+                        {renderLocalizedEditor(
+                            'Correct Answer',
+                            'answer_en',
+                            'answer_ur',
+                            true,
+                        )}
+                    </div>
+                );
+            case 'objective_passage_mcq':
+                return (
+                    <div className="space-y-5">
+                        {renderLocalizedEditor(
+                            'Passage',
+                            'passage_en',
+                            'passage_ur',
+                            true,
+                        )}
+                        {renderPassageItems()}
+                    </div>
+                );
+            case 'subjective_grouped':
+                return (
+                    <div className="space-y-5">
+                        {renderLocalizedEditor(
+                            'Shared Instructions',
+                            'intro_en',
+                            'intro_ur',
+                            false,
+                        )}
+                        {renderGroupedItems()}
+                    </div>
+                );
+            case 'subjective_pairs':
+                return (
+                    <div className="space-y-5">
+                        {renderLocalizedEditor(
+                            'Instructions',
+                            'prompt_en',
+                            'prompt_ur',
+                            false,
+                        )}
+                        {renderPairs()}
+                    </div>
+                );
+            default:
+                return (
+                    <div className="space-y-5">
+                        {renderLocalizedEditor(
+                            'Prompt',
+                            'prompt_en',
+                            'prompt_ur',
+                            true,
+                        )}
+                        {renderLocalizedEditor(
+                            'Guidance / Notes',
+                            'guidance_en',
+                            'guidance_ur',
+                            false,
+                        )}
+                        {selectedType?.have_answer
+                            ? renderLocalizedEditor(
+                                  'Answer',
+                                  'answer_en',
+                                  'answer_ur',
+                                  true,
+                              )
+                            : null}
+                    </div>
+                );
+        }
+    };
+
+    return (
+        <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
+            <div className="flex items-center gap-4">
+                <Link
+                    href={backHref}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
+                >
+                    <ArrowLeftIcon className="size-4" />
+                </Link>
+                <div>
+                    <h1 className="h1-semibold">{title}</h1>
                 </div>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-5">
                 <SectionCard
                     icon={<FileQuestionIcon className="size-4" />}
-                    title="Question"
+                    title="Setup"
                 >
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <Field
@@ -512,7 +1294,7 @@ export function QuestionForm({
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="max-h-80">
                                     <SelectItem value="none">
                                         Select type
                                     </SelectItem>
@@ -524,27 +1306,6 @@ export function QuestionForm({
                                             {item.name}
                                         </SelectItem>
                                     ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-
-                        <Field
-                            label="Status"
-                            required
-                            error={form.errors.status}
-                        >
-                            <Select
-                                value={form.data.status}
-                                onValueChange={(value) =>
-                                    form.setData('status', value)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">Active</SelectItem>
-                                    <SelectItem value="0">Inactive</SelectItem>
                                 </SelectContent>
                             </Select>
                         </Field>
@@ -731,269 +1492,101 @@ export function QuestionForm({
                                 </Select>
                             </Field>
                         </div>
+
+                        <div className="md:col-span-2 xl:col-span-3">
+                            <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-muted/20 px-4 py-3">
+                                {selectedType ? (
+                                    <>
+                                        <Badge
+                                            variant="outline"
+                                            className="bg-background"
+                                        >
+                                            {selectedType.is_objective
+                                                ? 'Objective'
+                                                : 'Subjective'}
+                                        </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            className="bg-background"
+                                        >
+                                            {selectedType.schema.label}
+                                        </Badge>
+                                        {selectedType.have_answer ? (
+                                            <Badge
+                                                variant="outline"
+                                                className="bg-background"
+                                            >
+                                                Answer fields
+                                            </Badge>
+                                        ) : null}
+                                        {selectedType.is_objective &&
+                                        selectedType.schema.settings
+                                            .supports_single_toggle ? (
+                                            <Badge
+                                                variant="outline"
+                                                className="bg-background"
+                                            >
+                                                {selectedType.is_single
+                                                    ? 'Single correct'
+                                                    : 'Multiple correct'}
+                                            </Badge>
+                                        ) : null}
+                                    </>
+                                ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                        Choose a type to load its fields.
+                                    </span>
+                                )}
+
+                                <div className="ml-auto flex items-center gap-3">
+                                    <Label className="font-medium">
+                                        Active
+                                    </Label>
+                                    <Switch
+                                        checked={form.data.status === '1'}
+                                        onCheckedChange={(checked) =>
+                                            form.setData(
+                                                'status',
+                                                checked ? '1' : '0',
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            {form.errors.status ? (
+                                <p className="mt-1.5 text-xs text-destructive">
+                                    {form.errors.status}
+                                </p>
+                            ) : null}
+                        </div>
                     </div>
                 </SectionCard>
 
-                {selectedType?.have_statement ? (
-                    <SectionCard
-                        icon={<LanguagesIcon className="size-4" />}
-                        title={selectedType.statement_label ?? 'Statement'}
-                    >
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <Field
-                                label="English"
-                                required
-                                error={form.errors.statement_en}
-                            >
-                                <textarea
-                                    rows={4}
-                                    value={form.data.statement_en}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'statement_en',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className={textareaClassName}
-                                />
-                            </Field>
+                <SectionCard
+                    icon={<ScrollTextIcon className="size-4" />}
+                    title="Builder"
+                >
+                    {renderSchemaBuilder()}
+                </SectionCard>
 
-                            <Field
-                                label="Urdu"
-                                error={form.errors.statement_ur}
-                            >
-                                <textarea
-                                    dir="rtl"
-                                    rows={4}
-                                    value={form.data.statement_ur}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'statement_ur',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className={textareaClassName}
-                                />
-                            </Field>
-                        </div>
-                    </SectionCard>
-                ) : null}
-
-                {selectedType?.have_description ? (
-                    <SectionCard
-                        icon={<LanguagesIcon className="size-4" />}
-                        title={selectedType.description_label ?? 'Description'}
-                    >
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <Field
-                                label="English"
-                                required
-                                error={form.errors.description_en}
-                            >
-                                <textarea
-                                    rows={4}
-                                    value={form.data.description_en}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'description_en',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className={textareaClassName}
-                                />
-                            </Field>
-
-                            <Field
-                                label="Urdu"
-                                error={form.errors.description_ur}
-                            >
-                                <textarea
-                                    dir="rtl"
-                                    rows={4}
-                                    value={form.data.description_ur}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'description_ur',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className={textareaClassName}
-                                />
-                            </Field>
-                        </div>
-                    </SectionCard>
-                ) : null}
-
-                {!selectedType?.is_objective && selectedType?.have_answer ? (
-                    <SectionCard
-                        icon={<ShieldCheckIcon className="size-4" />}
-                        title="Answer"
-                    >
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <Field
-                                label="English"
-                                required
-                                error={form.errors.answer_en}
-                            >
-                                <textarea
-                                    rows={4}
-                                    value={form.data.answer_en}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'answer_en',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className={textareaClassName}
-                                />
-                            </Field>
-
-                            <Field label="Urdu" error={form.errors.answer_ur}>
-                                <textarea
-                                    dir="rtl"
-                                    rows={4}
-                                    value={form.data.answer_ur}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'answer_ur',
-                                            event.target.value,
-                                        )
-                                    }
-                                    className={textareaClassName}
-                                />
-                            </Field>
-                        </div>
-                    </SectionCard>
-                ) : null}
-
-                {selectedType?.is_objective ? (
-                    <SectionCard
-                        icon={<ListChecksIcon className="size-4" />}
-                        title="Options"
-                    >
-                        <div className="space-y-3">
-                            {form.errors.options ? (
-                                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
-                                    {form.errors.options}
-                                </div>
-                            ) : null}
-
-                            {form.data.options.map((option, index) => (
-                                <div
-                                    key={`option-${index}`}
-                                    className="rounded-xl border p-4"
-                                >
-                                    <div className="mb-4 flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3">
-                                            <span className="inline-flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                                                {String.fromCharCode(
-                                                    65 + index,
-                                                )}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    toggleCorrectOption(index)
-                                                }
-                                                className={cn(
-                                                    'inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition-colors',
-                                                    option.is_correct
-                                                        ? 'bg-emerald-100 text-emerald-700'
-                                                        : 'bg-muted text-muted-foreground',
-                                                )}
-                                            >
-                                                {option.is_correct ? (
-                                                    <CheckCircle2Icon className="size-3.5" />
-                                                ) : (
-                                                    <CircleIcon className="size-3.5" />
-                                                )}
-                                                Correct
-                                            </button>
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => removeOption(index)}
-                                            disabled={
-                                                form.data.options.length <= 2
-                                            }
-                                            className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                            <Trash2Icon className="size-4" />
-                                        </button>
-                                    </div>
-
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                        <Field label="English">
-                                            <Input
-                                                value={option.text_en}
-                                                onChange={(event) =>
-                                                    setOptionValue(
-                                                        index,
-                                                        'text_en',
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </Field>
-
-                                        <Field label="Urdu">
-                                            <Input
-                                                dir="rtl"
-                                                value={option.text_ur}
-                                                onChange={(event) =>
-                                                    setOptionValue(
-                                                        index,
-                                                        'text_ur',
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </Field>
-                                    </div>
-                                </div>
-                            ))}
-
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={addOption}
-                            >
-                                <CirclePlusIcon className="size-4" />
-                                Add Option
-                            </Button>
-                        </div>
-                    </SectionCard>
-                ) : null}
-
-                <div className="flex items-center justify-end gap-3 pb-2">
+                <div className="flex flex-col gap-3 pb-2 sm:flex-row sm:justify-end">
                     <Button asChild variant="outline">
                         <Link href={backHref}>Cancel</Link>
                     </Button>
                     {secondarySubmitLabel ? (
                         <Button
                             type="submit"
-                            value="save-and-add-new"
                             variant="outline"
-                            disabled={
-                                form.processing ||
-                                !selectedType ||
-                                !selectedChapter
-                            }
+                            name="save_and_add_new"
+                            value="save-and-add-new"
+                            disabled={form.processing}
                         >
                             <CirclePlusIcon className="size-4" />
-                            {form.processing
-                                ? 'Saving...'
-                                : secondarySubmitLabel}
+                            {secondarySubmitLabel}
                         </Button>
                     ) : null}
-                    <Button
-                        type="submit"
-                        disabled={
-                            form.processing || !selectedType || !selectedChapter
-                        }
-                    >
-                        <FileQuestionIcon className="size-4" />
+                    <Button type="submit" disabled={form.processing}>
+                        <CheckCircle2Icon className="size-4" />
                         {form.processing ? 'Saving...' : submitLabel}
                     </Button>
                 </div>

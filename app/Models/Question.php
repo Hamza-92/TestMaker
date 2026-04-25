@@ -25,6 +25,7 @@ class Question extends Model
         'description_ur',
         'answer_en',
         'answer_ur',
+        'content',
         'source',
         'status',
         'created_by',
@@ -33,6 +34,7 @@ class Question extends Model
     protected function casts(): array
     {
         return [
+            'content' => 'array',
             'status' => 'integer',
         ];
     }

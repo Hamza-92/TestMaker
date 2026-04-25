@@ -29,6 +29,18 @@ class QuestionBulkImporter
         ?string $defaultSource,
         int $defaultStatus,
     ): array {
+        if (! QuestionTypeSchemaRegistry::supportsSimpleImport($questionType)) {
+            return $this->previewReport(
+                status: 'error',
+                totalRows: 0,
+                readyRows: 0,
+                failedRows: 0,
+                errors: ['Bulk import currently supports only simple single-prompt question types.'],
+                rows: [],
+                records: [],
+            );
+        }
+
         [$rows, $optionIndexes, $headerErrors] = $this->readRows($file);
 
         if ($headerErrors !== []) {
@@ -119,6 +131,16 @@ class QuestionBulkImporter
         int $defaultStatus,
         int $creatorId,
     ): array {
+        if (! QuestionTypeSchemaRegistry::supportsSimpleImport($questionType)) {
+            return $this->importReport(
+                status: 'error',
+                totalRows: 0,
+                importedRows: 0,
+                failedRows: 0,
+                errors: ['Bulk import currently supports only simple single-prompt question types.'],
+            );
+        }
+
         $preview = $this->preview(
             file: $file,
             questionType: $questionType,
@@ -154,6 +176,16 @@ class QuestionBulkImporter
         ?Topic $topic,
         int $creatorId,
     ): array {
+        if (! QuestionTypeSchemaRegistry::supportsSimpleImport($questionType)) {
+            return $this->importReport(
+                status: 'error',
+                totalRows: 0,
+                importedRows: 0,
+                failedRows: 0,
+                errors: ['Bulk import currently supports only simple single-prompt question types.'],
+            );
+        }
+
         DB::transaction(function () use ($creatorId, $questionType, $chapter, $topic, $records): void {
             foreach ($records as $record) {
                 $question = Question::query()->create([
@@ -300,6 +332,11 @@ class QuestionBulkImporter
         int $defaultStatus,
     ): array {
         $errors = [];
+        $schema = QuestionTypeSchemaRegistry::resolve($questionType->schema_key, $questionType->is_objective, [
+            'objective_type_id' => $questionType->objective_type_id,
+            'have_description' => $questionType->have_description,
+            'have_answer' => $questionType->have_answer,
+        ]);
         $sourceInput = $row['source'] ?? null;
         $source = $sourceInput !== null
             ? Question::normalizeSource($sourceInput)
@@ -338,7 +375,11 @@ class QuestionBulkImporter
 
         $options = [];
 
-        if ($questionType->is_objective) {
+        if (in_array($schema['key'], [
+            QuestionTypeSchemaRegistry::OBJECTIVE_MCQ,
+            QuestionTypeSchemaRegistry::OBJECTIVE_BLANK_CHOICE,
+            QuestionTypeSchemaRegistry::OBJECTIVE_TRUE_FALSE,
+        ], true)) {
             foreach ($optionIndexes as $index) {
                 $textEn = $row["option_{$index}_en"] ?? null;
                 $textUr = $row["option_{$index}_ur"] ?? null;
@@ -364,25 +405,42 @@ class QuestionBulkImporter
                     'sort_order' => count($options) + 1,
                 ];
             }
-
-            if (count($options) < 2) {
-                $errors[] = "Row {$rowNumber}: At least two options are required.";
-            }
-
-            $correctCount = collect($options)->where('is_correct', true)->count();
-
-            if ($correctCount < 1) {
-                $errors[] = "Row {$rowNumber}: Select at least one correct option.";
-            }
-
-            if ($questionType->is_single && $correctCount !== 1) {
-                $errors[] = "Row {$rowNumber}: Single objective questions require exactly one correct option.";
-            }
         }
 
         if ($errors !== []) {
             return ['errors' => $errors];
         }
+
+        $content = $this->buildImportContent(
+            questionType: $questionType,
+            schemaKey: $schema['key'],
+            statementEn: $statementEn,
+            statementUr: $statementUr,
+            descriptionEn: $descriptionEn,
+            descriptionUr: $descriptionUr,
+            answerEn: $answerEn,
+            answerUr: $answerUr,
+            options: $options,
+        );
+
+        if ($content === null) {
+            return [
+                'errors' => ["Row {$rowNumber}: Bulk import does not support {$schema['label']}."],
+            ];
+        }
+
+        $validator = validator(['content' => $content], []);
+        QuestionTypeSchemaRegistry::validateQuestionContent($questionType, $content, $validator);
+
+        foreach ($validator->errors()->all() as $message) {
+            $errors[] = "Row {$rowNumber}: {$message}";
+        }
+
+        if ($errors !== []) {
+            return ['errors' => $errors];
+        }
+
+        $questionPayload = QuestionTypeSchemaRegistry::buildQuestionPayload($questionType, $content);
 
         return [
             'errors' => [],
@@ -393,18 +451,101 @@ class QuestionBulkImporter
                     'topic_id' => $chapter->subject?->subject_type === 'topic-wise'
                         ? $topic?->id
                         : null,
-                    'statement_en' => $questionType->have_statement ? $statementEn : null,
-                    'statement_ur' => $questionType->have_statement ? $statementUr : null,
-                    'description_en' => $questionType->have_description ? $descriptionEn : null,
-                    'description_ur' => $questionType->have_description ? $descriptionUr : null,
-                    'answer_en' => ! $questionType->is_objective && $questionType->have_answer ? $answerEn : null,
-                    'answer_ur' => ! $questionType->is_objective && $questionType->have_answer ? $answerUr : null,
+                    'statement_en' => $questionPayload['statement_en'],
+                    'statement_ur' => $questionPayload['statement_ur'],
+                    'description_en' => $questionPayload['description_en'],
+                    'description_ur' => $questionPayload['description_ur'],
+                    'answer_en' => $questionPayload['answer_en'],
+                    'answer_ur' => $questionPayload['answer_ur'],
+                    'content' => $questionPayload['content'],
                     'source' => $source,
                     'status' => $status,
                 ],
-                'options' => $options,
+                'options' => $questionPayload['options'],
             ],
         ];
+    }
+
+    private function buildImportContent(
+        QuestionType $questionType,
+        string $schemaKey,
+        ?string $statementEn,
+        ?string $statementUr,
+        ?string $descriptionEn,
+        ?string $descriptionUr,
+        ?string $answerEn,
+        ?string $answerUr,
+        array $options,
+    ): ?array {
+        return match ($schemaKey) {
+            QuestionTypeSchemaRegistry::OBJECTIVE_MCQ,
+            QuestionTypeSchemaRegistry::OBJECTIVE_BLANK_CHOICE => [
+                'prompt_en' => $statementEn ?? '',
+                'prompt_ur' => $statementUr ?? '',
+                'options' => collect($options)
+                    ->map(fn (array $option) => [
+                        'text_en' => $option['text_en'] ?? '',
+                        'text_ur' => $option['text_ur'] ?? '',
+                        'is_correct' => (bool) ($option['is_correct'] ?? false),
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+            QuestionTypeSchemaRegistry::OBJECTIVE_TRUE_FALSE => [
+                'prompt_en' => $statementEn ?? '',
+                'prompt_ur' => $statementUr ?? '',
+                'correct_boolean' => $this->resolveTrueFalseValue($answerEn, $answerUr, $options) ?? '',
+            ],
+            QuestionTypeSchemaRegistry::OBJECTIVE_BLANK_OPEN => [
+                'prompt_en' => $statementEn ?? '',
+                'prompt_ur' => $statementUr ?? '',
+                'answer_en' => $answerEn ?? '',
+                'answer_ur' => $answerUr ?? '',
+            ],
+            QuestionTypeSchemaRegistry::SUBJECTIVE_STANDARD => [
+                'prompt_en' => $statementEn ?? '',
+                'prompt_ur' => $statementUr ?? '',
+                'guidance_en' => $descriptionEn ?? '',
+                'guidance_ur' => $descriptionUr ?? '',
+                'answer_en' => $questionType->have_answer ? ($answerEn ?? '') : '',
+                'answer_ur' => $questionType->have_answer ? ($answerUr ?? '') : '',
+            ],
+            default => null,
+        };
+    }
+
+    private function resolveTrueFalseValue(?string $answerEn, ?string $answerUr, array $options): ?string
+    {
+        foreach ([$answerEn, $answerUr] as $answer) {
+            $normalized = $this->normalizeBooleanWord($answer);
+
+            if ($normalized !== null) {
+                return $normalized;
+            }
+        }
+
+        $correctOption = collect($options)->firstWhere('is_correct', true);
+
+        if (! is_array($correctOption)) {
+            return null;
+        }
+
+        return $this->normalizeBooleanWord(
+            $correctOption['text_en'] ?? $correctOption['text_ur'] ?? null,
+        );
+    }
+
+    private function normalizeBooleanWord(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return match (strtolower(trim($value))) {
+            'true', 't' => 'true',
+            'false', 'f' => 'false',
+            default => null,
+        };
     }
 
     private function normalizeHeader(mixed $value): string
