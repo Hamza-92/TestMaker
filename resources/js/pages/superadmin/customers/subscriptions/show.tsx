@@ -18,6 +18,7 @@ import {
     PlusIcon,
     WalletIcon,
     XCircleIcon,
+    XIcon,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -470,6 +471,11 @@ export default function ShowSubscription({
     function submitPayment(e: React.FormEvent) {
         e.preventDefault();
 
+        if (!editingLog && !paymentForm.receipt) {
+            setPaymentErrors((prev) => ({ ...prev, receipt: 'A receipt is required.' }));
+            return;
+        }
+
         const fd = new FormData();
         fd.append('amount', paymentForm.amount);
         fd.append('payment_method', paymentForm.payment_method);
@@ -836,7 +842,10 @@ export default function ShowSubscription({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>Receipt</Label>
+                            <Label className="flex items-center gap-1">
+                                Receipt
+                                {!editingLog && <span className="text-destructive text-xs">*</span>}
+                            </Label>
                             <div
                                 className="border-input hover:border-ring/50 flex cursor-pointer items-center gap-3 rounded-md border border-dashed px-4 py-3 transition-colors"
                                 onClick={() => fileRef.current?.click()}
@@ -846,8 +855,21 @@ export default function ShowSubscription({
                                     <p className="truncate text-sm">
                                         {paymentForm.receipt ? paymentForm.receipt.name : 'Upload receipt'}
                                     </p>
-                                    <p className="text-muted-foreground text-xs">JPG, PNG, PDF, WebP</p>
+                                    <p className="text-muted-foreground text-xs">JPG, PNG, PDF, WebP · max 5 MB</p>
                                 </div>
+                                {paymentForm.receipt && (
+                                    <button
+                                        type="button"
+                                        className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPaymentForm((current) => ({ ...current, receipt: null }));
+                                            if (fileRef.current) fileRef.current.value = '';
+                                        }}
+                                    >
+                                        <XIcon className="size-4" />
+                                    </button>
+                                )}
                             </div>
                             <input
                                 ref={fileRef}

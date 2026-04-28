@@ -158,7 +158,7 @@ class CustomerSubscriptionController extends Controller
             ]);
         }
 
-        $validated = $this->validatePaymentPayload($request);
+        $validated = $this->validatePaymentPayload($request, requireReceipt: false);
         $this->ensurePaymentFitsSubscription($subscription, (float) $validated['amount'], $paymentLog);
 
         $attachments = $paymentLog->attachments ?? [];
@@ -454,14 +454,17 @@ class CustomerSubscriptionController extends Controller
             ->with('success', 'Subscription added successfully.');
     }
 
-    private function validatePaymentPayload(Request $request): array
+    private function validatePaymentPayload(Request $request, bool $requireReceipt = true): array
     {
         return $request->validate([
             'amount'         => ['required', 'numeric', 'min:0.01'],
             'payment_method' => ['required', 'in:cash,bank_transfer,online,cheque'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'notes'          => ['nullable', 'string', 'max:1000'],
-            'receipt'        => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
+            'receipt'        => [
+                $requireReceipt ? 'required' : 'nullable',
+                'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120',
+            ],
         ]);
     }
 
