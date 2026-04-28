@@ -20,7 +20,7 @@ import {
     XCircleIcon,
     XIcon,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -401,16 +401,6 @@ export default function ShowSubscription({
     auditLogs,
 }: Props) {
     const statusCfg = SUB_STATUS[subscription.status];
-    const defaultPaymentAmount = useMemo(() => {
-        const remainingTrackable = Number(paymentSummary.remaining_trackable_amount);
-
-        if (remainingTrackable > 0) {
-            return paymentSummary.remaining_trackable_amount;
-        }
-
-        return subscription.amount;
-    }, [paymentSummary.remaining_trackable_amount, subscription.amount]);
-
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [paymentDetail, setPaymentDetail] = useState<PaymentLog | null>(null);
     const [editingLog, setEditingLog] = useState<PaymentLog | null>(null);
@@ -419,7 +409,7 @@ export default function ShowSubscription({
     const [paymentProcessing, setPaymentProcessing] = useState(false);
     const [detailProcessing, setDetailProcessing] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
-    const [paymentForm, setPaymentForm] = useState<PaymentFormState>(buildPaymentForm(defaultPaymentAmount));
+    const [paymentForm, setPaymentForm] = useState<PaymentFormState>(buildPaymentForm(''));
     const fileRef = useRef<HTMLInputElement>(null);
 
     const canAddPayment = Number(paymentSummary.remaining_trackable_amount) > 0;
@@ -427,7 +417,7 @@ export default function ShowSubscription({
     function openAdd() {
         setEditingLog(null);
         setPaymentErrors({});
-        setPaymentForm(buildPaymentForm(defaultPaymentAmount));
+        setPaymentForm(buildPaymentForm(''));
         setPaymentOpen(true);
     }
 
@@ -456,7 +446,7 @@ export default function ShowSubscription({
         if (!nextOpen) {
             setEditingLog(null);
             setPaymentErrors({});
-            setPaymentForm(buildPaymentForm(defaultPaymentAmount));
+            setPaymentForm(buildPaymentForm(''));
         }
     }
 
@@ -782,7 +772,7 @@ export default function ShowSubscription({
                                 <Input
                                     id="p-amount"
                                     type="number"
-                                    step="0.01"
+                                    step="1"
                                     min="0.01"
                                     value={paymentForm.amount}
                                     onChange={(e) => setPaymentForm((current) => ({ ...current, amount: e.target.value }))}

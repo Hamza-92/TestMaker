@@ -211,7 +211,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                     <Input
                                         type="number"
                                         min="0"
-                                        step="0.01"
+                                        step="1"
                                         className="pl-11"
                                         value={data.amount}
                                         onChange={(e) => setData('amount', e.target.value)}
