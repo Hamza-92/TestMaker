@@ -32,7 +32,7 @@ interface Subscription {
     id: number;
     name: string;
     amount: string;
-    allowed_questions: number;
+    allowed_questions: number | null;
     started_at: string;
     expired_at: string | null;
     duration: number;
@@ -611,10 +611,12 @@ export default function ShowCustomer({
                                                         <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                                                             <span>{money(subscription.amount)}</span>
                                                             <span>Paid {money(paid)}</span>
-                                                            <span className="flex items-center gap-1">
-                                                                <HashIcon className="size-3.5" />
-                                                                {subscription.allowed_questions.toLocaleString()}
-                                                            </span>
+                                                            {subscription.allowed_questions != null && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <HashIcon className="size-3.5" />
+                                                                    {subscription.allowed_questions.toLocaleString()}
+                                                                </span>
+                                                            )}
                                                             <span>{subscription.duration} days</span>
                                                         </div>
                                                     </div>

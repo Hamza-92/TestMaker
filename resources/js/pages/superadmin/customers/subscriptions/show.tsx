@@ -66,7 +66,8 @@ interface Subscription {
     id: number;
     name: string;
     amount: string;
-    allowed_questions: number;
+    allowed_questions: number | null;
+    is_question_based: boolean;
     started_at: string | null;
     expired_at: string | null;
     duration: number;
@@ -561,15 +562,17 @@ export default function ShowSubscription({
                     <div className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <InfoCell label="Plan Name" value={subscription.name} />
                         <InfoCell label="Amount" highlight value={money(subscription.amount)} />
-                        <InfoCell
-                            label="Allowed Questions"
-                            value={
-                                <span className="flex items-center gap-1.5">
-                                    <HashIcon className="text-muted-foreground size-3.5" />
-                                    {subscription.allowed_questions.toLocaleString()}
-                                </span>
-                            }
-                        />
+                        {subscription.is_question_based && (
+                            <InfoCell
+                                label="Allowed Questions"
+                                value={
+                                    <span className="flex items-center gap-1.5">
+                                        <HashIcon className="text-muted-foreground size-3.5" />
+                                        {subscription.allowed_questions?.toLocaleString() ?? '—'}
+                                    </span>
+                                }
+                            />
+                        )}
                         <InfoCell
                             label="Duration"
                             value={

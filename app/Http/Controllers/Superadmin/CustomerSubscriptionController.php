@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -82,6 +83,7 @@ class CustomerSubscriptionController extends Controller
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
                 'max_teachers'      => $subscription->max_teachers,
+                'is_question_based' => $subscription->is_question_based,
                 'pattern_access'    => $summaryIds['pattern_access'],
                 'class_access'      => $summaryIds['class_access'],
                 'subject_access'    => $summaryIds['subject_access'],
@@ -266,6 +268,7 @@ class CustomerSubscriptionController extends Controller
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
                 'max_teachers'      => $subscription->max_teachers,
+                'is_question_based' => $subscription->is_question_based,
                 'access_scope'      => SubscriptionAccess::resolveScope($subscription, $resources),
             ],
             'patterns'        => $resources['patterns'],
@@ -285,7 +288,11 @@ class CustomerSubscriptionController extends Controller
         $validated = $request->validate([
             'name'               => ['required', 'string', 'max:255'],
             'amount'             => ['required', 'numeric', 'min:0'],
-            'allowed_questions'  => ['required', 'integer', 'min:0'],
+            'is_question_based'  => ['boolean'],
+            'allowed_questions'  => [
+                Rule::requiredIf(fn () => $request->boolean('is_question_based')),
+                'nullable', 'integer', 'min:0',
+            ],
             'started_at'         => ['required', 'date'],
             'duration'           => ['required', 'integer', 'min:1'],
             'status'             => ['required', 'in:active,expired,cancelled'],
@@ -311,20 +318,22 @@ class CustomerSubscriptionController extends Controller
         ];
 
         DB::transaction(function () use ($validated, $startedAt, $subscription, $oldValues, $accessScope, $summaryIds) {
+            $isQuestionBased = $validated['is_question_based'] ?? false;
             $subscription->update([
-                'name'              => $validated['name'],
-                'pattern_access'    => $summaryIds['pattern_access'],
-                'class_access'      => $summaryIds['class_access'],
-                'subject_access'    => $summaryIds['subject_access'],
-                'access_scope'      => $accessScope,
-                'allow_teachers'    => $validated['allow_teachers'] ?? false,
-                'max_teachers'      => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
-                'allowed_questions' => $validated['allowed_questions'],
-                'amount'            => $validated['amount'],
-                'started_at'        => $startedAt,
-                'duration'          => $validated['duration'],
-                'expired_at'        => $startedAt->copy()->addDays((int) $validated['duration']),
-                'status'            => $validated['status'],
+                'name'               => $validated['name'],
+                'pattern_access'     => $summaryIds['pattern_access'],
+                'class_access'       => $summaryIds['class_access'],
+                'subject_access'     => $summaryIds['subject_access'],
+                'access_scope'       => $accessScope,
+                'allow_teachers'     => $validated['allow_teachers'] ?? false,
+                'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
+                'is_question_based'  => $isQuestionBased,
+                'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
+                'amount'             => $validated['amount'],
+                'started_at'         => $startedAt,
+                'duration'           => $validated['duration'],
+                'expired_at'         => $startedAt->copy()->addDays((int) $validated['duration']),
+                'status'             => $validated['status'],
             ]);
 
             AuditLog::record(
@@ -371,7 +380,11 @@ class CustomerSubscriptionController extends Controller
         $validated = $request->validate([
             'name'               => ['required', 'string', 'max:255'],
             'amount'             => ['required', 'numeric', 'min:0'],
-            'allowed_questions'  => ['required', 'integer', 'min:0'],
+            'is_question_based'  => ['boolean'],
+            'allowed_questions'  => [
+                Rule::requiredIf(fn () => $request->boolean('is_question_based')),
+                'nullable', 'integer', 'min:0',
+            ],
             'started_at'         => ['required', 'date'],
             'duration'           => ['required', 'integer', 'min:1'],
             'status'             => ['required', 'in:active,expired,cancelled'],
@@ -386,17 +399,19 @@ class CustomerSubscriptionController extends Controller
         $createdSubscription = null;
 
         DB::transaction(function () use ($validated, $startedAt, $customer, $accessScope, $summaryIds, &$createdSubscription) {
+            $isQuestionBased = $validated['is_question_based'] ?? false;
             $createdSubscription = Subscription::create([
-                'user_id'           => $customer->id,
-                'name'              => $validated['name'],
-                'pattern_access'    => $summaryIds['pattern_access'],
-                'class_access'      => $summaryIds['class_access'],
-                'subject_access'    => $summaryIds['subject_access'],
-                'access_scope'      => $accessScope,
-                'allow_teachers'    => $validated['allow_teachers'] ?? false,
-                'max_teachers'      => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
-                'allowed_questions' => $validated['allowed_questions'],
-                'amount'            => $validated['amount'],
+                'user_id'            => $customer->id,
+                'name'               => $validated['name'],
+                'pattern_access'     => $summaryIds['pattern_access'],
+                'class_access'       => $summaryIds['class_access'],
+                'subject_access'     => $summaryIds['subject_access'],
+                'access_scope'       => $accessScope,
+                'allow_teachers'     => $validated['allow_teachers'] ?? false,
+                'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
+                'is_question_based'  => $isQuestionBased,
+                'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
+                'amount'             => $validated['amount'],
                 'started_at'        => $startedAt,
                 'duration'          => $validated['duration'],
                 'expired_at'        => $startedAt->copy()->addDays((int) $validated['duration']),

@@ -2,6 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     CalendarIcon,
+    ClipboardListIcon,
     FileTextIcon,
     HashIcon,
     LockIcon,
@@ -43,6 +44,7 @@ interface Props {
 interface FormData {
     name: string;
     amount: string;
+    is_question_based: boolean;
     allowed_questions: string;
     started_at: string;
     duration: string;
@@ -100,12 +102,36 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
+function ToggleField({
+    icon,
+    label,
+    checked,
+    onCheckedChange,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+}) {
+    return (
+        <div className="min-w-0 space-y-1.5">
+            <Label>{label}</Label>
+            <div className="border-input flex h-9 items-center gap-2 rounded-md border px-3">
+                <span className="text-muted-foreground [&_svg]:size-4">{icon}</span>
+                <span className="text-muted-foreground flex-1 text-sm">{checked ? 'Yes' : 'No'}</span>
+                <Switch checked={checked} onCheckedChange={onCheckedChange} />
+            </div>
+        </div>
+    );
+}
+
 export default function AddCustomerSubscription({ customer, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
     const today = new Date().toISOString().slice(0, 10);
 
     const { data, setData, post, processing, errors } = useForm<FormData>({
         name: '',
         amount: '',
+        is_question_based: false,
         allowed_questions: '',
         started_at: today,
         duration: '30',
@@ -124,7 +150,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
         <>
             <Head title={`Add Subscription - ${customer.name}`} />
 
-            <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 p-4 md:p-6">
+            <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
                 <div className="flex min-w-0 items-center gap-4">
                     <Link
                         href={`/superadmin/customers/${customer.id}`}
@@ -155,7 +181,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                         />
                         <Separator />
 
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             <Field label="Plan Name" required error={errors.name}>
                                 <InputWithIcon
                                     icon={<FileTextIcon />}
@@ -178,16 +204,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                         onChange={(e) => setData('amount', e.target.value)}
                                     />
                                 </div>
-                            </Field>
-
-                            <Field label="Allowed Questions" required error={errors.allowed_questions}>
-                                <InputWithIcon
-                                    icon={<HashIcon />}
-                                    type="number"
-                                    min="0"
-                                    value={data.allowed_questions}
-                                    onChange={(e) => setData('allowed_questions', e.target.value)}
-                                />
                             </Field>
 
                             <Field label="Duration (Days)" required error={errors.duration}>
@@ -221,32 +237,38 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                 </Select>
                             </Field>
 
-                            {/* ── Teacher Permissions ──────────────────────────── */}
-                            <div className="col-span-full">
-                                <Separator />
-                            </div>
+                            <ToggleField
+                                icon={<ClipboardListIcon />}
+                                label="Question Based"
+                                checked={data.is_question_based}
+                                onCheckedChange={(checked) => {
+                                    setData('is_question_based', checked);
+                                    if (!checked) setData('allowed_questions', '');
+                                }}
+                            />
 
-                            {/* Allow Teachers toggle — spans full width */}
-                            <div className="col-span-full flex items-center justify-between rounded-lg border p-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-primary/10 text-primary flex size-8 items-center justify-center rounded-md">
-                                        <UsersIcon className="size-4" />
-                                    </div>
-                                    <p className="text-sm font-medium">Allow Adding Teachers</p>
-                                </div>
-                                <Switch
-                                    checked={data.allow_teachers}
-                                    onCheckedChange={(checked) => {
-                                        setData('allow_teachers', checked);
+                            {data.is_question_based && (
+                                <Field label="Allowed Questions" required error={errors.allowed_questions}>
+                                    <InputWithIcon
+                                        icon={<HashIcon />}
+                                        type="number"
+                                        min="0"
+                                        value={data.allowed_questions}
+                                        onChange={(e) => setData('allowed_questions', e.target.value)}
+                                    />
+                                </Field>
+                            )}
 
-                                        if (!checked) {
-                                            setData('max_teachers', '');
-                                        }
-                                    }}
-                                />
-                            </div>
+                            <ToggleField
+                                icon={<UsersIcon />}
+                                label="Allow Teachers"
+                                checked={data.allow_teachers}
+                                onCheckedChange={(checked) => {
+                                    setData('allow_teachers', checked);
+                                    if (!checked) setData('max_teachers', '');
+                                }}
+                            />
 
-                            {/* Max Teachers — only visible when teachers are allowed */}
                             {data.allow_teachers && (
                                 <Field label="Max Teachers" error={errors.max_teachers}>
                                     <InputWithIcon
