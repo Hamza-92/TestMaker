@@ -5,7 +5,6 @@ import {
     CalendarIcon,
     ChevronDownIcon,
     ChevronRightIcon,
-    FileUpIcon,
     HelpCircleIcon,
     LayersIcon,
     ListChecksIcon,
@@ -990,8 +989,8 @@ function ChaptersTab({
                         className="grid border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground"
                         style={{
                             gridTemplateColumns: isTopicWise
-                                ? '2rem 3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 9.5rem'
-                                : '3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 8.5rem',
+                                ? '2rem 3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 8rem'
+                                : '3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 6rem',
                         }}
                     >
                         {isTopicWise && <span />}
@@ -1076,7 +1075,7 @@ function ChaptersTab({
                                         <Link
                                             href={`/superadmin/subjects/${subject.id}/chapters/${ch.id}/questions`}
                                             className="rounded p-1 text-muted-foreground transition-colors hover:text-primary"
-                                            title="View questions"
+                                            title="Questions"
                                         >
                                             <ListChecksIcon className="size-3.5" />
                                         </Link>
@@ -1091,20 +1090,6 @@ function ChaptersTab({
                                                 <PlusIcon className="size-3.5" />
                                             </button>
                                         )}
-                                        <Link
-                                            href={`/superadmin/subjects/${subject.id}/chapters/${ch.id}/questions/add`}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:text-primary"
-                                            title="Add question"
-                                        >
-                                            <PlusIcon className="size-3.5" />
-                                        </Link>
-                                        <Link
-                                            href={`/superadmin/subjects/${subject.id}/chapters/${ch.id}/questions/import`}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:text-primary"
-                                            title="Import questions"
-                                        >
-                                            <FileUpIcon className="size-3.5" />
-                                        </Link>
                                         <button
                                             onClick={() => openEditChapter(ch)}
                                             className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
