@@ -201,6 +201,8 @@ export default function ImportQuestions({
     chapters,
     sourceOptions,
     defaults,
+    lockedChapterId,
+    backHref = '/superadmin/questions',
     preview,
     previewToken,
     report,
@@ -209,6 +211,8 @@ export default function ImportQuestions({
     chapters: ChapterOption[];
     sourceOptions: SourceOption[];
     defaults: ImportDefaults;
+    lockedChapterId?: number | null;
+    backHref?: string;
     preview: ImportPreview | null;
     previewToken: string | null;
     report: ImportReport | null;
@@ -229,6 +233,8 @@ export default function ImportQuestions({
         previewToken ?? '',
     );
     const [isImporting, setIsImporting] = useState(false);
+    const isChapterLocked =
+        lockedChapterId !== null && lockedChapterId !== undefined;
 
     const selectedChapter = useMemo(
         () =>
@@ -415,9 +421,12 @@ export default function ImportQuestions({
 
     const handlePreviewSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        form.post('/superadmin/questions/import/preview', {
-            preserveScroll: true,
-        });
+        form.post(
+            `/superadmin/questions/import/preview${isChapterLocked ? '?chapter_scoped=1' : ''}`,
+            {
+                preserveScroll: true,
+            },
+        );
     };
 
     const handleImport = () => {
@@ -435,6 +444,7 @@ export default function ImportQuestions({
                 source: form.data.source,
                 status: form.data.status,
                 preview_token: activePreviewToken,
+                chapter_scoped: isChapterLocked ? '1' : '0',
             },
             {
                 preserveScroll: true,
@@ -451,7 +461,7 @@ export default function ImportQuestions({
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-4">
                         <Link
-                            href="/superadmin/questions"
+                            href={backHref}
                             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
                         >
                             <ArrowLeftIcon className="size-4" />
@@ -721,7 +731,10 @@ export default function ImportQuestions({
                     </div>
                 ) : null}
 
-                <form onSubmit={handlePreviewSubmit} className="w-full min-w-0 space-y-5">
+                <form
+                    onSubmit={handlePreviewSubmit}
+                    className="w-full min-w-0 space-y-5"
+                >
                     <SectionCard
                         icon={<UploadIcon className="size-4" />}
                         title="Import"
@@ -735,8 +748,7 @@ export default function ImportQuestions({
                                 <div className="space-y-2">
                                     <Select
                                         value={
-                                            form.data.question_type_id ||
-                                            'none'
+                                            form.data.question_type_id || 'none'
                                         }
                                         onValueChange={(value) => {
                                             clearPreview();
@@ -783,120 +795,183 @@ export default function ImportQuestions({
                                 </div>
                             </Field>
 
-                            <Field label="Pattern">
-                                <Select
-                                    value={patternFilter}
-                                    onValueChange={setPatternFilter}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="All patterns" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All patterns
-                                        </SelectItem>
-                                        {patternOptions.map((pattern) => (
-                                            <SelectItem
-                                                key={pattern.id}
-                                                value={String(pattern.id)}
-                                            >
-                                                {pattern.short_name
-                                                    ? `${pattern.short_name} / ${pattern.name}`
-                                                    : pattern.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
+                            {isChapterLocked && selectedChapter ? (
+                                <div className="md:col-span-2 xl:col-span-3">
+                                    <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+                                        <Badge
+                                            variant="outline"
+                                            className="bg-background"
+                                        >
+                                            {selectedChapter.subject.name_eng}
+                                        </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            className="bg-background"
+                                        >
+                                            {selectedChapter.class.name}
+                                        </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            className="bg-background"
+                                        >
+                                            {selectedChapter.pattern.short_name
+                                                ? `${selectedChapter.pattern.short_name} / ${selectedChapter.pattern.name}`
+                                                : selectedChapter.pattern.name}
+                                        </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            className="bg-background"
+                                        >
+                                            {chapterTitle(selectedChapter)}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <Field label="Pattern">
+                                        <Select
+                                            value={patternFilter}
+                                            onValueChange={setPatternFilter}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="All patterns" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">
+                                                    All patterns
+                                                </SelectItem>
+                                                {patternOptions.map(
+                                                    (pattern) => (
+                                                        <SelectItem
+                                                            key={pattern.id}
+                                                            value={String(
+                                                                pattern.id,
+                                                            )}
+                                                        >
+                                                            {pattern.short_name
+                                                                ? `${pattern.short_name} / ${pattern.name}`
+                                                                : pattern.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
 
-                            <Field label="Class">
-                                <Select
-                                    value={classFilter}
-                                    onValueChange={setClassFilter}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="All classes" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All classes
-                                        </SelectItem>
-                                        {classOptions.map((schoolClass) => (
-                                            <SelectItem
-                                                key={schoolClass.id}
-                                                value={String(schoolClass.id)}
-                                            >
-                                                {schoolClass.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
+                                    <Field label="Class">
+                                        <Select
+                                            value={classFilter}
+                                            onValueChange={setClassFilter}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="All classes" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">
+                                                    All classes
+                                                </SelectItem>
+                                                {classOptions.map(
+                                                    (schoolClass) => (
+                                                        <SelectItem
+                                                            key={schoolClass.id}
+                                                            value={String(
+                                                                schoolClass.id,
+                                                            )}
+                                                        >
+                                                            {schoolClass.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
 
-                            <Field label="Subject">
-                                <Select
-                                    value={subjectFilter}
-                                    onValueChange={setSubjectFilter}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="All subjects" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All subjects
-                                        </SelectItem>
-                                        {subjectOptions.map((subject) => (
-                                            <SelectItem
-                                                key={subject.id}
-                                                value={String(subject.id)}
-                                            >
-                                                {subject.name_eng}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
+                                    <Field label="Subject">
+                                        <Select
+                                            value={subjectFilter}
+                                            onValueChange={setSubjectFilter}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="All subjects" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">
+                                                    All subjects
+                                                </SelectItem>
+                                                {subjectOptions.map(
+                                                    (subject) => (
+                                                        <SelectItem
+                                                            key={subject.id}
+                                                            value={String(
+                                                                subject.id,
+                                                            )}
+                                                        >
+                                                            {subject.name_eng}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
 
-                            <Field
-                                label="Chapter"
-                                required
-                                error={form.errors.chapter_id}
-                            >
-                                <Select
-                                    value={form.data.chapter_id || 'none'}
-                                    disabled={filteredChapters.length === 0}
-                                    onValueChange={(value) => {
-                                        clearPreview();
-                                        const nextValue =
-                                            value === 'none' ? '' : value;
-                                        form.setData('chapter_id', nextValue);
-                                        form.setData('topic_id', '');
-                                    }}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
-                                            placeholder={
-                                                filteredChapters.length === 0
-                                                    ? 'No chapters'
-                                                    : 'Select chapter'
+                                    <Field
+                                        label="Chapter"
+                                        required
+                                        error={form.errors.chapter_id}
+                                    >
+                                        <Select
+                                            value={
+                                                form.data.chapter_id || 'none'
                                             }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-80">
-                                        <SelectItem value="none">
-                                            Select chapter
-                                        </SelectItem>
-                                        {filteredChapters.map((chapter) => (
-                                            <SelectItem
-                                                key={chapter.id}
-                                                value={String(chapter.id)}
-                                            >
-                                                {chapterTitle(chapter)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
+                                            disabled={
+                                                filteredChapters.length === 0
+                                            }
+                                            onValueChange={(value) => {
+                                                clearPreview();
+                                                const nextValue =
+                                                    value === 'none'
+                                                        ? ''
+                                                        : value;
+                                                form.setData(
+                                                    'chapter_id',
+                                                    nextValue,
+                                                );
+                                                form.setData('topic_id', '');
+                                            }}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue
+                                                    placeholder={
+                                                        filteredChapters.length ===
+                                                        0
+                                                            ? 'No chapters'
+                                                            : 'Select chapter'
+                                                    }
+                                                />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-80">
+                                                <SelectItem value="none">
+                                                    Select chapter
+                                                </SelectItem>
+                                                {filteredChapters.map(
+                                                    (chapter) => (
+                                                        <SelectItem
+                                                            key={chapter.id}
+                                                            value={String(
+                                                                chapter.id,
+                                                            )}
+                                                        >
+                                                            {chapterTitle(
+                                                                chapter,
+                                                            )}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
+                                </>
+                            )}
 
                             {usesTopicSelection ? (
                                 <Field
@@ -1020,7 +1095,7 @@ export default function ImportQuestions({
 
                     <div className="flex items-center justify-end gap-3 pb-2">
                         <Button asChild variant="outline">
-                            <Link href="/superadmin/questions">Cancel</Link>
+                            <Link href={backHref}>Cancel</Link>
                         </Button>
                         <Button
                             type="submit"

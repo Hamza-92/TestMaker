@@ -143,6 +143,7 @@ interface QuestionFormProps {
     sourceOptions: SourceOption[];
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     secondarySubmitLabel?: string;
+    lockedChapterId?: number | null;
 }
 
 interface PatternFilterOption {
@@ -306,7 +307,10 @@ export function QuestionForm({
     sourceOptions,
     onSubmit,
     secondarySubmitLabel,
+    lockedChapterId,
 }: QuestionFormProps) {
+    const isChapterLocked =
+        lockedChapterId !== null && lockedChapterId !== undefined;
     const selectedType = useMemo(
         () =>
             questionTypes.find(
@@ -438,7 +442,10 @@ export function QuestionForm({
             return;
         }
 
-        form.setData('content', createEmptyQuestionContent(selectedType.schema_key));
+        form.setData(
+            'content',
+            createEmptyQuestionContent(selectedType.schema_key),
+        );
         setLastSchemaKey(selectedType.schema_key);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedType?.schema_key]);
@@ -494,7 +501,10 @@ export function QuestionForm({
     const errorFor = (path: string) =>
         form.errors[path as keyof typeof form.errors] as string | undefined;
 
-    const setContentValue = (key: keyof QuestionContentFormData, value: unknown) =>
+    const setContentValue = (
+        key: keyof QuestionContentFormData,
+        value: unknown,
+    ) =>
         form.setData('content', {
             ...form.data.content,
             [key]: value,
@@ -540,7 +550,9 @@ export function QuestionForm({
 
         setContentValue(
             'options',
-            form.data.content.options.filter((_, optionIndex) => optionIndex !== index),
+            form.data.content.options.filter(
+                (_, optionIndex) => optionIndex !== index,
+            ),
         );
     };
 
@@ -557,7 +569,10 @@ export function QuestionForm({
     };
 
     const addItem = () =>
-        setContentValue('items', [...form.data.content.items, createEmptyItem()]);
+        setContentValue('items', [
+            ...form.data.content.items,
+            createEmptyItem(),
+        ]);
 
     const removeItem = (index: number) => {
         if (form.data.content.items.length <= 1) {
@@ -566,7 +581,9 @@ export function QuestionForm({
 
         setContentValue(
             'items',
-            form.data.content.items.filter((_, itemIndex) => itemIndex !== index),
+            form.data.content.items.filter(
+                (_, itemIndex) => itemIndex !== index,
+            ),
         );
     };
 
@@ -586,7 +603,10 @@ export function QuestionForm({
         });
     };
 
-    const toggleItemOptionCorrect = (itemIndex: number, optionIndex: number) => {
+    const toggleItemOptionCorrect = (
+        itemIndex: number,
+        optionIndex: number,
+    ) => {
         updateItem(itemIndex, {
             options: form.data.content.items[itemIndex].options.map(
                 (option, currentIndex) => ({
@@ -634,7 +654,10 @@ export function QuestionForm({
     };
 
     const addPair = () =>
-        setContentValue('pairs', [...form.data.content.pairs, createEmptyPair()]);
+        setContentValue('pairs', [
+            ...form.data.content.pairs,
+            createEmptyPair(),
+        ]);
 
     const removePair = (index: number) => {
         if (form.data.content.pairs.length <= 1) {
@@ -643,7 +666,9 @@ export function QuestionForm({
 
         setContentValue(
             'pairs',
-            form.data.content.pairs.filter((_, pairIndex) => pairIndex !== index),
+            form.data.content.pairs.filter(
+                (_, pairIndex) => pairIndex !== index,
+            ),
         );
     };
 
@@ -917,7 +942,9 @@ export function QuestionForm({
                         className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
                     >
                         <div className="flex items-center justify-between gap-3">
-                            <Badge variant="outline">Item {itemIndex + 1}</Badge>
+                            <Badge variant="outline">
+                                Item {itemIndex + 1}
+                            </Badge>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -1030,7 +1057,9 @@ export function QuestionForm({
                         className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
                     >
                         <div className="flex items-center justify-between gap-3">
-                            <Badge variant="outline">Pair {pairIndex + 1}</Badge>
+                            <Badge variant="outline">
+                                Pair {pairIndex + 1}
+                            </Badge>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -1160,7 +1189,8 @@ export function QuestionForm({
                             >
                                 <Select
                                     value={
-                                        form.data.content.correct_boolean || 'none'
+                                        form.data.content.correct_boolean ||
+                                        'none'
                                     }
                                     onValueChange={(value) =>
                                         setContentValue(
@@ -1176,8 +1206,12 @@ export function QuestionForm({
                                         <SelectItem value="none">
                                             Select answer
                                         </SelectItem>
-                                        <SelectItem value="true">True</SelectItem>
-                                        <SelectItem value="false">False</SelectItem>
+                                        <SelectItem value="true">
+                                            True
+                                        </SelectItem>
+                                        <SelectItem value="false">
+                                            False
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </Field>
@@ -1334,119 +1368,160 @@ export function QuestionForm({
                             </Select>
                         </Field>
 
-                        <Field label="Pattern">
-                            <Select
-                                value={patternFilter}
-                                onValueChange={setPatternFilter}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="All patterns" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All patterns
-                                    </SelectItem>
-                                    {patternOptions.map((pattern) => (
-                                        <SelectItem
-                                            key={pattern.id}
-                                            value={String(pattern.id)}
-                                        >
-                                            {pattern.short_name
-                                                ? `${pattern.short_name} / ${pattern.name}`
-                                                : pattern.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
+                        {isChapterLocked && selectedChapter ? (
+                            <div className="md:col-span-2 xl:col-span-3">
+                                <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+                                    <Badge
+                                        variant="outline"
+                                        className="bg-background"
+                                    >
+                                        {selectedChapter.subject.name_eng}
+                                    </Badge>
+                                    <Badge
+                                        variant="outline"
+                                        className="bg-background"
+                                    >
+                                        {selectedChapter.class.name}
+                                    </Badge>
+                                    <Badge
+                                        variant="outline"
+                                        className="bg-background"
+                                    >
+                                        {selectedChapter.pattern.short_name
+                                            ? `${selectedChapter.pattern.short_name} / ${selectedChapter.pattern.name}`
+                                            : selectedChapter.pattern.name}
+                                    </Badge>
+                                    <Badge
+                                        variant="outline"
+                                        className="bg-background"
+                                    >
+                                        {chapterTitle(selectedChapter)}
+                                    </Badge>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <Field label="Pattern">
+                                    <Select
+                                        value={patternFilter}
+                                        onValueChange={setPatternFilter}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="All patterns" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">
+                                                All patterns
+                                            </SelectItem>
+                                            {patternOptions.map((pattern) => (
+                                                <SelectItem
+                                                    key={pattern.id}
+                                                    value={String(pattern.id)}
+                                                >
+                                                    {pattern.short_name
+                                                        ? `${pattern.short_name} / ${pattern.name}`
+                                                        : pattern.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
 
-                        <Field label="Class">
-                            <Select
-                                value={classFilter}
-                                onValueChange={setClassFilter}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="All classes" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All classes
-                                    </SelectItem>
-                                    {classOptions.map((schoolClass) => (
-                                        <SelectItem
-                                            key={schoolClass.id}
-                                            value={String(schoolClass.id)}
-                                        >
-                                            {schoolClass.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
+                                <Field label="Class">
+                                    <Select
+                                        value={classFilter}
+                                        onValueChange={setClassFilter}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="All classes" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">
+                                                All classes
+                                            </SelectItem>
+                                            {classOptions.map((schoolClass) => (
+                                                <SelectItem
+                                                    key={schoolClass.id}
+                                                    value={String(
+                                                        schoolClass.id,
+                                                    )}
+                                                >
+                                                    {schoolClass.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
 
-                        <Field label="Subject">
-                            <Select
-                                value={subjectFilter}
-                                onValueChange={setSubjectFilter}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="All subjects" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All subjects
-                                    </SelectItem>
-                                    {subjectOptions.map((subject) => (
-                                        <SelectItem
-                                            key={subject.id}
-                                            value={String(subject.id)}
-                                        >
-                                            {subject.name_eng}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
+                                <Field label="Subject">
+                                    <Select
+                                        value={subjectFilter}
+                                        onValueChange={setSubjectFilter}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="All subjects" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">
+                                                All subjects
+                                            </SelectItem>
+                                            {subjectOptions.map((subject) => (
+                                                <SelectItem
+                                                    key={subject.id}
+                                                    value={String(subject.id)}
+                                                >
+                                                    {subject.name_eng}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
 
-                        <Field
-                            label="Chapter"
-                            required
-                            error={form.errors.chapter_id}
-                        >
-                            <Select
-                                value={form.data.chapter_id || 'none'}
-                                disabled={filteredChapters.length === 0}
-                                onValueChange={(value) => {
-                                    const nextValue =
-                                        value === 'none' ? '' : value;
-                                    form.setData('chapter_id', nextValue);
-                                    form.setData('topic_id', '');
-                                }}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue
-                                        placeholder={
-                                            filteredChapters.length === 0
-                                                ? 'No chapters'
-                                                : 'Select chapter'
-                                        }
-                                    />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-80">
-                                    <SelectItem value="none">
-                                        Select chapter
-                                    </SelectItem>
-                                    {filteredChapters.map((chapter) => (
-                                        <SelectItem
-                                            key={chapter.id}
-                                            value={String(chapter.id)}
-                                        >
-                                            {chapterTitle(chapter)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
+                                <Field
+                                    label="Chapter"
+                                    required
+                                    error={form.errors.chapter_id}
+                                >
+                                    <Select
+                                        value={form.data.chapter_id || 'none'}
+                                        disabled={filteredChapters.length === 0}
+                                        onValueChange={(value) => {
+                                            const nextValue =
+                                                value === 'none' ? '' : value;
+                                            form.setData(
+                                                'chapter_id',
+                                                nextValue,
+                                            );
+                                            form.setData('topic_id', '');
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue
+                                                placeholder={
+                                                    filteredChapters.length ===
+                                                    0
+                                                        ? 'No chapters'
+                                                        : 'Select chapter'
+                                                }
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-80">
+                                            <SelectItem value="none">
+                                                Select chapter
+                                            </SelectItem>
+                                            {filteredChapters.map((chapter) => (
+                                                <SelectItem
+                                                    key={chapter.id}
+                                                    value={String(chapter.id)}
+                                                >
+                                                    {chapterTitle(chapter)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
+                            </>
+                        )}
 
                         {usesTopicSelection ? (
                             <Field label="Topic" error={form.errors.topic_id}>

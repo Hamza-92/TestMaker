@@ -14,6 +14,21 @@ class QuestionTypeController extends Controller
 {
     public function index()
     {
+        return $this->renderIndex('all');
+    }
+
+    public function objectiveIndex()
+    {
+        return $this->renderIndex('objective');
+    }
+
+    public function subjectiveIndex()
+    {
+        return $this->renderIndex('subjective');
+    }
+
+    private function renderIndex(string $initialKind)
+    {
         $questionTypes = QuestionType::with('objectiveType:id,name')
             ->withCount(['questions', 'objectiveChildren'])
             ->orderByDesc('created_at')
@@ -42,10 +57,26 @@ class QuestionTypeController extends Controller
             'questionTypes' => $questionTypes
                 ->map(fn (QuestionType $questionType) => $this->transformQuestionType($questionType))
                 ->values(),
+            'initialKind' => $initialKind,
         ]);
     }
 
     public function show(QuestionType $questionType)
+    {
+        return $this->renderShow($questionType, '/superadmin/question-types');
+    }
+
+    public function showFromObjective(QuestionType $questionType)
+    {
+        return $this->renderShow($questionType, '/superadmin/question-types/objective');
+    }
+
+    public function showFromSubjective(QuestionType $questionType)
+    {
+        return $this->renderShow($questionType, '/superadmin/question-types/subjective');
+    }
+
+    private function renderShow(QuestionType $questionType, string $backHref)
     {
         $questionType->load([
             'objectiveType:id,name,heading_en',
@@ -64,6 +95,7 @@ class QuestionTypeController extends Controller
                     'created_at' => $log->created_at?->toISOString(),
                 ])->values(),
             ],
+            'backHref' => $backHref,
         ]);
     }
 
@@ -94,6 +126,21 @@ class QuestionTypeController extends Controller
 
     public function edit(QuestionType $questionType)
     {
+        return $this->renderEdit($questionType, '/superadmin/question-types');
+    }
+
+    public function editFromObjective(QuestionType $questionType)
+    {
+        return $this->renderEdit($questionType, '/superadmin/question-types/objective');
+    }
+
+    public function editFromSubjective(QuestionType $questionType)
+    {
+        return $this->renderEdit($questionType, '/superadmin/question-types/subjective');
+    }
+
+    private function renderEdit(QuestionType $questionType, string $scope)
+    {
         return Inertia::render('superadmin/question-types/edit', [
             'questionType' => [
                 'id' => $questionType->id,
@@ -118,6 +165,7 @@ class QuestionTypeController extends Controller
                 'status' => $questionType->status,
             ],
             'questionSchemas' => QuestionTypeSchemaRegistry::options(),
+            'backHref' => "{$scope}/{$questionType->id}",
         ]);
     }
 
@@ -146,7 +194,9 @@ class QuestionTypeController extends Controller
             );
         }
 
-        return redirect()->route('superadmin.question-types.show', $questionType)
+        $scope = $questionType->is_objective ? 'objective' : 'subjective';
+
+        return redirect("/superadmin/question-types/{$scope}/{$questionType->id}")
             ->with('success', 'Question type updated successfully.');
     }
 

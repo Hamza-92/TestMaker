@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
@@ -10,6 +9,7 @@ use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\TopicController;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -76,8 +76,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}', [TopicController::class, 'update'])->name('superadmin.subjects.chapters.topics.update');
     Route::delete('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}', [TopicController::class, 'destroy'])->name('superadmin.subjects.chapters.topics.destroy');
 
+    Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions', [QuestionController::class, 'chapterIndex'])->name('superadmin.subjects.chapters.questions');
+    Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions/add', [QuestionController::class, 'createForChapter'])->name('superadmin.subjects.chapters.questions.add');
+    Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions/import', [QuestionController::class, 'importForChapter'])->name('superadmin.subjects.chapters.questions.import');
+
     Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types');
     Route::get('superadmin/question-types/add', [QuestionTypeController::class, 'create'])->name('superadmin.question-types.add');
+    Route::get('superadmin/question-types/objective', [QuestionTypeController::class, 'objectiveIndex'])->name('superadmin.question-types.objective');
+    Route::get('superadmin/question-types/subjective', [QuestionTypeController::class, 'subjectiveIndex'])->name('superadmin.question-types.subjective');
+    Route::get('superadmin/question-types/objective/{questionType}', [QuestionTypeController::class, 'showFromObjective'])->name('superadmin.question-types.objective.show');
+    Route::get('superadmin/question-types/subjective/{questionType}', [QuestionTypeController::class, 'showFromSubjective'])->name('superadmin.question-types.subjective.show');
+    Route::get('superadmin/question-types/objective/{questionType}/edit', [QuestionTypeController::class, 'editFromObjective'])->name('superadmin.question-types.objective.edit');
+    Route::get('superadmin/question-types/subjective/{questionType}/edit', [QuestionTypeController::class, 'editFromSubjective'])->name('superadmin.question-types.subjective.edit');
     Route::post('superadmin/question-types', [QuestionTypeController::class, 'store'])->name('superadmin.question-types.store');
     Route::get('superadmin/question-types/{questionType}', [QuestionTypeController::class, 'show'])->name('superadmin.question-types.show');
     Route::get('superadmin/question-types/{questionType}/edit', [QuestionTypeController::class, 'edit'])->name('superadmin.question-types.edit');
@@ -100,6 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // this route will be just kept until the app is fully developed and live, after it, this route will be deleted
 Route::get('/run-migrate', function () {
     Artisan::call('migrate');
+
     return Artisan::output();
 });
 

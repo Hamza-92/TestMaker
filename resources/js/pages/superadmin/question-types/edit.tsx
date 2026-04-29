@@ -20,9 +20,11 @@ interface QuestionTypePayload {
 export default function EditQuestionType({
     questionType,
     questionSchemas,
+    backHref,
 }: {
     questionType: QuestionTypePayload;
     questionSchemas: QuestionSchemaOption[];
+    backHref: string;
 }) {
     const form = useForm<QuestionTypeFormData>({
         name: questionType.name,
@@ -49,7 +51,7 @@ export default function EditQuestionType({
             <QuestionTypeForm
                 title="Edit Question Type"
                 submitLabel="Save Changes"
-                backHref={`/superadmin/question-types/${questionType.id}`}
+                backHref={backHref}
                 form={form}
                 questionSchemas={questionSchemas}
                 onSubmit={handleSubmit}

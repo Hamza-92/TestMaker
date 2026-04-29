@@ -11,9 +11,10 @@ use App\Models\Chapter;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\QuestionType;
-use App\Support\Questions\QuestionTypeSchemaRegistry;
+use App\Models\Subject;
 use App\Models\Topic;
 use App\Support\Questions\QuestionBulkImporter;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -50,12 +51,58 @@ class QuestionController extends Controller
         ]);
     }
 
-    public function create()
+    public function chapterIndex(Subject $subject, Chapter $chapter)
+    {
+        $this->ensureChapterBelongsToSubject($subject, $chapter);
+
+        $questions = Question::query()
+            ->where('chapter_id', $chapter->id)
+            ->with([
+                'questionType.objectiveType:id,name',
+                'chapter.subject:id,name_eng,name_ur,subject_type',
+                'chapter.schoolClass:id,name',
+                'chapter.pattern:id,name,short_name',
+                'topic:id,name,name_ur,chapter_id',
+                'options',
+            ])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return Inertia::render('superadmin/questions/chapter', [
+            'chapter' => $this->chapterContext($chapter),
+            'questions' => $questions
+                ->map(fn (Question $question) => $this->transformQuestionListItem($question))
+                ->values(),
+            'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
+            'sourceOptions' => $this->sourceOptions(),
+        ]);
+    }
+
+    public function create(Request $request)
     {
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
             'chapters' => $this->chapterFormOptions(),
             'sourceOptions' => $this->sourceOptions(),
+            'defaultChapterId' => $request->integer('chapter_id') ?: null,
+            'defaultTopicId' => $request->integer('topic_id') ?: null,
+            'lockedChapterId' => null,
+            'backHref' => '/superadmin/questions',
+        ]);
+    }
+
+    public function createForChapter(Request $request, Subject $subject, Chapter $chapter)
+    {
+        $this->ensureChapterBelongsToSubject($subject, $chapter);
+
+        return Inertia::render('superadmin/questions/add', [
+            'questionTypes' => $this->questionTypeFormOptions(),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions' => $this->sourceOptions(),
+            'defaultChapterId' => $chapter->id,
+            'defaultTopicId' => $request->integer('topic_id') ?: null,
+            'lockedChapterId' => $chapter->id,
+            'backHref' => route('superadmin.subjects.chapters.questions', [$subject, $chapter], false),
         ]);
     }
 
@@ -74,6 +121,33 @@ class QuestionController extends Controller
                 'source' => (string) $request->query('source', ''),
                 'status' => in_array($status, ['0', '1'], true) ? $status : '1',
             ],
+            'lockedChapterId' => null,
+            'backHref' => '/superadmin/questions',
+            'preview' => $request->session()->get('question_import_preview'),
+            'previewToken' => $request->session()->get('question_import_preview_token'),
+            'report' => $request->session()->get('question_import_report'),
+        ]);
+    }
+
+    public function importForChapter(Request $request, Subject $subject, Chapter $chapter)
+    {
+        $this->ensureChapterBelongsToSubject($subject, $chapter);
+
+        $status = (string) $request->query('status', '1');
+
+        return Inertia::render('superadmin/questions/import', [
+            'questionTypes' => $this->questionTypeFormOptions(),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions' => $this->sourceOptions(),
+            'defaults' => [
+                'question_type_id' => (string) $request->query('question_type_id', ''),
+                'chapter_id' => (string) $chapter->id,
+                'topic_id' => (string) $request->query('topic_id', ''),
+                'source' => (string) $request->query('source', ''),
+                'status' => in_array($status, ['0', '1'], true) ? $status : '1',
+            ],
+            'lockedChapterId' => $chapter->id,
+            'backHref' => route('superadmin.subjects.chapters.questions', [$subject, $chapter], false),
             'preview' => $request->session()->get('question_import_preview'),
             'previewToken' => $request->session()->get('question_import_preview_token'),
             'report' => $request->session()->get('question_import_report'),
@@ -101,10 +175,7 @@ class QuestionController extends Controller
             defaultStatus: $validated['status'],
         );
 
-        $redirect = redirect()->route(
-            'superadmin.questions.import',
-            $this->importRedirectParams($validated),
-        );
+        $redirect = $this->importRedirect($request, $validated);
 
         if ($preview['status'] !== 'success') {
             return $redirect->with(
@@ -154,10 +225,7 @@ class QuestionController extends Controller
             creatorId: auth()->id(),
         );
 
-        return redirect()
-            ->route('superadmin.questions.import', [
-                ...$this->importRedirectParams($validated),
-            ])
+        return $this->importRedirect($request, $validated)
             ->with('question_import_report', $report);
     }
 
@@ -215,11 +283,22 @@ class QuestionController extends Controller
             return $question;
         });
 
-        return redirect()
-            ->route(
-                $saveAndAddNew ? 'superadmin.questions.add' : 'superadmin.questions.show',
-                $saveAndAddNew ? [] : $question,
-            )
+        if ($saveAndAddNew) {
+            if ($request->boolean('chapter_scoped')) {
+                return redirect()
+                    ->route('superadmin.subjects.chapters.questions.add', [
+                        'subject' => $chapter->subject_id,
+                        'chapter' => $chapter->id,
+                    ])
+                    ->with('success', 'Question created successfully.');
+            }
+
+            return redirect()
+                ->route('superadmin.questions.add', ['chapter_id' => $chapter->id])
+                ->with('success', 'Question created successfully.');
+        }
+
+        return redirect()->route('superadmin.questions.show', $question)
             ->with('success', 'Question created successfully.');
     }
 
@@ -341,7 +420,7 @@ class QuestionController extends Controller
 
         $question->delete();
 
-        return redirect()->route('superadmin.questions')
+        return back()
             ->with('success', 'Question deleted successfully.');
     }
 
@@ -378,8 +457,7 @@ class QuestionController extends Controller
         $preview = $this->pullImportPreview($request, $validated['preview_token']);
 
         if (! is_array($preview)) {
-            return redirect()
-                ->route('superadmin.questions.import', $this->importRedirectParams($validated))
+            return $this->importRedirect($request, $validated)
                 ->with('question_import_report', [
                     'status' => 'error',
                     'total_rows' => 0,
@@ -397,8 +475,7 @@ class QuestionController extends Controller
         $topic = $topicId ? Topic::query()->find($topicId) : null;
 
         if (! $questionType || ! $chapter || ($topicId && ! $topic)) {
-            return redirect()
-                ->route('superadmin.questions.import', $this->importRedirectParams($validated))
+            return $this->importRedirect($request, $validated)
                 ->with('question_import_report', [
                     'status' => 'error',
                     'total_rows' => 0,
@@ -416,8 +493,7 @@ class QuestionController extends Controller
             creatorId: auth()->id(),
         );
 
-        return redirect()
-            ->route('superadmin.questions.import', $this->importRedirectParams($preview))
+        return $this->importRedirect($request, $preview)
             ->with('question_import_report', $report);
     }
 
@@ -449,6 +525,23 @@ class QuestionController extends Controller
             'source' => $values['source'] ?? null,
             'status' => (string) ((int) ($values['status'] ?? 1)),
         ];
+    }
+
+    private function importRedirect(Request $request, array $values): RedirectResponse
+    {
+        if ($request->boolean('chapter_scoped') && isset($values['chapter_id'])) {
+            $chapter = Chapter::query()->find($values['chapter_id']);
+
+            if ($chapter) {
+                return redirect()->route('superadmin.subjects.chapters.questions.import', [
+                    'subject' => $chapter->subject_id,
+                    'chapter' => $chapter->id,
+                    ...Arr::except($this->importRedirectParams($values), ['chapter_id']),
+                ]);
+            }
+        }
+
+        return redirect()->route('superadmin.questions.import', $this->importRedirectParams($values));
     }
 
     private function storeImportPreview(Request $request, string $token, array $preview): void
@@ -511,6 +604,62 @@ class QuestionController extends Controller
                 'label' => $label,
             ])
             ->values();
+    }
+
+    private function ensureChapterBelongsToSubject(Subject $subject, Chapter $chapter): void
+    {
+        abort_if((int) $chapter->subject_id !== (int) $subject->id, 404);
+    }
+
+    private function chapterContext(Chapter $chapter): array
+    {
+        $chapter->load([
+            'subject:id,name_eng,name_ur,subject_type,status',
+            'schoolClass:id,name,status',
+            'pattern:id,name,short_name,status',
+            'topics' => fn ($query) => $query
+                ->withCount('questions')
+                ->orderBy('sort_id')
+                ->orderBy('name')
+                ->select('id', 'chapter_id', 'name', 'name_ur', 'status'),
+        ]);
+        $chapter->loadCount('questions');
+
+        return [
+            'id' => $chapter->id,
+            'name' => $chapter->name,
+            'name_ur' => $chapter->name_ur,
+            'chapter_number' => $chapter->chapter_number,
+            'status' => $chapter->status,
+            'questions_count' => $chapter->questions_count,
+            'subject' => [
+                'id' => $chapter->subject->id,
+                'name_eng' => $chapter->subject->name_eng,
+                'name_ur' => $chapter->subject->name_ur,
+                'subject_type' => $chapter->subject->subject_type,
+                'status' => $chapter->subject->status,
+            ],
+            'class' => [
+                'id' => $chapter->schoolClass->id,
+                'name' => $chapter->schoolClass->name,
+                'status' => $chapter->schoolClass->status,
+            ],
+            'pattern' => [
+                'id' => $chapter->pattern->id,
+                'name' => $chapter->pattern->name,
+                'short_name' => $chapter->pattern->short_name,
+                'status' => $chapter->pattern->status,
+            ],
+            'topics' => $chapter->topics
+                ->map(fn (Topic $topic) => [
+                    'id' => $topic->id,
+                    'name' => $topic->name,
+                    'name_ur' => $topic->name_ur,
+                    'status' => $topic->status,
+                    'questions_count' => $topic->questions_count,
+                ])
+                ->values(),
+        ];
     }
 
     private function chapterFormOptions(bool $includeInactive = false): Collection
@@ -634,10 +783,10 @@ class QuestionController extends Controller
             ],
             'topic' => $question->topic
                 ? [
-                'id' => $question->topic->id,
-                'name' => $question->topic->name,
-                'name_ur' => $question->topic->name_ur,
-            ]
+                    'id' => $question->topic->id,
+                    'name' => $question->topic->name,
+                    'name_ur' => $question->topic->name_ur,
+                ]
                 : null,
             'options_count' => $metrics['options_count'],
             'correct_options_count' => $metrics['correct_options_count'],

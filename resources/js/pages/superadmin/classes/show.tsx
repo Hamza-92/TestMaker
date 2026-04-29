@@ -150,7 +150,7 @@ export default function ShowClass({ schoolClass }: { schoolClass: ClassData }) {
                         </div>
                     </div>
 
-                    <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                    {/* <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                         <div className="p-5 text-center">
                             <p className="text-muted-foreground text-xs">Patterns</p>
                             <p className="mt-1 font-semibold">{schoolClass.patterns.length}</p>
@@ -163,7 +163,7 @@ export default function ShowClass({ schoolClass }: { schoolClass: ClassData }) {
                             <p className="text-muted-foreground text-xs">Status</p>
                             <p className="mt-1 font-semibold">{schoolClass.status === 1 ? 'Active' : 'Inactive'}</p>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* ── Linked Patterns ──────────────────────────────────────── */}

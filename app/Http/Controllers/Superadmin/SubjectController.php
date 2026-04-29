@@ -32,7 +32,10 @@ class SubjectController extends Controller
     {
         $chaptersWith = ['schoolClass:id,name', 'pattern:id,name,short_name'];
         if ($subject->subject_type === 'topic-wise') {
-            $chaptersWith['topics'] = fn ($q) => $q->orderBy('sort_id')->orderBy('name');
+            $chaptersWith['topics'] = fn ($q) => $q
+                ->withCount('questions')
+                ->orderBy('sort_id')
+                ->orderBy('name');
         }
 
         $subject->load([
@@ -40,6 +43,7 @@ class SubjectController extends Controller
             'classSubjects.pattern:id,name,short_name',
             'auditLogs.changedBy:id,name',
             'chapters' => fn ($q) => $q->with($chaptersWith)
+                ->withCount('questions')
                 ->orderBy('pattern_id')->orderBy('class_id')
                 ->orderBy('chapter_number')->orderBy('sort_id'),
         ]);
@@ -53,40 +57,42 @@ class SubjectController extends Controller
             ->values();
 
         $chapters = $subject->chapters->map(fn ($ch) => [
-            'id'             => $ch->id,
-            'name'           => $ch->name,
-            'name_ur'        => $ch->name_ur,
+            'id' => $ch->id,
+            'name' => $ch->name,
+            'name_ur' => $ch->name_ur,
             'chapter_number' => $ch->chapter_number,
-            'sort_id'        => $ch->sort_id,
-            'status'         => $ch->status,
-            'class_id'       => $ch->class_id,
-            'pattern_id'     => $ch->pattern_id,
-            'class'          => $ch->schoolClass ? ['id' => $ch->schoolClass->id, 'name' => $ch->schoolClass->name] : null,
-            'pattern'        => $ch->pattern    ? ['id' => $ch->pattern->id,    'name' => $ch->pattern->name]    : null,
-            'topics'         => $subject->subject_type === 'topic-wise'
+            'sort_id' => $ch->sort_id,
+            'status' => $ch->status,
+            'questions_count' => $ch->questions_count,
+            'class_id' => $ch->class_id,
+            'pattern_id' => $ch->pattern_id,
+            'class' => $ch->schoolClass ? ['id' => $ch->schoolClass->id, 'name' => $ch->schoolClass->name] : null,
+            'pattern' => $ch->pattern ? ['id' => $ch->pattern->id,    'name' => $ch->pattern->name] : null,
+            'topics' => $subject->subject_type === 'topic-wise'
                 ? $ch->topics->map(fn ($t) => [
-                    'id'      => $t->id,
-                    'name'    => $t->name,
+                    'id' => $t->id,
+                    'name' => $t->name,
                     'name_ur' => $t->name_ur,
                     'sort_id' => $t->sort_id,
-                    'status'  => $t->status,
+                    'status' => $t->status,
+                    'questions_count' => $t->questions_count,
                 ])->values()
                 : [],
         ])->values();
 
         return Inertia::render('superadmin/subjects/show', [
             'subject' => [
-                'id'               => $subject->id,
-                'name_eng'         => $subject->name_eng,
-                'name_ur'          => $subject->name_ur,
-                'subject_type'     => $subject->subject_type,
-                'status'           => $subject->status,
-                'created_at'       => $subject->created_at?->toISOString(),
+                'id' => $subject->id,
+                'name_eng' => $subject->name_eng,
+                'name_ur' => $subject->name_ur,
+                'subject_type' => $subject->subject_type,
+                'status' => $subject->status,
+                'created_at' => $subject->created_at?->toISOString(),
                 'links_by_pattern' => $linksByPattern,
-                'chapters'         => $chapters,
-                'audit_logs'       => $subject->auditLogs->map(fn ($log) => [
-                    'id'         => $log->id,
-                    'event'      => $log->event?->value,
+                'chapters' => $chapters,
+                'audit_logs' => $subject->auditLogs->map(fn ($log) => [
+                    'id' => $log->id,
+                    'event' => $log->event?->value,
                     'old_values' => $log->old_values ?? [],
                     'new_values' => $log->new_values ?? [],
                     'changed_by' => $log->changedBy?->name ?? 'System',
@@ -113,34 +119,34 @@ class SubjectController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name_eng'              => ['required', 'string', 'max:100', 'unique:subjects,name_eng'],
-            'name_ur'               => ['nullable', 'string', 'max:100'],
-            'subject_type'          => ['required', 'in:chapter-wise,topic-wise'],
-            'status'                => ['required', 'boolean'],
-            'links'                 => ['array'],
-            'links.*.class_id'      => ['required', 'integer', 'exists:classes,id'],
-            'links.*.pattern_id'    => ['required', 'integer', 'exists:patterns,id'],
+            'name_eng' => ['required', 'string', 'max:100', 'unique:subjects,name_eng'],
+            'name_ur' => ['nullable', 'string', 'max:100'],
+            'subject_type' => ['required', 'in:chapter-wise,topic-wise'],
+            'status' => ['required', 'boolean'],
+            'links' => ['array'],
+            'links.*.class_id' => ['required', 'integer', 'exists:classes,id'],
+            'links.*.pattern_id' => ['required', 'integer', 'exists:patterns,id'],
         ]);
 
         $subject = Subject::create([
-            'name_eng'     => $validated['name_eng'],
-            'name_ur'      => $validated['name_ur'] ?? null,
+            'name_eng' => $validated['name_eng'],
+            'name_ur' => $validated['name_ur'] ?? null,
             'subject_type' => $validated['subject_type'],
-            'status'       => $validated['status'],
-            'created_by'   => auth()->id(),
+            'status' => $validated['status'],
+            'created_by' => auth()->id(),
         ]);
 
         $this->syncLinks($subject, $validated['links'] ?? []);
 
         AuditLog::record(
-            model:     $subject,
-            event:     AuditEvent::Created,
+            model: $subject,
+            event: AuditEvent::Created,
             newValues: [
-                'name_eng'     => $subject->name_eng,
-                'name_ur'      => $subject->name_ur,
+                'name_eng' => $subject->name_eng,
+                'name_ur' => $subject->name_ur,
                 'subject_type' => $subject->subject_type,
-                'status'       => $subject->status,
-                'links'        => $validated['links'] ?? [],
+                'status' => $subject->status,
+                'links' => $validated['links'] ?? [],
             ],
             notes: 'Subject created.',
         );
@@ -163,8 +169,8 @@ class SubjectController extends Controller
             ->map(fn ($cs) => ['class_id' => $cs->class_id, 'pattern_id' => $cs->pattern_id]);
 
         return Inertia::render('superadmin/subjects/edit', [
-            'subject'       => $subject->only(['id', 'name_eng', 'name_ur', 'subject_type', 'status']),
-            'patterns'      => $patterns,
+            'subject' => $subject->only(['id', 'name_eng', 'name_ur', 'subject_type', 'status']),
+            'patterns' => $patterns,
             'existingLinks' => $existingLinks,
         ]);
     }
@@ -172,31 +178,31 @@ class SubjectController extends Controller
     public function update(Request $request, Subject $subject)
     {
         $validated = $request->validate([
-            'name_eng'              => ['required', 'string', 'max:100', Rule::unique('subjects', 'name_eng')->ignore($subject->id)],
-            'name_ur'               => ['nullable', 'string', 'max:100'],
-            'subject_type'          => ['required', 'in:chapter-wise,topic-wise'],
-            'status'                => ['required', 'boolean'],
-            'links'                 => ['array'],
-            'links.*.class_id'      => ['required', 'integer', 'exists:classes,id'],
-            'links.*.pattern_id'    => ['required', 'integer', 'exists:patterns,id'],
+            'name_eng' => ['required', 'string', 'max:100', Rule::unique('subjects', 'name_eng')->ignore($subject->id)],
+            'name_ur' => ['nullable', 'string', 'max:100'],
+            'subject_type' => ['required', 'in:chapter-wise,topic-wise'],
+            'status' => ['required', 'boolean'],
+            'links' => ['array'],
+            'links.*.class_id' => ['required', 'integer', 'exists:classes,id'],
+            'links.*.pattern_id' => ['required', 'integer', 'exists:patterns,id'],
         ]);
 
         $oldValues = $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']);
         $subject->update([
-            'name_eng'     => $validated['name_eng'],
-            'name_ur'      => $validated['name_ur'] ?? null,
+            'name_eng' => $validated['name_eng'],
+            'name_ur' => $validated['name_ur'] ?? null,
             'subject_type' => $validated['subject_type'],
-            'status'       => $validated['status'],
+            'status' => $validated['status'],
         ]);
 
         $this->syncLinks($subject, $validated['links'] ?? []);
 
         AuditLog::record(
-            model:     $subject,
-            event:     AuditEvent::Updated,
+            model: $subject,
+            event: AuditEvent::Updated,
             oldValues: $oldValues,
             newValues: $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']),
-            notes:     'Subject updated.',
+            notes: 'Subject updated.',
         );
 
         return redirect()->route('superadmin.subjects.show', $subject)
@@ -206,10 +212,10 @@ class SubjectController extends Controller
     public function destroy(Subject $subject)
     {
         AuditLog::record(
-            model:     $subject,
-            event:     AuditEvent::Deleted,
+            model: $subject,
+            event: AuditEvent::Deleted,
             oldValues: ['name_eng' => $subject->name_eng],
-            notes:     'Subject deleted.',
+            notes: 'Subject deleted.',
         );
 
         $subject->delete();
@@ -229,7 +235,7 @@ class SubjectController extends Controller
         foreach ($rows as $link) {
             ClassSubject::create([
                 'subject_id' => $subject->id,
-                'class_id'   => $link['class_id'],
+                'class_id' => $link['class_id'],
                 'pattern_id' => $link['pattern_id'],
             ]);
         }

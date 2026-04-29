@@ -132,7 +132,7 @@ export default function ShowPattern({ pattern }: { pattern: PatternData }) {
                     </div>
 
                     <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                        <div className="p-5 text-center">
+                        {/* <div className="p-5 text-center">
                             <p className="text-muted-foreground text-xs">Short Name</p>
                             <p className="mt-1 font-semibold">{pattern.short_name ?? <span className="text-muted-foreground italic text-sm font-normal">—</span>}</p>
                         </div>
@@ -143,7 +143,7 @@ export default function ShowPattern({ pattern }: { pattern: PatternData }) {
                         <div className="p-5 text-center">
                             <p className="text-muted-foreground text-xs">Status</p>
                             <p className="mt-1 font-semibold">{pattern.status === 1 ? 'Active' : 'Inactive'}</p>
-                        </div>
+                        </div> */}
                     </div>
                 </div>
 

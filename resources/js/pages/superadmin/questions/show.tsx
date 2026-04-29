@@ -219,7 +219,10 @@ function TextPanel({
 }) {
     return (
         <div className="space-y-4 rounded-xl border p-5 shadow-sm md:p-6">
-            <SectionHeader icon={<SparklesIcon className="size-4" />} title={title} />
+            <SectionHeader
+                icon={<SparklesIcon className="size-4" />}
+                title={title}
+            />
             <Separator />
             <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border p-4">
@@ -248,7 +251,9 @@ function AuditLogCard({ log }: { log: AuditLogEntry }) {
         <div className="rounded-xl border p-4">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <span className={`inline-block size-2 rounded-full ${dotClass}`} />
+                    <span
+                        className={`inline-block size-2 rounded-full ${dotClass}`}
+                    />
                     <p className="font-medium">{label}</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -296,7 +301,9 @@ function renderContent(question: QuestionData) {
                                         ) : null}
                                     </div>
                                     <p className="text-sm whitespace-pre-wrap">
-                                        {option.text_en || option.text_ur || '-'}
+                                        {option.text_en ||
+                                            option.text_ur ||
+                                            '-'}
                                     </p>
                                 </div>
                             ))}
@@ -477,7 +484,9 @@ function renderContent(question: QuestionData) {
                                             Left
                                         </p>
                                         <p className="mt-1 text-sm whitespace-pre-wrap">
-                                            {pair.left_en || pair.left_ur || '-'}
+                                            {pair.left_en ||
+                                                pair.left_ur ||
+                                                '-'}
                                         </p>
                                     </div>
                                     <div>
@@ -485,7 +494,9 @@ function renderContent(question: QuestionData) {
                                             Right
                                         </p>
                                         <p className="mt-1 text-sm whitespace-pre-wrap">
-                                            {pair.right_en || pair.right_ur || '-'}
+                                            {pair.right_en ||
+                                                pair.right_ur ||
+                                                '-'}
                                         </p>
                                     </div>
                                 </div>
@@ -520,6 +531,8 @@ function renderContent(question: QuestionData) {
 }
 
 export default function ShowQuestion({ question }: { question: QuestionData }) {
+    const chapterQuestionsHref = `/superadmin/subjects/${question.chapter.subject.id}/chapters/${question.chapter.id}/questions`;
+
     return (
         <>
             <Head title={`Question #${question.id}`} />
@@ -528,14 +541,15 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
                         <Link
-                            href="/superadmin/questions"
+                            href={chapterQuestionsHref}
                             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
                         >
                             <ArrowLeftIcon className="size-4" />
                         </Link>
                         <div>
                             <h1 className="h1-semibold">
-                                {question.summary_text || `Question #${question.id}`}
+                                {question.summary_text ||
+                                    `Question #${question.id}`}
                             </h1>
                             <p className="text-sm text-muted-foreground">
                                 {question.question_type.name}
@@ -605,7 +619,9 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                                 Source
                             </p>
                             <p className="mt-1 font-semibold">
-                                {question.source_label || question.source || '-'}
+                                {question.source_label ||
+                                    question.source ||
+                                    '-'}
                             </p>
                         </div>
                         <div className="p-5 text-center">
