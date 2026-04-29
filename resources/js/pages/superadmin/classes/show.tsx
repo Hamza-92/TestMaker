@@ -97,10 +97,22 @@ function SectionHeader({ icon, title, description }: { icon: React.ReactNode; ti
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-export default function ShowClass({ schoolClass }: { schoolClass: ClassData }) {
-    const totalSubjects = schoolClass.subjects_by_pattern.reduce((sum, g) => sum + g.subjects.length, 0);
+interface ScopedPattern {
+    id: number;
+    name: string;
+    short_name: string | null;
+}
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function ShowClass({
+    schoolClass,
+    backHref = '/superadmin/classes',
+    scopedPattern = null,
+}: {
+    schoolClass: ClassData;
+    backHref?: string;
+    scopedPattern?: ScopedPattern | null;
+}) {
     return (
         <>
             <Head title={schoolClass.name} />
@@ -109,12 +121,16 @@ export default function ShowClass({ schoolClass }: { schoolClass: ClassData }) {
                 {/* ── Header ──────────────────────────────────────────────── */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/superadmin/classes" className="hover:bg-accent border-input flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors">
+                        <Link href={backHref} className="hover:bg-accent border-input flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors">
                             <ArrowLeftIcon className="size-4" />
                         </Link>
                         <div>
                             <h1 className="h1-semibold">{schoolClass.name}</h1>
-                            <p className="text-muted-foreground text-sm">Class details</p>
+                            <p className="text-muted-foreground text-sm">
+                                {scopedPattern
+                                    ? <>Viewing within <span className="font-medium">{scopedPattern.name}</span></>
+                                    : 'Class details'}
+                            </p>
                         </div>
                     </div>
                     <Button asChild variant="outline" className="sm:shrink-0">

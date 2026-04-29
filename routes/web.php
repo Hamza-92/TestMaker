@@ -48,6 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('superadmin/patterns/add', [PatternController::class, 'create'])->name('superadmin.patterns.add');
     Route::post('superadmin/patterns', [PatternController::class, 'store'])->name('superadmin.patterns.store');
     Route::get('superadmin/patterns/{pattern}', [PatternController::class, 'show'])->name('superadmin.patterns.show');
+    Route::get('superadmin/patterns/{pattern}/classes/{class}', [PatternController::class, 'showClass'])->name('superadmin.patterns.classes.show');
     Route::get('superadmin/patterns/{pattern}/edit', [PatternController::class, 'edit'])->name('superadmin.patterns.edit');
     Route::put('superadmin/patterns/{pattern}', [PatternController::class, 'update'])->name('superadmin.patterns.update');
     Route::delete('superadmin/patterns/{pattern}', [PatternController::class, 'destroy'])->name('superadmin.patterns.destroy');

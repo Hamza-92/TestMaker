@@ -6,6 +6,7 @@ use App\Enums\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Pattern;
+use App\Models\SchoolClass;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -115,6 +116,50 @@ class PatternController extends Controller
 
         return redirect()->route('superadmin.patterns.show', $pattern)
             ->with('success', 'Pattern updated successfully.');
+    }
+
+    public function showClass(Pattern $pattern, SchoolClass $class)
+    {
+        $class->load([
+            'patterns:id,name,short_name,status',
+            'classSubjects' => fn ($q) => $q->where('pattern_id', $pattern->id),
+            'classSubjects.subject:id,name_eng,name_ur,subject_type,status',
+            'classSubjects.pattern:id,name,short_name',
+            'auditLogs.changedBy:id,name',
+        ]);
+
+        $subjectsByPattern = $class->classSubjects
+            ->groupBy('pattern_id')
+            ->map(fn ($items) => [
+                'pattern'  => $items->first()->pattern,
+                'subjects' => $items->map(fn ($cs) => $cs->subject)->filter()->values(),
+            ])
+            ->values();
+
+        return Inertia::render('superadmin/classes/show', [
+            'schoolClass' => [
+                'id'                  => $class->id,
+                'name'                => $class->name,
+                'status'              => $class->status,
+                'created_at'          => $class->created_at?->toISOString(),
+                'patterns'            => $class->patterns,
+                'subjects_by_pattern' => $subjectsByPattern,
+                'audit_logs'          => $class->auditLogs->map(fn ($log) => [
+                    'id'         => $log->id,
+                    'event'      => $log->event?->value,
+                    'old_values' => $log->old_values ?? [],
+                    'new_values' => $log->new_values ?? [],
+                    'changed_by' => $log->changedBy?->name ?? 'System',
+                    'created_at' => $log->created_at?->toISOString(),
+                ]),
+            ],
+            'backHref'      => "/superadmin/patterns/{$pattern->id}",
+            'scopedPattern' => [
+                'id'         => $pattern->id,
+                'name'       => $pattern->name,
+                'short_name' => $pattern->short_name,
+            ],
+        ]);
     }
 
     public function destroy(Pattern $pattern)

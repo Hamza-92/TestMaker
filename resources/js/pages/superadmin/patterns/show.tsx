@@ -167,7 +167,7 @@ export default function ShowPattern({ pattern }: { pattern: PatternData }) {
                             {pattern.classes.map((cls) => (
                                 <Link
                                     key={cls.id}
-                                    href={`/superadmin/classes/${cls.id}`}
+                                    href={`/superadmin/patterns/${pattern.id}/classes/${cls.id}`}
                                     className="hover:bg-muted/50 flex items-center justify-between rounded-lg border px-4 py-3 transition-colors"
                                 >
                                     <span className="text-sm font-medium">{cls.name}</span>
