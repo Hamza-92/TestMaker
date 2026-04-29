@@ -133,16 +133,24 @@ function patternLabel(pattern: ChapterContext['pattern']) {
         : pattern.name;
 }
 
+interface ScopedTopic {
+    id: number;
+    name: string;
+    name_ur: string | null;
+}
+
 export default function ChapterQuestions({
     chapter,
     questions,
     questionTypes,
     sourceOptions,
+    scopedTopic = null,
 }: {
     chapter: ChapterContext;
     questions: QuestionRow[];
     questionTypes: QuestionTypeOption[];
     sourceOptions: SourceOption[];
+    scopedTopic?: ScopedTopic | null;
 }) {
     const [search, setSearch] = useState('');
     const [topicFilter, setTopicFilter] = useState('all');
@@ -155,8 +163,14 @@ export default function ChapterQuestions({
     const [deleting, setDeleting] = useState(false);
 
     const baseHref = `/superadmin/subjects/${chapter.subject.id}/chapters/${chapter.id}/questions`;
-    const addHref = `${baseHref}/add`;
-    const importHref = `${baseHref}/import`;
+    const topicBase = scopedTopic
+        ? `/superadmin/subjects/${chapter.subject.id}/chapters/${chapter.id}/topics/${scopedTopic.id}/questions`
+        : null;
+    const addHref = topicBase ? `${topicBase}/add` : `${baseHref}/add`;
+    const importHref = scopedTopic
+        ? `${baseHref}/import?topic_id=${scopedTopic.id}`
+        : `${baseHref}/import`;
+    const isTopicWise = chapter.subject.subject_type === 'topic-wise';
 
     const typeOptions = useMemo(() => {
         const availableIds = new Set(
@@ -230,7 +244,7 @@ export default function ChapterQuestions({
 
     const hasActiveFilters =
         search.trim() !== '' ||
-        topicFilter !== 'all' ||
+        (!scopedTopic && topicFilter !== 'all') ||
         typeFilter !== 'all' ||
         sourceFilter !== 'all' ||
         statusFilter !== 'all';
@@ -284,7 +298,7 @@ export default function ChapterQuestions({
                         </Link>
                         <div className="min-w-0">
                             <h1 className="truncate text-lg font-semibold">
-                                {chapterTitle(chapter)}
+                                {scopedTopic ? scopedTopic.name : chapterTitle(chapter)}
                             </h1>
                             <div className="mt-1 flex flex-wrap gap-1.5">
                                 <Badge variant="outline" className="bg-muted">
@@ -296,8 +310,13 @@ export default function ChapterQuestions({
                                 <Badge variant="outline" className="bg-muted">
                                     {patternLabel(chapter.pattern)}
                                 </Badge>
+                                {scopedTopic ? (
+                                    <Badge variant="outline" className="bg-muted">
+                                        {chapterTitle(chapter)}
+                                    </Badge>
+                                ) : null}
                                 <Badge variant="outline" className="bg-muted">
-                                    {questions.length} questions
+                                    {questions.length} question{questions.length !== 1 ? 's' : ''}
                                 </Badge>
                             </div>
                         </div>
@@ -320,7 +339,7 @@ export default function ChapterQuestions({
                 </div>
 
                 <div className="rounded-lg border p-3">
-                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_10rem_11rem_10rem_8rem_auto_auto]">
+                    <div className={`grid gap-2 md:grid-cols-2 ${isTopicWise && !scopedTopic ? 'xl:grid-cols-[minmax(220px,1fr)_10rem_11rem_10rem_8rem_auto_auto]' : 'xl:grid-cols-[minmax(220px,1fr)_11rem_10rem_8rem_auto_auto]'}`}>
                         <div className="relative min-w-0">
                             <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -334,7 +353,7 @@ export default function ChapterQuestions({
                             />
                         </div>
 
-                        {chapter.subject.subject_type === 'topic-wise' ? (
+                        {isTopicWise && !scopedTopic ? (
                             <Select
                                 value={topicFilter}
                                 onValueChange={(value) => {
@@ -346,22 +365,15 @@ export default function ChapterQuestions({
                                     <SelectValue placeholder="Topic" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">
-                                        All topics
-                                    </SelectItem>
+                                    <SelectItem value="all">All topics</SelectItem>
                                     {chapter.topics.map((topic) => (
-                                        <SelectItem
-                                            key={topic.id}
-                                            value={String(topic.id)}
-                                        >
+                                        <SelectItem key={topic.id} value={String(topic.id)}>
                                             {topic.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                        ) : (
-                            <div className="hidden xl:block" />
-                        )}
+                        ) : null}
 
                         <Select
                             value={typeFilter}
@@ -473,8 +485,7 @@ export default function ChapterQuestions({
                                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">
                                         Type
                                     </th>
-                                    {chapter.subject.subject_type ===
-                                    'topic-wise' ? (
+                                    {isTopicWise && !scopedTopic ? (
                                         <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">
                                             Topic
                                         </th>
@@ -492,12 +503,7 @@ export default function ChapterQuestions({
                                 {paginated.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={
-                                                chapter.subject.subject_type ===
-                                                'topic-wise'
-                                                    ? 6
-                                                    : 5
-                                            }
+                                            colSpan={isTopicWise && !scopedTopic ? 6 : 5}
                                             className="py-12 text-center text-muted-foreground"
                                         >
                                             No questions found
@@ -519,11 +525,9 @@ export default function ChapterQuestions({
                                             <td className="px-3 py-2.5">
                                                 {question.question_type.name}
                                             </td>
-                                            {chapter.subject.subject_type ===
-                                            'topic-wise' ? (
+                                            {isTopicWise && !scopedTopic ? (
                                                 <td className="px-3 py-2.5 text-muted-foreground">
-                                                    {question.topic?.name ??
-                                                        '-'}
+                                                    {question.topic?.name ?? '-'}
                                                 </td>
                                             ) : null}
                                             <td className="px-3 py-2.5 text-muted-foreground">

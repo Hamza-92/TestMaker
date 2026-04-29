@@ -80,6 +80,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions', [QuestionController::class, 'chapterIndex'])->name('superadmin.subjects.chapters.questions');
     Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions/add', [QuestionController::class, 'createForChapter'])->name('superadmin.subjects.chapters.questions.add');
     Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions/import', [QuestionController::class, 'importForChapter'])->name('superadmin.subjects.chapters.questions.import');
+    Route::get('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}/questions', [QuestionController::class, 'topicIndex'])->name('superadmin.subjects.chapters.topics.questions');
+    Route::get('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}/questions/add', [QuestionController::class, 'createForTopic'])->name('superadmin.subjects.chapters.topics.questions.add');
 
     Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types');
     Route::get('superadmin/question-types/add', [QuestionTypeController::class, 'create'])->name('superadmin.question-types.add');

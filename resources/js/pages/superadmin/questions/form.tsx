@@ -5,10 +5,9 @@ import {
     CheckCircle2Icon,
     CirclePlusIcon,
     FileQuestionIcon,
-    ScrollTextIcon,
     Trash2Icon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -144,27 +143,42 @@ interface QuestionFormProps {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     secondarySubmitLabel?: string;
     lockedChapterId?: number | null;
+    lockedTopicId?: number | null;
 }
 
-interface PatternFilterOption {
-    id: number;
-    name: string;
-    short_name: string | null;
-}
-
-interface ClassFilterOption {
-    id: number;
-    name: string;
-}
-
-interface SubjectFilterOption {
-    id: number;
-    name_eng: string;
-    name_ur: string | null;
-}
 
 const textareaClassName =
-    'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex min-h-[108px] w-full rounded-xl border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]';
+    'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-xl border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] resize-none overflow-hidden';
+
+function AutoTextarea({
+    value,
+    onChange,
+    dir,
+}: {
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    dir?: string;
+}) {
+    const ref = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    }, [value]);
+
+    return (
+        <textarea
+            ref={ref}
+            rows={1}
+            value={value}
+            onChange={onChange}
+            dir={dir}
+            className={textareaClassName}
+        />
+    );
+}
 
 function createEmptyOption(): QuestionOptionFormData {
     return {
@@ -308,9 +322,12 @@ export function QuestionForm({
     onSubmit,
     secondarySubmitLabel,
     lockedChapterId,
+    lockedTopicId,
 }: QuestionFormProps) {
     const isChapterLocked =
         lockedChapterId !== null && lockedChapterId !== undefined;
+    const isTopicLocked =
+        lockedTopicId !== null && lockedTopicId !== undefined;
     const selectedType = useMemo(
         () =>
             questionTypes.find(
@@ -327,104 +344,8 @@ export function QuestionForm({
         [chapters, form.data.chapter_id],
     );
 
-    const [patternFilter, setPatternFilter] = useState(() =>
-        selectedChapter ? String(selectedChapter.pattern.id) : 'all',
-    );
-    const [classFilter, setClassFilter] = useState(() =>
-        selectedChapter ? String(selectedChapter.class.id) : 'all',
-    );
-    const [subjectFilter, setSubjectFilter] = useState(() =>
-        selectedChapter ? String(selectedChapter.subject.id) : 'all',
-    );
     const [lastSchemaKey, setLastSchemaKey] = useState(
         selectedType?.schema_key ?? '',
-    );
-
-    const patternOptions = useMemo(() => {
-        const patterns = new Map<number, PatternFilterOption>();
-
-        chapters.forEach((chapter) => {
-            if (patterns.has(chapter.pattern.id)) {
-                return;
-            }
-
-            patterns.set(chapter.pattern.id, {
-                id: chapter.pattern.id,
-                name: chapter.pattern.name,
-                short_name: chapter.pattern.short_name,
-            });
-        });
-
-        return Array.from(patterns.values()).sort((left, right) =>
-            left.name.localeCompare(right.name),
-        );
-    }, [chapters]);
-
-    const classOptions = useMemo(() => {
-        const classes = new Map<number, ClassFilterOption>();
-
-        chapters
-            .filter(
-                (chapter) =>
-                    patternFilter === 'all' ||
-                    String(chapter.pattern.id) === patternFilter,
-            )
-            .forEach((chapter) => {
-                if (classes.has(chapter.class.id)) {
-                    return;
-                }
-
-                classes.set(chapter.class.id, {
-                    id: chapter.class.id,
-                    name: chapter.class.name,
-                });
-            });
-
-        return Array.from(classes.values()).sort((left, right) =>
-            left.name.localeCompare(right.name),
-        );
-    }, [chapters, patternFilter]);
-
-    const subjectOptions = useMemo(() => {
-        const subjects = new Map<number, SubjectFilterOption>();
-
-        chapters
-            .filter(
-                (chapter) =>
-                    (patternFilter === 'all' ||
-                        String(chapter.pattern.id) === patternFilter) &&
-                    (classFilter === 'all' ||
-                        String(chapter.class.id) === classFilter),
-            )
-            .forEach((chapter) => {
-                if (subjects.has(chapter.subject.id)) {
-                    return;
-                }
-
-                subjects.set(chapter.subject.id, {
-                    id: chapter.subject.id,
-                    name_eng: chapter.subject.name_eng,
-                    name_ur: chapter.subject.name_ur,
-                });
-            });
-
-        return Array.from(subjects.values()).sort((left, right) =>
-            left.name_eng.localeCompare(right.name_eng),
-        );
-    }, [chapters, classFilter, patternFilter]);
-
-    const filteredChapters = useMemo(
-        () =>
-            chapters.filter(
-                (chapter) =>
-                    (patternFilter === 'all' ||
-                        String(chapter.pattern.id) === patternFilter) &&
-                    (classFilter === 'all' ||
-                        String(chapter.class.id) === classFilter) &&
-                    (subjectFilter === 'all' ||
-                        String(chapter.subject.id) === subjectFilter),
-            ),
-        [chapters, classFilter, patternFilter, subjectFilter],
     );
 
     const usesTopicSelection =
@@ -462,41 +383,6 @@ export function QuestionForm({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableTopics, form.data.chapter_id, usesTopicSelection]);
-
-    useEffect(() => {
-        if (
-            classFilter !== 'all' &&
-            !classOptions.some(
-                (schoolClass) => String(schoolClass.id) === classFilter,
-            )
-        ) {
-            setClassFilter('all');
-        }
-    }, [classFilter, classOptions]);
-
-    useEffect(() => {
-        if (
-            subjectFilter !== 'all' &&
-            !subjectOptions.some(
-                (subject) => String(subject.id) === subjectFilter,
-            )
-        ) {
-            setSubjectFilter('all');
-        }
-    }, [subjectFilter, subjectOptions]);
-
-    useEffect(() => {
-        if (
-            selectedChapter &&
-            !filteredChapters.some(
-                (chapter) => chapter.id === selectedChapter.id,
-            )
-        ) {
-            form.setData('chapter_id', '');
-            form.setData('topic_id', '');
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filteredChapters, selectedChapter]);
 
     const errorFor = (path: string) =>
         form.errors[path as keyof typeof form.errors] as string | undefined;
@@ -680,7 +566,7 @@ export function QuestionForm({
         control: 'textarea' | 'input' = 'textarea',
     ) => (
         <BuilderCard title={title}>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                     label="English"
                     required={required}
@@ -694,13 +580,11 @@ export function QuestionForm({
                             }
                         />
                     ) : (
-                        <textarea
-                            rows={4}
+                        <AutoTextarea
                             value={String(form.data.content[englishKey] ?? '')}
                             onChange={(event) =>
                                 setContentValue(englishKey, event.target.value)
                             }
-                            className={textareaClassName}
                         />
                     )}
                 </Field>
@@ -718,14 +602,12 @@ export function QuestionForm({
                             }
                         />
                     ) : (
-                        <textarea
+                        <AutoTextarea
                             dir="rtl"
-                            rows={4}
                             value={String(form.data.content[urduKey] ?? '')}
                             onChange={(event) =>
                                 setContentValue(urduKey, event.target.value)
                             }
-                            className={textareaClassName}
                         />
                     )}
                 </Field>
@@ -785,7 +667,7 @@ export function QuestionForm({
                             </Button>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <Field
                                 label="English"
                                 error={errorFor(`${prefix}.${index}.text_en`)}
@@ -859,7 +741,7 @@ export function QuestionForm({
                             </Button>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <Field
                                 label="Question (English)"
                                 required
@@ -867,15 +749,13 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_en`,
                                 )}
                             >
-                                <textarea
-                                    rows={3}
+                                <AutoTextarea
                                     value={item.prompt_en}
                                     onChange={(event) =>
                                         updateItem(itemIndex, {
                                             prompt_en: event.target.value,
                                         })
                                     }
-                                    className={textareaClassName}
                                 />
                             </Field>
                             <Field
@@ -884,16 +764,14 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_ur`,
                                 )}
                             >
-                                <textarea
+                                <AutoTextarea
                                     dir="rtl"
-                                    rows={3}
                                     value={item.prompt_ur}
                                     onChange={(event) =>
                                         updateItem(itemIndex, {
                                             prompt_ur: event.target.value,
                                         })
                                     }
-                                    className={textareaClassName}
                                 />
                             </Field>
                         </div>
@@ -955,7 +833,7 @@ export function QuestionForm({
                             </Button>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <Field
                                 label="Prompt (English)"
                                 required
@@ -963,15 +841,13 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_en`,
                                 )}
                             >
-                                <textarea
-                                    rows={3}
+                                <AutoTextarea
                                     value={item.prompt_en}
                                     onChange={(event) =>
                                         updateItem(itemIndex, {
                                             prompt_en: event.target.value,
                                         })
                                     }
-                                    className={textareaClassName}
                                 />
                             </Field>
                             <Field
@@ -980,22 +856,20 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_ur`,
                                 )}
                             >
-                                <textarea
+                                <AutoTextarea
                                     dir="rtl"
-                                    rows={3}
                                     value={item.prompt_ur}
                                     onChange={(event) =>
                                         updateItem(itemIndex, {
                                             prompt_ur: event.target.value,
                                         })
                                     }
-                                    className={textareaClassName}
                                 />
                             </Field>
                         </div>
 
                         {selectedType?.have_answer ? (
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-4 sm:grid-cols-2">
                                 <Field
                                     label="Answer (English)"
                                     error={errorFor(
@@ -1070,7 +944,7 @@ export function QuestionForm({
                             </Button>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <Field
                                 label="Left (English)"
                                 error={errorFor(
@@ -1295,7 +1169,7 @@ export function QuestionForm({
     };
 
     return (
-        <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 p-4 md:p-6">
+        <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
             <div className="flex min-w-0 items-center gap-4">
                 <Link
                     href={backHref}
@@ -1303,17 +1177,16 @@ export function QuestionForm({
                 >
                     <ArrowLeftIcon className="size-4" />
                 </Link>
-                <div>
-                    <h1 className="h1-semibold">{title}</h1>
-                </div>
+                <h1 className="h1-semibold">{title}</h1>
             </div>
 
             <form onSubmit={onSubmit} className="w-full min-w-0 space-y-5">
                 <SectionCard
                     icon={<FileQuestionIcon className="size-4" />}
-                    title="Setup"
+                    title="Question"
                 >
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {/* ── Setup row ──────────────────────────────────────── */}
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <Field
                             label="Question Type"
                             required
@@ -1332,14 +1205,9 @@ export function QuestionForm({
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-80">
-                                    <SelectItem value="none">
-                                        Select type
-                                    </SelectItem>
+                                    <SelectItem value="none">Select type</SelectItem>
                                     {questionTypes.map((item) => (
-                                        <SelectItem
-                                            key={item.id}
-                                            value={String(item.id)}
-                                        >
+                                        <SelectItem key={item.id} value={String(item.id)}>
                                             {item.name}
                                         </SelectItem>
                                     ))}
@@ -1347,16 +1215,84 @@ export function QuestionForm({
                             </Select>
                         </Field>
 
-                        <Field
-                            label="Status"
-                            required
-                            error={form.errors.status}
-                        >
+                        {!isChapterLocked && (
+                            <Field label="Chapter" required error={form.errors.chapter_id}>
+                                <Select
+                                    value={form.data.chapter_id || 'none'}
+                                    disabled={chapters.length === 0}
+                                    onValueChange={(value) => {
+                                        form.setData('chapter_id', value === 'none' ? '' : value);
+                                        form.setData('topic_id', '');
+                                    }}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue
+                                            placeholder={chapters.length === 0 ? 'No chapters' : 'Select chapter'}
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-80">
+                                        <SelectItem value="none">Select chapter</SelectItem>
+                                        {chapters.map((chapter) => (
+                                            <SelectItem key={chapter.id} value={String(chapter.id)}>
+                                                {chapter.subject.name_eng} — {chapterTitle(chapter)} · {chapter.class.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+                        )}
+
+                        {usesTopicSelection && !isTopicLocked && (
+                            <Field label="Topic" error={form.errors.topic_id}>
+                                <Select
+                                    value={form.data.topic_id || 'none'}
+                                    disabled={availableTopics.length === 0}
+                                    onValueChange={(value) =>
+                                        form.setData('topic_id', value === 'none' ? '' : value)
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue
+                                            placeholder={availableTopics.length === 0 ? 'No topics' : 'Select topic'}
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        {availableTopics.map((topic) => (
+                                            <SelectItem key={topic.id} value={String(topic.id)}>
+                                                {topic.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+                        )}
+
+                        <Field label="Source" error={form.errors.source}>
+                            <Select
+                                value={form.data.source || 'none'}
+                                onValueChange={(value) =>
+                                    form.setData('source', value === 'none' ? '' : value)
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select source" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Select source</SelectItem>
+                                    {sourceOptions.map((source) => (
+                                        <SelectItem key={source.value} value={source.value}>
+                                            {source.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </Field>
+
+                        <Field label="Status" required error={form.errors.status}>
                             <Select
                                 value={form.data.status}
-                                onValueChange={(value) =>
-                                    form.setData('status', value)
-                                }
+                                onValueChange={(value) => form.setData('status', value)}
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
@@ -1367,241 +1303,16 @@ export function QuestionForm({
                                 </SelectContent>
                             </Select>
                         </Field>
-
-                        {isChapterLocked && selectedChapter ? (
-                            <div className="md:col-span-2 xl:col-span-3">
-                                <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-                                    <Badge
-                                        variant="outline"
-                                        className="bg-background"
-                                    >
-                                        {selectedChapter.subject.name_eng}
-                                    </Badge>
-                                    <Badge
-                                        variant="outline"
-                                        className="bg-background"
-                                    >
-                                        {selectedChapter.class.name}
-                                    </Badge>
-                                    <Badge
-                                        variant="outline"
-                                        className="bg-background"
-                                    >
-                                        {selectedChapter.pattern.short_name
-                                            ? `${selectedChapter.pattern.short_name} / ${selectedChapter.pattern.name}`
-                                            : selectedChapter.pattern.name}
-                                    </Badge>
-                                    <Badge
-                                        variant="outline"
-                                        className="bg-background"
-                                    >
-                                        {chapterTitle(selectedChapter)}
-                                    </Badge>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <Field label="Pattern">
-                                    <Select
-                                        value={patternFilter}
-                                        onValueChange={setPatternFilter}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="All patterns" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All patterns
-                                            </SelectItem>
-                                            {patternOptions.map((pattern) => (
-                                                <SelectItem
-                                                    key={pattern.id}
-                                                    value={String(pattern.id)}
-                                                >
-                                                    {pattern.short_name
-                                                        ? `${pattern.short_name} / ${pattern.name}`
-                                                        : pattern.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </Field>
-
-                                <Field label="Class">
-                                    <Select
-                                        value={classFilter}
-                                        onValueChange={setClassFilter}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="All classes" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All classes
-                                            </SelectItem>
-                                            {classOptions.map((schoolClass) => (
-                                                <SelectItem
-                                                    key={schoolClass.id}
-                                                    value={String(
-                                                        schoolClass.id,
-                                                    )}
-                                                >
-                                                    {schoolClass.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </Field>
-
-                                <Field label="Subject">
-                                    <Select
-                                        value={subjectFilter}
-                                        onValueChange={setSubjectFilter}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="All subjects" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All subjects
-                                            </SelectItem>
-                                            {subjectOptions.map((subject) => (
-                                                <SelectItem
-                                                    key={subject.id}
-                                                    value={String(subject.id)}
-                                                >
-                                                    {subject.name_eng}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </Field>
-
-                                <Field
-                                    label="Chapter"
-                                    required
-                                    error={form.errors.chapter_id}
-                                >
-                                    <Select
-                                        value={form.data.chapter_id || 'none'}
-                                        disabled={filteredChapters.length === 0}
-                                        onValueChange={(value) => {
-                                            const nextValue =
-                                                value === 'none' ? '' : value;
-                                            form.setData(
-                                                'chapter_id',
-                                                nextValue,
-                                            );
-                                            form.setData('topic_id', '');
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue
-                                                placeholder={
-                                                    filteredChapters.length ===
-                                                    0
-                                                        ? 'No chapters'
-                                                        : 'Select chapter'
-                                                }
-                                            />
-                                        </SelectTrigger>
-                                        <SelectContent className="max-h-80">
-                                            <SelectItem value="none">
-                                                Select chapter
-                                            </SelectItem>
-                                            {filteredChapters.map((chapter) => (
-                                                <SelectItem
-                                                    key={chapter.id}
-                                                    value={String(chapter.id)}
-                                                >
-                                                    {chapterTitle(chapter)}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </Field>
-                            </>
-                        )}
-
-                        {usesTopicSelection ? (
-                            <Field label="Topic" error={form.errors.topic_id}>
-                                <Select
-                                    value={form.data.topic_id || 'none'}
-                                    disabled={availableTopics.length === 0}
-                                    onValueChange={(value) =>
-                                        form.setData(
-                                            'topic_id',
-                                            value === 'none' ? '' : value,
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
-                                            placeholder={
-                                                availableTopics.length === 0
-                                                    ? 'No topics'
-                                                    : 'Select topic'
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">
-                                            None
-                                        </SelectItem>
-                                        {availableTopics.map((topic) => (
-                                            <SelectItem
-                                                key={topic.id}
-                                                value={String(topic.id)}
-                                            >
-                                                {topic.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        ) : null}
-
-                        <div className="md:col-span-2 xl:col-span-3">
-                            <Field label="Source" error={form.errors.source}>
-                                <Select
-                                    value={form.data.source || 'none'}
-                                    onValueChange={(value) =>
-                                        form.setData(
-                                            'source',
-                                            value === 'none' ? '' : value,
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select source" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">
-                                            Select source
-                                        </SelectItem>
-                                        {sourceOptions.map((source) => (
-                                            <SelectItem
-                                                key={source.value}
-                                                value={source.value}
-                                            >
-                                                {source.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        </div>
                     </div>
-                </SectionCard>
 
-                {selectedType ? (
-                    <SectionCard
-                        icon={<ScrollTextIcon className="size-4" />}
-                        title="Builder"
-                    >
-                        {renderSchemaBuilder()}
-                    </SectionCard>
-                ) : null}
+                    {/* ── Builder ────────────────────────────────────────── */}
+                    {selectedType && (
+                        <>
+                            <Separator />
+                            {renderSchemaBuilder()}
+                        </>
+                    )}
+                </SectionCard>
 
                 <div className="flex flex-col gap-3 pb-2 sm:flex-row sm:justify-end">
                     <Button asChild variant="outline">

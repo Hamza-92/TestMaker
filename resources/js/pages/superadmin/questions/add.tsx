@@ -81,6 +81,7 @@ export default function AddQuestion({
     defaultChapterId,
     defaultTopicId,
     lockedChapterId,
+    lockedTopicId,
     backHref = '/superadmin/questions',
 }: {
     questionTypes: QuestionTypeOption[];
@@ -89,20 +90,18 @@ export default function AddQuestion({
     defaultChapterId?: number | null;
     defaultTopicId?: number | null;
     lockedChapterId?: number | null;
+    lockedTopicId?: number | null;
     backHref?: string;
 }) {
     const sticky = loadSticky(questionTypes, chapters, sourceOptions);
 
     const scopedChapterId = lockedChapterId ?? defaultChapterId ?? null;
-    const scopedTopicId = defaultTopicId ?? null;
     const initialChapterId = scopedChapterId
         ? scopedChapterId.toString()
         : (sticky.chapter_id ?? '');
-    const initialTopicId = scopedTopicId
-        ? scopedTopicId.toString()
-        : scopedChapterId
-          ? ''
-          : (sticky.topic_id ?? '');
+    const initialTopicId = lockedTopicId
+        ? lockedTopicId.toString()
+        : (defaultTopicId?.toString() ?? (scopedChapterId ? '' : (sticky.topic_id ?? '')));
 
     const form = useForm<QuestionFormData>({
         question_type_id: sticky.question_type_id ?? '',
@@ -131,7 +130,9 @@ export default function AddQuestion({
             query.set('save_and_add_new', '1');
         }
 
-        if (lockedChapterId) {
+        if (lockedTopicId) {
+            query.set('topic_scoped', '1');
+        } else if (lockedChapterId) {
             query.set('chapter_scoped', '1');
         }
 
@@ -169,6 +170,7 @@ export default function AddQuestion({
                 onSubmit={handleSubmit}
                 secondarySubmitLabel="Save & Add New"
                 lockedChapterId={lockedChapterId}
+                lockedTopicId={lockedTopicId}
             />
         </>
     );

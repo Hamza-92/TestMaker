@@ -129,6 +129,57 @@ class QuestionController extends Controller
         ]);
     }
 
+    public function topicIndex(Subject $subject, Chapter $chapter, Topic $topic)
+    {
+        $this->ensureChapterBelongsToSubject($subject, $chapter);
+        abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
+
+        $questions = Question::query()
+            ->where('chapter_id', $chapter->id)
+            ->where('topic_id', $topic->id)
+            ->with([
+                'questionType.objectiveType:id,name',
+                'chapter.subject:id,name_eng,name_ur,subject_type',
+                'chapter.schoolClass:id,name',
+                'chapter.pattern:id,name,short_name',
+                'topic:id,name,name_ur,chapter_id',
+                'options',
+            ])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return Inertia::render('superadmin/questions/chapter', [
+            'chapter'      => $this->chapterContext($chapter),
+            'scopedTopic'  => [
+                'id'      => $topic->id,
+                'name'    => $topic->name,
+                'name_ur' => $topic->name_ur,
+            ],
+            'questions'     => $questions
+                ->map(fn (Question $question) => $this->transformQuestionListItem($question))
+                ->values(),
+            'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
+            'sourceOptions' => $this->sourceOptions(),
+        ]);
+    }
+
+    public function createForTopic(Request $request, Subject $subject, Chapter $chapter, Topic $topic)
+    {
+        $this->ensureChapterBelongsToSubject($subject, $chapter);
+        abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
+
+        return Inertia::render('superadmin/questions/add', [
+            'questionTypes'  => $this->questionTypeFormOptions(),
+            'chapters'       => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions'  => $this->sourceOptions(),
+            'defaultChapterId' => $chapter->id,
+            'defaultTopicId'   => $topic->id,
+            'lockedChapterId'  => $chapter->id,
+            'lockedTopicId'    => $topic->id,
+            'backHref' => route('superadmin.subjects.chapters.topics.questions', [$subject, $chapter, $topic], false),
+        ]);
+    }
+
     public function importForChapter(Request $request, Subject $subject, Chapter $chapter)
     {
         $this->ensureChapterBelongsToSubject($subject, $chapter);
@@ -284,6 +335,20 @@ class QuestionController extends Controller
         });
 
         if ($saveAndAddNew) {
+            if ($request->boolean('topic_scoped')) {
+                $topicId = $validated['topic_id'] ?? null;
+                $topic   = $topicId ? Topic::query()->find($topicId) : null;
+                if ($topic) {
+                    return redirect()
+                        ->route('superadmin.subjects.chapters.topics.questions.add', [
+                            'subject' => $chapter->subject_id,
+                            'chapter' => $chapter->id,
+                            'topic'   => $topic->id,
+                        ])
+                        ->with('success', 'Question created successfully.');
+                }
+            }
+
             if ($request->boolean('chapter_scoped')) {
                 return redirect()
                     ->route('superadmin.subjects.chapters.questions.add', [
