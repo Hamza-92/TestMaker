@@ -123,4 +123,10 @@ Route::get('/run-optimize-clear', function () {
     return Artisan::output();
 });
 
+Route::get('/run-optimize', function () {
+    Artisan::call('optimize:clear');
+
+    return Artisan::output();
+});
+
 require __DIR__.'/settings.php';
