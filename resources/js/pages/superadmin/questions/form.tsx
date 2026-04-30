@@ -21,7 +21,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
 
 export interface QuestionSchemaOption {
     key: string;
@@ -414,11 +413,7 @@ export function QuestionForm({
             'options',
             form.data.content.options.map((option, optionIndex) => ({
                 ...option,
-                is_correct: selectedType?.is_single
-                    ? optionIndex === index
-                    : optionIndex === index
-                      ? !option.is_correct
-                      : option.is_correct,
+                is_correct: optionIndex === index,
             })),
         );
     };
@@ -497,11 +492,7 @@ export function QuestionForm({
             options: form.data.content.items[itemIndex].options.map(
                 (option, currentIndex) => ({
                     ...option,
-                    is_correct: selectedType?.is_single
-                        ? currentIndex === optionIndex
-                        : currentIndex === optionIndex
-                          ? !option.is_correct
-                          : option.is_correct,
+                    is_correct: currentIndex === optionIndex,
                 }),
             ),
         });
@@ -630,84 +621,89 @@ export function QuestionForm({
         <BuilderCard
             title="Answer Options"
             actions={
-                <Button type="button" variant="outline" onClick={onAdd}>
+                <Button type="button" variant="outline" size="sm" onClick={onAdd}>
                     <CirclePlusIcon className="size-4" />
                     Add option
                 </Button>
             }
         >
-            <div className="space-y-4">
+            <div className="overflow-hidden rounded-xl border">
+                {/* Header */}
+                <div
+                    className="grid items-center border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground"
+                    style={{ gridTemplateColumns: '2rem 1fr 1fr 4.5rem 2rem' }}
+                >
+                    <span>#</span>
+                    <span>Option (English)</span>
+                    <span>Option (Urdu)</span>
+                    <span className="text-center">Correct</span>
+                    <span />
+                </div>
+
+                {/* Rows */}
                 {options.map((option, index) => (
                     <div
                         key={`${prefix}-${index}`}
-                        className="rounded-2xl border border-border/70 bg-muted/20 p-4"
+                        className={`grid items-start gap-2 px-3 py-2${index !== 0 ? ' border-t' : ''}`}
+                        style={{ gridTemplateColumns: '2rem 1fr 1fr 4.5rem 2rem' }}
                     >
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <Badge variant="outline">
-                                    Option {index + 1}
-                                </Badge>
-                                <div className="flex items-center gap-2 text-sm">
-                                    <span className="font-medium">Correct</span>
-                                    <Switch
-                                        checked={option.is_correct}
-                                        onCheckedChange={() =>
-                                            onToggleCorrect(index)
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onRemove(index)}
-                            >
-                                <Trash2Icon className="size-4" />
-                            </Button>
+                        <span className="pt-2 text-xs font-semibold text-muted-foreground">
+                            {String.fromCharCode(65 + index)}
+                        </span>
+
+                        <div className="min-w-0">
+                            <Input
+                                value={option.text_en}
+                                onChange={(event) =>
+                                    onOptionValue(index, 'text_en', event.target.value)
+                                }
+                            />
+                            {errorFor(`${prefix}.${index}.text_en`) && (
+                                <p className="mt-1 text-xs text-destructive">
+                                    {errorFor(`${prefix}.${index}.text_en`)}
+                                </p>
+                            )}
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field
-                                label="English"
-                                error={errorFor(`${prefix}.${index}.text_en`)}
-                            >
-                                <Input
-                                    value={option.text_en}
-                                    onChange={(event) =>
-                                        onOptionValue(
-                                            index,
-                                            'text_en',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <Field
-                                label="Urdu"
-                                error={errorFor(`${prefix}.${index}.text_ur`)}
-                            >
-                                <Input
-                                    dir="rtl"
-                                    value={option.text_ur}
-                                    onChange={(event) =>
-                                        onOptionValue(
-                                            index,
-                                            'text_ur',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
+                        <div className="min-w-0">
+                            <Input
+                                dir="rtl"
+                                value={option.text_ur}
+                                onChange={(event) =>
+                                    onOptionValue(index, 'text_ur', event.target.value)
+                                }
+                            />
+                            {errorFor(`${prefix}.${index}.text_ur`) && (
+                                <p className="mt-1 text-xs text-destructive">
+                                    {errorFor(`${prefix}.${index}.text_ur`)}
+                                </p>
+                            )}
                         </div>
+
+                        <div className="flex items-center justify-center pt-2.5">
+                            <input
+                                type="radio"
+                                name={prefix}
+                                checked={option.is_correct}
+                                onChange={() => onToggleCorrect(index)}
+                                className="size-4 cursor-pointer accent-primary"
+                            />
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => onRemove(index)}
+                            className="mt-1.5 rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
+                        >
+                            <Trash2Icon className="size-3.5" />
+                        </button>
                     </div>
                 ))}
-                {errorFor(prefix) ? (
-                    <p className="text-xs text-destructive">
-                        {errorFor(prefix)}
-                    </p>
-                ) : null}
             </div>
+
+            {errorFor(prefix) && (
+                <p className="text-xs text-destructive">{errorFor(prefix)}</p>
+            )}
         </BuilderCard>
     );
 
