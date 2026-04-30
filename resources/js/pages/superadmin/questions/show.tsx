@@ -82,6 +82,8 @@ interface QuestionData {
         name: string;
         name_ur: string | null;
         chapter_number: number | null;
+        group_name: string | null;
+        group_heading: string | null;
         subject: {
             id: number;
             name_eng: string;
@@ -199,10 +201,13 @@ function chapterLabel(chapter: QuestionData['chapter']) {
     const chapterPart = chapter.chapter_number
         ? `Chapter ${chapter.chapter_number}`
         : chapter.name;
+    const groupedChapter = chapter.group_name
+        ? `${chapter.group_name} / ${chapterPart}`
+        : chapterPart;
 
     return [
         chapter.subject.name_eng,
-        chapterPart,
+        groupedChapter,
         chapter.class.name,
         chapter.pattern.short_name ?? chapter.pattern.name,
     ].join(' / ');

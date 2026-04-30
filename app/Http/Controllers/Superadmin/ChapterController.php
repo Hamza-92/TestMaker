@@ -13,10 +13,12 @@ class ChapterController extends Controller
     public function store(Request $request, Subject $subject)
     {
         $validated = $request->validate([
-            'class_id'       => ['required', 'integer', 'exists:classes,id'],
-            'pattern_id'     => ['required', 'integer', 'exists:patterns,id'],
-            'name'           => ['required', 'string', 'max:150'],
-            'name_ur'        => ['nullable', 'string', 'max:150'],
+            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            'pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'name' => ['required', 'string', 'max:150'],
+            'name_ur' => ['nullable', 'string', 'max:150'],
+            'group_name' => ['nullable', 'string', 'max:100'],
+            'group_heading' => ['nullable', 'string', 'max:150'],
             'chapter_number' => [
                 'nullable', 'integer', 'min:1',
                 Rule::unique('chapters')->where(fn ($q) => $q
@@ -25,7 +27,7 @@ class ChapterController extends Controller
                     ->where('pattern_id', $request->pattern_id)
                 ),
             ],
-            'status'         => ['required', 'boolean'],
+            'status' => ['required', 'boolean'],
         ]);
 
         abort_unless(
@@ -38,14 +40,16 @@ class ChapterController extends Controller
         );
 
         Chapter::create([
-            'subject_id'     => $subject->id,
-            'class_id'       => $validated['class_id'],
-            'pattern_id'     => $validated['pattern_id'],
-            'name'           => $validated['name'],
-            'name_ur'        => $validated['name_ur'] ?? null,
+            'subject_id' => $subject->id,
+            'class_id' => $validated['class_id'],
+            'pattern_id' => $validated['pattern_id'],
+            'name' => $validated['name'],
+            'name_ur' => $validated['name_ur'] ?? null,
             'chapter_number' => $validated['chapter_number'] ?? null,
-            'status'         => $validated['status'],
-            'created_by'     => auth()->id(),
+            'group_name' => $this->nullableString($validated['group_name'] ?? null),
+            'group_heading' => $this->nullableString($validated['group_heading'] ?? null),
+            'status' => $validated['status'],
+            'created_by' => auth()->id(),
         ]);
 
         return back()->with('success', 'Chapter added successfully.');
@@ -56,8 +60,10 @@ class ChapterController extends Controller
         abort_if($chapter->subject_id !== $subject->id, 403);
 
         $validated = $request->validate([
-            'name'           => ['required', 'string', 'max:150'],
-            'name_ur'        => ['nullable', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150'],
+            'name_ur' => ['nullable', 'string', 'max:150'],
+            'group_name' => ['nullable', 'string', 'max:100'],
+            'group_heading' => ['nullable', 'string', 'max:150'],
             'chapter_number' => [
                 'nullable', 'integer', 'min:1',
                 Rule::unique('chapters')->where(fn ($q) => $q
@@ -66,14 +72,16 @@ class ChapterController extends Controller
                     ->where('pattern_id', $chapter->pattern_id)
                 )->ignore($chapter->id),
             ],
-            'status'         => ['required', 'boolean'],
+            'status' => ['required', 'boolean'],
         ]);
 
         $chapter->update([
-            'name'           => $validated['name'],
-            'name_ur'        => $validated['name_ur'] ?? null,
+            'name' => $validated['name'],
+            'name_ur' => $validated['name_ur'] ?? null,
             'chapter_number' => $validated['chapter_number'] ?? null,
-            'status'         => $validated['status'],
+            'group_name' => $this->nullableString($validated['group_name'] ?? null),
+            'group_heading' => $this->nullableString($validated['group_heading'] ?? null),
+            'status' => $validated['status'],
         ]);
 
         return back()->with('success', 'Chapter updated successfully.');
@@ -86,5 +94,12 @@ class ChapterController extends Controller
         $chapter->delete();
 
         return back()->with('success', 'Chapter deleted.');
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        $normalized = trim((string) $value);
+
+        return $normalized === '' ? null : $normalized;
     }
 }

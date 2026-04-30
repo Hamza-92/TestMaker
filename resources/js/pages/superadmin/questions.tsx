@@ -43,6 +43,8 @@ interface QuestionRow {
         name: string;
         name_ur: string | null;
         chapter_number: number | null;
+        group_name: string | null;
+        group_heading: string | null;
         subject: {
             id: number;
             name_eng: string;
@@ -147,7 +149,9 @@ function truncateText(value: string, maxLength = 84) {
         : value;
 }
 
-function patternLabel(pattern: PatternFilterOption | QuestionRow['chapter']['pattern']) {
+function patternLabel(
+    pattern: PatternFilterOption | QuestionRow['chapter']['pattern'],
+) {
     return pattern.short_name
         ? `${pattern.short_name} / ${pattern.name}`
         : pattern.name;
@@ -157,10 +161,13 @@ function chapterLabel(chapter: QuestionRow['chapter']) {
     const chapterPart = chapter.chapter_number
         ? `Ch ${chapter.chapter_number}`
         : chapter.name;
+    const groupedChapter = chapter.group_name
+        ? `${chapter.group_name} / ${chapterPart}`
+        : chapterPart;
 
     return [
         chapter.subject.name_eng,
-        chapterPart,
+        groupedChapter,
         chapter.class.name,
         patternLabel(chapter.pattern),
     ].join(' / ');
@@ -236,7 +243,9 @@ function matchesSearch(question: QuestionRow, query: string) {
 
     return (
         question.question_type.name.toLowerCase().includes(normalized) ||
-        question.question_type.schema.label.toLowerCase().includes(normalized) ||
+        question.question_type.schema.label
+            .toLowerCase()
+            .includes(normalized) ||
         question.chapter.subject.name_eng.toLowerCase().includes(normalized) ||
         question.chapter.class.name.toLowerCase().includes(normalized) ||
         question.chapter.pattern.name.toLowerCase().includes(normalized) ||
@@ -371,7 +380,8 @@ export default function Questions({
 
         return allClassOptions.filter(
             (option) =>
-                availableIds.has(option.id) || String(option.id) === classFilter,
+                availableIds.has(option.id) ||
+                String(option.id) === classFilter,
         );
     }, [activeFilters, allClassOptions, classFilter, questions]);
 
@@ -609,7 +619,9 @@ export default function Questions({
                                 <SelectValue placeholder="Pattern" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All patterns</SelectItem>
+                                <SelectItem value="all">
+                                    All patterns
+                                </SelectItem>
                                 {patternOptions.map((pattern) => (
                                     <SelectItem
                                         key={pattern.id}
@@ -655,7 +667,9 @@ export default function Questions({
                                 <SelectValue placeholder="Subject" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All subjects</SelectItem>
+                                <SelectItem value="all">
+                                    All subjects
+                                </SelectItem>
                                 {subjectOptions.map((subject) => (
                                     <SelectItem
                                         key={subject.id}
@@ -816,7 +830,10 @@ export default function Questions({
                                             </td>
                                             <td className="px-4 py-3">
                                                 <p className="font-medium">
-                                                    {question.question_type.name}
+                                                    {
+                                                        question.question_type
+                                                            .name
+                                                    }
                                                 </p>
                                             </td>
                                             <td className="px-4 py-3">

@@ -149,13 +149,13 @@ class QuestionController extends Controller
             ->get();
 
         return Inertia::render('superadmin/questions/chapter', [
-            'chapter'      => $this->chapterContext($chapter),
-            'scopedTopic'  => [
-                'id'      => $topic->id,
-                'name'    => $topic->name,
+            'chapter' => $this->chapterContext($chapter),
+            'scopedTopic' => [
+                'id' => $topic->id,
+                'name' => $topic->name,
                 'name_ur' => $topic->name_ur,
             ],
-            'questions'     => $questions
+            'questions' => $questions
                 ->map(fn (Question $question) => $this->transformQuestionListItem($question))
                 ->values(),
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
@@ -169,13 +169,13 @@ class QuestionController extends Controller
         abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
 
         return Inertia::render('superadmin/questions/add', [
-            'questionTypes'  => $this->questionTypeFormOptions(),
-            'chapters'       => $this->chapterFormOptions(includeInactive: true),
-            'sourceOptions'  => $this->sourceOptions(),
+            'questionTypes' => $this->questionTypeFormOptions(),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
-            'defaultTopicId'   => $topic->id,
-            'lockedChapterId'  => $chapter->id,
-            'lockedTopicId'    => $topic->id,
+            'defaultTopicId' => $topic->id,
+            'lockedChapterId' => $chapter->id,
+            'lockedTopicId' => $topic->id,
             'backHref' => route('superadmin.subjects.chapters.topics.questions', [$subject, $chapter, $topic], false),
         ]);
     }
@@ -337,13 +337,13 @@ class QuestionController extends Controller
         if ($saveAndAddNew) {
             if ($request->boolean('topic_scoped')) {
                 $topicId = $validated['topic_id'] ?? null;
-                $topic   = $topicId ? Topic::query()->find($topicId) : null;
+                $topic = $topicId ? Topic::query()->find($topicId) : null;
                 if ($topic) {
                     return redirect()
                         ->route('superadmin.subjects.chapters.topics.questions.add', [
                             'subject' => $chapter->subject_id,
                             'chapter' => $chapter->id,
-                            'topic'   => $topic->id,
+                            'topic' => $topic->id,
                         ])
                         ->with('success', 'Question created successfully.');
                 }
@@ -695,6 +695,8 @@ class QuestionController extends Controller
             'name' => $chapter->name,
             'name_ur' => $chapter->name_ur,
             'chapter_number' => $chapter->chapter_number,
+            'group_name' => $chapter->group_name,
+            'group_heading' => $chapter->group_heading,
             'status' => $chapter->status,
             'questions_count' => $chapter->questions_count,
             'subject' => [
@@ -741,6 +743,9 @@ class QuestionController extends Controller
                     ->select('id', 'chapter_id', 'name', 'name_ur', 'status'),
             ])
             ->when(! $includeInactive, fn ($query) => $query->where('status', 1))
+            ->orderBy('group_name')
+            ->orderBy('group_heading')
+            ->orderBy('chapter_number')
             ->orderBy('name')
             ->get([
                 'id',
@@ -750,6 +755,8 @@ class QuestionController extends Controller
                 'name',
                 'name_ur',
                 'chapter_number',
+                'group_name',
+                'group_heading',
                 'status',
             ])
             ->filter(function (Chapter $chapter) use ($includeInactive) {
@@ -770,6 +777,8 @@ class QuestionController extends Controller
                 'name' => $chapter->name,
                 'name_ur' => $chapter->name_ur,
                 'chapter_number' => $chapter->chapter_number,
+                'group_name' => $chapter->group_name,
+                'group_heading' => $chapter->group_heading,
                 'status' => $chapter->status,
                 'subject' => [
                     'id' => $chapter->subject->id,
@@ -830,6 +839,8 @@ class QuestionController extends Controller
                 'name' => $question->chapter->name,
                 'name_ur' => $question->chapter->name_ur,
                 'chapter_number' => $question->chapter->chapter_number,
+                'group_name' => $question->chapter->group_name,
+                'group_heading' => $question->chapter->group_heading,
                 'subject' => [
                     'id' => $question->chapter->subject->id,
                     'name_eng' => $question->chapter->subject->name_eng,

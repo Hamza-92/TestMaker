@@ -15,6 +15,8 @@ class Chapter extends Model
         'name',
         'name_ur',
         'chapter_number',
+        'group_name',
+        'group_heading',
         'sort_id',
         'status',
         'created_by',

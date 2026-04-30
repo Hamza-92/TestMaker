@@ -45,6 +45,8 @@ interface ChapterContext {
     name: string;
     name_ur: string | null;
     chapter_number: number | null;
+    group_name: string | null;
+    group_heading: string | null;
     status: number;
     questions_count: number;
     subject: {
@@ -122,9 +124,11 @@ function sourceFilterValue(question: QuestionRow) {
 }
 
 function chapterTitle(chapter: ChapterContext) {
-    return chapter.chapter_number
+    const title = chapter.chapter_number
         ? `Ch ${chapter.chapter_number} - ${chapter.name}`
         : chapter.name;
+
+    return chapter.group_name ? `${chapter.group_name} / ${title}` : title;
 }
 
 function patternLabel(pattern: ChapterContext['pattern']) {
@@ -298,7 +302,9 @@ export default function ChapterQuestions({
                         </Link>
                         <div className="min-w-0">
                             <h1 className="truncate text-lg font-semibold">
-                                {scopedTopic ? scopedTopic.name : chapterTitle(chapter)}
+                                {scopedTopic
+                                    ? scopedTopic.name
+                                    : chapterTitle(chapter)}
                             </h1>
                             <div className="mt-1 flex flex-wrap gap-1.5">
                                 <Badge variant="outline" className="bg-muted">
@@ -311,12 +317,24 @@ export default function ChapterQuestions({
                                     {patternLabel(chapter.pattern)}
                                 </Badge>
                                 {scopedTopic ? (
-                                    <Badge variant="outline" className="bg-muted">
+                                    <Badge
+                                        variant="outline"
+                                        className="bg-muted"
+                                    >
                                         {chapterTitle(chapter)}
                                     </Badge>
                                 ) : null}
+                                {chapter.group_heading ? (
+                                    <Badge
+                                        variant="outline"
+                                        className="bg-muted"
+                                    >
+                                        {chapter.group_heading}
+                                    </Badge>
+                                ) : null}
                                 <Badge variant="outline" className="bg-muted">
-                                    {questions.length} question{questions.length !== 1 ? 's' : ''}
+                                    {questions.length} question
+                                    {questions.length !== 1 ? 's' : ''}
                                 </Badge>
                             </div>
                         </div>
@@ -339,7 +357,9 @@ export default function ChapterQuestions({
                 </div>
 
                 <div className="rounded-lg border p-3">
-                    <div className={`grid gap-2 md:grid-cols-2 ${isTopicWise && !scopedTopic ? 'xl:grid-cols-[minmax(220px,1fr)_10rem_11rem_10rem_8rem_auto_auto]' : 'xl:grid-cols-[minmax(220px,1fr)_11rem_10rem_8rem_auto_auto]'}`}>
+                    <div
+                        className={`grid gap-2 md:grid-cols-2 ${isTopicWise && !scopedTopic ? 'xl:grid-cols-[minmax(220px,1fr)_10rem_11rem_10rem_8rem_auto_auto]' : 'xl:grid-cols-[minmax(220px,1fr)_11rem_10rem_8rem_auto_auto]'}`}
+                    >
                         <div className="relative min-w-0">
                             <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -365,9 +385,14 @@ export default function ChapterQuestions({
                                     <SelectValue placeholder="Topic" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All topics</SelectItem>
+                                    <SelectItem value="all">
+                                        All topics
+                                    </SelectItem>
                                     {chapter.topics.map((topic) => (
-                                        <SelectItem key={topic.id} value={String(topic.id)}>
+                                        <SelectItem
+                                            key={topic.id}
+                                            value={String(topic.id)}
+                                        >
                                             {topic.name}
                                         </SelectItem>
                                     ))}
@@ -503,7 +528,11 @@ export default function ChapterQuestions({
                                 {paginated.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={isTopicWise && !scopedTopic ? 6 : 5}
+                                            colSpan={
+                                                isTopicWise && !scopedTopic
+                                                    ? 6
+                                                    : 5
+                                            }
                                             className="py-12 text-center text-muted-foreground"
                                         >
                                             No questions found
@@ -527,7 +556,8 @@ export default function ChapterQuestions({
                                             </td>
                                             {isTopicWise && !scopedTopic ? (
                                                 <td className="px-3 py-2.5 text-muted-foreground">
-                                                    {question.topic?.name ?? '-'}
+                                                    {question.topic?.name ??
+                                                        '-'}
                                                 </td>
                                             ) : null}
                                             <td className="px-3 py-2.5 text-muted-foreground">

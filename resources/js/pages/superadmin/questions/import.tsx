@@ -143,9 +143,11 @@ function SectionCard({
 }
 
 function chapterTitle(chapter: ChapterOption) {
-    return chapter.chapter_number
+    const title = chapter.chapter_number
         ? `Chapter ${chapter.chapter_number}`
         : chapter.name;
+
+    return chapter.group_name ? `${chapter.group_name} / ${title}` : title;
 }
 
 function truncateText(value: string, maxLength = 100) {

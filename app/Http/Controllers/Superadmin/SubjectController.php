@@ -45,6 +45,7 @@ class SubjectController extends Controller
             'chapters' => fn ($q) => $q->with($chaptersWith)
                 ->withCount('questions')
                 ->orderBy('pattern_id')->orderBy('class_id')
+                ->orderBy('group_name')->orderBy('group_heading')
                 ->orderBy('chapter_number')->orderBy('sort_id'),
         ]);
 
@@ -61,6 +62,8 @@ class SubjectController extends Controller
             'name' => $ch->name,
             'name_ur' => $ch->name_ur,
             'chapter_number' => $ch->chapter_number,
+            'group_name' => $ch->group_name,
+            'group_heading' => $ch->group_heading,
             'sort_id' => $ch->sort_id,
             'status' => $ch->status,
             'questions_count' => $ch->questions_count,

@@ -68,6 +68,8 @@ interface ChapterData {
     name: string;
     name_ur: string | null;
     chapter_number: number | null;
+    group_name: string | null;
+    group_heading: string | null;
     sort_id: number;
     status: number;
     questions_count: number;
@@ -112,6 +114,8 @@ interface ChapterFormData {
     name: string;
     name_ur: string;
     chapter_number: string;
+    group_name: string;
+    group_heading: string;
     status: string;
     [key: string]: string;
 }
@@ -431,7 +435,7 @@ function ChapterDialog({
                         </div>
                     )}
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
                         <Field
                             label="Chapter #"
                             error={form.errors.chapter_number}
@@ -447,6 +451,15 @@ function ChapterDialog({
                                     )
                                 }
                                 placeholder="e.g. 1"
+                            />
+                        </Field>
+                        <Field label="Group" error={form.errors.group_name}>
+                            <Input
+                                value={form.data.group_name}
+                                onChange={(e) =>
+                                    form.setData('group_name', e.target.value)
+                                }
+                                placeholder="e.g. Group A"
                             />
                         </Field>
                         <Field
@@ -478,6 +491,19 @@ function ChapterDialog({
                             </Select>
                         </Field>
                     </div>
+
+                    <Field
+                        label="Group Heading"
+                        error={form.errors.group_heading}
+                    >
+                        <Input
+                            value={form.data.group_heading}
+                            onChange={(e) =>
+                                form.setData('group_heading', e.target.value)
+                            }
+                            placeholder="e.g. Short Questions"
+                        />
+                    </Field>
 
                     <Field
                         label="Chapter Name (English)"
@@ -705,6 +731,8 @@ function ChaptersTab({
         name: '',
         name_ur: '',
         chapter_number: '',
+        group_name: '',
+        group_heading: '',
         status: '1',
     });
     const topicForm = useForm<TopicFormData>({
@@ -759,6 +787,8 @@ function ChaptersTab({
         chapterForm.setData('name', '');
         chapterForm.setData('name_ur', '');
         chapterForm.setData('chapter_number', '');
+        chapterForm.setData('group_name', '');
+        chapterForm.setData('group_heading', '');
         chapterForm.setData('status', '1');
         chapterForm.clearErrors();
         setChapterDialog({ mode: 'add' });
@@ -773,6 +803,8 @@ function ChaptersTab({
             'chapter_number',
             ch.chapter_number?.toString() ?? '',
         );
+        chapterForm.setData('group_name', ch.group_name ?? '');
+        chapterForm.setData('group_heading', ch.group_heading ?? '');
         chapterForm.setData('status', ch.status.toString());
         chapterForm.clearErrors();
         setChapterDialog({ mode: 'edit', chapter: ch });
@@ -989,8 +1021,8 @@ function ChaptersTab({
                         className="grid border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground"
                         style={{
                             gridTemplateColumns: isTopicWise
-                                ? '2rem 3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 8rem'
-                                : '3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 6rem',
+                                ? '2rem 3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 9.5rem'
+                                : '3rem minmax(0,1fr) minmax(0,0.8fr) 5.5rem 5rem 8.5rem',
                         }}
                     >
                         {isTopicWise && <span />}
@@ -1003,6 +1035,13 @@ function ChaptersTab({
                     </div>
 
                     {filteredChapters.map((ch, idx) => {
+                        const previousChapter = filteredChapters[idx - 1];
+                        const startsGroup =
+                            idx === 0 ||
+                            previousChapter?.group_name !== ch.group_name ||
+                            previousChapter?.group_heading !== ch.group_heading;
+                        const hasGroup =
+                            Boolean(ch.group_name) || Boolean(ch.group_heading);
                         const isExpanded = expandedChapters.has(ch.id);
                         const isAddingTopic =
                             topicState?.mode === 'add' &&
@@ -1018,6 +1057,20 @@ function ChaptersTab({
                                 key={ch.id}
                                 className={idx !== 0 ? 'border-t' : ''}
                             >
+                                {startsGroup && hasGroup && (
+                                    <div className="flex items-center gap-2 border-b bg-muted/20 px-4 py-2 text-xs">
+                                        {ch.group_name && (
+                                            <span className="font-semibold text-foreground">
+                                                {ch.group_name}
+                                            </span>
+                                        )}
+                                        {ch.group_heading && (
+                                            <span className="truncate text-muted-foreground">
+                                                {ch.group_heading}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                                 {/* Chapter row */}
                                 <div
                                     className="grid items-center px-4 py-3 transition-colors hover:bg-muted/20"
@@ -1357,7 +1410,7 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                             </div>
                         </div>
                     </div>
-                    <div className="grid divide-y sm:grid-cols-4 sm:divide-x sm:divide-y-0 hidden ">
+                    <div className="grid hidden divide-y sm:grid-cols-4 sm:divide-x sm:divide-y-0">
                         <div className="p-5 text-center">
                             <p className="text-xs text-muted-foreground">
                                 Type

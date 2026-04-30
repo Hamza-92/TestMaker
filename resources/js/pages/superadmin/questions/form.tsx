@@ -58,6 +58,8 @@ export interface ChapterOption {
     name: string;
     name_ur: string | null;
     chapter_number: number | null;
+    group_name: string | null;
+    group_heading: string | null;
     status: number;
     subject: {
         id: number;
@@ -144,7 +146,6 @@ interface QuestionFormProps {
     lockedChapterId?: number | null;
     lockedTopicId?: number | null;
 }
-
 
 const textareaClassName =
     'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-xl border bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] resize-none overflow-hidden';
@@ -305,9 +306,11 @@ function BuilderCard({
 }
 
 function chapterTitle(chapter: ChapterOption) {
-    return chapter.chapter_number
+    const title = chapter.chapter_number
         ? `Chapter ${chapter.chapter_number}`
         : chapter.name;
+
+    return chapter.group_name ? `${chapter.group_name} / ${title}` : title;
 }
 
 export function QuestionForm({
@@ -325,8 +328,7 @@ export function QuestionForm({
 }: QuestionFormProps) {
     const isChapterLocked =
         lockedChapterId !== null && lockedChapterId !== undefined;
-    const isTopicLocked =
-        lockedTopicId !== null && lockedTopicId !== undefined;
+    const isTopicLocked = lockedTopicId !== null && lockedTopicId !== undefined;
     const selectedType = useMemo(
         () =>
             questionTypes.find(
@@ -621,7 +623,12 @@ export function QuestionForm({
         <BuilderCard
             title="Answer Options"
             actions={
-                <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onAdd}
+                >
                     <CirclePlusIcon className="size-4" />
                     Add option
                 </Button>
@@ -644,8 +651,10 @@ export function QuestionForm({
                 {options.map((option, index) => (
                     <div
                         key={`${prefix}-${index}`}
-                        className={`grid items-start gap-2 px-3 py-2${index !== 0 ? ' border-t' : ''}`}
-                        style={{ gridTemplateColumns: '2rem 1fr 1fr 4.5rem 2rem' }}
+                        className={`grid items-start gap-2 px-3 py-2${index !== 0 ? 'border-t' : ''}`}
+                        style={{
+                            gridTemplateColumns: '2rem 1fr 1fr 4.5rem 2rem',
+                        }}
                     >
                         <span className="pt-2 text-xs font-semibold text-muted-foreground">
                             {String.fromCharCode(65 + index)}
@@ -655,7 +664,11 @@ export function QuestionForm({
                             <Input
                                 value={option.text_en}
                                 onChange={(event) =>
-                                    onOptionValue(index, 'text_en', event.target.value)
+                                    onOptionValue(
+                                        index,
+                                        'text_en',
+                                        event.target.value,
+                                    )
                                 }
                             />
                             {errorFor(`${prefix}.${index}.text_en`) && (
@@ -670,7 +683,11 @@ export function QuestionForm({
                                 dir="rtl"
                                 value={option.text_ur}
                                 onChange={(event) =>
-                                    onOptionValue(index, 'text_ur', event.target.value)
+                                    onOptionValue(
+                                        index,
+                                        'text_ur',
+                                        event.target.value,
+                                    )
                                 }
                             />
                             {errorFor(`${prefix}.${index}.text_ur`) && (
@@ -1201,9 +1218,14 @@ export function QuestionForm({
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-80">
-                                    <SelectItem value="none">Select type</SelectItem>
+                                    <SelectItem value="none">
+                                        Select type
+                                    </SelectItem>
                                     {questionTypes.map((item) => (
-                                        <SelectItem key={item.id} value={String(item.id)}>
+                                        <SelectItem
+                                            key={item.id}
+                                            value={String(item.id)}
+                                        >
                                             {item.name}
                                         </SelectItem>
                                     ))}
@@ -1212,25 +1234,43 @@ export function QuestionForm({
                         </Field>
 
                         {!isChapterLocked && (
-                            <Field label="Chapter" required error={form.errors.chapter_id}>
+                            <Field
+                                label="Chapter"
+                                required
+                                error={form.errors.chapter_id}
+                            >
                                 <Select
                                     value={form.data.chapter_id || 'none'}
                                     disabled={chapters.length === 0}
                                     onValueChange={(value) => {
-                                        form.setData('chapter_id', value === 'none' ? '' : value);
+                                        form.setData(
+                                            'chapter_id',
+                                            value === 'none' ? '' : value,
+                                        );
                                         form.setData('topic_id', '');
                                     }}
                                 >
                                     <SelectTrigger className="w-full">
                                         <SelectValue
-                                            placeholder={chapters.length === 0 ? 'No chapters' : 'Select chapter'}
+                                            placeholder={
+                                                chapters.length === 0
+                                                    ? 'No chapters'
+                                                    : 'Select chapter'
+                                            }
                                         />
                                     </SelectTrigger>
                                     <SelectContent className="max-h-80">
-                                        <SelectItem value="none">Select chapter</SelectItem>
+                                        <SelectItem value="none">
+                                            Select chapter
+                                        </SelectItem>
                                         {chapters.map((chapter) => (
-                                            <SelectItem key={chapter.id} value={String(chapter.id)}>
-                                                {chapter.subject.name_eng} — {chapterTitle(chapter)} · {chapter.class.name}
+                                            <SelectItem
+                                                key={chapter.id}
+                                                value={String(chapter.id)}
+                                            >
+                                                {chapter.subject.name_eng} —{' '}
+                                                {chapterTitle(chapter)} ·{' '}
+                                                {chapter.class.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1244,18 +1284,30 @@ export function QuestionForm({
                                     value={form.data.topic_id || 'none'}
                                     disabled={availableTopics.length === 0}
                                     onValueChange={(value) =>
-                                        form.setData('topic_id', value === 'none' ? '' : value)
+                                        form.setData(
+                                            'topic_id',
+                                            value === 'none' ? '' : value,
+                                        )
                                     }
                                 >
                                     <SelectTrigger className="w-full">
                                         <SelectValue
-                                            placeholder={availableTopics.length === 0 ? 'No topics' : 'Select topic'}
+                                            placeholder={
+                                                availableTopics.length === 0
+                                                    ? 'No topics'
+                                                    : 'Select topic'
+                                            }
                                         />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="none">
+                                            None
+                                        </SelectItem>
                                         {availableTopics.map((topic) => (
-                                            <SelectItem key={topic.id} value={String(topic.id)}>
+                                            <SelectItem
+                                                key={topic.id}
+                                                value={String(topic.id)}
+                                            >
                                                 {topic.name}
                                             </SelectItem>
                                         ))}
@@ -1268,16 +1320,24 @@ export function QuestionForm({
                             <Select
                                 value={form.data.source || 'none'}
                                 onValueChange={(value) =>
-                                    form.setData('source', value === 'none' ? '' : value)
+                                    form.setData(
+                                        'source',
+                                        value === 'none' ? '' : value,
+                                    )
                                 }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select source" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">Select source</SelectItem>
+                                    <SelectItem value="none">
+                                        Select source
+                                    </SelectItem>
                                     {sourceOptions.map((source) => (
-                                        <SelectItem key={source.value} value={source.value}>
+                                        <SelectItem
+                                            key={source.value}
+                                            value={source.value}
+                                        >
                                             {source.label}
                                         </SelectItem>
                                     ))}
@@ -1285,10 +1345,16 @@ export function QuestionForm({
                             </Select>
                         </Field>
 
-                        <Field label="Status" required error={form.errors.status}>
+                        <Field
+                            label="Status"
+                            required
+                            error={form.errors.status}
+                        >
                             <Select
                                 value={form.data.status}
-                                onValueChange={(value) => form.setData('status', value)}
+                                onValueChange={(value) =>
+                                    form.setData('status', value)
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue />

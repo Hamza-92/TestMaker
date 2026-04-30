@@ -117,4 +117,10 @@ Route::get('/run-migrate', function () {
     return Artisan::output();
 });
 
+Route::get('/run-optimize-clear', function () {
+    Artisan::call('optimize:clear');
+
+    return Artisan::output();
+});
+
 require __DIR__.'/settings.php';
