@@ -4,7 +4,6 @@ import {
     ArrowLeftIcon,
     CheckCircle2Icon,
     CirclePlusIcon,
-    FileQuestionIcon,
     Trash2Icon,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -262,48 +261,6 @@ function Field({
     );
 }
 
-function SectionCard({
-    children,
-    icon,
-    title,
-}: {
-    children: ReactNode;
-    icon: ReactNode;
-    title: string;
-}) {
-    return (
-        <section className="w-full min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-card p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-                <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    {icon}
-                </span>
-                <h3 className="text-sm font-semibold">{title}</h3>
-            </div>
-            <Separator />
-            {children}
-        </section>
-    );
-}
-
-function BuilderCard({
-    actions,
-    children,
-    title,
-}: {
-    actions?: ReactNode;
-    children: ReactNode;
-    title: string;
-}) {
-    return (
-        <div className="w-full min-w-0 space-y-4 rounded-2xl border p-4">
-            <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold">{title}</p>
-                {actions}
-            </div>
-            {children}
-        </div>
-    );
-}
 
 function chapterTitle(chapter: ChapterOption) {
     const title = chapter.chapter_number
@@ -552,14 +509,12 @@ export function QuestionForm({
     };
 
     const renderLocalizedEditor = (
-        title: string,
         englishKey: keyof QuestionContentFormData,
         urduKey: keyof QuestionContentFormData,
         required = false,
         control: 'textarea' | 'input' = 'textarea',
     ) => (
-        <BuilderCard title={title}>
-            <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
                 <Field
                     label="English"
                     required={required}
@@ -605,7 +560,6 @@ export function QuestionForm({
                     )}
                 </Field>
             </div>
-        </BuilderCard>
     );
 
     const renderOptionsEditor = (
@@ -620,20 +574,18 @@ export function QuestionForm({
         onRemove: (index: number) => void,
         prefix = 'content.options',
     ) => (
-        <BuilderCard
-            title="Answer Options"
-            actions={
+        <div className="space-y-2">
+            <div className="flex justify-end">
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={onAdd}
                 >
-                    <CirclePlusIcon className="size-4" />
+                    <CirclePlusIcon className="size-3.5" />
                     Add option
                 </Button>
-            }
-        >
+            </div>
             <div className="overflow-hidden rounded-xl border">
                 {/* Header */}
                 <div
@@ -721,24 +673,22 @@ export function QuestionForm({
             {errorFor(prefix) && (
                 <p className="text-xs text-destructive">{errorFor(prefix)}</p>
             )}
-        </BuilderCard>
+        </div>
     );
 
     const renderPassageItems = () => (
-        <BuilderCard
-            title="Passage Questions"
-            actions={
-                <Button type="button" variant="outline" onClick={addItem}>
-                    <CirclePlusIcon className="size-4" />
+        <div className="space-y-3">
+            <div className="flex justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                    <CirclePlusIcon className="size-3.5" />
                     Add sub-question
                 </Button>
-            }
-        >
-            <div className="space-y-5">
+            </div>
+            <div className="space-y-3">
                 {form.data.content.items.map((item, itemIndex) => (
                     <div
                         key={`passage-item-${itemIndex}`}
-                        className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
+                        className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3"
                     >
                         <div className="flex items-center justify-between gap-3">
                             <Badge variant="outline">
@@ -754,7 +704,7 @@ export function QuestionForm({
                             </Button>
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-2">
                             <Field
                                 label="Question (English)"
                                 required
@@ -813,24 +763,22 @@ export function QuestionForm({
                     </p>
                 ) : null}
             </div>
-        </BuilderCard>
+        </div>
     );
 
     const renderGroupedItems = () => (
-        <BuilderCard
-            title="Question Items"
-            actions={
-                <Button type="button" variant="outline" onClick={addItem}>
-                    <CirclePlusIcon className="size-4" />
+        <div className="space-y-3">
+            <div className="flex justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                    <CirclePlusIcon className="size-3.5" />
                     Add item
                 </Button>
-            }
-        >
-            <div className="space-y-5">
+            </div>
+            <div className="space-y-3">
                 {form.data.content.items.map((item, itemIndex) => (
                     <div
                         key={`group-item-${itemIndex}`}
-                        className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
+                        className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3"
                     >
                         <div className="flex items-center justify-between gap-3">
                             <Badge variant="outline">
@@ -846,7 +794,7 @@ export function QuestionForm({
                             </Button>
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-2">
                             <Field
                                 label="Prompt (English)"
                                 required
@@ -882,7 +830,7 @@ export function QuestionForm({
                         </div>
 
                         {selectedType?.have_answer ? (
-                            <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-3 sm:grid-cols-2">
                                 <Field
                                     label="Answer (English)"
                                     error={errorFor(
@@ -924,24 +872,22 @@ export function QuestionForm({
                     </p>
                 ) : null}
             </div>
-        </BuilderCard>
+        </div>
     );
 
     const renderPairs = () => (
-        <BuilderCard
-            title="Pair Rows"
-            actions={
-                <Button type="button" variant="outline" onClick={addPair}>
-                    <CirclePlusIcon className="size-4" />
+        <div className="space-y-3">
+            <div className="flex justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={addPair}>
+                    <CirclePlusIcon className="size-3.5" />
                     Add pair
                 </Button>
-            }
-        >
-            <div className="space-y-4">
+            </div>
+            <div className="space-y-3">
                 {form.data.content.pairs.map((pair, pairIndex) => (
                     <div
                         key={`pair-${pairIndex}`}
-                        className="space-y-4 rounded-2xl border border-border/70 bg-muted/20 p-4"
+                        className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3"
                     >
                         <div className="flex items-center justify-between gap-3">
                             <Badge variant="outline">
@@ -957,7 +903,7 @@ export function QuestionForm({
                             </Button>
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-2">
                             <Field
                                 label="Left (English)"
                                 error={errorFor(
@@ -1029,7 +975,7 @@ export function QuestionForm({
                     </p>
                 ) : null}
             </div>
-        </BuilderCard>
+        </div>
     );
 
     const renderSchemaBuilder = () => {
@@ -1041,15 +987,8 @@ export function QuestionForm({
             case 'objective_mcq':
             case 'objective_blank_choice':
                 return (
-                    <div className="space-y-5">
-                        {renderLocalizedEditor(
-                            selectedSchema.key === 'objective_blank_choice'
-                                ? 'Blank Statement'
-                                : 'Question Statement',
-                            'prompt_en',
-                            'prompt_ur',
-                            true,
-                        )}
+                    <div className="space-y-4">
+                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
                         {renderOptionsEditor(
                             form.data.content.options,
                             setOptionValue,
@@ -1061,120 +1000,70 @@ export function QuestionForm({
                 );
             case 'objective_true_false':
                 return (
-                    <div className="space-y-5">
-                        {renderLocalizedEditor(
-                            'Statement',
-                            'prompt_en',
-                            'prompt_ur',
-                            true,
-                        )}
-                        <BuilderCard title="Correct Answer">
-                            <Field
-                                label="Result"
-                                required
-                                error={errorFor('content.correct_boolean')}
+                    <div className="space-y-4">
+                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        <Field
+                            label="Correct Answer"
+                            required
+                            error={errorFor('content.correct_boolean')}
+                        >
+                            <Select
+                                value={
+                                    form.data.content.correct_boolean || 'none'
+                                }
+                                onValueChange={(value) =>
+                                    setContentValue(
+                                        'correct_boolean',
+                                        value === 'none' ? '' : value,
+                                    )
+                                }
                             >
-                                <Select
-                                    value={
-                                        form.data.content.correct_boolean ||
-                                        'none'
-                                    }
-                                    onValueChange={(value) =>
-                                        setContentValue(
-                                            'correct_boolean',
-                                            value === 'none' ? '' : value,
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select answer" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">
-                                            Select answer
-                                        </SelectItem>
-                                        <SelectItem value="true">
-                                            True
-                                        </SelectItem>
-                                        <SelectItem value="false">
-                                            False
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        </BuilderCard>
+                                <SelectTrigger className="w-full sm:w-48">
+                                    <SelectValue placeholder="Select answer" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Select answer</SelectItem>
+                                    <SelectItem value="true">True</SelectItem>
+                                    <SelectItem value="false">False</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </Field>
                     </div>
                 );
             case 'objective_blank_open':
                 return (
-                    <div className="space-y-5">
-                        {renderLocalizedEditor(
-                            'Blank Statement',
-                            'prompt_en',
-                            'prompt_ur',
-                            true,
-                        )}
-                        {renderLocalizedEditor(
-                            'Correct Answer',
-                            'answer_en',
-                            'answer_ur',
-                            true,
-                            'input',
-                        )}
+                    <div className="space-y-4">
+                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        {renderLocalizedEditor('answer_en', 'answer_ur', true, 'input')}
                     </div>
                 );
             case 'objective_passage_mcq':
                 return (
-                    <div className="space-y-5">
-                        {renderLocalizedEditor(
-                            'Passage',
-                            'passage_en',
-                            'passage_ur',
-                            true,
-                        )}
+                    <div className="space-y-4">
+                        {renderLocalizedEditor('passage_en', 'passage_ur', true)}
                         {renderPassageItems()}
                     </div>
                 );
             case 'subjective_grouped':
                 return (
-                    <div className="space-y-5">
-                        {renderLocalizedEditor(
-                            'Shared Instructions',
-                            'intro_en',
-                            'intro_ur',
-                            false,
-                        )}
+                    <div className="space-y-4">
+                        {renderLocalizedEditor('intro_en', 'intro_ur')}
                         {renderGroupedItems()}
                     </div>
                 );
             case 'subjective_pairs':
                 return (
-                    <div className="space-y-5">
-                        {renderLocalizedEditor(
-                            'Instructions',
-                            'prompt_en',
-                            'prompt_ur',
-                            false,
-                        )}
+                    <div className="space-y-4">
+                        {renderLocalizedEditor('prompt_en', 'prompt_ur')}
                         {renderPairs()}
                     </div>
                 );
             default:
                 return (
-                    <div className="space-y-5">
-                        {renderLocalizedEditor(
-                            'Question',
-                            'prompt_en',
-                            'prompt_ur',
-                            true,
-                        )}
+                    <div className="space-y-4">
+                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
                         {selectedType?.have_answer
-                            ? renderLocalizedEditor(
-                                  'Answer',
-                                  'answer_en',
-                                  'answer_ur',
-                                  true,
-                              )
+                            ? renderLocalizedEditor('answer_en', 'answer_ur', true)
                             : null}
                     </div>
                 );
@@ -1193,13 +1082,9 @@ export function QuestionForm({
                 <h1 className="h1-semibold">{title}</h1>
             </div>
 
-            <form onSubmit={onSubmit} className="w-full min-w-0 space-y-5">
-                <SectionCard
-                    icon={<FileQuestionIcon className="size-4" />}
-                    title="Question"
-                >
-                    {/* ── Setup row ──────────────────────────────────────── */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <form onSubmit={onSubmit} className="w-full min-w-0 space-y-4">
+                <section className="w-full min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <Field
                             label="Question Type"
                             required
@@ -1367,14 +1252,13 @@ export function QuestionForm({
                         </Field>
                     </div>
 
-                    {/* ── Builder ────────────────────────────────────────── */}
                     {selectedType && (
                         <>
                             <Separator />
                             {renderSchemaBuilder()}
                         </>
                     )}
-                </SectionCard>
+                </section>
 
                 <div className="flex flex-col gap-3 pb-2 sm:flex-row sm:justify-end">
                     <Button asChild variant="outline">

@@ -54,6 +54,7 @@ interface QuestionTypeFormProps {
     backHref: string;
     form: InertiaFormProps<QuestionTypeFormData>;
     questionSchemas: QuestionSchemaOption[];
+    lockedKind?: 'objective' | 'subjective';
     onSubmit: (event: React.FormEvent) => void;
 }
 
@@ -165,6 +166,7 @@ export function QuestionTypeForm({
     backHref,
     form,
     questionSchemas,
+    lockedKind,
     onSubmit,
 }: QuestionTypeFormProps) {
     const filteredSchemas = questionSchemas.filter(
@@ -175,6 +177,61 @@ export function QuestionTypeForm({
         filteredSchemas.find((schema) => schema.key === form.data.schema_key) ??
         filteredSchemas[0] ??
         null;
+
+    const schemaFields = (
+        <>
+            <Field
+                label="Schema"
+                required
+                error={form.errors.schema_key}
+            >
+                <Select
+                    value={form.data.schema_key}
+                    onValueChange={(value) =>
+                        form.setData('schema_key', value)
+                    }
+                >
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select schema" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {filteredSchemas.map((schema) => (
+                            <SelectItem
+                                key={schema.key}
+                                value={schema.key}
+                            >
+                                {schema.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </Field>
+
+            {selectedSchema ? (
+                <div className="grid gap-3 md:grid-cols-2 md:col-span-2">
+                    {selectedSchema.settings.supports_answer_toggle ? (
+                        <SwitchRow
+                            checked={form.data.have_answer}
+                            label="Answers"
+                            onCheckedChange={(checked) =>
+                                form.setData('have_answer', checked)
+                            }
+                        />
+                    ) : null}
+
+                    {selectedSchema.settings.supports_single_toggle ? (
+                        <SwitchRow
+                            checked={form.data.is_single}
+                            label="Single correct"
+                            onCheckedChange={(checked) =>
+                                form.setData('is_single', checked)
+                            }
+                        />
+                    ) : null}
+                </div>
+            ) : null}
+        </>
+    );
 
     return (
         <div className="mx-auto w-full max-w-5xl min-w-0 space-y-6 p-4 md:p-6">
@@ -261,101 +318,54 @@ export function QuestionTypeForm({
                                 </SelectContent>
                             </Select>
                         </Field>
+
+                        {lockedKind ? schemaFields : null}
                     </div>
                 </SectionCard>
 
-                <SectionCard
-                    icon={<Layers3Icon className="size-4" />}
-                    title="Structure"
-                >
-                    <div className="grid gap-3 md:grid-cols-2">
-                        <KindCard
-                            active={!form.data.is_objective}
-                            label="Subjective"
-                            icon={<FileTextIcon className="size-4" />}
-                            onClick={() => {
-                                const firstSchema = questionSchemas.find(
-                                    (schema) => schema.kind === 'subjective',
-                                );
-                                form.setData({
-                                    ...form.data,
-                                    is_objective: false,
-                                    schema_key: firstSchema?.key ?? '',
-                                    is_single: false,
-                                });
-                            }}
-                        />
-
-                        <KindCard
-                            active={form.data.is_objective}
-                            label="Objective"
-                            icon={<TargetIcon className="size-4" />}
-                            onClick={() => {
-                                const firstSchema = questionSchemas.find(
-                                    (schema) => schema.kind === 'objective',
-                                );
-                                form.setData({
-                                    ...form.data,
-                                    is_objective: true,
-                                    schema_key: firstSchema?.key ?? '',
-                                });
-                            }}
-                        />
-                    </div>
-
-                    <div>
-                        <Field
-                            label="Schema"
-                            required
-                            error={form.errors.schema_key}
-                        >
-                            <Select
-                                value={form.data.schema_key}
-                                onValueChange={(value) =>
-                                    form.setData('schema_key', value)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select schema" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {filteredSchemas.map((schema) => (
-                                        <SelectItem
-                                            key={schema.key}
-                                            value={schema.key}
-                                        >
-                                            {schema.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-                    </div>
-
-                    {selectedSchema ? (
+                {!lockedKind ? (
+                    <SectionCard
+                        icon={<Layers3Icon className="size-4" />}
+                        title="Structure"
+                    >
                         <div className="grid gap-3 md:grid-cols-2">
-                            {selectedSchema.settings.supports_answer_toggle ? (
-                                <SwitchRow
-                                    checked={form.data.have_answer}
-                                    label="Answers"
-                                    onCheckedChange={(checked) =>
-                                        form.setData('have_answer', checked)
-                                    }
-                                />
-                            ) : null}
+                            <KindCard
+                                active={!form.data.is_objective}
+                                label="Subjective"
+                                icon={<FileTextIcon className="size-4" />}
+                                onClick={() => {
+                                    const firstSchema = questionSchemas.find(
+                                        (schema) => schema.kind === 'subjective',
+                                    );
+                                    form.setData({
+                                        ...form.data,
+                                        is_objective: false,
+                                        schema_key: firstSchema?.key ?? '',
+                                        is_single: false,
+                                    });
+                                }}
+                            />
 
-                            {selectedSchema.settings.supports_single_toggle ? (
-                                <SwitchRow
-                                    checked={form.data.is_single}
-                                    label="Single correct"
-                                    onCheckedChange={(checked) =>
-                                        form.setData('is_single', checked)
-                                    }
-                                />
-                            ) : null}
+                            <KindCard
+                                active={form.data.is_objective}
+                                label="Objective"
+                                icon={<TargetIcon className="size-4" />}
+                                onClick={() => {
+                                    const firstSchema = questionSchemas.find(
+                                        (schema) => schema.kind === 'objective',
+                                    );
+                                    form.setData({
+                                        ...form.data,
+                                        is_objective: true,
+                                        schema_key: firstSchema?.key ?? '',
+                                    });
+                                }}
+                            />
                         </div>
-                    ) : null}
-                </SectionCard>
+
+                        <div>{schemaFields}</div>
+                    </SectionCard>
+                ) : null}
 
                 <div className="flex items-center justify-end gap-3 pb-2">
                     <Button asChild variant="outline">

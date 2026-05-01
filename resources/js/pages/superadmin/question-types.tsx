@@ -167,6 +167,7 @@ export default function QuestionTypes({
 
     const confirmDelete = () => {
         if (!deleteTarget) return;
+
         setDeleting(true);
         router.delete(`/superadmin/question-types/${deleteTarget.id}`, {
             onFinish: () => { setDeleting(false); setDeleteTarget(null); },
@@ -188,11 +189,15 @@ export default function QuestionTypes({
                         <p className="mt-0.5 text-sm text-muted-foreground">{filtered.length} total</p>
                     </div>
                     <Link
-                        href="/superadmin/question-types/add"
+                        href={
+                            initialKind === 'all'
+                                ? '/superadmin/question-types/add'
+                                : `/superadmin/question-types/${initialKind}/add`
+                        }
                         className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                     >
                         <PlusIcon size={16} color="currentColor" />
-                        <span className="hidden sm:inline">Add Question Type</span>
+                        <span className="hidden sm:inline capitalize">Add {initialKind === 'all' ? '' : initialKind} Type</span>
                     </Link>
                 </div>
 
@@ -203,7 +208,10 @@ export default function QuestionTypes({
                         <Input
                             placeholder="Search name, heading, schema…"
                             value={search}
-                            onChange={(e) => { setSearch(e.target.value); resetPage(); }}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                resetPage();
+                            }}
                             className="pl-9"
                         />
                     </div>

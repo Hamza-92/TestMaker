@@ -106,6 +106,22 @@ class QuestionTypeController extends Controller
         ]);
     }
 
+    public function createObjective()
+    {
+        return Inertia::render('superadmin/question-types/add', [
+            'questionSchemas' => QuestionTypeSchemaRegistry::options(),
+            'lockedKind' => 'objective',
+        ]);
+    }
+
+    public function createSubjective()
+    {
+        return Inertia::render('superadmin/question-types/add', [
+            'questionSchemas' => QuestionTypeSchemaRegistry::options(),
+            'lockedKind' => 'subjective',
+        ]);
+    }
+
     public function store(QuestionTypeUpsertRequest $request)
     {
         $payload = $this->buildPayload($request->validated(), auth()->id());

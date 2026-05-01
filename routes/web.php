@@ -86,7 +86,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types');
     Route::get('superadmin/question-types/add', [QuestionTypeController::class, 'create'])->name('superadmin.question-types.add');
     Route::get('superadmin/question-types/objective', [QuestionTypeController::class, 'objectiveIndex'])->name('superadmin.question-types.objective');
+    Route::get('superadmin/question-types/objective/add', [QuestionTypeController::class, 'createObjective'])->name('superadmin.question-types.objective.add');
     Route::get('superadmin/question-types/subjective', [QuestionTypeController::class, 'subjectiveIndex'])->name('superadmin.question-types.subjective');
+    Route::get('superadmin/question-types/subjective/add', [QuestionTypeController::class, 'createSubjective'])->name('superadmin.question-types.subjective.add');
     Route::get('superadmin/question-types/objective/{questionType}', [QuestionTypeController::class, 'showFromObjective'])->name('superadmin.question-types.objective.show');
     Route::get('superadmin/question-types/subjective/{questionType}', [QuestionTypeController::class, 'showFromSubjective'])->name('superadmin.question-types.subjective.show');
     Route::get('superadmin/question-types/objective/{questionType}/edit', [QuestionTypeController::class, 'editFromObjective'])->name('superadmin.question-types.objective.edit');

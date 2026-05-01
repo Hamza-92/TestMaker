@@ -4,9 +4,16 @@ import type { QuestionSchemaOption, QuestionTypeFormData } from './form';
 
 export default function AddQuestionType({
     questionSchemas,
+    lockedKind,
 }: {
     questionSchemas: QuestionSchemaOption[];
+    lockedKind?: 'objective' | 'subjective' | null;
 }) {
+    const isObjective = lockedKind === 'objective';
+    const defaultSchema = questionSchemas.find(
+        (s) => s.kind === (lockedKind ?? 'subjective'),
+    );
+
     const form = useForm<QuestionTypeFormData>({
         name: '',
         name_ur: '',
@@ -16,10 +23,14 @@ export default function AddQuestionType({
         description_ur: '',
         have_answer: true,
         is_single: false,
-        is_objective: false,
-        schema_key: 'subjective_standard',
+        is_objective: isObjective,
+        schema_key: defaultSchema?.key ?? 'subjective_standard',
         status: '1',
     });
+
+    const backHref = lockedKind
+        ? `/superadmin/question-types/${lockedKind}`
+        : '/superadmin/question-types';
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
@@ -32,9 +43,10 @@ export default function AddQuestionType({
             <QuestionTypeForm
                 title="Add Question Type"
                 submitLabel="Save Question Type"
-                backHref="/superadmin/question-types"
+                backHref={backHref}
                 form={form}
                 questionSchemas={questionSchemas}
+                lockedKind={lockedKind ?? undefined}
                 onSubmit={handleSubmit}
             />
         </>
