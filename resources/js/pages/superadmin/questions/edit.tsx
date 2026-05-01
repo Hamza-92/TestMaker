@@ -22,11 +22,13 @@ export default function EditQuestion({
     questionTypes,
     chapters,
     sourceOptions,
+    backHref,
 }: {
     question: QuestionPayload;
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
     sourceOptions: SourceOption[];
+    backHref: string;
 }) {
     const form = useForm<QuestionFormData>({
         question_type_id: String(question.question_type_id),
@@ -48,7 +50,7 @@ export default function EditQuestion({
             <QuestionForm
                 title="Edit Question"
                 submitLabel="Save Changes"
-                backHref={`/superadmin/questions/${question.id}`}
+                backHref={backHref}
                 form={form}
                 questionTypes={questionTypes}
                 chapters={chapters}

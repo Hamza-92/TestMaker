@@ -195,10 +195,12 @@ export default function Questions({
 
     // ── Navigate to load questions from server ────────────────────────────────
     const navigate = (newChapterId: string, newTopicId = '') => {
-        const params: Record<string, string> = {};
-        if (newChapterId) params.chapter_id = newChapterId;
-        if (newTopicId) params.topic_id = newTopicId;
-        router.get('/superadmin/questions', params, { preserveState: true, replace: true });
+        let url = '/superadmin/questions';
+        if (newChapterId) {
+            url += `/chapters/${newChapterId}`;
+            if (newTopicId) url += `/topics/${newTopicId}`;
+        }
+        router.get(url, {}, { preserveState: true, replace: true });
     };
 
     // ── Filter handlers ───────────────────────────────────────────────────────
@@ -267,18 +269,16 @@ export default function Questions({
     const confirmDelete = () => {
         if (!deleteTarget) return;
         setDeleting(true);
-        const params: Record<string, string> = {};
-        if (filters.chapter_id) params.chapter_id = String(filters.chapter_id);
-        if (filters.topic_id) params.topic_id = String(filters.topic_id);
         router.delete(`/superadmin/questions/${deleteTarget.id}`, {
-            data: params,
             onFinish: () => { setDeleting(false); setDeleteTarget(null); },
         });
     };
 
     // ── Add button href ───────────────────────────────────────────────────────
-    const addHref = chapterId
-        ? `/superadmin/questions/add?chapter_id=${chapterId}${topicId ? `&topic_id=${topicId}` : ''}`
+    const addHref = topicId
+        ? `/superadmin/questions/chapters/${chapterId}/topics/${topicId}/add`
+        : chapterId
+        ? `/superadmin/questions/chapters/${chapterId}/add`
         : '/superadmin/questions/add';
 
     // ── Chapter label helper ──────────────────────────────────────────────────

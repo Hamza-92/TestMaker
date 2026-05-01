@@ -28,11 +28,25 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class QuestionController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $chapterId = $request->integer('chapter_id') ?: null;
-        $topicId   = $request->integer('topic_id') ?: null;
+        return $this->renderQuestionsIndex(null, null);
+    }
 
+    public function chapterFilter(Chapter $chapter)
+    {
+        return $this->renderQuestionsIndex($chapter->id, null);
+    }
+
+    public function topicFilter(Chapter $chapter, Topic $topic)
+    {
+        abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
+
+        return $this->renderQuestionsIndex($chapter->id, $topic->id);
+    }
+
+    private function renderQuestionsIndex(?int $chapterId, ?int $topicId)
+    {
         $questions = null;
         if ($chapterId) {
             $query = Question::query()
@@ -92,23 +106,38 @@ class QuestionController extends Controller
         ]);
     }
 
-    public function create(Request $request)
+    public function create()
     {
-        $chapterId = $request->integer('chapter_id') ?: null;
-        $topicId   = $request->integer('topic_id') ?: null;
+        return $this->renderCreateForm(null, null);
+    }
 
-        $backParams = array_filter(['chapter_id' => $chapterId, 'topic_id' => $topicId]);
-        $backHref   = '/superadmin/questions' . (! empty($backParams) ? '?' . http_build_query($backParams) : '');
+    public function createForChapterClean(Chapter $chapter)
+    {
+        return $this->renderCreateForm($chapter->id, null);
+    }
+
+    public function createForTopicClean(Chapter $chapter, Topic $topic)
+    {
+        abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
+
+        return $this->renderCreateForm($chapter->id, $topic->id);
+    }
+
+    private function renderCreateForm(?int $chapterId, ?int $topicId)
+    {
+        $backHref = $topicId
+            ? "/superadmin/questions/chapters/{$chapterId}/topics/{$topicId}"
+            : ($chapterId ? "/superadmin/questions/chapters/{$chapterId}" : '/superadmin/questions');
 
         return Inertia::render('superadmin/questions/add', [
-            'questionTypes'   => $this->questionTypeFormOptions(),
-            'chapters'        => $this->chapterFormOptions(includeInactive: true),
-            'sourceOptions'   => $this->sourceOptions(),
+            'questionTypes'    => $this->questionTypeFormOptions(),
+            'chapters'         => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions'    => $this->sourceOptions(),
             'defaultChapterId' => $chapterId,
-            'defaultTopicId'  => $topicId,
-            'lockedChapterId' => $chapterId,
-            'lockedTopicId'   => $topicId,
-            'backHref'        => $backHref,
+            'defaultTopicId'   => $topicId,
+            'lockedChapterId'  => $chapterId,
+            'lockedTopicId'    => $topicId,
+            'backHref'         => $backHref,
         ]);
     }
 
@@ -358,42 +387,18 @@ class QuestionController extends Controller
         $topicId = $validated['topic_id'] ?? null;
 
         if ($saveAndAddNew) {
-            if ($request->boolean('topic_scoped')) {
-                $topic = $topicId ? Topic::query()->find($topicId) : null;
-                if ($topic) {
-                    return redirect()
-                        ->route('superadmin.subjects.chapters.topics.questions.add', [
-                            'subject' => $chapter->subject_id,
-                            'chapter' => $chapter->id,
-                            'topic'   => $topic->id,
-                        ])
-                        ->with('success', 'Question created successfully.');
-                }
-            }
+            $addUrl = $topicId
+                ? "/superadmin/questions/chapters/{$chapter->id}/topics/{$topicId}/add"
+                : "/superadmin/questions/chapters/{$chapter->id}/add";
 
-            if ($request->boolean('chapter_scoped')) {
-                return redirect()
-                    ->route('superadmin.subjects.chapters.questions.add', [
-                        'subject' => $chapter->subject_id,
-                        'chapter' => $chapter->id,
-                    ])
-                    ->with('success', 'Question created successfully.');
-            }
-
-            $addParams = array_filter(['chapter_id' => $chapter->id, 'topic_id' => $topicId]);
-
-            return redirect()
-                ->route('superadmin.questions.add', $addParams)
-                ->with('success', 'Question created successfully.');
+            return redirect($addUrl)->with('success', 'Question created successfully.');
         }
 
-        $listParams = http_build_query(array_filter([
-            'chapter_id' => $question->chapter_id,
-            'topic_id'   => $question->topic_id,
-        ]));
+        $listUrl = $question->topic_id
+            ? "/superadmin/questions/chapters/{$question->chapter_id}/topics/{$question->topic_id}"
+            : "/superadmin/questions/chapters/{$question->chapter_id}";
 
-        return redirect('/superadmin/questions' . ($listParams ? "?{$listParams}" : ''))
-            ->with('success', 'Question created successfully.');
+        return redirect($listUrl)->with('success', 'Question created successfully.');
     }
 
     public function show(Question $question)
@@ -422,6 +427,10 @@ class QuestionController extends Controller
             'options',
         ]);
 
+        $backHref = $question->topic_id
+            ? "/superadmin/questions/chapters/{$question->chapter_id}/topics/{$question->topic_id}"
+            : "/superadmin/questions/chapters/{$question->chapter_id}";
+
         return Inertia::render('superadmin/questions/edit', [
             'question' => [
                 'id' => $question->id,
@@ -436,8 +445,9 @@ class QuestionController extends Controller
                 ),
             ],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters'      => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
+            'backHref'      => $backHref,
         ]);
     }
 
@@ -492,8 +502,12 @@ class QuestionController extends Controller
             }
         });
 
-        return redirect()->route('superadmin.questions.show', $question)
-            ->with('success', 'Question updated successfully.');
+        $topicId = $validated['topic_id'] ?? null;
+        $listUrl = $topicId
+            ? "/superadmin/questions/chapters/{$validated['chapter_id']}/topics/{$topicId}"
+            : "/superadmin/questions/chapters/{$validated['chapter_id']}";
+
+        return redirect($listUrl)->with('success', 'Question updated successfully.');
     }
 
     public function destroy(Question $question): RedirectResponse

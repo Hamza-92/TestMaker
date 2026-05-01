@@ -105,6 +105,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('superadmin/questions/import/preview', [QuestionController::class, 'previewImport'])->name('superadmin.questions.import.preview');
     Route::post('superadmin/questions/import', [QuestionController::class, 'storeImport'])->name('superadmin.questions.import.store');
     Route::get('superadmin/questions/import/template', [QuestionController::class, 'downloadImportTemplate'])->name('superadmin.questions.import.template');
+    Route::get('superadmin/questions/chapters/{chapter}', [QuestionController::class, 'chapterFilter'])->name('superadmin.questions.chapter');
+    Route::get('superadmin/questions/chapters/{chapter}/add', [QuestionController::class, 'createForChapterClean'])->name('superadmin.questions.chapters.add');
+    Route::get('superadmin/questions/chapters/{chapter}/topics/{topic}', [QuestionController::class, 'topicFilter'])->name('superadmin.questions.topic');
+    Route::get('superadmin/questions/chapters/{chapter}/topics/{topic}/add', [QuestionController::class, 'createForTopicClean'])->name('superadmin.questions.chapters.topics.add');
     Route::post('superadmin/questions', [QuestionController::class, 'store'])->name('superadmin.questions.store');
     Route::get('superadmin/questions/{question}', [QuestionController::class, 'show'])->name('superadmin.questions.show');
     Route::get('superadmin/questions/{question}/edit', [QuestionController::class, 'edit'])->name('superadmin.questions.edit');

@@ -7,7 +7,6 @@ import {
     ChevronRightIcon,
     HelpCircleIcon,
     LayersIcon,
-    ListChecksIcon,
     ListIcon,
     LogsIcon,
     PencilIcon,
@@ -1117,21 +1116,11 @@ function ChaptersTab({
                                     >
                                         {ch.name_ur ?? '—'}
                                     </p>
-                                    <Link
-                                        href={`/superadmin/subjects/${subject.id}/chapters/${ch.id}/questions`}
-                                        className="text-sm font-medium text-primary hover:underline"
-                                    >
+                                    <span className="text-sm font-medium text-muted-foreground">
                                         {ch.questions_count}
-                                    </Link>
+                                    </span>
                                     <StatusBadge status={ch.status} />
                                     <div className="flex items-center justify-end gap-1">
-                                        <Link
-                                            href={`/superadmin/subjects/${subject.id}/chapters/${ch.id}/questions`}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:text-primary"
-                                            title="Questions"
-                                        >
-                                            <ListChecksIcon className="size-3.5" />
-                                        </Link>
                                         {isTopicWise && (
                                             <button
                                                 onClick={() =>
@@ -1211,13 +1200,6 @@ function ChaptersTab({
                                                         status={topic.status}
                                                     />
                                                     <div className="flex items-center gap-1">
-                                                        <Link
-                                                            href={`/superadmin/subjects/${subject.id}/chapters/${ch.id}/topics/${topic.id}/questions`}
-                                                            className="rounded p-1 text-muted-foreground transition-colors hover:text-primary"
-                                                            title="Questions"
-                                                        >
-                                                            <ListChecksIcon className="size-3" />
-                                                        </Link>
                                                         <button
                                                             onClick={() =>
                                                                 openEditTopic(

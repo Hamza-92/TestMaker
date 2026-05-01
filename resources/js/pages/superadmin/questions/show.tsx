@@ -536,7 +536,9 @@ function renderContent(question: QuestionData) {
 }
 
 export default function ShowQuestion({ question }: { question: QuestionData }) {
-    const chapterQuestionsHref = `/superadmin/subjects/${question.chapter.subject.id}/chapters/${question.chapter.id}/questions`;
+    const questionsHref = question.topic
+        ? `/superadmin/questions/chapters/${question.chapter.id}/topics/${question.topic.id}`
+        : `/superadmin/questions/chapters/${question.chapter.id}`;
 
     return (
         <>
@@ -546,7 +548,7 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
                         <Link
-                            href={chapterQuestionsHref}
+                            href={questionsHref}
                             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
                         >
                             <ArrowLeftIcon className="size-4" />
