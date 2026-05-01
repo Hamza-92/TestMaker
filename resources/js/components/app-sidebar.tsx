@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
     BookOpenIcon,
+    HelpCircleIcon,
     LayoutGrid,
     SchoolIcon,
     ShapesIcon,
@@ -47,6 +48,11 @@ const mainNavItems: NavItem[] = [
         title: 'Subjects',
         href: '/superadmin/subjects',
         icon: BookOpenIcon,
+    },
+    {
+        title: 'Questions',
+        href: '/superadmin/questions',
+        icon: HelpCircleIcon,
     },
     {
         title: 'Question Types',

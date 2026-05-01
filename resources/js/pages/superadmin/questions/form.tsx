@@ -1264,10 +1264,13 @@ export function QuestionForm({
                     <Button asChild variant="outline">
                         <Link href={backHref}>Cancel</Link>
                     </Button>
+                    <Button type="submit" variant="outline" disabled={form.processing}>
+                        <CheckCircle2Icon className="size-4" />
+                        {form.processing ? 'Saving...' : submitLabel}
+                    </Button>
                     {secondarySubmitLabel ? (
                         <Button
                             type="submit"
-                            variant="outline"
                             name="save_and_add_new"
                             value="save-and-add-new"
                             disabled={form.processing}
@@ -1276,10 +1279,6 @@ export function QuestionForm({
                             {secondarySubmitLabel}
                         </Button>
                     ) : null}
-                    <Button type="submit" disabled={form.processing}>
-                        <CheckCircle2Icon className="size-4" />
-                        {form.processing ? 'Saving...' : submitLabel}
-                    </Button>
                 </div>
             </form>
         </div>

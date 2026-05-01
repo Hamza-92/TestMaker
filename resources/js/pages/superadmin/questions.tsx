@@ -5,7 +5,6 @@ import {
     ChevronsLeftIcon,
     ChevronsRightIcon,
     EyeIcon,
-    FileUpIcon,
     PencilIcon,
     SearchIcon,
     Trash2Icon,
@@ -20,7 +19,6 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -28,7 +26,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import type { QuestionTypeOption } from './questions/form';
+import type { ChapterOption, QuestionTypeOption, SourceOption } from './questions/form';
 
 interface QuestionRow {
     id: number;
@@ -44,965 +42,546 @@ interface QuestionRow {
         name_ur: string | null;
         chapter_number: number | null;
         group_name: string | null;
-        group_heading: string | null;
-        subject: {
-            id: number;
-            name_eng: string;
-            name_ur: string | null;
-            subject_type: 'chapter-wise' | 'topic-wise';
-        };
-        class: {
-            id: number;
-            name: string;
-        };
-        pattern: {
-            id: number;
-            name: string;
-            short_name: string | null;
-        };
+        subject: { id: number; name_eng: string; subject_type: 'chapter-wise' | 'topic-wise' };
+        class: { id: number; name: string };
+        pattern: { id: number; name: string; short_name: string | null };
     };
-    topic: {
-        id: number;
-        name: string;
-        name_ur: string | null;
-    } | null;
+    topic: { id: number; name: string; name_ur: string | null } | null;
     options_count: number;
     correct_options_count: number;
     items_count: number;
 }
 
-interface PatternFilterOption {
-    id: number;
-    name: string;
-    short_name: string | null;
+interface Filters {
+    chapter_id: number | null;
+    topic_id: number | null;
 }
 
-interface ClassFilterOption {
-    id: number;
-    name: string;
+function uniqueById<T extends { id: number }>(arr: T[]): T[] {
+    const seen = new Set<number>();
+    return arr.filter((item) => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+    });
 }
 
-interface SubjectFilterOption {
-    id: number;
-    name_eng: string;
-    name_ur: string | null;
-}
-
-interface SourceFilterOption {
-    value: string;
-    label: string;
-}
-
-type FacetKey =
-    | 'pattern'
-    | 'class'
-    | 'subject'
-    | 'kind'
-    | 'type'
-    | 'source'
-    | 'status';
-
-interface FacetFilters {
-    pattern: string;
-    class: string;
-    subject: string;
-    kind: string;
-    type: string;
-    source: string;
-    status: string;
-}
-
-const PAGE_SIZE_OPTIONS = [5, 10, 20];
-const BLANK_SOURCE_VALUE = '__blank__';
-const KIND_FILTER_OPTIONS = [
-    { value: 'objective', label: 'Objective' },
-    { value: 'subjective', label: 'Subjective' },
-] as const;
-const STATUS_FILTER_OPTIONS = [
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-] as const;
-
-function statusBadge(status: number) {
+function StatusBadge({ status }: { status: number }) {
     return status === 1 ? (
-        <Badge
-            variant="outline"
-            className="border-emerald-200 bg-emerald-100 font-medium text-emerald-700"
-        >
+        <Badge variant="outline" className="border-emerald-200 bg-emerald-100 font-medium text-emerald-700">
             <span className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />
             Active
         </Badge>
     ) : (
-        <Badge
-            variant="outline"
-            className="border-gray-200 bg-gray-100 font-medium text-gray-600"
-        >
+        <Badge variant="outline" className="border-gray-200 bg-gray-100 font-medium text-gray-600">
             <span className="mr-1 inline-block size-1.5 rounded-full bg-gray-400" />
             Inactive
         </Badge>
     );
 }
 
-function truncateText(value: string, maxLength = 84) {
-    return value.length > maxLength
-        ? `${value.slice(0, maxLength - 1)}...`
-        : value;
-}
-
-function patternLabel(
-    pattern: PatternFilterOption | QuestionRow['chapter']['pattern'],
-) {
-    return pattern.short_name
-        ? `${pattern.short_name} / ${pattern.name}`
-        : pattern.name;
-}
-
-function chapterLabel(chapter: QuestionRow['chapter']) {
-    const chapterPart = chapter.chapter_number
-        ? `Ch ${chapter.chapter_number}`
-        : chapter.name;
-    const groupedChapter = chapter.group_name
-        ? `${chapter.group_name} / ${chapterPart}`
-        : chapterPart;
-
-    return [
-        chapter.subject.name_eng,
-        groupedChapter,
-        chapter.class.name,
-        patternLabel(chapter.pattern),
-    ].join(' / ');
-}
-
-function sourceFilterValue(question: QuestionRow) {
-    return question.source && question.source.length > 0
-        ? question.source
-        : BLANK_SOURCE_VALUE;
-}
-
-function matchesFacetFilters(
-    question: QuestionRow,
-    filters: FacetFilters,
-    excluded: FacetKey[] = [],
-) {
-    const skip = new Set(excluded);
-
-    const matchesPattern =
-        skip.has('pattern') ||
-        filters.pattern === 'all' ||
-        String(question.chapter.pattern.id) === filters.pattern;
-
-    const matchesClass =
-        skip.has('class') ||
-        filters.class === 'all' ||
-        String(question.chapter.class.id) === filters.class;
-
-    const matchesSubject =
-        skip.has('subject') ||
-        filters.subject === 'all' ||
-        String(question.chapter.subject.id) === filters.subject;
-
-    const matchesKind =
-        skip.has('kind') ||
-        filters.kind === 'all' ||
-        (filters.kind === 'objective' && question.question_type.is_objective) ||
-        (filters.kind === 'subjective' && !question.question_type.is_objective);
-
-    const matchesType =
-        skip.has('type') ||
-        filters.type === 'all' ||
-        String(question.question_type.id) === filters.type;
-
-    const matchesSource =
-        skip.has('source') ||
-        filters.source === 'all' ||
-        sourceFilterValue(question) === filters.source;
-
-    const matchesStatus =
-        skip.has('status') ||
-        filters.status === 'all' ||
-        (filters.status === 'active' && question.status === 1) ||
-        (filters.status === 'inactive' && question.status === 0);
-
-    return (
-        matchesPattern &&
-        matchesClass &&
-        matchesSubject &&
-        matchesKind &&
-        matchesType &&
-        matchesSource &&
-        matchesStatus
+function KindBadge({ isObjective }: { isObjective: boolean }) {
+    return isObjective ? (
+        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[11px] font-normal text-blue-700 px-1.5 py-0">
+            Obj
+        </Badge>
+    ) : (
+        <Badge variant="outline" className="border-violet-200 bg-violet-50 text-[11px] font-normal text-violet-700 px-1.5 py-0">
+            Subj
+        </Badge>
     );
 }
 
-function matchesSearch(question: QuestionRow, query: string) {
-    const normalized = query.trim().toLowerCase();
-
-    if (normalized === '') {
-        return true;
-    }
-
-    return (
-        question.question_type.name.toLowerCase().includes(normalized) ||
-        question.question_type.schema.label
-            .toLowerCase()
-            .includes(normalized) ||
-        question.chapter.subject.name_eng.toLowerCase().includes(normalized) ||
-        question.chapter.class.name.toLowerCase().includes(normalized) ||
-        question.chapter.pattern.name.toLowerCase().includes(normalized) ||
-        (question.chapter.pattern.short_name ?? '')
-            .toLowerCase()
-            .includes(normalized) ||
-        question.chapter.name.toLowerCase().includes(normalized) ||
-        (question.topic?.name ?? '').toLowerCase().includes(normalized) ||
-        (question.source_label ?? question.source ?? '')
-            .toLowerCase()
-            .includes(normalized) ||
-        question.summary_text.toLowerCase().includes(normalized)
-    );
-}
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const NONE = '__none__';
 
 export default function Questions({
+    chapters,
     questions,
-    questionTypes,
+    filters,
+    questionTypes: _questionTypes,
+    sourceOptions: _sourceOptions,
 }: {
-    questions: QuestionRow[];
+    chapters: ChapterOption[];
+    questions: QuestionRow[] | null;
+    filters: Filters;
     questionTypes: QuestionTypeOption[];
+    sourceOptions: SourceOption[];
 }) {
+    // ── Derive the initial chapter from filters ──────────────────────────────
+    const activeChapter = useMemo(
+        () => chapters.find((c) => c.id === filters.chapter_id) ?? null,
+        [chapters, filters.chapter_id],
+    );
+
+    // ── Local cascading-filter state ─────────────────────────────────────────
+    const [patternId, setPatternId] = useState(() =>
+        activeChapter ? String(activeChapter.pattern.id) : '',
+    );
+    const [classId, setClassId] = useState(() =>
+        activeChapter ? String(activeChapter.class.id) : '',
+    );
+    const [subjectId, setSubjectId] = useState(() =>
+        activeChapter ? String(activeChapter.subject.id) : '',
+    );
+    const [chapterId, setChapterId] = useState(() =>
+        filters.chapter_id ? String(filters.chapter_id) : '',
+    );
+    const [topicId, setTopicId] = useState(() =>
+        filters.topic_id ? String(filters.topic_id) : '',
+    );
+
+    // ── Search / pagination (client-side, within loaded questions) ────────────
     const [search, setSearch] = useState('');
-    const [patternFilter, setPatternFilter] = useState('all');
-    const [classFilter, setClassFilter] = useState('all');
-    const [subjectFilter, setSubjectFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [kindFilter, setKindFilter] = useState('all');
-    const [typeFilter, setTypeFilter] = useState('all');
-    const [sourceFilter, setSourceFilter] = useState('all');
-    const [pageSize, setPageSize] = useState(10);
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [deleteTarget, setDeleteTarget] = useState<QuestionRow | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    const activeFilters = useMemo<FacetFilters>(
-        () => ({
-            pattern: patternFilter,
-            class: classFilter,
-            subject: subjectFilter,
-            kind: kindFilter,
-            type: typeFilter,
-            source: sourceFilter,
-            status: statusFilter,
-        }),
-        [
-            classFilter,
-            kindFilter,
-            patternFilter,
-            sourceFilter,
-            statusFilter,
-            subjectFilter,
-            typeFilter,
-        ],
+    // ── Cascaded dropdown options ─────────────────────────────────────────────
+    const patterns = useMemo(
+        () => uniqueById(chapters.map((c) => c.pattern)),
+        [chapters],
     );
 
-    const allPatternOptions = useMemo(() => {
-        const patterns = new Map<number, PatternFilterOption>();
+    const availableClasses = useMemo(
+        () =>
+            !patternId
+                ? []
+                : uniqueById(
+                      chapters
+                          .filter((c) => String(c.pattern.id) === patternId)
+                          .map((c) => c.class),
+                  ),
+        [chapters, patternId],
+    );
 
-        questions.forEach((question) => {
-            patterns.set(question.chapter.pattern.id, question.chapter.pattern);
-        });
+    const availableSubjects = useMemo(
+        () =>
+            !classId
+                ? []
+                : uniqueById(
+                      chapters
+                          .filter(
+                              (c) =>
+                                  String(c.pattern.id) === patternId &&
+                                  String(c.class.id) === classId,
+                          )
+                          .map((c) => c.subject),
+                  ),
+        [chapters, patternId, classId],
+    );
 
-        return Array.from(patterns.values()).sort((left, right) =>
-            patternLabel(left).localeCompare(patternLabel(right)),
-        );
-    }, [questions]);
+    const availableChapters = useMemo(
+        () =>
+            !subjectId
+                ? []
+                : chapters.filter(
+                      (c) =>
+                          String(c.pattern.id) === patternId &&
+                          String(c.class.id) === classId &&
+                          String(c.subject.id) === subjectId,
+                  ),
+        [chapters, patternId, classId, subjectId],
+    );
 
-    const allClassOptions = useMemo(() => {
-        const classes = new Map<number, ClassFilterOption>();
+    const selectedChapter = useMemo(
+        () => availableChapters.find((c) => String(c.id) === chapterId) ?? null,
+        [availableChapters, chapterId],
+    );
 
-        questions.forEach((question) => {
-            classes.set(question.chapter.class.id, question.chapter.class);
-        });
+    const isTopicWise = selectedChapter?.subject.subject_type === 'topic-wise';
+    const availableTopics = selectedChapter?.topics ?? [];
 
-        return Array.from(classes.values()).sort((left, right) =>
-            left.name.localeCompare(right.name),
-        );
-    }, [questions]);
+    // ── Navigate to load questions from server ────────────────────────────────
+    const navigate = (newChapterId: string, newTopicId = '') => {
+        const params: Record<string, string> = {};
+        if (newChapterId) params.chapter_id = newChapterId;
+        if (newTopicId) params.topic_id = newTopicId;
+        router.get('/superadmin/questions', params, { preserveState: true, replace: true });
+    };
 
-    const allSubjectOptions = useMemo(() => {
-        const subjects = new Map<number, SubjectFilterOption>();
+    // ── Filter handlers ───────────────────────────────────────────────────────
+    const handlePatternChange = (val: string) => {
+        const v = val === NONE ? '' : val;
+        setPatternId(v);
+        setClassId('');
+        setSubjectId('');
+        setChapterId('');
+        setTopicId('');
+        if (filters.chapter_id) navigate('');
+    };
 
-        questions.forEach((question) => {
-            subjects.set(question.chapter.subject.id, question.chapter.subject);
-        });
+    const handleClassChange = (val: string) => {
+        const v = val === NONE ? '' : val;
+        setClassId(v);
+        setSubjectId('');
+        setChapterId('');
+        setTopicId('');
+        if (filters.chapter_id) navigate('');
+    };
 
-        return Array.from(subjects.values()).sort((left, right) =>
-            left.name_eng.localeCompare(right.name_eng),
-        );
-    }, [questions]);
+    const handleSubjectChange = (val: string) => {
+        const v = val === NONE ? '' : val;
+        setSubjectId(v);
+        setChapterId('');
+        setTopicId('');
+        if (filters.chapter_id) navigate('');
+    };
 
-    const allSourceOptions = useMemo(() => {
-        const sources = new Map<string, SourceFilterOption>();
+    const handleChapterChange = (val: string) => {
+        const v = val === NONE ? '' : val;
+        setChapterId(v);
+        setTopicId('');
+        if (!v) { navigate(''); return; }
+        const ch = availableChapters.find((c) => String(c.id) === v);
+        if (ch?.subject.subject_type !== 'topic-wise') {
+            navigate(v);
+        }
+        // topic-wise: wait for topic selection
+    };
 
-        questions.forEach((question) => {
-            sources.set(sourceFilterValue(question), {
-                value: sourceFilterValue(question),
-                label: question.source_label || question.source || 'No source',
-            });
-        });
+    const handleTopicChange = (val: string) => {
+        const v = val === NONE ? '' : val;
+        setTopicId(v);
+        navigate(chapterId, v);
+    };
 
-        return Array.from(sources.values()).sort((left, right) =>
-            left.label.localeCompare(right.label),
-        );
-    }, [questions]);
-
-    const patternOptions = useMemo(() => {
-        const availableIds = new Set(
-            questions
-                .filter((question) =>
-                    matchesFacetFilters(question, activeFilters, ['pattern']),
-                )
-                .map((question) => question.chapter.pattern.id),
-        );
-
-        return allPatternOptions.filter(
-            (option) =>
-                availableIds.has(option.id) ||
-                String(option.id) === patternFilter,
-        );
-    }, [activeFilters, allPatternOptions, patternFilter, questions]);
-
-    const classOptions = useMemo(() => {
-        const availableIds = new Set(
-            questions
-                .filter((question) =>
-                    matchesFacetFilters(question, activeFilters, ['class']),
-                )
-                .map((question) => question.chapter.class.id),
-        );
-
-        return allClassOptions.filter(
-            (option) =>
-                availableIds.has(option.id) ||
-                String(option.id) === classFilter,
-        );
-    }, [activeFilters, allClassOptions, classFilter, questions]);
-
-    const subjectOptions = useMemo(() => {
-        const availableIds = new Set(
-            questions
-                .filter((question) =>
-                    matchesFacetFilters(question, activeFilters, ['subject']),
-                )
-                .map((question) => question.chapter.subject.id),
-        );
-
-        return allSubjectOptions.filter(
-            (option) =>
-                availableIds.has(option.id) ||
-                String(option.id) === subjectFilter,
-        );
-    }, [activeFilters, allSubjectOptions, questions, subjectFilter]);
-
-    const kindOptions = useMemo(() => {
-        const availableKinds = new Set(
-            questions
-                .filter((question) =>
-                    matchesFacetFilters(question, activeFilters, ['kind']),
-                )
-                .map((question) =>
-                    question.question_type.is_objective
-                        ? 'objective'
-                        : 'subjective',
-                ),
-        );
-
-        return KIND_FILTER_OPTIONS.filter(
-            (option) =>
-                availableKinds.has(option.value) || option.value === kindFilter,
-        );
-    }, [activeFilters, kindFilter, questions]);
-
-    const typeOptions = useMemo(() => {
-        const availableIds = new Set(
-            questions
-                .filter((question) =>
-                    matchesFacetFilters(question, activeFilters, ['type']),
-                )
-                .map((question) => question.question_type.id),
-        );
-
-        return questionTypes.filter(
-            (option) =>
-                availableIds.has(option.id) || String(option.id) === typeFilter,
-        );
-    }, [activeFilters, questionTypes, questions, typeFilter]);
-
-    const sourceOptions = useMemo(() => {
-        const availableValues = new Set(
-            questions
-                .filter((question) =>
-                    matchesFacetFilters(question, activeFilters, ['source']),
-                )
-                .map((question) => sourceFilterValue(question)),
-        );
-
-        return allSourceOptions.filter(
-            (option) =>
-                availableValues.has(option.value) ||
-                option.value === sourceFilter,
-        );
-    }, [activeFilters, allSourceOptions, questions, sourceFilter]);
-
-    const statusOptions = useMemo(() => {
-        const availableStatuses = new Set(
-            questions
-                .filter((question) =>
-                    matchesFacetFilters(question, activeFilters, ['status']),
-                )
-                .map((question) =>
-                    question.status === 1 ? 'active' : 'inactive',
-                ),
-        );
-
-        return STATUS_FILTER_OPTIONS.filter(
-            (option) =>
-                availableStatuses.has(option.value) ||
-                option.value === statusFilter,
-        );
-    }, [activeFilters, questions, statusFilter]);
-
+    // ── Client-side search within loaded questions ────────────────────────────
     const filtered = useMemo(() => {
-        return questions.filter((question) => {
-            return (
-                matchesSearch(question, search) &&
-                matchesFacetFilters(question, activeFilters)
-            );
-        });
-    }, [activeFilters, questions, search]);
-
-    const hasActiveFilters =
-        search.trim() !== '' ||
-        patternFilter !== 'all' ||
-        classFilter !== 'all' ||
-        subjectFilter !== 'all' ||
-        kindFilter !== 'all' ||
-        typeFilter !== 'all' ||
-        sourceFilter !== 'all' ||
-        statusFilter !== 'all';
+        if (!questions) return [];
+        const q = search.toLowerCase().trim();
+        if (!q) return questions;
+        return questions.filter((r) =>
+            r.summary_text.toLowerCase().includes(q) ||
+            r.question_type.name.toLowerCase().includes(q),
+        );
+    }, [questions, search]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const safePage = Math.min(page, totalPages);
-    const paginated = filtered.slice(
-        (safePage - 1) * pageSize,
-        safePage * pageSize,
-    );
+    const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+    const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
 
-    const goTo = (targetPage: number) =>
-        setPage(Math.min(Math.max(1, targetPage), totalPages));
-
-    const clearFilters = () => {
-        setSearch('');
-        setPatternFilter('all');
-        setClassFilter('all');
-        setSubjectFilter('all');
-        setKindFilter('all');
-        setTypeFilter('all');
-        setSourceFilter('all');
-        setStatusFilter('all');
-        setPage(1);
-    };
-
+    // ── Delete ────────────────────────────────────────────────────────────────
     const confirmDelete = () => {
-        if (!deleteTarget) {
-            return;
-        }
-
+        if (!deleteTarget) return;
         setDeleting(true);
+        const params: Record<string, string> = {};
+        if (filters.chapter_id) params.chapter_id = String(filters.chapter_id);
+        if (filters.topic_id) params.topic_id = String(filters.topic_id);
         router.delete(`/superadmin/questions/${deleteTarget.id}`, {
-            onFinish: () => {
-                setDeleting(false);
-                setDeleteTarget(null);
-            },
+            data: params,
+            onFinish: () => { setDeleting(false); setDeleteTarget(null); },
         });
     };
+
+    // ── Add button href ───────────────────────────────────────────────────────
+    const addHref = chapterId
+        ? `/superadmin/questions/add?chapter_id=${chapterId}${topicId ? `&topic_id=${topicId}` : ''}`
+        : '/superadmin/questions/add';
+
+    // ── Chapter label helper ──────────────────────────────────────────────────
+    const chapterLabel = (c: ChapterOption) => {
+        const title = c.chapter_number ? `Chapter ${c.chapter_number}` : c.name;
+        return c.group_name ? `${c.group_name} / ${title}` : title;
+    };
+
+    const canAddQuestion = !!chapterId && (!isTopicWise || !!topicId);
+    const showTable = questions !== null;
 
     return (
         <>
             <Head title="Questions" />
 
             <div className="space-y-5 p-4 md:p-6">
-                <div className="flex items-center justify-between">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4">
                     <div>
                         <h1 className="h1-semibold">Questions</h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            {filtered.length} total
-                        </p>
+                        {showTable && (
+                            <p className="mt-0.5 text-sm text-muted-foreground">
+                                {filtered.length} question{filtered.length !== 1 ? 's' : ''}
+                            </p>
+                        )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    {canAddQuestion && (
                         <Link
-                            href="/superadmin/questions/import"
-                            className="flex items-center gap-2 rounded-lg border border-input px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
-                        >
-                            <FileUpIcon className="size-4" />
-                            <span className="hidden sm:inline">
-                                Bulk Import
-                            </span>
-                        </Link>
-                        <Link
-                            href="/superadmin/questions/add"
-                            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                            href={addHref}
+                            className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <PlusIcon size={16} color="currentColor" />
-                            <span className="hidden sm:inline">
-                                Add Question
-                            </span>
+                            <span className="hidden sm:inline">Add Question</span>
                         </Link>
-                    </div>
+                    )}
                 </div>
 
-                <div className="space-y-4 rounded-xl border p-4 shadow-sm">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="relative min-w-0 flex-1">
-                            <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                placeholder="Search questions..."
-                                value={search}
-                                onChange={(event) => {
-                                    setSearch(event.target.value);
-                                    setPage(1);
-                                }}
-                                className="pl-9"
-                            />
-                        </div>
+                {/* Cascading Filters */}
+                <div className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        {/* Pattern */}
+                        <Select
+                            value={patternId || NONE}
+                            onValueChange={handlePatternChange}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Pattern" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={NONE}>All patterns</SelectItem>
+                                {patterns.map((p) => (
+                                    <SelectItem key={p.id} value={String(p.id)}>
+                                        {p.short_name ?? p.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
-                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                            <button
-                                type="button"
-                                onClick={clearFilters}
-                                disabled={!hasActiveFilters}
-                                className="flex h-10 items-center rounded-lg border border-input px-4 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Clear Filters
-                            </button>
+                        {/* Class */}
+                        <Select
+                            value={classId || NONE}
+                            onValueChange={handleClassChange}
+                            disabled={availableClasses.length === 0}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Class" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={NONE}>All classes</SelectItem>
+                                {availableClasses.map((c) => (
+                                    <SelectItem key={c.id} value={String(c.id)}>
+                                        {c.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
+                        {/* Subject */}
+                        <Select
+                            value={subjectId || NONE}
+                            onValueChange={handleSubjectChange}
+                            disabled={availableSubjects.length === 0}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={NONE}>All subjects</SelectItem>
+                                {availableSubjects.map((s) => (
+                                    <SelectItem key={s.id} value={String(s.id)}>
+                                        {s.name_eng}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Chapter */}
+                        <Select
+                            value={chapterId || NONE}
+                            onValueChange={handleChapterChange}
+                            disabled={availableChapters.length === 0}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Chapter" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-80">
+                                <SelectItem value={NONE}>Select chapter</SelectItem>
+                                {availableChapters.map((c) => (
+                                    <SelectItem key={c.id} value={String(c.id)}>
+                                        {chapterLabel(c)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Topic (topic-wise only) */}
+                        {isTopicWise ? (
                             <Select
-                                value={String(pageSize)}
-                                onValueChange={(value) => {
-                                    setPageSize(Number(value));
-                                    setPage(1);
-                                }}
+                                value={topicId || NONE}
+                                onValueChange={handleTopicChange}
+                                disabled={availableTopics.length === 0}
                             >
-                                <SelectTrigger className="w-24">
-                                    <SelectValue />
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Topic" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    {PAGE_SIZE_OPTIONS.map((value) => (
-                                        <SelectItem
-                                            key={value}
-                                            value={String(value)}
-                                        >
-                                            {value}
+                                <SelectContent className="max-h-80">
+                                    <SelectItem value={NONE}>All topics</SelectItem>
+                                    {availableTopics.map((t) => (
+                                        <SelectItem key={t.id} value={String(t.id)}>
+                                            {t.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-                        <Select
-                            value={patternFilter}
-                            onValueChange={(value) => {
-                                setPatternFilter(value);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Pattern" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All patterns
-                                </SelectItem>
-                                {patternOptions.map((pattern) => (
-                                    <SelectItem
-                                        key={pattern.id}
-                                        value={String(pattern.id)}
-                                    >
-                                        {patternLabel(pattern)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={classFilter}
-                            onValueChange={(value) => {
-                                setClassFilter(value);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Class" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All classes</SelectItem>
-                                {classOptions.map((schoolClass) => (
-                                    <SelectItem
-                                        key={schoolClass.id}
-                                        value={String(schoolClass.id)}
-                                    >
-                                        {schoolClass.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={subjectFilter}
-                            onValueChange={(value) => {
-                                setSubjectFilter(value);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Subject" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All subjects
-                                </SelectItem>
-                                {subjectOptions.map((subject) => (
-                                    <SelectItem
-                                        key={subject.id}
-                                        value={String(subject.id)}
-                                    >
-                                        {subject.name_eng}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={kindFilter}
-                            onValueChange={(value) => {
-                                setKindFilter(value);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Objective / Subjective" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All objective / subjective
-                                </SelectItem>
-                                {kindOptions.map((option) => (
-                                    <SelectItem
-                                        key={option.value}
-                                        value={option.value}
-                                    >
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={typeFilter}
-                            onValueChange={(value) => {
-                                setTypeFilter(value);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Question Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All question types
-                                </SelectItem>
-                                {typeOptions.map((item) => (
-                                    <SelectItem
-                                        key={item.id}
-                                        value={String(item.id)}
-                                    >
-                                        {item.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={sourceFilter}
-                            onValueChange={(value) => {
-                                setSourceFilter(value);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Source" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All sources</SelectItem>
-                                {sourceOptions.map((source) => (
-                                    <SelectItem
-                                        key={source.value}
-                                        value={source.value}
-                                    >
-                                        {source.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select
-                            value={statusFilter}
-                            onValueChange={(value) => {
-                                setStatusFilter(value);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All statuses
-                                </SelectItem>
-                                {statusOptions.map((option) => (
-                                    <SelectItem
-                                        key={option.value}
-                                        value={option.value}
-                                    >
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        ) : (
+                            <div className="hidden lg:block" />
+                        )}
                     </div>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/40">
-                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Question
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Type
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Chapter
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Source
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Status
-                                    </th>
-                                    <th className="w-16 px-4 py-3 text-center font-medium text-muted-foreground" />
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {paginated.length === 0 ? (
-                                    <tr>
-                                        <td
-                                            colSpan={6}
-                                            className="py-16 text-center text-muted-foreground"
-                                        >
-                                            <SearchIcon className="mx-auto mb-2 size-8 opacity-30" />
-                                            No questions found
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginated.map((question, index) => (
-                                        <tr
-                                            key={question.id}
-                                            className={`transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
-                                        >
-                                            <td className="px-4 py-3">
-                                                <p className="font-medium">
-                                                    {truncateText(
-                                                        question.summary_text,
-                                                    )}
-                                                </p>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <p className="font-medium">
-                                                    {
-                                                        question.question_type
-                                                            .name
-                                                    }
-                                                </p>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <p className="font-medium">
-                                                    {chapterLabel(
-                                                        question.chapter,
-                                                    )}
-                                                </p>
-                                                {question.topic ? (
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {question.topic.name}
-                                                    </p>
-                                                ) : null}
-                                            </td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {question.source_label ||
-                                                    question.source ||
-                                                    '-'}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {statusBadge(question.status)}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <Link
-                                                        href={`/superadmin/questions/${question.id}`}
-                                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                                    >
-                                                        <EyeIcon className="size-4" />
-                                                    </Link>
-                                                    <Link
-                                                        href={`/superadmin/questions/${question.id}/edit`}
-                                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                                    >
-                                                        <PencilIcon className="size-4" />
-                                                    </Link>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setDeleteTarget(
-                                                                question,
-                                                            )
-                                                        }
-                                                        className="rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10"
-                                                    >
-                                                        <Trash2Icon className="size-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                {/* Empty state */}
+                {!showTable && (
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center text-muted-foreground">
+                        <SearchIcon className="mb-3 size-8 opacity-30" />
+                        <p className="text-sm font-medium">Select a chapter to view questions</p>
+                        {isTopicWise && chapterId && !topicId && (
+                            <p className="mt-1 text-xs opacity-70">Then select a topic</p>
+                        )}
                     </div>
+                )}
 
-                    <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-3">
-                        <p className="text-xs text-muted-foreground">
-                            {filtered.length === 0
-                                ? 'No results'
-                                : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
-                        </p>
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                onClick={() => goTo(1)}
-                                disabled={safePage === 1}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
+                {/* Questions table */}
+                {showTable && (
+                    <div className="space-y-3">
+                        {/* Table toolbar */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative min-w-48 flex-1">
+                                <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="Search questions…"
+                                    value={search}
+                                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                                    className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-lg border bg-transparent px-3 py-1 pl-9 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
+                                />
+                            </div>
+                            <Select
+                                value={String(pageSize)}
+                                onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}
                             >
-                                <ChevronsLeftIcon className="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => goTo(safePage - 1)}
-                                disabled={safePage === 1}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
-                            >
-                                <ChevronLeftIcon className="size-4" />
-                            </button>
+                                <SelectTrigger className="w-20">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PAGE_SIZE_OPTIONS.map((n) => (
+                                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                            <div className="flex items-center gap-1 px-1">
-                                {Array.from(
-                                    { length: totalPages },
-                                    (_, index) => index + 1,
-                                )
-                                    .filter(
-                                        (value) =>
-                                            value === 1 ||
-                                            value === totalPages ||
-                                            Math.abs(value - safePage) <= 1,
-                                    )
-                                    .reduce<(number | 'ellipsis')[]>(
-                                        (carry, value, index, array) => {
-                                            if (
-                                                index > 0 &&
-                                                value -
-                                                    (array[
-                                                        index - 1
-                                                    ] as number) >
-                                                    1
-                                            ) {
-                                                carry.push('ellipsis');
-                                            }
-
-                                            carry.push(value);
-
-                                            return carry;
-                                        },
-                                        [],
-                                    )
-                                    .map((value, index) =>
-                                        value === 'ellipsis' ? (
-                                            <span
-                                                key={`ellipsis-${index}`}
-                                                className="px-1 text-xs text-muted-foreground"
-                                            >
-                                                ...
-                                            </span>
+                        <div className="overflow-hidden rounded-xl border shadow-sm">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b bg-muted/40">
+                                            <th className="w-10 px-3 py-3 text-left font-medium text-muted-foreground">#</th>
+                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">Question</th>
+                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">Type</th>
+                                            {isTopicWise && !topicId && (
+                                                <th className="px-3 py-3 text-left font-medium text-muted-foreground">Topic</th>
+                                            )}
+                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">Status</th>
+                                            <th className="w-24 px-3 py-3" />
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {paginated.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={isTopicWise && !topicId ? 6 : 5} className="py-16 text-center text-muted-foreground">
+                                                    <SearchIcon className="mx-auto mb-2 size-8 opacity-30" />
+                                                    No questions found
+                                                </td>
+                                            </tr>
                                         ) : (
-                                            <button
-                                                key={value}
-                                                type="button"
-                                                onClick={() =>
-                                                    goTo(value as number)
-                                                }
-                                                className={`min-w-[28px] rounded px-2 py-1 text-xs font-medium transition-colors ${safePage === value ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-                                            >
-                                                {value}
-                                            </button>
-                                        ),
-                                    )}
+                                            paginated.map((q, i) => (
+                                                <tr
+                                                    key={q.id}
+                                                    className={`transition-colors ${i % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
+                                                >
+                                                    <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
+                                                        {(safePage - 1) * pageSize + i + 1}
+                                                    </td>
+                                                    <td className="px-3 py-3 max-w-sm">
+                                                        <p className="line-clamp-2 text-sm">{q.summary_text}</p>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <KindBadge isObjective={q.question_type.is_objective} />
+                                                            <span className="text-xs text-muted-foreground">{q.question_type.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    {isTopicWise && !topicId && (
+                                                        <td className="px-3 py-3 text-xs text-muted-foreground">
+                                                            {q.topic?.name ?? '—'}
+                                                        </td>
+                                                    )}
+                                                    <td className="px-3 py-3">
+                                                        <StatusBadge status={q.status} />
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <Link
+                                                                href={`/superadmin/questions/${q.id}`}
+                                                                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                                title="View"
+                                                            >
+                                                                <EyeIcon className="size-4" />
+                                                            </Link>
+                                                            <Link
+                                                                href={`/superadmin/questions/${q.id}/edit`}
+                                                                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                                title="Edit"
+                                                            >
+                                                                <PencilIcon className="size-4" />
+                                                            </Link>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDeleteTarget(q)}
+                                                                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2Icon className="size-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => goTo(safePage + 1)}
-                                disabled={safePage === totalPages}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
-                            >
-                                <ChevronRightIcon className="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => goTo(totalPages)}
-                                disabled={safePage === totalPages}
-                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
-                            >
-                                <ChevronsRightIcon className="size-4" />
-                            </button>
+                            {/* Pagination */}
+                            <div className="flex flex-col gap-3 border-t bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                                <p className="text-sm text-muted-foreground">
+                                    {filtered.length === 0
+                                        ? 'No results'
+                                        : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <button type="button" onClick={() => goTo(1)} disabled={safePage === 1} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                        <ChevronsLeftIcon className="size-4" />
+                                    </button>
+                                    <button type="button" onClick={() => goTo(safePage - 1)} disabled={safePage === 1} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                        <ChevronLeftIcon className="size-4" />
+                                    </button>
+                                    <span className="px-2 text-sm text-muted-foreground">{safePage} / {totalPages}</span>
+                                    <button type="button" onClick={() => goTo(safePage + 1)} disabled={safePage === totalPages} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                        <ChevronRightIcon className="size-4" />
+                                    </button>
+                                    <button type="button" onClick={() => goTo(totalPages)} disabled={safePage === totalPages} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                        <ChevronsRightIcon className="size-4" />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
 
-            <Dialog
-                open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
-            >
-                <DialogContent>
+            {/* Delete dialog */}
+            <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <DialogContent className="sm:max-w-md">
                     <DialogTitle>Delete Question</DialogTitle>
                     <DialogDescription>
-                        Are you sure you want to delete question #
-                        {deleteTarget?.id}?
+                        Delete this question? This cannot be undone.
                     </DialogDescription>
-                    <DialogFooter className="gap-2">
+                    <DialogFooter>
                         <button
                             type="button"
                             onClick={() => setDeleteTarget(null)}
-                            className="flex h-9 items-center rounded-lg border border-input px-4 text-sm font-medium transition-colors hover:bg-accent"
+                            className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
                         >
                             Cancel
                         </button>
@@ -1010,10 +589,9 @@ export default function Questions({
                             type="button"
                             onClick={confirmDelete}
                             disabled={deleting}
-                            className="flex h-9 items-center gap-2 rounded-lg bg-destructive px-4 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                            className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
                         >
-                            <Trash2Icon className="size-4" />
-                            {deleting ? 'Deleting...' : 'Delete'}
+                            {deleting ? 'Deleting…' : 'Delete'}
                         </button>
                     </DialogFooter>
                 </DialogContent>

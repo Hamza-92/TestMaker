@@ -28,26 +28,40 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class QuestionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $questions = Question::query()
-            ->with([
-                'questionType.objectiveType:id,name',
-                'chapter.subject:id,name_eng,name_ur,subject_type',
-                'chapter.schoolClass:id,name',
-                'chapter.pattern:id,name,short_name',
-                'topic:id,name,name_ur,chapter_id',
-                'options',
-            ])
-            ->orderByDesc('created_at')
-            ->get();
+        $chapterId = $request->integer('chapter_id') ?: null;
+        $topicId   = $request->integer('topic_id') ?: null;
+
+        $questions = null;
+        if ($chapterId) {
+            $query = Question::query()
+                ->where('chapter_id', $chapterId)
+                ->with([
+                    'questionType.objectiveType:id,name',
+                    'chapter.subject:id,name_eng,name_ur,subject_type',
+                    'chapter.schoolClass:id,name',
+                    'chapter.pattern:id,name,short_name',
+                    'topic:id,name,name_ur,chapter_id',
+                    'options',
+                ])
+                ->orderByDesc('created_at');
+
+            if ($topicId) {
+                $query->where('topic_id', $topicId);
+            }
+
+            $questions = $query->get()
+                ->map(fn (Question $question) => $this->transformQuestionListItem($question))
+                ->values();
+        }
 
         return Inertia::render('superadmin/questions', [
-            'questions' => $questions
-                ->map(fn (Question $question) => $this->transformQuestionListItem($question))
-                ->values(),
+            'chapters'      => $this->chapterFormOptions(includeInactive: true),
+            'questions'     => $questions,
+            'filters'       => ['chapter_id' => $chapterId, 'topic_id' => $topicId],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions' => $this->sourceOptions(),
         ]);
     }
 
@@ -80,14 +94,21 @@ class QuestionController extends Controller
 
     public function create(Request $request)
     {
+        $chapterId = $request->integer('chapter_id') ?: null;
+        $topicId   = $request->integer('topic_id') ?: null;
+
+        $backParams = array_filter(['chapter_id' => $chapterId, 'topic_id' => $topicId]);
+        $backHref   = '/superadmin/questions' . (! empty($backParams) ? '?' . http_build_query($backParams) : '');
+
         return Inertia::render('superadmin/questions/add', [
-            'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters' => $this->chapterFormOptions(),
-            'sourceOptions' => $this->sourceOptions(),
-            'defaultChapterId' => $request->integer('chapter_id') ?: null,
-            'defaultTopicId' => $request->integer('topic_id') ?: null,
-            'lockedChapterId' => null,
-            'backHref' => '/superadmin/questions',
+            'questionTypes'   => $this->questionTypeFormOptions(),
+            'chapters'        => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions'   => $this->sourceOptions(),
+            'defaultChapterId' => $chapterId,
+            'defaultTopicId'  => $topicId,
+            'lockedChapterId' => $chapterId,
+            'lockedTopicId'   => $topicId,
+            'backHref'        => $backHref,
         ]);
     }
 
@@ -334,16 +355,17 @@ class QuestionController extends Controller
             return $question;
         });
 
+        $topicId = $validated['topic_id'] ?? null;
+
         if ($saveAndAddNew) {
             if ($request->boolean('topic_scoped')) {
-                $topicId = $validated['topic_id'] ?? null;
                 $topic = $topicId ? Topic::query()->find($topicId) : null;
                 if ($topic) {
                     return redirect()
                         ->route('superadmin.subjects.chapters.topics.questions.add', [
                             'subject' => $chapter->subject_id,
                             'chapter' => $chapter->id,
-                            'topic' => $topic->id,
+                            'topic'   => $topic->id,
                         ])
                         ->with('success', 'Question created successfully.');
                 }
@@ -358,12 +380,19 @@ class QuestionController extends Controller
                     ->with('success', 'Question created successfully.');
             }
 
+            $addParams = array_filter(['chapter_id' => $chapter->id, 'topic_id' => $topicId]);
+
             return redirect()
-                ->route('superadmin.questions.add', ['chapter_id' => $chapter->id])
+                ->route('superadmin.questions.add', $addParams)
                 ->with('success', 'Question created successfully.');
         }
 
-        return redirect()->route('superadmin.questions.show', $question)
+        $listParams = http_build_query(array_filter([
+            'chapter_id' => $question->chapter_id,
+            'topic_id'   => $question->topic_id,
+        ]));
+
+        return redirect('/superadmin/questions' . ($listParams ? "?{$listParams}" : ''))
             ->with('success', 'Question created successfully.');
     }
 
