@@ -4,8 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Enums\UserStatus;
+use App\Enums\UserType;
 use Illuminate\Database\Seeder;
-use Database\Seeders\MediumSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,12 +17,16 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             MediumSeeder::class,
+            PermissionSeeder::class,
         ]);
         // User::factory(10)->create();
 
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Super Admin',
+            'email' => 'admin@testmaker.com',
+            'user_type' => UserType::SuperAdmin,
+            'status' => UserStatus::Active,
+            'created_by' => null,
         ]);
     }
 }

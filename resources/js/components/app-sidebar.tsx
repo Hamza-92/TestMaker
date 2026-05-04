@@ -6,11 +6,13 @@ import {
     SchoolIcon,
     ShapesIcon,
     TagIcon,
+    UserCogIcon,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { usePermission } from '@/hooks/use-permission';
 import {
     Sidebar,
     SidebarContent,
@@ -23,7 +25,7 @@ import {
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
@@ -71,7 +73,17 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+const usersNavItem: NavItem = {
+    title: 'Users',
+    href: '/superadmin/users',
+    icon: UserCogIcon,
+};
+
 export function AppSidebar() {
+    const { can } = usePermission();
+
+    const navItems = can('users.view') ? [...baseNavItems, usersNavItem] : baseNavItems;
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -87,7 +99,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={navItems} />
             </SidebarContent>
 
             <SidebarFooter>
