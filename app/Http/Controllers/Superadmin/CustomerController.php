@@ -187,7 +187,7 @@ class CustomerController extends Controller
             'name'                  => ['required', 'string', 'max:255'],
             'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone'                 => ['required', 'string', 'max:30'],
-            'password'              => ['required', 'string', 'min:8', 'confirmed'],
+            'password'              => ['required', 'string', 'min:3', 'confirmed'],
             'status'                => ['required', 'in:active,inactive,suspended'],
             'school_name'           => ['nullable', 'string', 'max:255'],
             'logo'                  => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],

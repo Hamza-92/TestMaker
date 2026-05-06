@@ -46,6 +46,40 @@ interface FormData {
     [key: string]: string | boolean | File | null;
 }
 
+function CompletionRing({ percent }: { percent: number }) {
+    const r      = 20;
+    const circ   = 2 * Math.PI * r;
+    const offset = circ - (percent / 100) * circ;
+    const color  = percent === 100 ? '#10b981' : percent >= 60 ? '#f59e0b' : '#6366f1';
+
+    return (
+        <div className="flex shrink-0 items-center gap-2">
+            <div className="relative size-12">
+                <svg className="size-full -rotate-90" viewBox="0 0 48 48">
+                    <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted" />
+                    <circle
+                        cx="24" cy="24" r={r}
+                        fill="none"
+                        strokeWidth="4"
+                        stroke={color}
+                        strokeDasharray={circ}
+                        strokeDashoffset={offset}
+                        strokeLinecap="round"
+                        style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                    />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold" style={{ color }}>
+                    {percent}%
+                </span>
+            </div>
+            <div className="hidden text-right sm:block">
+                <p className="text-xs font-medium">Profile</p>
+                <p className="text-muted-foreground text-xs">Complete</p>
+            </div>
+        </div>
+    );
+}
+
 function SectionHeader({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
     return (
         <div className="flex min-w-0 items-start gap-3">
@@ -119,6 +153,14 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
         is_show_address: customer.is_show_address,
     });
 
+    const completionPercent = Math.round(
+        [
+            data.name, data.email, data.phone,
+            data.school_name, logoPreview,
+            data.address, data.city, data.province,
+        ].filter(Boolean).length / 8 * 100,
+    );
+
     const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null;
         setData('logo', file);
@@ -148,10 +190,11 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                     >
                         <ArrowLeftIcon className="size-4" />
                     </Link>
-                    <div>
+                    <div className="flex-1">
                         <h1 className="h1-semibold">Edit Customer</h1>
                         <p className="text-muted-foreground text-sm">Update customer account and school details</p>
                     </div>
+                    <CompletionRing percent={completionPercent} />
                 </div>
 
                 <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">

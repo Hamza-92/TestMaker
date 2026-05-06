@@ -22,6 +22,40 @@ interface FormData {
     [key: string]: string;
 }
 
+function CompletionRing({ percent }: { percent: number }) {
+    const r      = 20;
+    const circ   = 2 * Math.PI * r;
+    const offset = circ - (percent / 100) * circ;
+    const color  = percent === 100 ? '#10b981' : percent >= 60 ? '#f59e0b' : '#6366f1';
+
+    return (
+        <div className="flex shrink-0 items-center gap-2">
+            <div className="relative size-12">
+                <svg className="size-full -rotate-90" viewBox="0 0 48 48">
+                    <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted" />
+                    <circle
+                        cx="24" cy="24" r={r}
+                        fill="none"
+                        strokeWidth="4"
+                        stroke={color}
+                        strokeDasharray={circ}
+                        strokeDashoffset={offset}
+                        strokeLinecap="round"
+                        style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                    />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold" style={{ color }}>
+                    {percent}%
+                </span>
+            </div>
+            <div className="hidden text-right sm:block">
+                <p className="text-xs font-medium">Profile</p>
+                <p className="text-muted-foreground text-xs">Complete</p>
+            </div>
+        </div>
+    );
+}
+
 function SectionHeader({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
     return (
         <div className="flex min-w-0 items-start gap-3">
@@ -46,6 +80,10 @@ export default function EditUser({ user }: { user: TargetUser }) {
         status: user.status,
     });
 
+    const completionPercent = Math.round(
+        [data.name, data.email, data.status].filter(Boolean).length / 3 * 100,
+    );
+
     function submit(e: React.FormEvent) {
         e.preventDefault();
         put(`/superadmin/users/${user.id}`);
@@ -63,10 +101,11 @@ export default function EditUser({ user }: { user: TargetUser }) {
                     >
                         <ArrowLeftIcon className="size-4" />
                     </Link>
-                    <div>
+                    <div className="flex-1">
                         <h1 className="h1-semibold">Edit User</h1>
                         <p className="text-muted-foreground text-sm">{user.name}</p>
                     </div>
+                    <CompletionRing percent={completionPercent} />
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">

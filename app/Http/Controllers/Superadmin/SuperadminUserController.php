@@ -42,7 +42,7 @@ class SuperadminUserController extends Controller
         $validated = $request->validate([
             'name'     => ['required', 'string', 'max:255'],
             'email'    => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:3', 'confirmed'],
             'status'   => ['required', Rule::in(['active', 'inactive', 'suspended'])],
         ]);
 
@@ -77,7 +77,7 @@ class SuperadminUserController extends Controller
         $validated = $request->validate([
             'name'     => ['required', 'string', 'max:255'],
             'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'password' => ['nullable', 'string', 'min:3', 'confirmed'],
             'status'   => ['required', Rule::in(['active', 'inactive', 'suspended'])],
         ]);
 
