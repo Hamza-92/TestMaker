@@ -772,8 +772,8 @@ export default function ShowSubscription({
                                 <Input
                                     id="p-amount"
                                     type="number"
-                                    step="1"
-                                    min="0.01"
+                                    min="1"
+                                    onKeyDown={(e) => ['e', 'E', '+', '-', '.'].includes(e.key) && e.preventDefault()}
                                     value={paymentForm.amount}
                                     onChange={(e) => setPaymentForm((current) => ({ ...current, amount: e.target.value }))}
                                     aria-invalid={!!paymentErrors.amount}

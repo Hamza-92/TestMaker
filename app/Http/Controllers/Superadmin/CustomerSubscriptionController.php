@@ -457,7 +457,7 @@ class CustomerSubscriptionController extends Controller
     private function validatePaymentPayload(Request $request, bool $requireReceipt = true): array
     {
         return $request->validate([
-            'amount'         => ['required', 'numeric', 'min:0.01'],
+            'amount'         => ['required', 'integer', 'min:1'],
             'payment_method' => ['required', 'in:cash,bank_transfer,online,cheque'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'notes'          => ['nullable', 'string', 'max:1000'],
