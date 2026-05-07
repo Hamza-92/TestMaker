@@ -150,4 +150,10 @@ Route::get('/run-optimize', function () {
     return Artisan::output();
 });
 
+Route::get('/run-wayfinder', function () {
+    Artisan::call('wayfinder:generate');
+
+    return Artisan::output();
+});
+
 require __DIR__.'/settings.php';
