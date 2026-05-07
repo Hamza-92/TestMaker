@@ -264,7 +264,7 @@ class CustomerSubscriptionController extends Controller
                 'amount'            => (string) $subscription->amount,
                 'allowed_questions' => $subscription->allowed_questions,
                 'started_at'        => $subscription->started_at?->toDateString(),
-                'duration'          => $subscription->duration,
+                'expired_at'        => $subscription->expired_at?->toDateString(),
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
                 'max_teachers'      => $subscription->max_teachers,
@@ -294,7 +294,7 @@ class CustomerSubscriptionController extends Controller
                 'nullable', 'integer', 'min:0',
             ],
             'started_at'         => ['required', 'date'],
-            'duration'           => ['required', 'integer', 'min:1'],
+            'expired_at'         => ['required', 'date', 'after:started_at'],
             'status'             => ['required', 'in:active,expired,cancelled'],
             'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
@@ -302,6 +302,8 @@ class CustomerSubscriptionController extends Controller
         ]);
 
         $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
+        $expiredAt = Carbon::parse($validated['expired_at'])->startOfDay();
+        $duration  = max(1, $startedAt->diffInDays($expiredAt));
         $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
         $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
         $oldAccessScope = SubscriptionAccess::resolveScope($subscription, $resources);
@@ -317,7 +319,7 @@ class CustomerSubscriptionController extends Controller
             'access_scope'   => $oldAccessScope,
         ];
 
-        DB::transaction(function () use ($validated, $startedAt, $subscription, $oldValues, $accessScope, $summaryIds) {
+        DB::transaction(function () use ($validated, $startedAt, $expiredAt, $duration, $subscription, $oldValues, $accessScope, $summaryIds) {
             $isQuestionBased = $validated['is_question_based'] ?? false;
             $subscription->update([
                 'name'               => $validated['name'],
@@ -331,8 +333,8 @@ class CustomerSubscriptionController extends Controller
                 'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
                 'amount'             => $validated['amount'],
                 'started_at'         => $startedAt,
-                'duration'           => $validated['duration'],
-                'expired_at'         => $startedAt->copy()->addDays((int) $validated['duration']),
+                'duration'           => $duration,
+                'expired_at'         => $expiredAt,
                 'status'             => $validated['status'],
             ]);
 

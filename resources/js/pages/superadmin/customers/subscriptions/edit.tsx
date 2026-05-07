@@ -5,11 +5,11 @@ import {
     ClipboardListIcon,
     FileTextIcon,
     HashIcon,
-    LockIcon,
     SaveIcon,
     SchoolIcon,
     UsersIcon,
 } from 'lucide-react';
+import { useRef } from 'react';
 import { HierarchicalAccessControl } from '@/components/subscription-access-control';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,7 +38,7 @@ interface SubscriptionData {
     amount: string;
     allowed_questions: number | null;
     started_at: string | null;
-    duration: number;
+    expired_at: string | null;
     status: string;
     allow_teachers: boolean;
     max_teachers: number | null;
@@ -62,12 +62,14 @@ interface FormData {
     is_question_based: boolean;
     allowed_questions: string;
     started_at: string;
-    duration: string;
+    expired_at: string;
     status: string;
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
     max_teachers: string;
 }
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SectionHeader({ icon, title, description }: { icon: React.ReactNode; title: string; description?: string }) {
     return (
@@ -83,15 +85,11 @@ function SectionHeader({ icon, title, description }: { icon: React.ReactNode; ti
     );
 }
 
-function Field({
-    label,
-    required,
-    error,
-    children,
-}: {
+function Field({ label, required, error, hint, children }: {
     label: string;
     required?: boolean;
     error?: string;
+    hint?: string;
     children: React.ReactNode;
 }) {
     return (
@@ -101,6 +99,7 @@ function Field({
                 {required && <span className="text-destructive text-xs">*</span>}
             </Label>
             {children}
+            {hint && !error && <p className="text-muted-foreground text-xs">{hint}</p>}
             {error && <p className="text-destructive text-xs">{error}</p>}
         </div>
     );
@@ -117,12 +116,7 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
-function ToggleField({
-    icon,
-    label,
-    checked,
-    onCheckedChange,
-}: {
+function ToggleField({ icon, label, checked, onCheckedChange }: {
     icon: React.ReactNode;
     label: string;
     checked: boolean;
@@ -140,6 +134,30 @@ function ToggleField({
     );
 }
 
+function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 'type'>) {
+    const ref = useRef<HTMLInputElement>(null);
+    return (
+        <div className="relative">
+            <Input
+                ref={ref}
+                type="date"
+                className={`pr-9${className ? ` ${className}` : ''}`}
+                {...props}
+            />
+            <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => ref.current?.showPicker?.()}
+                className="text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+            >
+                <CalendarIcon className="size-4" />
+            </button>
+        </div>
+    );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function EditCustomerSubscription({ customer, subscription, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
     const { data, setData, put, processing, errors } = useForm<FormData>({
         name: subscription.name,
@@ -147,7 +165,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
         is_question_based: subscription.is_question_based,
         allowed_questions: subscription.allowed_questions != null ? String(subscription.allowed_questions) : '',
         started_at: subscription.started_at ?? '',
-        duration: String(subscription.duration),
+        expired_at: subscription.expired_at ?? '',
         status: subscription.status,
         access_scope: subscription.access_scope,
         allow_teachers: subscription.allow_teachers,
@@ -188,10 +206,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
 
                     {/* ── Subscription Details ───────────────────────────────── */}
                     <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
-                        <SectionHeader
-                            icon={<FileTextIcon className="size-4" />}
-                            title="Subscription"
-                        />
+                        <SectionHeader icon={<FileTextIcon className="size-4" />} title="Subscription" />
                         <Separator />
 
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -212,6 +227,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                         type="number"
                                         min="0"
                                         step="1"
+                                        onKeyDown={(e) => ['e', 'E', '+', '-', '.'].includes(e.key) && e.preventDefault()}
                                         className="pl-11"
                                         value={data.amount}
                                         onChange={(e) => setData('amount', e.target.value)}
@@ -219,21 +235,18 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                 </div>
                             </Field>
 
-                            <Field label="Duration (Days)" required error={errors.duration}>
-                                <InputWithIcon
-                                    icon={<CalendarIcon />}
-                                    type="number"
-                                    min="1"
-                                    value={data.duration}
-                                    onChange={(e) => setData('duration', e.target.value)}
+                            <Field label="Start Date" required error={errors.started_at}>
+                                <DateInput
+                                    value={data.started_at}
+                                    onChange={(e) => setData('started_at', e.target.value)}
                                 />
                             </Field>
 
-                            <Field label="Start Date" required error={errors.started_at}>
-                                <Input
-                                    type="date"
-                                    value={data.started_at}
-                                    onChange={(e) => setData('started_at', e.target.value)}
+                            <Field label="Expiry Date" required error={errors.expired_at}>
+                                <DateInput
+                                    min={data.started_at || undefined}
+                                    value={data.expired_at}
+                                    onChange={(e) => setData('expired_at', e.target.value)}
                                 />
                             </Field>
 
@@ -297,24 +310,18 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     </div>
 
                     {/* ── Access Control ─────────────────────────────────────── */}
-                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
-                        <SectionHeader
-                            icon={<LockIcon className="size-4" />}
-                            title="Access"
-                        />
+                    <HierarchicalAccessControl
+                        patterns={patterns}
+                        classes={classes}
+                        subjects={subjects}
+                        patternClassMap={patternClassMap}
+                        classSubjectMap={classSubjectMap}
+                        value={data.access_scope}
+                        onChange={(val) => setData('access_scope', val)}
+                        error={errors.access_scope}
+                    />
 
-                        <HierarchicalAccessControl
-                            patterns={patterns}
-                            classes={classes}
-                            subjects={subjects}
-                            patternClassMap={patternClassMap}
-                            classSubjectMap={classSubjectMap}
-                            value={data.access_scope}
-                            onChange={(val) => setData('access_scope', val)}
-                            error={errors.access_scope}
-                        />
-                    </div>
-
+                    {/* ── Actions ──────────────────────────────────────────────── */}
                     <div className="flex items-center justify-end gap-3 pb-2">
                         <Link
                             href={`/superadmin/customers/${customer.id}/subscriptions/${subscription.id}`}
