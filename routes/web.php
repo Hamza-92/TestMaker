@@ -11,7 +11,11 @@ use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\SuperadminUserController;
 use App\Http\Controllers\Superadmin\TopicController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
+use App\Enums\UserType;
+use App\Models\Permission;
+use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -151,9 +155,41 @@ Route::get('/run-optimize', function () {
 });
 
 Route::get('/run-seed', function () {
-    Artisan::call('db:seed');
+    // Only seeds safe, idempotent seeders — never recreates users
+    Artisan::call('db:seed', ['--class' => 'PermissionSeeder', '--force' => true]);
+    $out = trim(Artisan::output()) ?: '(no output)';
 
-    return Artisan::output();
+    Artisan::call('db:seed', ['--class' => 'MediumSeeder', '--force' => true]);
+    $out .= "\n" . (trim(Artisan::output()) ?: '(no output)');
+
+    return response($out, 200)->header('Content-Type', 'text/plain');
+});
+
+Route::get('/run-assign-permissions', function () {
+    $allIds = Permission::pluck('id');
+
+    if ($allIds->isEmpty()) {
+        return response("No permissions found — run /run-seed first.", 200)
+            ->header('Content-Type', 'text/plain');
+    }
+
+    $users = User::where('user_type', UserType::SuperAdmin)
+        ->whereNotNull('created_by')
+        ->get();
+
+    if ($users->isEmpty()) {
+        return response("No non-master superadmin users found.", 200)
+            ->header('Content-Type', 'text/plain');
+    }
+
+    $output = '';
+    foreach ($users as $user) {
+        $user->permissions()->syncWithoutDetaching($allIds);
+        Cache::forget("user_permissions_{$user->id}");
+        $output .= "✓ Assigned all {$allIds->count()} permissions to: {$user->name} ({$user->email})\n";
+    }
+
+    return response($output, 200)->header('Content-Type', 'text/plain');
 });
 
 Route::get('/run-wayfinder', function () {
@@ -163,19 +199,32 @@ Route::get('/run-wayfinder', function () {
 });
 
 Route::get('/run-all', function () {
-    $steps = [
-        'optimize:clear'     => [],
-        'migrate'            => ['--force' => true],
-        'db:seed'            => ['--force' => true],
-        'optimize'           => [],
-    ];
-
     $output = '';
 
-    foreach ($steps as $command => $args) {
+    // Step 1-5: artisan commands
+    $commands = [
+        ['optimize:clear', []],
+        ['migrate', ['--force' => true]],
+        ['db:seed', ['--class' => 'MediumSeeder', '--force' => true]],
+        ['db:seed', ['--class' => 'PermissionSeeder', '--force' => true]],
+        ['optimize', []],
+    ];
+
+    foreach ($commands as [$command, $args]) {
         Artisan::call($command, $args);
         $result = trim(Artisan::output());
-        $output .= "▶ {$command}\n" . ($result ?: '(no output)') . "\n\n";
+        $label = $command . (isset($args['--class']) ? " ({$args['--class']})" : '');
+        $output .= "▶ {$label}\n" . ($result ?: '(no output)') . "\n\n";
+    }
+
+    // Step 6: assign all permissions to non-master superadmins
+    $allIds = Permission::pluck('id');
+    $users  = User::where('user_type', UserType::SuperAdmin)->whereNotNull('created_by')->get();
+
+    foreach ($users as $user) {
+        $user->permissions()->syncWithoutDetaching($allIds);
+        Cache::forget("user_permissions_{$user->id}");
+        $output .= "✓ Permissions assigned to: {$user->name} ({$user->email})\n";
     }
 
     return response($output, 200)->header('Content-Type', 'text/plain');
