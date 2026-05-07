@@ -13,8 +13,10 @@ class PaymentLog extends Model
     protected $fillable = [
         'subscription_id',
         'amount',
+        'commission_amount',
         'payment_method',
         'account_number',
+        'next_payment_date',
         'status',
         'attachments',
         'reviewed_by',

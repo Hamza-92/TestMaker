@@ -148,3 +148,7 @@
 .h1-semibold {
     @apply text-2xl font-semibold;
 }
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    display: none;
+}
