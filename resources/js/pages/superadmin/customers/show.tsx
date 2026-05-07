@@ -8,7 +8,6 @@ import {
     ClockIcon,
     CreditCardIcon,
     HashIcon,
-    LayersIcon,
     LogsIcon,
     MailIcon,
     MapPinIcon,
@@ -391,6 +390,14 @@ export default function ShowCustomer({
         }
     });
 
+    const duesBySubscription = new Map<number, number>();
+    customer.subscriptions.forEach((sub) => {
+        const paid = paidBySubscription.get(sub.id) ?? 0;
+        duesBySubscription.set(sub.id, Math.max(0, Number(sub.amount) - paid));
+    });
+
+    const totalDues = Array.from(duesBySubscription.values()).reduce((sum, d) => sum + d, 0);
+
     const expiredCount = customer.subscriptions.filter((subscription) => subscription.status === 'expired').length;
 
     return (
@@ -506,15 +513,15 @@ export default function ShowCustomer({
                                             icon={<BadgeCheckIcon className="size-4 text-blue-700" />}
                                             label="Active Plans"
                                             value={String(activeSubscriptions.length)}
-                                            meta={activeSub ? activeSub.name : 'No active plan'}
+                                            meta={`of ${customer.subscriptions.length} total · ${expiredCount} expired`}
                                             toneClass="bg-blue-100 text-blue-700"
                                         />
                                         <MetricCard
-                                            icon={<LayersIcon className="size-4 text-violet-700" />}
-                                            label="Plans"
-                                            value={String(customer.subscriptions.length)}
-                                            meta={`${expiredCount} expired`}
-                                            toneClass="bg-violet-100 text-violet-700"
+                                            icon={<WalletIcon className="size-4 text-rose-700" />}
+                                            label="Outstanding"
+                                            value={totalDues > 0 ? money(totalDues) : 'Settled'}
+                                            meta={totalDues > 0 ? 'Dues across all plans' : 'All payments clear'}
+                                            toneClass={totalDues > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}
                                         />
                                     </div>
 
@@ -595,6 +602,7 @@ export default function ShowCustomer({
                                 <div className="space-y-4 p-5 sm:p-6">
                                     {customer.subscriptions.map((subscription) => {
                                         const paid = paidBySubscription.get(subscription.id) ?? 0;
+                                        const dues = duesBySubscription.get(subscription.id) ?? 0;
                                         const timeLeft = remainingDays(subscription.duration, subscription.expired_at);
                                         const timeRatio = ratio(timeLeft, subscription.duration);
                                         const expiryDays = daysLeft(subscription.expired_at);
@@ -611,6 +619,13 @@ export default function ShowCustomer({
                                                         <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                                                             <span>{money(subscription.amount)}</span>
                                                             <span>Paid {money(paid)}</span>
+                                                            {dues > 0 ? (
+                                                                <span className="font-medium text-rose-600">
+                                                                    {money(dues)} due
+                                                                </span>
+                                                            ) : (
+                                                                <span className="font-medium text-emerald-600">Settled</span>
+                                                            )}
                                                             {subscription.allowed_questions != null && (
                                                                 <span className="flex items-center gap-1">
                                                                     <HashIcon className="size-3.5" />
