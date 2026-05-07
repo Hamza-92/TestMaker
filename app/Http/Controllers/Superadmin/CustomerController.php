@@ -19,24 +19,23 @@ class CustomerController extends Controller
     public function index()
     {
         $today = now()->startOfDay();
+        $todayStr = $today->toDateString();
         $nearExpiryThresholdDays = 7;
+        $currentUserId = auth()->id();
 
         $customers = User::where('user_type', UserType::Customer)
             ->with([
-                'subscriptions' => fn ($q) => $q->latest('started_at')->select([
-                    'id',
-                    'user_id',
-                    'name',
-                    'amount',
-                    'started_at',
-                    'expired_at',
-                    'duration',
-                    'status',
-                ]),
+                'subscriptions' => fn ($q) => $q
+                    ->latest('started_at')
+                    ->select(['id', 'user_id', 'name', 'amount', 'started_at', 'expired_at', 'duration', 'status', 'created_by'])
+                    ->with(['paymentLogs' => fn ($pq) => $pq->select([
+                        'id', 'subscription_id', 'amount', 'commission_amount',
+                        'status', 'next_payment_date', 'created_by',
+                    ])]),
             ])
             ->orderByDesc('created_at')
             ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'created_at'])
-            ->map(function (User $customer) use ($today, $nearExpiryThresholdDays) {
+            ->map(function (User $customer) use ($today, $todayStr, $nearExpiryThresholdDays, $currentUserId) {
                 $activeSubscription = $customer->subscriptions->first(
                     fn ($subscription) => $subscription->status?->value === 'active'
                 );
@@ -56,28 +55,59 @@ class CustomerController extends Controller
                     default => 'no_plan',
                 };
 
+                $allLogs = $customer->subscriptions->flatMap(fn ($s) => $s->paymentLogs);
+
+                $totalPaid = (int) $allLogs
+                    ->filter(fn ($l) => $l->status?->value === 'approved')
+                    ->sum('amount');
+
+                $totalPending = (int) $allLogs
+                    ->filter(fn ($l) => in_array($l->status?->value, ['pending_review', 'reviewed']))
+                    ->sum('amount');
+
+                $totalDues = max(0, (int) $customer->subscriptions->sum('amount') - $totalPaid);
+
+                $myCommission = (int) $allLogs
+                    ->filter(fn ($l) => (int) $l->created_by === $currentUserId)
+                    ->sum('commission_amount');
+
+                $nextPaymentDate = $allLogs
+                    ->filter(fn ($l) => $l->next_payment_date !== null && $l->next_payment_date >= $todayStr)
+                    ->sortBy('next_payment_date')
+                    ->first()
+                    ?->next_payment_date;
+
+                $isMyCustomer = $customer->subscriptions->some(fn ($s) => (int) $s->created_by === $currentUserId)
+                    || $allLogs->some(fn ($l) => (int) $l->created_by === $currentUserId);
+
                 return [
-                    'id' => $customer->id,
-                    'name' => $customer->name,
-                    'email' => $customer->email,
-                    'school_name' => $customer->school_name,
-                    'logo' => $customer->logo,
-                    'city' => $customer->city,
-                    'province' => $customer->province,
-                    'status' => $customer->status?->value,
-                    'created_at' => $customer->created_at?->toISOString(),
+                    'id'                 => $customer->id,
+                    'name'               => $customer->name,
+                    'email'              => $customer->email,
+                    'school_name'        => $customer->school_name,
+                    'logo'               => $customer->logo,
+                    'city'               => $customer->city,
+                    'province'           => $customer->province,
+                    'status'             => $customer->status?->value,
+                    'created_at'         => $customer->created_at?->toISOString(),
                     'subscription_count' => $customer->subscriptions->count(),
-                    'plan_state' => $planState,
-                    'subscription' => $subscription ? [
-                        'id' => $subscription->id,
-                        'name' => $subscription->name,
-                        'amount' => (string) $subscription->amount,
-                        'started_at' => $subscription->started_at?->toISOString(),
-                        'expired_at' => $subscription->expired_at?->toISOString(),
-                        'duration' => $subscription->duration,
-                        'status' => $subscription->status?->value,
+                    'plan_state'         => $planState,
+                    'subscription'       => $subscription ? [
+                        'id'             => $subscription->id,
+                        'name'           => $subscription->name,
+                        'amount'         => (string) $subscription->amount,
+                        'started_at'     => $subscription->started_at?->toISOString(),
+                        'expired_at'     => $subscription->expired_at?->toISOString(),
+                        'duration'       => $subscription->duration,
+                        'status'         => $subscription->status?->value,
                         'days_to_expiry' => $daysToExpiry,
                     ] : null,
+                    'total_paid'         => (string) $totalPaid,
+                    'total_pending'      => (string) $totalPending,
+                    'total_dues'         => (string) $totalDues,
+                    'my_commission'      => (string) $myCommission,
+                    'next_payment_date'  => $nextPaymentDate,
+                    'is_my_customer'     => $isMyCustomer,
                 ];
             })
             ->values();
