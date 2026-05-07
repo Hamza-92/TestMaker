@@ -201,6 +201,13 @@ function money(amount: string) {
     return `Rs. ${Number(amount).toLocaleString()}`;
 }
 
+function truncateFilename(name: string, max = 36): string {
+    if (name.length <= max) return name;
+    const dot = name.lastIndexOf('.');
+    const ext = dot > 0 ? name.slice(dot) : '';
+    return name.slice(0, max - ext.length - 1) + '…' + ext;
+}
+
 function SectionCard({
     icon,
     title,
@@ -842,8 +849,8 @@ export default function ShowSubscription({
                             >
                                 <PaperclipIcon className="text-muted-foreground size-4 shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm">
-                                        {paymentForm.receipt ? paymentForm.receipt.name : 'Upload receipt'}
+                                    <p className="text-sm" title={paymentForm.receipt?.name}>
+                                        {paymentForm.receipt ? truncateFilename(paymentForm.receipt.name) : 'Upload receipt'}
                                     </p>
                                     <p className="text-muted-foreground text-xs">JPG, PNG, PDF, WebP · max 5 MB</p>
                                 </div>
