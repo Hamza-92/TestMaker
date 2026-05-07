@@ -150,10 +150,35 @@ Route::get('/run-optimize', function () {
     return Artisan::output();
 });
 
+Route::get('/run-seed', function () {
+    Artisan::call('db:seed');
+
+    return Artisan::output();
+});
+
 Route::get('/run-wayfinder', function () {
     Artisan::call('wayfinder:generate');
 
     return Artisan::output();
+});
+
+Route::get('/run-all', function () {
+    $steps = [
+        'optimize:clear'     => [],
+        'migrate'            => ['--force' => true],
+        'db:seed'            => ['--force' => true],
+        'optimize'           => [],
+    ];
+
+    $output = '';
+
+    foreach ($steps as $command => $args) {
+        Artisan::call($command, $args);
+        $result = trim(Artisan::output());
+        $output .= "▶ {$command}\n" . ($result ?: '(no output)') . "\n\n";
+    }
+
+    return response($output, 200)->header('Content-Type', 'text/plain');
 });
 
 require __DIR__.'/settings.php';
