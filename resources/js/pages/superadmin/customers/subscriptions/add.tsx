@@ -8,7 +8,6 @@ import {
     CreditCardIcon,
     FileTextIcon,
     HashIcon,
-    LockIcon,
     PaperclipIcon,
     SaveIcon,
     SchoolIcon,
@@ -503,19 +502,16 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                     </div>
 
                     {/* ── Access Control ─────────────────────────────────────── */}
-                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
-                        <SectionHeader icon={<LockIcon className="size-4" />} title="Access" />
-                        <HierarchicalAccessControl
-                            patterns={patterns}
-                            classes={classes}
-                            subjects={subjects}
-                            patternClassMap={patternClassMap}
-                            classSubjectMap={classSubjectMap}
-                            value={data.access_scope}
-                            onChange={(val) => setData('access_scope', val)}
-                            error={errors.access_scope}
-                        />
-                    </div>
+                    <HierarchicalAccessControl
+                        patterns={patterns}
+                        classes={classes}
+                        subjects={subjects}
+                        patternClassMap={patternClassMap}
+                        classSubjectMap={classSubjectMap}
+                        value={data.access_scope}
+                        onChange={(val) => setData('access_scope', val)}
+                        error={errors.access_scope}
+                    />
 
                     {/* ── Actions ──────────────────────────────────────────────── */}
                     <div className="flex items-center justify-end gap-3 pb-2">
