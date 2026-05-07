@@ -145,7 +145,7 @@ Route::get('/run-optimize-clear', function () {
 });
 
 Route::get('/run-optimize', function () {
-    Artisan::call('optimize:clear');
+    Artisan::call('optimize');
 
     return Artisan::output();
 });
