@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
+import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
@@ -36,6 +37,7 @@ const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Patterns({ patterns }: { patterns: Pattern[] }) {
+    const { can } = usePermission();
     const [search, setSearch]           = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [pageSize, setPageSize]       = useState(10);
@@ -88,13 +90,15 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                         <h1 className="h1-semibold">Patterns</h1>
                         <p className="text-muted-foreground mt-0.5 text-sm">{filtered.length} total</p>
                     </div>
-                    <Link
-                        href="/superadmin/patterns/add"
-                        className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
-                    >
-                        <PlusIcon size={16} color="currentColor" />
-                        <span className="hidden sm:inline">Add Pattern</span>
-                    </Link>
+                    {can('patterns.create') && (
+                        <Link
+                            href="/superadmin/patterns/add"
+                            className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+                        >
+                            <PlusIcon size={16} color="currentColor" />
+                            <span className="hidden sm:inline">Add Pattern</span>
+                        </Link>
+                    )}
                 </div>
 
                 {/* ── Filters ─────────────────────────────────────────────── */}
@@ -187,12 +191,16 @@ export default function Patterns({ patterns }: { patterns: Pattern[] }) {
                                                     <Link href={`/superadmin/patterns/${pattern.id}`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
                                                         <EyeIcon className="size-4" />
                                                     </Link>
-                                                    <Link href={`/superadmin/patterns/${pattern.id}/edit`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
-                                                        <PencilIcon className="size-4" />
-                                                    </Link>
-                                                    <button onClick={() => setDeleteTarget(pattern)} className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors">
-                                                        <Trash2Icon className="size-4" />
-                                                    </button>
+                                                    {can('patterns.edit') && (
+                                                        <Link href={`/superadmin/patterns/${pattern.id}/edit`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
+                                                            <PencilIcon className="size-4" />
+                                                        </Link>
+                                                    )}
+                                                    {can('patterns.delete') && (
+                                                        <button onClick={() => setDeleteTarget(pattern)} className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors">
+                                                            <Trash2Icon className="size-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

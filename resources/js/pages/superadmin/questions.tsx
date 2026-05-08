@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
+import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
@@ -108,6 +109,8 @@ export default function Questions({
     questionTypes: QuestionTypeOption[];
     sourceOptions: SourceOption[];
 }) {
+    const { can } = usePermission();
+
     // ── Derive the initial chapter from filters ──────────────────────────────
     const activeChapter = useMemo(
         () => chapters.find((c) => c.id === filters.chapter_id) ?? null,
@@ -305,7 +308,7 @@ export default function Questions({
                             </p>
                         )}
                     </div>
-                    {canAddQuestion && (
+                    {canAddQuestion && can('questions.create') && (
                         <Link
                             href={addHref}
                             className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
@@ -518,21 +521,25 @@ export default function Questions({
                                                             >
                                                                 <EyeIcon className="size-4" />
                                                             </Link>
-                                                            <Link
-                                                                href={`/superadmin/questions/${q.id}/edit`}
-                                                                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                                                title="Edit"
-                                                            >
-                                                                <PencilIcon className="size-4" />
-                                                            </Link>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setDeleteTarget(q)}
-                                                                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2Icon className="size-4" />
-                                                            </button>
+                                                            {can('questions.edit') && (
+                                                                <Link
+                                                                    href={`/superadmin/questions/${q.id}/edit`}
+                                                                    className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                                    title="Edit"
+                                                                >
+                                                                    <PencilIcon className="size-4" />
+                                                                </Link>
+                                                            )}
+                                                            {can('questions.delete') && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setDeleteTarget(q)}
+                                                                    className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2Icon className="size-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import { usePermission } from '@/hooks/use-permission';
 import PlusIcon from '@/components/icons/PlusIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -209,6 +210,7 @@ function FinancialStat({ icon, label, value, className }: { icon: ReactNode; lab
 }
 
 export default function Customers({ customers }: { customers: Customer[] }) {
+    const { can } = usePermission();
     const [tab, setTab] = useState<'all' | 'mine'>('all');
     const [search, setSearch] = useState('');
     const [accountStatusFilter, setAccountStatusFilter] = useState<string>('all');
@@ -289,13 +291,15 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                             {filtered.length} shown / {customers.length} total
                         </p>
                     </div>
-                    <Link
-                        href="/superadmin/customers/add"
-                        className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
-                    >
-                        <PlusIcon size={16} color="currentColor" />
-                        <span className="hidden sm:inline">Add Customer</span>
-                    </Link>
+                    {can('customers.create') && (
+                        <Link
+                            href="/superadmin/customers/add"
+                            className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+                        >
+                            <PlusIcon size={16} color="currentColor" />
+                            <span className="hidden sm:inline">Add Customer</span>
+                        </Link>
+                    )}
                 </div>
 
                 {/* Tab toggle */}
@@ -702,8 +706,10 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                         <div className="flex items-center justify-end gap-1">
                                                             <ActionIconLink href={`/superadmin/customers/${customer.id}`}
                                                                 icon={<EyeIcon className="size-4" />} label="View customer" />
-                                                            <ActionIconLink href={`/superadmin/customers/${customer.id}/edit`}
-                                                                icon={<PencilIcon className="size-4" />} label="Edit customer" />
+                                                            {can('customers.edit') && (
+                                                                <ActionIconLink href={`/superadmin/customers/${customer.id}/edit`}
+                                                                    icon={<PencilIcon className="size-4" />} label="Edit customer" />
+                                                            )}
                                                         </div>
                                                     </td>
                                                 )}

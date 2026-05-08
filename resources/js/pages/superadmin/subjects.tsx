@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
+import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
@@ -207,6 +208,7 @@ function matchesFacetFilters(
 }
 
 export default function Subjects({ subjects }: { subjects: Subject[] }) {
+    const { can } = usePermission();
     const [search, setSearch] = useState('');
     const [patternFilter, setPatternFilter] = useState('all');
     const [classFilter, setClassFilter] = useState('all');
@@ -403,13 +405,15 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                             {filtered.length} total
                         </p>
                     </div>
-                    <Link
-                        href="/superadmin/subjects/add"
-                        className="bg-primary text-primary-foreground flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-primary/90"
-                    >
-                        <PlusIcon size={16} color="currentColor" />
-                        <span className="hidden sm:inline">Add Subject</span>
-                    </Link>
+                    {can('subjects.create') && (
+                        <Link
+                            href="/superadmin/subjects/add"
+                            className="bg-primary text-primary-foreground flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-primary/90"
+                        >
+                            <PlusIcon size={16} color="currentColor" />
+                            <span className="hidden sm:inline">Add Subject</span>
+                        </Link>
+                    )}
                 </div>
 
                 <div className="space-y-4 rounded-xl border p-4 shadow-sm">
@@ -668,23 +672,23 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                                         >
                                                             <EyeIcon className="size-4" />
                                                         </Link>
-                                                        <Link
-                                                            href={`/superadmin/subjects/${subject.id}/edit`}
-                                                            className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors"
-                                                        >
-                                                            <PencilIcon className="size-4" />
-                                                        </Link>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setDeleteTarget(
-                                                                    subject,
-                                                                )
-                                                            }
-                                                            className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors"
-                                                        >
-                                                            <Trash2Icon className="size-4" />
-                                                        </button>
+                                                        {can('subjects.edit') && (
+                                                            <Link
+                                                                href={`/superadmin/subjects/${subject.id}/edit`}
+                                                                className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors"
+                                                            >
+                                                                <PencilIcon className="size-4" />
+                                                            </Link>
+                                                        )}
+                                                        {can('subjects.delete') && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDeleteTarget(subject)}
+                                                                className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors"
+                                                            >
+                                                                <Trash2Icon className="size-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

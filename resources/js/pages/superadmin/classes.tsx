@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
+import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
@@ -53,6 +54,7 @@ const PATTERN_COLORS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Classes({ classes }: { classes: SchoolClass[] }) {
+    const { can } = usePermission();
     const [search, setSearch]             = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [pageSize, setPageSize]         = useState(10);
@@ -105,13 +107,15 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
                         <h1 className="h1-semibold">Classes</h1>
                         <p className="text-muted-foreground mt-0.5 text-sm">{filtered.length} total</p>
                     </div>
-                    <Link
-                        href="/superadmin/classes/add"
-                        className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
-                    >
-                        <PlusIcon size={16} color="currentColor" />
-                        <span className="hidden sm:inline">Add Class</span>
-                    </Link>
+                    {can('classes.create') && (
+                        <Link
+                            href="/superadmin/classes/add"
+                            className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+                        >
+                            <PlusIcon size={16} color="currentColor" />
+                            <span className="hidden sm:inline">Add Class</span>
+                        </Link>
+                    )}
                 </div>
 
                 {/* ── Filters ─────────────────────────────────────────────── */}
@@ -218,12 +222,16 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
                                                     <Link href={`/superadmin/classes/${cls.id}`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
                                                         <EyeIcon className="size-4" />
                                                     </Link>
-                                                    <Link href={`/superadmin/classes/${cls.id}/edit`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
-                                                        <PencilIcon className="size-4" />
-                                                    </Link>
-                                                    <button onClick={() => setDeleteTarget(cls)} className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors">
-                                                        <Trash2Icon className="size-4" />
-                                                    </button>
+                                                    {can('classes.edit') && (
+                                                        <Link href={`/superadmin/classes/${cls.id}/edit`} className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors">
+                                                            <PencilIcon className="size-4" />
+                                                        </Link>
+                                                    )}
+                                                    {can('classes.delete') && (
+                                                        <button onClick={() => setDeleteTarget(cls)} className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors">
+                                                            <Trash2Icon className="size-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

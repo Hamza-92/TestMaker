@@ -20,6 +20,7 @@ import {
     XCircleIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -366,6 +367,7 @@ export default function ShowCustomer({
     paymentLogs: PaymentLog[];
     customerLogs: CustomerLog[];
 }) {
+    const { can } = usePermission();
     const logoUrl = customer.logo ? `/storage/${customer.logo}` : null;
     const location = [customer.city, customer.province].filter(Boolean).join(', ');
     const address = customer.is_show_address ? customer.address : null;
@@ -420,18 +422,22 @@ export default function ShowCustomer({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={`/superadmin/customers/${customer.id}/edit`}>
-                                <PencilIcon className="size-4" />
-                                Edit
-                            </Link>
-                        </Button>
-                        <Button asChild size="sm">
-                            <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
-                                <PlusIcon className="size-4" />
-                                Add Subscription
-                            </Link>
-                        </Button>
+                        {can('customers.edit') && (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={`/superadmin/customers/${customer.id}/edit`}>
+                                    <PencilIcon className="size-4" />
+                                    Edit
+                                </Link>
+                            </Button>
+                        )}
+                        {can('subscriptions.create') && (
+                            <Button asChild size="sm">
+                                <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
+                                    <PlusIcon className="size-4" />
+                                    Add Subscription
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -577,12 +583,14 @@ export default function ShowCustomer({
                             title="Subscriptions"
                             meta={`${customer.subscriptions.length} total`}
                             action={
-                                <Button asChild size="sm">
-                                    <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
-                                        <PlusIcon className="size-4" />
-                                        Add
-                                    </Link>
-                                </Button>
+                                can('subscriptions.create') ? (
+                                    <Button asChild size="sm">
+                                        <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
+                                            <PlusIcon className="size-4" />
+                                            Add
+                                        </Link>
+                                    </Button>
+                                ) : undefined
                             }
                         >
                             {customer.subscriptions.length === 0 ? (
@@ -590,12 +598,14 @@ export default function ShowCustomer({
                                     icon={<SchoolIcon className="size-6 opacity-40" />}
                                     title="No subscriptions yet"
                                     action={
-                                        <Button asChild variant="outline" size="sm">
-                                            <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
-                                                <PlusIcon className="size-4" />
-                                                Add First Subscription
-                                            </Link>
-                                        </Button>
+                                        can('subscriptions.create') ? (
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
+                                                    <PlusIcon className="size-4" />
+                                                    Add First Subscription
+                                                </Link>
+                                            </Button>
+                                        ) : undefined
                                     }
                                 />
                             ) : (

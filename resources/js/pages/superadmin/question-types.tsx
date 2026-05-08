@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
+import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
@@ -106,6 +107,7 @@ export default function QuestionTypes({
     questionTypes: QuestionType[];
     initialKind?: string;
 }) {
+    const { can } = usePermission();
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [answerFilter, setAnswerFilter] = useState('all');
@@ -188,17 +190,19 @@ export default function QuestionTypes({
                         <h1 className="h1-semibold">{pageTitle}</h1>
                         <p className="mt-0.5 text-sm text-muted-foreground">{filtered.length} total</p>
                     </div>
-                    <Link
-                        href={
-                            initialKind === 'all'
-                                ? '/superadmin/question-types/add'
-                                : `/superadmin/question-types/${initialKind}/add`
-                        }
-                        className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-                    >
-                        <PlusIcon size={16} color="currentColor" />
-                        <span className="hidden sm:inline capitalize">Add {initialKind === 'all' ? '' : initialKind} Type</span>
-                    </Link>
+                    {can('question_types.create') && (
+                        <Link
+                            href={
+                                initialKind === 'all'
+                                    ? '/superadmin/question-types/add'
+                                    : `/superadmin/question-types/${initialKind}/add`
+                            }
+                            className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                        >
+                            <PlusIcon size={16} color="currentColor" />
+                            <span className="hidden sm:inline capitalize">Add {initialKind === 'all' ? '' : initialKind} Type</span>
+                        </Link>
+                    )}
                 </div>
 
                 {/* Filters */}
@@ -344,21 +348,25 @@ export default function QuestionTypes({
                                                     >
                                                         <EyeIcon className="size-4" />
                                                     </Link>
-                                                    <Link
-                                                        href={`/superadmin/question-types/${qt.id}/edit`}
-                                                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                                        title="Edit"
-                                                    >
-                                                        <PencilIcon className="size-4" />
-                                                    </Link>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDeleteTarget(qt)}
-                                                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2Icon className="size-4" />
-                                                    </button>
+                                                    {can('question_types.edit') && (
+                                                        <Link
+                                                            href={`/superadmin/question-types/${qt.id}/edit`}
+                                                            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                            title="Edit"
+                                                        >
+                                                            <PencilIcon className="size-4" />
+                                                        </Link>
+                                                    )}
+                                                    {can('question_types.delete') && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeleteTarget(qt)}
+                                                            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2Icon className="size-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

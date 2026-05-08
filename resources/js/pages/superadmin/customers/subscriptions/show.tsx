@@ -21,6 +21,7 @@ import {
     XIcon,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -407,6 +408,7 @@ export default function ShowSubscription({
     paymentSummary,
     auditLogs,
 }: Props) {
+    const { can } = usePermission();
     const statusCfg = SUB_STATUS[subscription.status];
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [paymentDetail, setPaymentDetail] = useState<PaymentLog | null>(null);
@@ -419,7 +421,7 @@ export default function ShowSubscription({
     const [paymentForm, setPaymentForm] = useState<PaymentFormState>(buildPaymentForm(''));
     const fileRef = useRef<HTMLInputElement>(null);
 
-    const canAddPayment = Number(paymentSummary.remaining_trackable_amount) > 0;
+    const canAddPayment = can('subscriptions.manage_payments') && Number(paymentSummary.remaining_trackable_amount) > 0;
 
     function openAdd() {
         setEditingLog(null);
@@ -553,13 +555,15 @@ export default function ShowSubscription({
                     icon={<FileTextIcon className="size-4" />}
                     title="Subscription"
                     action={
-                        <Link
-                            href={`/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/edit`}
-                            className="border-input hover:bg-accent flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors"
-                        >
-                            <PencilIcon className="size-3.5" />
-                            Edit
-                        </Link>
+                        can('subscriptions.edit') ? (
+                            <Link
+                                href={`/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/edit`}
+                                className="border-input hover:bg-accent flex h-8 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors"
+                            >
+                                <PencilIcon className="size-3.5" />
+                                Edit
+                            </Link>
+                        ) : undefined
                     }
                 >
                     <div className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -708,7 +712,7 @@ export default function ShowSubscription({
                                                         <EyeIcon className="size-3" />
                                                         Details
                                                     </Button>
-                                                    {log.is_editable && (
+                                                    {log.is_editable && can('subscriptions.manage_payments') && (
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
@@ -1012,7 +1016,7 @@ export default function ShowSubscription({
                             {detailErrors.status && <p className="text-destructive text-xs">{detailErrors.status}</p>}
 
                             <DialogFooter>
-                                {paymentDetail.status === 'pending_review' && (
+                                {paymentDetail.status === 'pending_review' && can('subscriptions.manage_payments') && (
                                     <Button
                                         type="button"
                                         onClick={() => movePaymentStatus(paymentDetail, 'reviewed')}
@@ -1023,7 +1027,7 @@ export default function ShowSubscription({
                                     </Button>
                                 )}
 
-                                {paymentDetail.status === 'reviewed' && (
+                                {paymentDetail.status === 'reviewed' && can('subscriptions.manage_payments') && (
                                     <>
                                         <Button
                                             type="button"
