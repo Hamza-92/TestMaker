@@ -116,7 +116,7 @@ function patternLabel(pattern: PatternFilterOption | null) {
     }
 
     return pattern.short_name
-        ? `${pattern.short_name} / ${pattern.name}`
+        ? `${pattern.short_name}`
         : pattern.name;
 }
 
@@ -739,10 +739,10 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                             if (
                                                 index > 0 &&
                                                 value -
-                                                    (array[
-                                                        index - 1
-                                                    ] as number) >
-                                                    1
+                                                (array[
+                                                    index - 1
+                                                ] as number) >
+                                                1
                                             ) {
                                                 carry.push('ellipsis');
                                             }
