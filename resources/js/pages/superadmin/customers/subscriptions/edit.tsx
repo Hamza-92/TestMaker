@@ -250,6 +250,23 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                 />
                             </Field>
 
+                            <Field label="Duration (days)">
+                                <Input
+                                    type="number"
+                                    disabled
+                                    value={(() => {
+                                        if (!data.started_at || !data.expired_at) return '';
+                                        const diff = Math.round(
+                                            (new Date(data.expired_at).getTime() - new Date(data.started_at).getTime()) /
+                                            86_400_000,
+                                        );
+                                        return diff > 0 ? String(diff) : '';
+                                    })()}
+                                    placeholder="—"
+                                    className="bg-muted/40 text-muted-foreground cursor-default"
+                                />
+                            </Field>
+
                             <Field label="Status" required error={errors.status}>
                                 <Select value={data.status} onValueChange={(value) => setData('status', value)}>
                                     <SelectTrigger className="w-full">
