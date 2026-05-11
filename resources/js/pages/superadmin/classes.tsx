@@ -57,10 +57,23 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
     const { can } = usePermission();
     const [search, setSearch]             = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [patternFilter, setPatternFilter] = useState<string>('all');
     const [pageSize, setPageSize]         = useState(10);
     const [page, setPage]                 = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null);
     const [deleting, setDeleting]         = useState(false);
+
+    // ── Unique patterns for filter dropdown ──────────────────────────────────
+    const allPatterns = useMemo(() => {
+        const seen = new Set<number>();
+        const result: Pattern[] = [];
+        for (const cls of classes) {
+            for (const p of cls.patterns) {
+                if (!seen.has(p.id)) { seen.add(p.id); result.push(p); }
+            }
+        }
+        return result.sort((a, b) => a.name.localeCompare(b.name));
+    }, [classes]);
 
     // ── Filter + Search ──────────────────────────────────────────────────────
     const filtered = useMemo(() => {
@@ -74,9 +87,12 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
                 statusFilter === 'all' ||
                 (statusFilter === 'active' && c.status === 1) ||
                 (statusFilter === 'inactive' && c.status === 0);
-            return matchesSearch && matchesStatus;
+            const matchesPattern =
+                patternFilter === 'all' ||
+                c.patterns.some((p) => p.id === Number(patternFilter));
+            return matchesSearch && matchesStatus && matchesPattern;
         });
-    }, [classes, search, statusFilter]);
+    }, [classes, search, statusFilter, patternFilter]);
 
     // ── Pagination ───────────────────────────────────────────────────────────
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -87,6 +103,7 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); };
     const handleStatusChange = (val: string) => { setStatusFilter(val); setPage(1); };
+    const handlePatternChange = (val: string) => { setPatternFilter(val); setPage(1); };
 
     const confirmDelete = () => {
         if (!deleteTarget) return;
@@ -130,6 +147,20 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
                         />
                     </div>
                     <div className="flex items-center gap-2">
+                        <Select value={patternFilter} onValueChange={handlePatternChange}>
+                            <SelectTrigger className="w-40 gap-1.5">
+                                <SelectValue placeholder="Pattern" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All patterns</SelectItem>
+                                {allPatterns.map((p) => (
+                                    <SelectItem key={p.id} value={String(p.id)}>
+                                        {p.name}{p.short_name ? ` (${p.short_name})` : ''}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
                         <Select value={statusFilter} onValueChange={handleStatusChange}>
                             <SelectTrigger className="w-36 gap-1.5">
                                 <SelectValue placeholder="Status" />
