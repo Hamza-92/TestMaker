@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Concerns\HasPermissions;
+use App\Enums\AccountType;
 use App\Enums\UserStatus;
 use App\Enums\UserType;
 use Database\Factories\UserFactory;
@@ -21,7 +22,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'name', 'email', 'phone', 'password',
     'address', 'city', 'province', 'is_show_address',
     'school_name', 'logo',
-    'user_type', 'school_id', 'status', 'created_by',
+    'user_type', 'school_id', 'status', 'account_type', 'created_by',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
@@ -38,6 +39,7 @@ class User extends Authenticatable
             'is_show_address'          => 'boolean',
             'user_type'                => UserType::class,
             'status'                   => UserStatus::class,
+            'account_type'             => AccountType::class,
         ];
     }
 

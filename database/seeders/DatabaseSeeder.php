@@ -21,12 +21,15 @@ class DatabaseSeeder extends Seeder
         ]);
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Super Admin',
-            'email' => 'admin@testmaker.com',
-            'user_type' => UserType::SuperAdmin,
-            'status' => UserStatus::Active,
-            'created_by' => null,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@testmaker.com'],
+            [
+                'name' => 'Super Admin',
+                'password' => bcrypt('11111111'),
+                'user_type' => UserType::SuperAdmin,
+                'status' => UserStatus::Active,
+                'created_by' => null,
+            ]
+        );
     }
 }

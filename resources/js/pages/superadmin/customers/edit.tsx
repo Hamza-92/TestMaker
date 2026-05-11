@@ -22,6 +22,7 @@ interface Customer {
     email: string;
     phone: string | null;
     status: string;
+    account_type: string;
     school_name: string | null;
     logo: string | null;
     address: string | null;
@@ -36,6 +37,7 @@ interface FormData {
     email: string;
     phone: string;
     status: string;
+    account_type: string;
     school_name: string;
     logo: File | null;
     remove_logo: boolean;
@@ -59,11 +61,8 @@ function CompletionRing({ percent }: { percent: number }) {
                     <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted" />
                     <circle
                         cx="24" cy="24" r={r}
-                        fill="none"
-                        strokeWidth="4"
-                        stroke={color}
-                        strokeDasharray={circ}
-                        strokeDashoffset={offset}
+                        fill="none" strokeWidth="4" stroke={color}
+                        strokeDasharray={circ} strokeDashoffset={offset}
                         strokeLinecap="round"
                         style={{ transition: 'stroke-dashoffset 0.3s ease' }}
                     />
@@ -94,18 +93,12 @@ function SectionHeader({ icon, title, description }: { icon: React.ReactNode; ti
     );
 }
 
-function FieldGroup({ children, cols = 2 }: { children: React.ReactNode; cols?: 1 | 2 | 3 }) {
-    const colClass = { 1: '', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3' }[cols];
-
+function FieldGroup({ children, cols = 2 }: { children: React.ReactNode; cols?: 1 | 2 | 3 | 4 }) {
+    const colClass = { 1: '', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-2 lg:grid-cols-3', 4: 'sm:grid-cols-2 lg:grid-cols-4' }[cols];
     return <div className={`grid min-w-0 gap-4 ${colClass}`}>{children}</div>;
 }
 
-function Field({
-    label,
-    required,
-    error,
-    children,
-}: {
+function Field({ label, required, error, children }: {
     label: string;
     required?: boolean;
     error?: string;
@@ -139,17 +132,18 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
     const logoRef = useRef<HTMLInputElement>(null);
 
     const { data, setData, post, processing, errors } = useForm<FormData>({
-        _method: 'put',
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone ?? '',
-        status: customer.status,
-        school_name: customer.school_name ?? '',
-        logo: null,
-        remove_logo: false,
-        address: customer.address ?? '',
-        city: customer.city ?? '',
-        province: customer.province ?? '',
+        _method:         'put',
+        name:            customer.name,
+        email:           customer.email,
+        phone:           customer.phone ?? '',
+        status:          customer.status,
+        account_type:    customer.account_type,
+        school_name:     customer.school_name ?? '',
+        logo:            null,
+        remove_logo:     false,
+        address:         customer.address ?? '',
+        city:            customer.city ?? '',
+        province:        customer.province ?? '',
         is_show_address: customer.is_show_address,
     });
 
@@ -182,7 +176,9 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
     return (
         <>
             <Head title={`Edit Customer - ${customer.name}`} />
-            <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6 p-4 md:p-6">
+            <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
+
+                {/* ── Header ──────────────────────────────────────────────── */}
                 <div className="flex min-w-0 items-center gap-4">
                     <Link
                         href={`/superadmin/customers/${customer.id}`}
@@ -198,7 +194,9 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                 </div>
 
                 <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">
-                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
+
+                    {/* ── Section 1: Account Details ───────────────────────── */}
+                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<UserIcon className="size-4" />}
                             title="Account Details"
@@ -206,7 +204,8 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                         />
                         <Separator />
 
-                        <FieldGroup cols={3}>
+                        {/* Row 1: Name | Email | Phone | School Name */}
+                        <FieldGroup cols={4}>
                             <Field label="Full Name" required error={errors.name}>
                                 <InputWithIcon icon={<UserIcon />} value={data.name} onChange={(e) => setData('name', e.target.value)} />
                             </Field>
@@ -226,8 +225,16 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                                     onChange={(e) => setData('phone', e.target.value)}
                                 />
                             </Field>
+                            <Field label="School Name" error={errors.school_name}>
+                                <InputWithIcon
+                                    icon={<SchoolIcon />}
+                                    value={data.school_name}
+                                    onChange={(e) => setData('school_name', e.target.value)}
+                                />
+                            </Field>
                         </FieldGroup>
 
+                        {/* Row 2: Status | Account Type */}
                         <FieldGroup cols={2}>
                             <Field label="Status" required error={errors.status}>
                                 <Select value={data.status} onValueChange={(value) => setData('status', value)}>
@@ -241,38 +248,52 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                                     </SelectContent>
                                 </Select>
                             </Field>
-                            <Field label="School Name" error={errors.school_name}>
-                                <InputWithIcon
-                                    icon={<SchoolIcon />}
-                                    value={data.school_name}
-                                    onChange={(e) => setData('school_name', e.target.value)}
-                                />
+                            <Field label="Account Type" required error={errors.account_type}>
+                                <Select value={data.account_type} onValueChange={(value) => setData('account_type', value)}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="trial">
+                                            <span className="flex items-center gap-2">
+                                                <span className="size-2 rounded-full bg-amber-400" /> Trial
+                                            </span>
+                                        </SelectItem>
+                                        <SelectItem value="paid">
+                                            <span className="flex items-center gap-2">
+                                                <span className="size-2 rounded-full bg-emerald-500" /> Paid
+                                            </span>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </Field>
                         </FieldGroup>
                     </div>
 
-                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
+                    {/* ── Section 2: Location & Logo ───────────────────────── */}
+                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<SchoolIcon className="size-4" />}
-                            title="School & Location"
-                            description="Logo and geographic information"
+                            title="Location & Logo"
+                            description="School logo and geographic information"
                         />
                         <Separator />
 
+                        {/* Logo */}
                         <div className="space-y-1.5">
                             <Label>School Logo</Label>
                             <div className="flex items-center gap-3">
                                 <div
                                     onClick={() => logoRef.current?.click()}
-                                    className="border-input bg-muted/30 hover:bg-muted/60 flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors"
+                                    className="border-input bg-muted/30 hover:bg-muted/60 flex size-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors"
                                 >
                                     {logoPreview ? (
                                         <img src={logoPreview} alt="Logo" className="size-full object-cover" />
                                     ) : (
-                                        <ImageIcon className="text-muted-foreground size-6" />
+                                        <ImageIcon className="text-muted-foreground size-5" />
                                     )}
                                 </div>
-                                <div className="space-y-1">
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={() => logoRef.current?.click()}
@@ -280,7 +301,6 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                                     >
                                         {logoPreview ? 'Change' : 'Upload'}
                                     </button>
-                                    <p className="text-muted-foreground text-xs">PNG, JPG · max 2MB</p>
                                     {logoPreview && (
                                         <button
                                             type="button"
@@ -290,21 +310,22 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                                             Remove
                                         </button>
                                     )}
+                                    <p className="text-muted-foreground text-xs">PNG, JPG · max 2MB</p>
                                 </div>
                             </div>
                             {errors.logo && <p className="text-destructive text-xs">{errors.logo as string}</p>}
                             <input ref={logoRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleLogoChange} />
                         </div>
 
-                        <Field label="Address" error={errors.address}>
-                            <InputWithIcon
-                                icon={<MapPinIcon />}
-                                value={data.address}
-                                onChange={(e) => setData('address', e.target.value)}
-                            />
-                        </Field>
-
-                        <div className="grid gap-4 sm:grid-cols-3">
+                        {/* Address | City | Province | Show Address */}
+                        <FieldGroup cols={4}>
+                            <Field label="Address" error={errors.address}>
+                                <InputWithIcon
+                                    icon={<MapPinIcon />}
+                                    value={data.address}
+                                    onChange={(e) => setData('address', e.target.value)}
+                                />
+                            </Field>
                             <Field label="City" error={errors.city}>
                                 <Input value={data.city} onChange={(e) => setData('city', e.target.value)} />
                             </Field>
@@ -323,9 +344,10 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                                     </label>
                                 </div>
                             </div>
-                        </div>
+                        </FieldGroup>
                     </div>
 
+                    {/* ── Actions ──────────────────────────────────────────── */}
                     <div className="flex items-center justify-end gap-3 pb-2">
                         <Link
                             href={`/superadmin/customers/${customer.id}`}

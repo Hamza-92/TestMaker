@@ -4,6 +4,7 @@ import {
     HelpCircleIcon,
     LayoutGrid,
     SchoolIcon,
+    Settings2Icon,
     ShapesIcon,
     TagIcon,
     UserCogIcon,
@@ -45,6 +46,7 @@ export function AppSidebar() {
             ],
         }] : []),
         ...(can('users.view')          ? [{ title: 'Users', href: '/superadmin/users', icon: UserCogIcon }] : []),
+        ...(can('trial_settings.edit') ? [{ title: 'Trial Settings', href: '/superadmin/trial-settings', icon: Settings2Icon }] : []),
     ];
 
     return (

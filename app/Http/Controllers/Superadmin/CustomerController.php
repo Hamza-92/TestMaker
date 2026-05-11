@@ -34,7 +34,7 @@ class CustomerController extends Controller
                     ])]),
             ])
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'created_at'])
+            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at'])
             ->map(function (User $customer) use ($today, $todayStr, $nearExpiryThresholdDays, $currentUserId) {
                 $activeSubscription = $customer->subscriptions->first(
                     fn ($subscription) => $subscription->status?->value === 'active'
@@ -89,6 +89,7 @@ class CustomerController extends Controller
                     'city'               => $customer->city,
                     'province'           => $customer->province,
                     'status'             => $customer->status?->value,
+                    'account_type'       => $customer->account_type?->value,
                     'created_at'         => $customer->created_at?->toISOString(),
                     'subscription_count' => $customer->subscriptions->count(),
                     'plan_state'         => $planState,
@@ -159,7 +160,7 @@ class CustomerController extends Controller
                 'id', 'name', 'email', 'phone',
                 'school_name', 'logo',
                 'address', 'city', 'province', 'is_show_address',
-                'status', 'created_at',
+                'status', 'account_type', 'created_at',
                 'subscriptions',
             ]),
             'paymentLogs' => $paymentLogs,
@@ -201,7 +202,7 @@ class CustomerController extends Controller
                 'id', 'name', 'email', 'phone',
                 'school_name', 'logo',
                 'address', 'city', 'province', 'is_show_address',
-                'status',
+                'status', 'account_type',
             ]),
         ]);
     }
@@ -219,6 +220,7 @@ class CustomerController extends Controller
             'phone'                 => ['required', 'string', 'max:30'],
             'password'              => ['required', 'string', 'min:3', 'confirmed'],
             'status'                => ['required', 'in:active,inactive,suspended'],
+            'account_type'          => ['required', 'in:trial,paid'],
             'school_name'           => ['nullable', 'string', 'max:255'],
             'logo'                  => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'address'               => ['nullable', 'string', 'max:255'],
@@ -261,6 +263,7 @@ class CustomerController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($customer->id)],
             'phone' => ['required', 'string', 'max:30'],
             'status' => ['required', 'in:active,inactive,suspended'],
+            'account_type' => ['required', 'in:trial,paid'],
             'school_name' => ['nullable', 'string', 'max:255'],
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -275,6 +278,7 @@ class CustomerController extends Controller
             'email' => $customer->email,
             'phone' => $customer->phone,
             'status' => $customer->status->value,
+            'account_type' => $customer->account_type?->value,
             'school_name' => $customer->school_name,
             'address' => $customer->address,
             'city' => $customer->city,
@@ -440,6 +444,7 @@ class CustomerController extends Controller
             'email' => 'email',
             'phone' => 'phone number',
             'status' => 'status',
+            'account_type' => 'account type',
             'school_name' => 'school name',
             'address' => 'address',
             'city' => 'city',

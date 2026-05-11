@@ -50,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
             'question_types.view', 'question_types.create', 'question_types.edit', 'question_types.delete',
             'questions.view', 'questions.create', 'questions.edit', 'questions.delete', 'questions.import',
             'users.view', 'users.create', 'users.edit', 'users.delete', 'users.manage_permissions',
+            'trial_settings.edit',
         ];
 
         foreach ($permissions as $permission) {

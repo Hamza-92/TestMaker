@@ -59,6 +59,9 @@ class PermissionSeeder extends Seeder
             ['name' => 'users.edit',               'display_name' => 'Edit Users',               'group' => 'Users'],
             ['name' => 'users.delete',             'display_name' => 'Delete Users',             'group' => 'Users'],
             ['name' => 'users.manage_permissions', 'display_name' => 'Manage User Permissions',  'group' => 'Users'],
+
+            // Trial Settings
+            ['name' => 'trial_settings.edit', 'display_name' => 'Manage Trial Settings', 'group' => 'Trial Settings'],
         ];
 
         foreach ($permissions as $data) {

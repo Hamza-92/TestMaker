@@ -22,7 +22,7 @@ import {
     XCircleIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { usePermission } from '@/hooks/use-permission';
 import PlusIcon from '@/components/icons/PlusIcon';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +61,7 @@ interface Customer {
     city: string | null;
     province: string | null;
     status: AccountStatus;
+    account_type: 'trial' | 'paid';
     created_at: string;
     subscription_count: number;
     plan_state: PlanState;
@@ -78,6 +79,7 @@ type ColumnKey =
     | 'email'
     | 'school'
     | 'location'
+    | 'account_type'
     | 'account_status'
     | 'plan'
     | 'plan_status'
@@ -92,7 +94,7 @@ type ColumnKey =
 const PAGE_SIZE_OPTIONS = [10, 20, 30];
 
 const ALL_COLUMNS: ColumnKey[] = [
-    'customer', 'email', 'school', 'location', 'account_status',
+    'customer', 'email', 'school', 'location', 'account_type', 'account_status',
     'plan', 'plan_status', 'expires', 'dues', 'next_payment',
     'pending', 'commission', 'joined', 'actions',
 ];
@@ -102,6 +104,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
     email: 'Email',
     school: 'School',
     location: 'Location',
+    account_type: 'Account Type',
     account_status: 'Account Status',
     plan: 'Plan',
     plan_status: 'Plan Status',
@@ -133,6 +136,7 @@ const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
     email: false,
     school: true,
     location: false,
+    account_type: true,
     account_status: false,
     plan: true,
     plan_status: true,
@@ -209,10 +213,28 @@ function FinancialStat({ icon, label, value, className }: { icon: ReactNode; lab
     );
 }
 
+function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 'type'>) {
+    const ref = useRef<HTMLInputElement>(null);
+    return (
+        <div className="relative">
+            <Input ref={ref} type="date" className={`pr-9${className ? ` ${className}` : ''}`} {...props} />
+            <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => ref.current?.showPicker?.()}
+                className="text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+            >
+                <CalendarIcon className="size-4" />
+            </button>
+        </div>
+    );
+}
+
 export default function Customers({ customers }: { customers: Customer[] }) {
     const { can } = usePermission();
     const [tab, setTab] = useState<'all' | 'mine'>('all');
     const [search, setSearch] = useState('');
+    const [accountTypeFilter, setAccountTypeFilter] = useState<string>('all');
     const [accountStatusFilter, setAccountStatusFilter] = useState<string>('all');
     const [planFilter, setPlanFilter] = useState<string>('all');
     const [joinedFrom, setJoinedFrom] = useState('');
@@ -247,13 +269,14 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                 (customer.school_name ?? '').toLowerCase().includes(query) ||
                 location.includes(query) ||
                 planName.includes(query);
+            const matchesAccountType   = accountTypeFilter === 'all' || customer.account_type === accountTypeFilter;
             const matchesAccountStatus = accountStatusFilter === 'all' || customer.status === accountStatusFilter;
-            const matchesPlanState = planFilter === 'all' || customer.plan_state === planFilter;
-            const matchesJoinedFrom = !joinedFrom || createdAt >= joinedFrom;
-            const matchesJoinedTo = !joinedTo || createdAt <= joinedTo;
-            return matchesSearch && matchesAccountStatus && matchesPlanState && matchesJoinedFrom && matchesJoinedTo;
+            const matchesPlanState     = planFilter === 'all' || customer.plan_state === planFilter;
+            const matchesJoinedFrom    = !joinedFrom || createdAt >= joinedFrom;
+            const matchesJoinedTo      = !joinedTo || createdAt <= joinedTo;
+            return matchesSearch && matchesAccountType && matchesAccountStatus && matchesPlanState && matchesJoinedFrom && matchesJoinedTo;
         });
-    }, [tabCustomers, search, accountStatusFilter, planFilter, joinedFrom, joinedTo]);
+    }, [tabCustomers, search, accountTypeFilter, accountStatusFilter, planFilter, joinedFrom, joinedTo]);
 
     const financials = useMemo(() => ({
         totalDues: filtered.reduce((s, c) => s + Number(c.total_dues), 0),
@@ -272,11 +295,11 @@ export default function Customers({ customers }: { customers: Customer[] }) {
     const handleTab = (next: 'all' | 'mine') => { setTab(next); setPage(1); };
 
     const clearFilters = () => {
-        setSearch(''); setAccountStatusFilter('all'); setPlanFilter('all');
-        setJoinedFrom(''); setJoinedTo(''); setPage(1);
+        setSearch(''); setAccountTypeFilter('all'); setAccountStatusFilter('all');
+        setPlanFilter('all'); setJoinedFrom(''); setJoinedTo(''); setPage(1);
     };
 
-    const hasActiveFilters = search !== '' || accountStatusFilter !== 'all' || planFilter !== 'all' || joinedFrom !== '' || joinedTo !== '';
+    const hasActiveFilters = search !== '' || accountTypeFilter !== 'all' || accountStatusFilter !== 'all' || planFilter !== 'all' || joinedFrom !== '' || joinedTo !== '';
 
     return (
         <>
@@ -381,16 +404,33 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                 {/* Filters */}
                 <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[220px] flex-1">
+                        <div className="relative min-w-[10rem] flex-1">
                             <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                            <Input placeholder="Search customer, school, email, plan" value={search}
-                                onChange={(e) => handleSearch(e.target.value)} className="pl-9" />
+                            <Input placeholder="Search…" value={search}
+                                onChange={(e) => handleSearch(e.target.value)} className="w-full pl-9" />
                         </div>
 
-                        <Select value={accountStatusFilter} onValueChange={(v) => { setAccountStatusFilter(v); setPage(1); }}>
-                            <SelectTrigger className="w-40"><SelectValue placeholder="Account" /></SelectTrigger>
+                        <Select value={accountTypeFilter} onValueChange={(v) => { setAccountTypeFilter(v); setPage(1); }}>
+                            <SelectTrigger className="w-36"><SelectValue placeholder="Type" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Accounts</SelectItem>
+                                <SelectItem value="all">All Types</SelectItem>
+                                <SelectItem value="trial">
+                                    <span className="flex items-center gap-2">
+                                        <span className="size-2 rounded-full bg-amber-400" /> Trial
+                                    </span>
+                                </SelectItem>
+                                <SelectItem value="paid">
+                                    <span className="flex items-center gap-2">
+                                        <span className="size-2 rounded-full bg-emerald-500" /> Paid
+                                    </span>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select value={accountStatusFilter} onValueChange={(v) => { setAccountStatusFilter(v); setPage(1); }}>
+                            <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="inactive">Inactive</SelectItem>
                                 <SelectItem value="suspended">Suspended</SelectItem>
@@ -430,11 +470,11 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                     <div className="flex flex-wrap items-end gap-2">
                         <div className="w-full sm:w-auto">
                             <p className="text-muted-foreground mb-1 text-xs font-medium">Joined From</p>
-                            <Input type="date" value={joinedFrom} onChange={(e) => { setJoinedFrom(e.target.value); setPage(1); }} className="w-full sm:w-40" />
+                            <DateInput value={joinedFrom} onChange={(e) => { setJoinedFrom(e.target.value); setPage(1); }} className="w-full sm:w-40" />
                         </div>
                         <div className="w-full sm:w-auto">
                             <p className="text-muted-foreground mb-1 text-xs font-medium">Joined To</p>
-                            <Input type="date" value={joinedTo} onChange={(e) => { setJoinedTo(e.target.value); setPage(1); }} className="w-full sm:w-40" />
+                            <DateInput value={joinedTo} onChange={(e) => { setJoinedTo(e.target.value); setPage(1); }} className="w-full sm:w-40" />
                         </div>
                         <div className="w-full sm:w-auto">
                             <p className="text-muted-foreground mb-1 text-xs font-medium">Rows</p>
@@ -486,6 +526,9 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                 <MapPinIcon className="size-3.5" /> Location
                                             </div>
                                         </th>
+                                    )}
+                                    {visibleCols.account_type && (
+                                        <th className="text-muted-foreground px-4 py-3 font-medium">Account Type</th>
                                     )}
                                     {visibleCols.account_status && (
                                         <th className="text-muted-foreground px-4 py-3 font-medium">Account</th>
@@ -605,6 +648,16 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                 {visibleCols.location && (
                                                     <td className="text-muted-foreground px-4 py-3">
                                                         {location || <span className="italic">-</span>}
+                                                    </td>
+                                                )}
+
+                                                {visibleCols.account_type && (
+                                                    <td className="px-4 py-3">
+                                                        <Badge variant="outline" className={cn('font-medium', customer.account_type === 'paid'
+                                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                            : 'border-amber-200 bg-amber-50 text-amber-700')}>
+                                                            {customer.account_type === 'paid' ? 'Paid' : 'Trial'}
+                                                        </Badge>
                                                     </td>
                                                 )}
 

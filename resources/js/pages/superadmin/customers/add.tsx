@@ -20,7 +20,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface FormData {
     name: string;
     email: string;
@@ -28,6 +27,7 @@ interface FormData {
     password: string;
     password_confirmation: string;
     status: string;
+    account_type: string;
     school_name: string;
     logo: File | null;
     address: string;
@@ -37,7 +37,6 @@ interface FormData {
     [key: string]: string | boolean | File | null;
 }
 
-// ─── Completion Ring ──────────────────────────────────────────────────────────
 function CompletionRing({ percent }: { percent: number }) {
     const r      = 20;
     const circ   = 2 * Math.PI * r;
@@ -51,11 +50,8 @@ function CompletionRing({ percent }: { percent: number }) {
                     <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted" />
                     <circle
                         cx="24" cy="24" r={r}
-                        fill="none"
-                        strokeWidth="4"
-                        stroke={color}
-                        strokeDasharray={circ}
-                        strokeDashoffset={offset}
+                        fill="none" strokeWidth="4" stroke={color}
+                        strokeDasharray={circ} strokeDashoffset={offset}
                         strokeLinecap="round"
                         style={{ transition: 'stroke-dashoffset 0.3s ease' }}
                     />
@@ -72,7 +68,6 @@ function CompletionRing({ percent }: { percent: number }) {
     );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 function SectionHeader({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
     return (
         <div className="flex min-w-0 items-start gap-3">
@@ -87,9 +82,8 @@ function SectionHeader({ icon, title, description }: { icon: React.ReactNode; ti
     );
 }
 
-function FieldGroup({ children, cols = 2 }: { children: React.ReactNode; cols?: 1 | 2 | 3 }) {
-    const colClass = { 1: '', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3' }[cols];
-
+function FieldGroup({ children, cols = 2 }: { children: React.ReactNode; cols?: 1 | 2 | 3 | 4 }) {
+    const colClass = { 1: '', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-2 lg:grid-cols-3', 4: 'sm:grid-cols-2 lg:grid-cols-4' }[cols];
     return <div className={`grid min-w-0 gap-4 ${colClass}`}>{children}</div>;
 }
 
@@ -122,7 +116,6 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AddCustomer() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm]   = useState(false);
@@ -136,6 +129,7 @@ export default function AddCustomer() {
         password:              '',
         password_confirmation: '',
         status:                'active',
+        account_type:          'trial',
         school_name:           '',
         logo:                  null,
         address:               '',
@@ -167,7 +161,7 @@ export default function AddCustomer() {
     return (
         <>
             <Head title="Add Customer" />
-            <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6 p-4 md:p-6">
+            <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
 
                 {/* ── Header ──────────────────────────────────────────────── */}
                 <div className="flex min-w-0 items-center gap-4">
@@ -186,17 +180,17 @@ export default function AddCustomer() {
 
                 <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">
 
-                    {/* ── Section 1: Account & Security ────────────────────── */}
-                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
+                    {/* ── Section 1: Account & Security ───────────────────── */}
+                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<UserIcon className="size-4" />}
                             title="Account & Security"
-                            description="Login credentials and account status"
+                            description="Login credentials, status, and school"
                         />
                         <Separator />
 
-                        {/* Row 1: Name + Email + Phone */}
-                        <FieldGroup cols={3}>
+                        {/* Row 1: Name | Email | Phone | School Name */}
+                        <FieldGroup cols={4}>
                             <Field label="Full Name" required error={errors.name}>
                                 <InputWithIcon
                                     icon={<UserIcon />}
@@ -220,10 +214,17 @@ export default function AddCustomer() {
                                     onChange={(e) => setData('phone', e.target.value)}
                                 />
                             </Field>
+                            <Field label="School Name" error={errors.school_name}>
+                                <InputWithIcon
+                                    icon={<SchoolIcon />}
+                                    value={data.school_name}
+                                    onChange={(e) => setData('school_name', e.target.value)}
+                                />
+                            </Field>
                         </FieldGroup>
 
-                        {/* Row 2: Password + Confirm + Status */}
-                        <FieldGroup cols={3}>
+                        {/* Row 2: Password | Confirm | Status | Account Type */}
+                        <FieldGroup cols={4}>
                             <Field label="Password" required error={errors.password}>
                                 <div className="relative">
                                     <div className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
@@ -288,33 +289,52 @@ export default function AddCustomer() {
                                     </SelectContent>
                                 </Select>
                             </Field>
+                            <Field label="Account Type" required error={errors.account_type}>
+                                <Select value={data.account_type} onValueChange={(v) => setData('account_type', v)}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="trial">
+                                            <span className="flex items-center gap-2">
+                                                <span className="size-2 rounded-full bg-amber-400" /> Trial
+                                            </span>
+                                        </SelectItem>
+                                        <SelectItem value="paid">
+                                            <span className="flex items-center gap-2">
+                                                <span className="size-2 rounded-full bg-emerald-500" /> Paid
+                                            </span>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </Field>
                         </FieldGroup>
                     </div>
 
-                    {/* ── Section 2: School & Location ─────────────────────── */}
-                    <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
+                    {/* ── Section 2: Location & Logo ───────────────────────── */}
+                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
                         <SectionHeader
                             icon={<SchoolIcon className="size-4" />}
-                            title="School & Location"
-                            description="School details and geographic information"
+                            title="Location & Logo"
+                            description="School logo and geographic information"
                         />
                         <Separator />
 
-                        {/* Row 1: Logo full width */}
+                        {/* Logo */}
                         <div className="space-y-1.5">
                             <Label>School Logo</Label>
                             <div className="flex items-center gap-3">
                                 <div
                                     onClick={() => logoRef.current?.click()}
-                                    className="border-input bg-muted/30 hover:bg-muted/60 flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors"
+                                    className="border-input bg-muted/30 hover:bg-muted/60 flex size-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors"
                                 >
                                     {logoPreview ? (
                                         <img src={logoPreview} alt="Logo" className="size-full object-cover" />
                                     ) : (
-                                        <ImageIcon className="text-muted-foreground size-6" />
+                                        <ImageIcon className="text-muted-foreground size-5" />
                                     )}
                                 </div>
-                                <div className="space-y-1">
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={() => logoRef.current?.click()}
@@ -322,44 +342,31 @@ export default function AddCustomer() {
                                     >
                                         {logoPreview ? 'Change' : 'Upload'}
                                     </button>
-                                    <p className="text-muted-foreground text-xs">PNG, JPG · max 2MB</p>
                                     {logoPreview && (
                                         <button
                                             type="button"
-                                            onClick={() => {
- setLogoPreview(null); setData('logo', null); 
-}}
+                                            onClick={() => { setLogoPreview(null); setData('logo', null); }}
                                             className="text-destructive text-xs hover:underline"
                                         >
                                             Remove
                                         </button>
                                     )}
+                                    <p className="text-muted-foreground text-xs">PNG, JPG · max 2MB</p>
                                 </div>
                             </div>
                             {errors.logo && <p className="text-destructive text-xs">{errors.logo as string}</p>}
                             <input ref={logoRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleLogoChange} />
                         </div>
 
-                        {/* Row 2: School Name full width */}
-                        <Field label="School Name" error={errors.school_name}>
-                            <InputWithIcon
-                                icon={<SchoolIcon />}
-                                value={data.school_name}
-                                onChange={(e) => setData('school_name', e.target.value)}
-                            />
-                        </Field>
-
-                        {/* Row 3: Address full width */}
-                        <Field label="Address" error={errors.address}>
-                            <InputWithIcon
-                                icon={<MapPinIcon />}
-                                value={data.address}
-                                onChange={(e) => setData('address', e.target.value)}
-                            />
-                        </Field>
-
-                        {/* Row 4: City + Province + Show Address */}
-                        <div className="grid gap-4 sm:grid-cols-3">
+                        {/* Address | City | Province | Show Address */}
+                        <FieldGroup cols={4}>
+                            <Field label="Address" error={errors.address}>
+                                <InputWithIcon
+                                    icon={<MapPinIcon />}
+                                    value={data.address}
+                                    onChange={(e) => setData('address', e.target.value)}
+                                />
+                            </Field>
                             <Field label="City" error={errors.city}>
                                 <Input
                                     value={data.city}
@@ -384,7 +391,7 @@ export default function AddCustomer() {
                                     </label>
                                 </div>
                             </div>
-                        </div>
+                        </FieldGroup>
                     </div>
 
                     {/* ── Actions ──────────────────────────────────────────── */}

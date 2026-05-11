@@ -363,6 +363,12 @@ class CustomerSubscriptionController extends Controller
 
     public function create(User $customer)
     {
+        abort_if(
+            $customer->account_type?->value === 'trial',
+            403,
+            'Subscriptions cannot be added to trial customers.'
+        );
+
         $resources = $this->accessResources();
 
         return Inertia::render('superadmin/customers/subscriptions/add', [
@@ -377,6 +383,12 @@ class CustomerSubscriptionController extends Controller
 
     public function store(Request $request, User $customer)
     {
+        abort_if(
+            $customer->account_type?->value === 'trial',
+            403,
+            'Subscriptions cannot be added to trial customers.'
+        );
+
         $resources = $this->accessResources();
 
         $validated = $request->validate([

@@ -77,6 +77,7 @@ interface Customer {
     province: string | null;
     is_show_address: boolean;
     status: CustomerStatus;
+    account_type: 'trial' | 'paid';
     created_at: string;
     subscriptions: Subscription[];
 }
@@ -430,7 +431,7 @@ export default function ShowCustomer({
                                 </Link>
                             </Button>
                         )}
-                        {can('subscriptions.create') && (
+                        {can('subscriptions.create') && customer.account_type !== 'trial' && (
                             <Button asChild size="sm">
                                 <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
                                     <PlusIcon className="size-4" />
@@ -583,7 +584,7 @@ export default function ShowCustomer({
                             title="Subscriptions"
                             meta={`${customer.subscriptions.length} total`}
                             action={
-                                can('subscriptions.create') ? (
+                                can('subscriptions.create') && customer.account_type !== 'trial' ? (
                                     <Button asChild size="sm">
                                         <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
                                             <PlusIcon className="size-4" />
@@ -596,9 +597,9 @@ export default function ShowCustomer({
                             {customer.subscriptions.length === 0 ? (
                                 <EmptyState
                                     icon={<SchoolIcon className="size-6 opacity-40" />}
-                                    title="No subscriptions yet"
+                                    title={customer.account_type === 'trial' ? 'Trial account' : 'No subscriptions yet'}
                                     action={
-                                        can('subscriptions.create') ? (
+                                        can('subscriptions.create') && customer.account_type !== 'trial' ? (
                                             <Button asChild variant="outline" size="sm">
                                                 <Link href={`/superadmin/customers/${customer.id}/subscriptions/add`}>
                                                     <PlusIcon className="size-4" />

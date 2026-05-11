@@ -10,6 +10,7 @@ use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\SuperadminUserController;
 use App\Http\Controllers\Superadmin\TopicController;
+use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
 use App\Enums\UserType;
 use App\Models\Permission;
@@ -123,6 +124,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('superadmin/questions/{question}', [QuestionController::class, 'update'])->name('superadmin.questions.update')->middleware('permission:questions.edit');
     Route::delete('superadmin/questions/{question}', [QuestionController::class, 'destroy'])->name('superadmin.questions.destroy')->middleware('permission:questions.delete');
     Route::get('superadmin/questions/{question}', [QuestionController::class, 'show'])->name('superadmin.questions.show')->middleware('permission:questions.view');
+
+    // ─── Trial Settings ───────────────────────────────────────────────────────
+    Route::get('superadmin/trial-settings', [TrialSettingController::class, 'index'])->name('superadmin.trial-settings')->middleware('permission:trial_settings.edit');
+    Route::put('superadmin/trial-settings', [TrialSettingController::class, 'update'])->name('superadmin.trial-settings.update')->middleware('permission:trial_settings.edit');
 
     // ─── Superadmin Users ─────────────────────────────────────────────────────
     Route::get('superadmin/users', [SuperadminUserController::class, 'index'])->name('superadmin.users')->middleware('permission:users.view');

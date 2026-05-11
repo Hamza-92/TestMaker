@@ -16,7 +16,8 @@
       "Bash(attrib \"D:\\\\Applications\\\\TestMaker\\\\resources\\\\js\\\\routes\")",
       "Bash(icacls \"D:\\\\Applications\\\\TestMaker\\\\resources\\\\js\\\\routes\")",
       "Bash(icacls \"D:\\\\Applications\\\\TestMaker\\\\resources\\\\js\\\\routes\" /grant \"BUILTIN\\\\Users:\\(OI\\)\\(CI\\)\\(M\\)\" /T)",
-      "PowerShell(icacls \"D:\\\\Applications\\\\TestMaker\\\\resources\\\\js\\\\routes\" /grant \"BUILTIN\\\\Users:\\(OI\\)\\(CI\\)\\(M\\)\" /T)"
+      "PowerShell(icacls \"D:\\\\Applications\\\\TestMaker\\\\resources\\\\js\\\\routes\" /grant \"BUILTIN\\\\Users:\\(OI\\)\\(CI\\)\\(M\\)\" /T)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Applications\\\\TestMaker\\\\app\\\\Models\\\\\" -File | Select-Object Name)"
     ]
   }
 }
