@@ -353,7 +353,7 @@ export function HierarchicalAccessControl({
                                                         {availableClassIds.map((classId) => {
                                                             const schoolClass = classLookup[classId];
                                                             const classSelected = Boolean(
-                                                                patternRule?.classes[String(classId)],
+                                                                patternRule?.classes?.[String(classId)],
                                                             );
                                                             const isActive = activeClassId === classId;
                                                             const availSubjects = getAvailableSubjectIds(
@@ -441,7 +441,7 @@ export function HierarchicalAccessControl({
                                                     {/* Subject panel — shown when a class is active */}
                                                     {activeClassId !== null && (() => {
                                                         const classSelected = Boolean(
-                                                            patternRule?.classes[String(activeClassId)],
+                                                            patternRule?.classes?.[String(activeClassId)],
                                                         );
                                                         const availableSubjectIds = getAvailableSubjectIds(
                                                             pattern.id,

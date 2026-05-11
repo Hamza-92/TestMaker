@@ -17,9 +17,16 @@ class TrialSetting extends Model
 
     public static function current(): self
     {
-        return static::firstOrCreate([], [
+        $instance = static::firstOrCreate([], [
             'trial_duration_days' => 30,
-            'access_scope'        => ['questions', 'patterns', 'classes', 'subjects'],
+            'access_scope'        => null,
         ]);
+
+        // Fix records that were accidentally created with an indexed array default
+        if (is_array($instance->access_scope) && array_key_exists(0, $instance->access_scope)) {
+            $instance->update(['access_scope' => null]);
+        }
+
+        return $instance;
     }
 }
