@@ -134,6 +134,33 @@ function ToggleField({ icon, label, checked, onCheckedChange }: {
     );
 }
 
+function CompletionRing({ percent }: { percent: number }) {
+    const r      = 20;
+    const circ   = 2 * Math.PI * r;
+    const offset = circ - (percent / 100) * circ;
+    const color  = percent === 100 ? '#10b981' : percent >= 60 ? '#f59e0b' : '#6366f1';
+    return (
+        <div className="flex shrink-0 items-center gap-2">
+            <div className="relative size-12">
+                <svg className="size-full -rotate-90" viewBox="0 0 48 48">
+                    <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted" />
+                    <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" stroke={color}
+                        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+                        style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                    />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold" style={{ color }}>
+                    {percent}%
+                </span>
+            </div>
+            <div className="hidden text-right sm:block">
+                <p className="text-xs font-medium">Subscription</p>
+                <p className="text-muted-foreground text-xs">{percent === 100 ? 'Complete' : 'In progress'}</p>
+            </div>
+        </div>
+    );
+}
+
 function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 'type'>) {
     const ref = useRef<HTMLInputElement>(null);
     return (
@@ -172,6 +199,16 @@ export default function EditCustomerSubscription({ customer, subscription, patte
         max_teachers: subscription.max_teachers != null ? String(subscription.max_teachers) : '',
     });
 
+    const completionPercent = Math.round(
+        [
+            data.name,
+            data.amount,
+            data.expired_at,
+            !data.is_question_based || Boolean(data.allowed_questions),
+            !data.allow_teachers || Boolean(data.max_teachers),
+        ].filter(Boolean).length / 5 * 100,
+    );
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         put(`/superadmin/customers/${customer.id}/subscriptions/${subscription.id}`);
@@ -189,9 +226,10 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                     >
                         <ArrowLeftIcon className="size-4" />
                     </Link>
-                    <div>
+                    <div className="flex-1">
                         <h1 className="h1-semibold">Edit Subscription</h1>
                     </div>
+                    <CompletionRing percent={completionPercent} />
                 </div>
 
                 <div className="w-full min-w-0 rounded-xl border p-5 shadow-sm">

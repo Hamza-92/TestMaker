@@ -61,8 +61,10 @@ function CompletionRing({ percent }: { percent: number }) {
                 </span>
             </div>
             <div className="hidden text-right sm:block">
-                <p className="text-xs font-medium">Profile</p>
-                <p className="text-muted-foreground text-xs">Complete</p>
+                <p className="text-xs font-medium">Setup</p>
+                <p className="text-muted-foreground text-xs">
+                    {percent >= 80 ? 'Add subscription' : 'In progress'}
+                </p>
             </div>
         </div>
     );
@@ -138,13 +140,14 @@ export default function AddCustomer() {
         is_show_address:       false,
     });
 
+    // Profile fields contribute 80%; subscription (added later) contributes the final 20%.
     const completionPercent = Math.round(
         [
             data.name, data.email, data.phone,
             data.password, data.password_confirmation,
             data.school_name, logoPreview,
             data.address, data.city, data.province,
-        ].filter(Boolean).length / 10 * 100,
+        ].filter(Boolean).length / 10 * 80,
     );
 
     const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -76,6 +76,7 @@ interface Customer {
 
 type ColumnKey =
     | 'customer'
+    | 'setup'
     | 'email'
     | 'school'
     | 'location'
@@ -94,13 +95,14 @@ type ColumnKey =
 const PAGE_SIZE_OPTIONS = [10, 20, 30];
 
 const ALL_COLUMNS: ColumnKey[] = [
-    'customer', 'email', 'school', 'location', 'account_type', 'account_status',
+    'customer', 'setup', 'email', 'school', 'location', 'account_type', 'account_status',
     'plan', 'plan_status', 'expires', 'dues', 'next_payment',
     'pending', 'commission', 'joined', 'actions',
 ];
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
     customer: 'Customer',
+    setup: 'Setup',
     email: 'Email',
     school: 'School',
     location: 'Location',
@@ -133,6 +135,7 @@ const PLAN_STATE_CONFIG: Record<PlanState, { label: string; className: string }>
 
 const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
     customer: true,
+    setup: false,
     email: false,
     school: true,
     location: false,
@@ -151,6 +154,33 @@ const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
 
 const ACTION_BUTTON_CLASS =
     'text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors';
+
+// Profile fields (80%) + subscription presence (20%) = 100%
+// name & email are always present (required); school_name, logo, city, province are optional.
+function computeSetup(c: Customer): number {
+    let score = 0;
+    if (c.name)                      score += 10; // always true
+    if (c.email)                     score += 10; // always true
+    if (c.school_name)               score += 15;
+    if (c.logo)                      score += 15;
+    if (c.city)                      score += 15;
+    if (c.province)                  score += 15;
+    if (c.subscription_count > 0)    score += 20;
+    return score; // max 100
+}
+
+function SetupBar({ percent }: { percent: number }) {
+    const bar  = percent === 100 ? 'bg-emerald-500' : percent >= 60 ? 'bg-amber-400' : 'bg-indigo-400';
+    const text = percent === 100 ? 'text-emerald-700' : percent >= 60 ? 'text-amber-700' : 'text-indigo-600';
+    return (
+        <div className="flex min-w-20 items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${percent}%` }} />
+            </div>
+            <span className={`w-8 text-right text-xs font-medium tabular-nums ${text}`}>{percent}%</span>
+        </div>
+    );
+}
 
 function initials(name: string): string {
     return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
@@ -404,7 +434,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                 {/* Filters */}
                 <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[10rem] flex-1">
+                        <div className="relative min-w-40 flex-1">
                             <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                             <Input placeholder="Search…" value={search}
                                 onChange={(e) => handleSearch(e.target.value)} className="w-full pl-9" />
@@ -505,6 +535,9 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                 <UserIcon className="size-3.5" /> Customer
                                             </div>
                                         </th>
+                                    )}
+                                    {visibleCols.setup && (
+                                        <th className="text-muted-foreground px-4 py-3 font-medium">Setup</th>
                                     )}
                                     {visibleCols.email && (
                                         <th className="px-4 py-3 font-medium">
@@ -630,6 +663,12 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                                 </p>
                                                             </div>
                                                         </div>
+                                                    </td>
+                                                )}
+
+                                                {visibleCols.setup && (
+                                                    <td className="px-4 py-3">
+                                                        <SetupBar percent={computeSetup(customer)} />
                                                     </td>
                                                 )}
 
@@ -803,7 +842,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                             <span key={`e-${i}`} className="text-muted-foreground px-1 text-xs">…</span>
                                         ) : (
                                             <button key={item} onClick={() => goTo(item as number)}
-                                                className={cn('min-w-[28px] rounded px-2 py-1 text-xs font-medium transition-colors',
+                                                className={cn('min-w-7 rounded px-2 py-1 text-xs font-medium transition-colors',
                                                     safePage === item ? 'bg-primary text-primary-foreground' : 'hover:bg-accent')}>
                                                 {item}
                                             </button>
