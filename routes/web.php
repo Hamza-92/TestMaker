@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Customer\DashboardController as CustomerDashboardController;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
@@ -124,6 +125,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('superadmin/questions/{question}', [QuestionController::class, 'update'])->name('superadmin.questions.update')->middleware('permission:questions.edit');
     Route::delete('superadmin/questions/{question}', [QuestionController::class, 'destroy'])->name('superadmin.questions.destroy')->middleware('permission:questions.delete');
     Route::get('superadmin/questions/{question}', [QuestionController::class, 'show'])->name('superadmin.questions.show')->middleware('permission:questions.view');
+
+    // ─── Customer ─────────────────────────────────────────────────────────────
+    Route::get('customer/dashboard', [CustomerDashboardController::class, 'index'])->name('customer.dashboard');
 
     // ─── Trial Settings ───────────────────────────────────────────────────────
     Route::get('superadmin/trial-settings', [TrialSettingController::class, 'index'])->name('superadmin.trial-settings')->middleware('permission:trial_settings.edit');
