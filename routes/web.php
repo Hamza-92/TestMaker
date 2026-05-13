@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Customer\DashboardController as CustomerDashboardController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
@@ -26,7 +26,17 @@ Route::inertia('/', 'welcome', [
 ])->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+
+    // ─── Shared smart dashboard (renders based on user type) ─────────────────
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // ─── Customer / Teacher app ───────────────────────────────────────────────
+    Route::middleware('app.user')->group(function () {
+        // Additional customer routes will be added here
+    });
+
+    // ─── Superadmin ───────────────────────────────────────────────────────────
+    Route::middleware('superadmin')->group(function () {
 
     // ─── Customers ───────────────────────────────────────────────────────────
     Route::get('superadmin/customers', [CustomerController::class, 'index'])->name('superadmin.customers')->middleware('permission:customers.view');
@@ -126,9 +136,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('superadmin/questions/{question}', [QuestionController::class, 'destroy'])->name('superadmin.questions.destroy')->middleware('permission:questions.delete');
     Route::get('superadmin/questions/{question}', [QuestionController::class, 'show'])->name('superadmin.questions.show')->middleware('permission:questions.view');
 
-    // ─── Customer ─────────────────────────────────────────────────────────────
-    Route::get('customer/dashboard', [CustomerDashboardController::class, 'index'])->name('customer.dashboard');
-
     // ─── Trial Settings ───────────────────────────────────────────────────────
     Route::get('superadmin/trial-settings', [TrialSettingController::class, 'index'])->name('superadmin.trial-settings')->middleware('permission:trial_settings.edit');
     Route::put('superadmin/trial-settings', [TrialSettingController::class, 'update'])->name('superadmin.trial-settings.update')->middleware('permission:trial_settings.edit');
@@ -142,6 +149,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('superadmin/users/{user}/edit', [SuperadminUserController::class, 'edit'])->name('superadmin.users.edit')->middleware('permission:users.edit');
     Route::put('superadmin/users/{user}', [SuperadminUserController::class, 'update'])->name('superadmin.users.update')->middleware('permission:users.edit');
     Route::delete('superadmin/users/{user}', [SuperadminUserController::class, 'destroy'])->name('superadmin.users.destroy')->middleware('permission:users.delete');
+
+    }); // end superadmin group
 });
 
 // this route will be just kept until the app is fully developed and live, after it, this route will be deleted

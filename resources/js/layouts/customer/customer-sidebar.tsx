@@ -33,27 +33,27 @@ const NAV_GROUPS: NavGroup[] = [
     {
         title: 'PAPER GENERATION',
         items: [
-            { label: 'Generate Paper', href: '/customer/papers/generate', icon: FilePlusIcon },
-            { label: 'Question Bank',  href: '/customer/questions',        icon: DatabaseIcon },
-            { label: 'Saved Papers',   href: '/customer/papers',           icon: BookmarkIcon },
-            { label: 'My Templates',   href: '/customer/templates',        icon: LayoutTemplateIcon },
+            { label: 'Generate Paper', href: '/papers/generate', icon: FilePlusIcon },
+            { label: 'Question Bank',  href: '/questions',       icon: DatabaseIcon },
+            { label: 'Saved Papers',   href: '/papers',          icon: BookmarkIcon },
+            { label: 'My Templates',   href: '/templates',       icon: LayoutTemplateIcon },
         ],
     },
     {
         title: 'MANAGEMENT',
         items: [
-            { label: 'Teachers',  href: '/customer/teachers',  icon: UsersIcon },
-            { label: 'Classes',   href: '/customer/classes',   icon: SchoolIcon },
-            { label: 'Subjects',  href: '/customer/subjects',  icon: BookOpenIcon },
-            { label: 'Settings',  href: '/customer/settings',  icon: SettingsIcon },
+            { label: 'Teachers',  href: '/teachers',  icon: UsersIcon },
+            { label: 'Classes',   href: '/classes',   icon: SchoolIcon },
+            { label: 'Subjects',  href: '/subjects',  icon: BookOpenIcon },
+            { label: 'Settings',  href: '/settings',  icon: SettingsIcon },
         ],
     },
     {
         title: 'ANALYTICS',
         items: [
-            { label: 'Reports',      href: '/customer/reports',    icon: BarChart3Icon },
-            { label: 'Activity Log', href: '/customer/activity',   icon: ActivityIcon },
-            { label: 'Most Used',    href: '/customer/most-used',  icon: TrendingUpIcon },
+            { label: 'Reports',      href: '/reports',    icon: BarChart3Icon },
+            { label: 'Activity Log', href: '/activity',   icon: ActivityIcon },
+            { label: 'Most Used',    href: '/most-used',  icon: TrendingUpIcon },
         ],
     },
 ];
@@ -123,11 +123,11 @@ export function CustomerSidebar() {
             {/* ── Dashboard ─────────────────────────────────────────────────── */}
             <div className="px-3 pb-2 pt-1">
                 <NavLink
-                    href="/customer/dashboard"
+                    href="/dashboard"
                     icon={LayoutDashboardIcon}
                     label="Dashboard"
                     collapsed={collapsed}
-                    active={url === '/customer/dashboard'}
+                    active={url === '/dashboard'}
                 />
             </div>
 

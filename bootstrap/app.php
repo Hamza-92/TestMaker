@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\CheckPermission;
+use App\Http\Middleware\EnsureAppUser;
+use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -24,7 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'permission' => CheckPermission::class,
+            'permission'    => CheckPermission::class,
+            'superadmin'    => EnsureSuperAdmin::class,
+            'app.user'      => EnsureAppUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

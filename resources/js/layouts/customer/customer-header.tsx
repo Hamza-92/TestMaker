@@ -93,8 +93,8 @@ function UserMenu() {
                             <p className="text-muted-foreground text-xs">{user.email as string}</p>
                         </div>
                         <div className="p-1">
-                            <MenuItem href="/customer/profile" icon={UserIcon} label="Profile" />
-                            <MenuItem href="/customer/settings" icon={SettingsIcon} label="Settings" />
+                            <MenuItem href="/profile" icon={UserIcon} label="Profile" />
+                            <MenuItem href="/settings" icon={SettingsIcon} label="Settings" />
                             <div className="my-1 border-t" />
                             <MenuItem href="/logout" icon={LogOutIcon} label="Log out" method="post" />
                         </div>
