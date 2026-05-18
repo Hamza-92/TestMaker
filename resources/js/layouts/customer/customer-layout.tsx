@@ -7,7 +7,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
             <CustomerSidebar />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <CustomerHeader />
-                <main className="flex-1 overflow-y-auto">
+                <main className="flex-1 overflow-y-auto p-4 md:p-6">
                     {children}
                 </main>
             </div>

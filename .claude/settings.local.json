@@ -21,7 +21,9 @@
       "Bash(Get-ChildItem -Path \"d:\\\\Hamza's Data\\\\TestMaker\\\\resources\\\\js\\\\pages\" -Directory)",
       "Bash(Select-Object Name)",
       "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\Hamza's Data\\\\TestMaker\\\\resources\\\\js\\\\pages\\\\customer\")",
-      "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\Hamza's Data\\\\TestMaker\\\\app\\\\Http\\\\Controllers\\\\Customer\")"
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\Hamza's Data\\\\TestMaker\\\\app\\\\Http\\\\Controllers\\\\Customer\")",
+      "Bash(Get-ChildItem -Path \"d:\\\\Applications\\\\TestMaker\" -Force)",
+      "Bash(Select-Object Name, FullName)"
     ]
   }
 }

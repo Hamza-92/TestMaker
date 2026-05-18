@@ -120,19 +120,17 @@ export function CustomerSidebar() {
                 )}
             </div>
 
-            {/* ── Dashboard ─────────────────────────────────────────────────── */}
-            <div className="px-3 pb-2 pt-1">
-                <NavLink
-                    href="/dashboard"
-                    icon={LayoutDashboardIcon}
-                    label="Dashboard"
-                    collapsed={collapsed}
-                    active={url === '/dashboard'}
-                />
-            </div>
-
             {/* ── Nav groups ────────────────────────────────────────────────── */}
-            <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+            <nav className="scrollbar-slim flex-1 space-y-4 overflow-y-auto px-3 pb-4 pt-1">
+                <div>
+                    <NavLink
+                        href="/dashboard"
+                        icon={LayoutDashboardIcon}
+                        label="Dashboard"
+                        collapsed={collapsed}
+                        active={url === '/dashboard'}
+                    />
+                </div>
                 {NAV_GROUPS.map((group) => (
                     <div key={group.title}>
                         {!collapsed && (
