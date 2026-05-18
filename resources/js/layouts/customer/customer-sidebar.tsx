@@ -174,7 +174,7 @@ export function CustomerSidebar() {
                     <p className="mb-3 text-[11px] leading-relaxed text-indigo-600/70 dark:text-slate-400">
                         Unlock unlimited questions and advanced analytics.
                     </p>
-                    <button className="w-full rounded-lg bg-gradient-to-r from-indigo-500 to-violet-500 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition-opacity hover:opacity-90 dark:shadow-indigo-900/40">
+                    <button className="w-full rounded-lg bg-linear-to-r from-indigo-500 to-violet-500 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-200 transition-opacity hover:opacity-90 dark:shadow-indigo-900/40">
                         View Plans
                     </button>
                 </div>

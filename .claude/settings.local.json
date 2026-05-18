@@ -23,7 +23,11 @@
       "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\Hamza's Data\\\\TestMaker\\\\resources\\\\js\\\\pages\\\\customer\")",
       "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\Hamza's Data\\\\TestMaker\\\\app\\\\Http\\\\Controllers\\\\Customer\")",
       "Bash(Get-ChildItem -Path \"d:\\\\Applications\\\\TestMaker\" -Force)",
-      "Bash(Select-Object Name, FullName)"
+      "Bash(Select-Object Name, FullName)",
+      "Bash(php -l app/Http/Controllers/Customer/GeneratePaperController.php)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(echo \"stdout exit: $?\")",
+      "Bash(node -e \"const {exec} = require\\('child_process'\\); exec\\('php artisan wayfinder:generate --with-form', {cwd: 'd:\\\\\\\\\\\\\\\\Applications\\\\\\\\\\\\\\\\TestMaker'}, \\(err, stdout, stderr\\) => { if\\(err\\) console.error\\('FAILED:', err.message\\); else console.log\\('OK:', stdout.trim\\(\\)\\); }\\);\")"
     ]
   }
 }

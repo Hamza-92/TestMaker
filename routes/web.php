@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Customer\GeneratePaperController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
@@ -32,7 +33,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ─── Customer / Teacher app ───────────────────────────────────────────────
     Route::middleware('app.user')->group(function () {
-        // Additional customer routes will be added here
+        Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
     });
 
     // ─── Superadmin ───────────────────────────────────────────────────────────
