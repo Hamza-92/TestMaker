@@ -27,7 +27,14 @@
       "Bash(php -l app/Http/Controllers/Customer/GeneratePaperController.php)",
       "Bash(echo \"Exit code: $?\")",
       "Bash(echo \"stdout exit: $?\")",
-      "Bash(node -e \"const {exec} = require\\('child_process'\\); exec\\('php artisan wayfinder:generate --with-form', {cwd: 'd:\\\\\\\\\\\\\\\\Applications\\\\\\\\\\\\\\\\TestMaker'}, \\(err, stdout, stderr\\) => { if\\(err\\) console.error\\('FAILED:', err.message\\); else console.log\\('OK:', stdout.trim\\(\\)\\); }\\);\")"
+      "Bash(node -e \"const {exec} = require\\('child_process'\\); exec\\('php artisan wayfinder:generate --with-form', {cwd: 'd:\\\\\\\\\\\\\\\\Applications\\\\\\\\\\\\\\\\TestMaker'}, \\(err, stdout, stderr\\) => { if\\(err\\) console.error\\('FAILED:', err.message\\); else console.log\\('OK:', stdout.trim\\(\\)\\); }\\);\")",
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; php artisan wayfinder:generate --verbose 2>&1; echo \"Exit: $LASTEXITCODE\")",
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; \\(Get-Content node_modules/@laravel/vite-plugin-wayfinder/package.json | ConvertFrom-Json\\).version)",
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; \\(Get-Content node_modules/vite/package.json | ConvertFrom-Json\\).version)",
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; cmd /c \"php artisan wayfinder:generate\" 2>&1; echo \"Exit: $LASTEXITCODE\")",
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; php artisan wayfinder:generate 2>&1; echo \"Exit: $LASTEXITCODE\")",
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; $j1 = Start-Job { cd D:\\\\Applications\\\\TestMaker; php artisan wayfinder:generate 2>&1 }; $j2 = Start-Job { cd D:\\\\Applications\\\\TestMaker; php artisan wayfinder:generate 2>&1 }; Wait-Job $j1, $j2 | Out-Null; Receive-Job $j1; Receive-Job $j2; echo \"J1 exit: $\\($j1.State\\), J2 exit: $\\($j2.State\\)\")",
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; Get-ChildItem vendor\\\\inertiajs\\\\ -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName | Select-Object -First 30)"
     ]
   }
 }

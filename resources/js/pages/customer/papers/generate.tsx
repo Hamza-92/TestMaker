@@ -45,7 +45,7 @@ function SelectField({
 }) {
     return (
         <div className="relative mt-2">
-            <label className="absolute -top-2.5 left-3 z-10 bg-white px-1 text-[11px] font-semibold text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+            <label className="absolute -top-2.5 left-3 z-10 bg-white px-1 text-[11px] font-semibold text-slate-500 dark:bg-[#0f172a] dark:text-slate-400">
                 {label}
                 <span className="ml-0.5 text-indigo-500">*</span>
             </label>
@@ -101,15 +101,16 @@ export default function GeneratePaper({ patterns, patternClasses, classSubjects 
         <>
             <Head title="Generate Paper" />
 
-            <div className="mx-auto max-w-3xl">
+            <div className="flex flex-col gap-4">
+                {/* ── Selection card ────────────────────────────────────────── */}
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/60 dark:bg-slate-900">
 
                     {/* Gradient top accent */}
                     <div className="h-[3px] bg-linear-to-r from-indigo-600 via-violet-500 to-orange-500" />
 
-                    {/* Body — the 3 cascading selects */}
+                    {/* Selects */}
                     <div className="px-6 py-6">
-                        <div className="grid gap-5 sm:grid-cols-3">
+                        <div className="grid gap-6 sm:grid-cols-3">
                             <SelectField
                                 label="Program"
                                 value={patternId}
@@ -148,16 +149,16 @@ export default function GeneratePaper({ patterns, patternClasses, classSubjects 
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4 dark:border-slate-800 dark:bg-slate-800/20">
+                    <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-3.5 dark:border-slate-800 dark:bg-slate-800/20">
                         <Link
                             href="/dashboard"
-                            className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 dark:border-slate-600 dark:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
+                            className="rounded-lg border border-slate-200 bg-white px-5 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800"
                         >
                             Close
                         </Link>
                         <button
                             disabled={!canProceed}
-                            className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg bg-linear-to-r from-indigo-500 to-violet-500 px-6 py-2 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 dark:shadow-indigo-900/30"
                         >
                             Next
                         </button>
