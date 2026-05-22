@@ -34,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ─── Customer / Teacher app ───────────────────────────────────────────────
     Route::middleware('app.user')->group(function () {
         Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
+        Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
     });
 
     // ─── Superadmin ───────────────────────────────────────────────────────────
