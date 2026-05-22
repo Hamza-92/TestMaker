@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
+use App\Models\Question;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -37,6 +39,13 @@ class GeneratePaperController extends Controller
                     'subjects.name_eng as name'
                 )
                 ->get(),
+
+            'sourceOptions' => collect(Question::sourceOptions())
+                ->map(fn (string $label, string $value) => [
+                    'value' => $value,
+                    'label' => $label,
+                ])
+                ->values(),
         ]);
     }
 
@@ -81,5 +90,71 @@ class GeneratePaperController extends Controller
             ->values();
 
         return response()->json(['chapters' => $chapters]);
+    }
+
+    public function questionTypes(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'chapter_ids' => ['required', 'array', 'min:1'],
+            'chapter_ids.*' => ['integer', 'exists:chapters,id'],
+            'topic_ids' => ['array'],
+            'topic_ids.*' => ['integer', 'exists:topics,id'],
+            'sources' => ['array'],
+            'sources.*' => ['string', Rule::in(Question::sourceValues())],
+        ]);
+
+        $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        $topicIds = collect($data['topic_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $sources = collect($data['sources'] ?? [])
+            ->filter(fn ($source) => in_array($source, Question::sourceValues(), true))
+            ->values();
+
+        if ($sources->isEmpty()) {
+            return response()->json(['sections' => []]);
+        }
+
+        $validTopicIds = $topicIds->isEmpty()
+            ? collect()
+            : DB::table('topics')
+                ->whereIn('id', $topicIds)
+                ->whereIn('chapter_id', $chapterIds)
+                ->pluck('id');
+
+        $rows = DB::table('questions')
+            ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
+            ->whereIn('questions.chapter_id', $chapterIds)
+            ->where('questions.status', 1)
+            ->where('question_types.status', 1)
+            ->whereIn('questions.source', $sources)
+            ->when($validTopicIds->isNotEmpty(), function ($query) use ($validTopicIds) {
+                $query->where(function ($query) use ($validTopicIds) {
+                    $query->whereIn('questions.topic_id', $validTopicIds)
+                        ->orWhereNull('questions.topic_id');
+                });
+            })
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.is_objective')
+            ->orderByDesc('question_types.is_objective')
+            ->orderBy('question_types.name')
+            ->select([
+                'question_types.id',
+                'question_types.name',
+                'question_types.is_objective',
+                DB::raw('COUNT(questions.id) as available_count'),
+            ])
+            ->get()
+            ->values();
+
+        $sections = $rows->map(fn ($row, int $index) => [
+            'id' => 'sec_'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
+            'questionTypeId' => (int) $row->id,
+            'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
+            'title' => $row->name,
+            'availableCount' => (int) $row->available_count,
+        ]);
+
+        return response()->json(['sections' => $sections]);
     }
 }
