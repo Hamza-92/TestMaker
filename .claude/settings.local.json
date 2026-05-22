@@ -34,7 +34,9 @@
       "PowerShell(cd D:\\\\Applications\\\\TestMaker; cmd /c \"php artisan wayfinder:generate\" 2>&1; echo \"Exit: $LASTEXITCODE\")",
       "PowerShell(cd D:\\\\Applications\\\\TestMaker; php artisan wayfinder:generate 2>&1; echo \"Exit: $LASTEXITCODE\")",
       "PowerShell(cd D:\\\\Applications\\\\TestMaker; $j1 = Start-Job { cd D:\\\\Applications\\\\TestMaker; php artisan wayfinder:generate 2>&1 }; $j2 = Start-Job { cd D:\\\\Applications\\\\TestMaker; php artisan wayfinder:generate 2>&1 }; Wait-Job $j1, $j2 | Out-Null; Receive-Job $j1; Receive-Job $j2; echo \"J1 exit: $\\($j1.State\\), J2 exit: $\\($j2.State\\)\")",
-      "PowerShell(cd D:\\\\Applications\\\\TestMaker; Get-ChildItem vendor\\\\inertiajs\\\\ -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName | Select-Object -First 30)"
+      "PowerShell(cd D:\\\\Applications\\\\TestMaker; Get-ChildItem vendor\\\\inertiajs\\\\ -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName | Select-Object -First 30)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(p['name'],p['version']\\) for p in d['packages'] if 'wayfinder' in p['name'] or 'fortify' in p['name'] or 'inertia' in p['name']]\")",
+      "Bash(npm view *)"
     ]
   }
 }
