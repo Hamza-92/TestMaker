@@ -200,7 +200,7 @@ function TriCheckbox({
             aria-label={label}
             onClick={onChange}
             className={cn(
-                'flex shrink-0 items-center justify-center rounded-[5px] border transition-all',
+                'flex shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-all',
                 checkboxSize,
                 state === 'checked'
                     ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
@@ -235,7 +235,7 @@ function SourceCheckbox({
             aria-checked={checked}
             onClick={onChange}
             className={cn(
-                'inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors',
+                'inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors',
                 checked
                     ? 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-100',
@@ -686,6 +686,45 @@ export default function GeneratePaper({
         return 'indeterminate';
     }
 
+    function allChaptersState(): 'unchecked' | 'checked' | 'indeterminate' {
+        if (!chapters || chapters.length === 0) {
+            return 'unchecked';
+        }
+
+        const states = chapters.map((chapter) => chapterState(chapter));
+
+        if (states.every((state) => state === 'checked')) {
+            return 'checked';
+        }
+
+        return states.some((state) => state !== 'unchecked')
+            ? 'indeterminate'
+            : 'unchecked';
+    }
+
+    function toggleAllChapters() {
+        if (!chapters || chapters.length === 0) {
+            return;
+        }
+
+        if (allChaptersState() === 'checked') {
+            setSelected({});
+
+            return;
+        }
+
+        const all: Record<number, Set<number>> = {};
+
+        for (const chapter of chapters) {
+            all[chapter.id] =
+                chapter.topics.length > 0
+                    ? new Set(chapter.topics.map((topic) => topic.id))
+                    : new Set([CHAPTER_ONLY_SELECTION]);
+        }
+
+        setSelected(all);
+    }
+
     function reset() {
         setStep('chapters');
         setPattern(null);
@@ -895,44 +934,19 @@ export default function GeneratePaper({
                                         Chapters &amp; topics
                                     </h2>
                                     {chapters && chapters.length > 0 && (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+                                            <TriCheckbox
+                                                state={allChaptersState()}
+                                                onChange={toggleAllChapters}
+                                                label="Select all chapters and topics"
+                                                size="sm"
+                                            />
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    const all: Record<
-                                                        number,
-                                                        Set<number>
-                                                    > = {};
-
-                                                    for (const chapter of chapters) {
-                                                        all[chapter.id] =
-                                                            chapter.topics
-                                                                .length > 0
-                                                                ? new Set(
-                                                                      chapter.topics.map(
-                                                                          (
-                                                                              topic,
-                                                                          ) =>
-                                                                              topic.id,
-                                                                      ),
-                                                                  )
-                                                                : new Set([
-                                                                      CHAPTER_ONLY_SELECTION,
-                                                                  ]);
-                                                    }
-
-                                                    setSelected(all);
-                                                }}
-                                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                                                onClick={toggleAllChapters}
+                                                className="cursor-pointer text-xs font-medium text-slate-700 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300"
                                             >
                                                 Select all
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelected({})}
-                                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                                            >
-                                                Clear
                                             </button>
                                         </div>
                                     )}
@@ -1153,14 +1167,14 @@ export default function GeneratePaper({
                             <button
                                 type="button"
                                 onClick={() => router.visit('/dashboard')}
-                                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                                className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={reset}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                             >
                                 <RotateCcwIcon className="size-3.5" />
                                 Reset
@@ -1170,7 +1184,7 @@ export default function GeneratePaper({
                                 disabled={!canContinueToQuestions}
                                 onClick={handleNext}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
+                                    'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
                                     !canContinueToQuestions
                                         ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                                         : 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400',
@@ -1185,7 +1199,7 @@ export default function GeneratePaper({
                             <button
                                 type="button"
                                 onClick={handleBackToChapters}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                             >
                                 <ArrowLeftIcon className="size-4" />
                                 Back
@@ -1195,7 +1209,7 @@ export default function GeneratePaper({
                                 disabled={questionSelection.totalMarks === 0}
                                 onClick={handleGeneratePaper}
                                 className={cn(
-                                    'rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
+                                    'cursor-pointer rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
                                     questionSelection.totalMarks === 0
                                         ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                                         : 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400',
@@ -1247,7 +1261,7 @@ function ChapterCard({
                         {chapter.chapter_number !== null && (
                             <span
                                 className={cn(
-                                    'rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold transition-colors',
+                                    'shrink-0 whitespace-nowrap rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold transition-colors',
                                     isActive
                                         ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200'
                                         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
@@ -1267,13 +1281,6 @@ function ChapterCard({
                             {chapter.name}
                         </h3>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                        {chapter.topics.length === 0
-                            ? isActive
-                                ? 'Chapter selected'
-                                : 'No topics'
-                            : `${selectedTopics.size} / ${chapter.topics.length} topics`}
-                    </p>
                 </div>
             </div>
 
@@ -1282,7 +1289,7 @@ function ChapterCard({
                     This chapter can be selected directly.
                 </p>
             ) : (
-                <ul className="scrollbar-slim mt-2 max-h-56 space-y-0.5 overflow-y-auto pr-1">
+                <ul className="mt-2 space-y-0.5">
                     {chapter.topics.map((topic) => {
                         const checked = selectedTopics.has(topic.id);
 
@@ -1292,8 +1299,8 @@ function ChapterCard({
                                 className={cn(
                                     'flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors',
                                     checked
-                                        ? 'bg-teal-50 text-teal-900 dark:bg-teal-500/10 dark:text-teal-100'
-                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60',
+                                        ? 'text-teal-700 dark:text-teal-300'
+                                        : 'text-slate-600 dark:text-slate-300',
                                 )}
                             >
                                 <TriCheckbox
@@ -1305,7 +1312,7 @@ function ChapterCard({
                                 <button
                                     type="button"
                                     onClick={() => onToggleTopic(topic.id)}
-                                    className="min-w-0 flex-1 truncate text-left text-[13px]"
+                                    className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px]"
                                 >
                                     {topic.name}
                                 </button>
@@ -1360,7 +1367,7 @@ function QuestionSelectionCard({
                         type="button"
                         onClick={() => onClear(section.id)}
                         aria-label={`Clear ${section.title}`}
-                        className="flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+                        className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
                     >
                         <Trash2Icon className="size-4" />
                     </button>
@@ -1397,7 +1404,7 @@ function QuestionSelectionCard({
                     onClick={() => onAddOne(section.id)}
                     aria-label={`Add one ${section.title} question`}
                     title={`Add one ${section.title} question`}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20"
+                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20"
                 >
                     <PlusIcon className="size-4" />
                     Add
