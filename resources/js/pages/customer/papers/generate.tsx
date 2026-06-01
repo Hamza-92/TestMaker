@@ -51,6 +51,11 @@ interface Chapter {
     topics: Topic[];
 }
 
+interface ChapterGroup {
+    heading: string | null;
+    items: Chapter[];
+}
+
 interface Props {
     patterns: Pattern[];
     patternClasses: PatternClass[];
@@ -454,10 +459,10 @@ export default function GeneratePaper({
 
     const chapterGroups = useMemo(() => {
         if (!chapters) {
-            return [] as { heading: string | null; items: Chapter[] }[];
+            return [] as ChapterGroup[];
         }
 
-        const groups: { heading: string | null; items: Chapter[] }[] = [];
+        const groups: ChapterGroup[] = [];
 
         for (const chapter of chapters) {
             const heading = chapter.group_heading || chapter.group_name || null;
@@ -472,6 +477,11 @@ export default function GeneratePaper({
 
         return groups;
     }, [chapters]);
+
+    const isChapterWiseSubject =
+        chapters !== null &&
+        chapters.length > 0 &&
+        chapters.every((chapter) => chapter.topics.length === 0);
 
     useEffect(() => {
         if (!pattern || !klass || !subject) {
@@ -700,6 +710,41 @@ export default function GeneratePaper({
         return states.some((state) => state !== 'unchecked')
             ? 'indeterminate'
             : 'unchecked';
+    }
+
+    function chapterGroupState(
+        group: ChapterGroup,
+    ): 'unchecked' | 'checked' | 'indeterminate' {
+        const states = group.items.map((chapter) => chapterState(chapter));
+
+        if (states.every((state) => state === 'checked')) {
+            return 'checked';
+        }
+
+        return states.some((state) => state !== 'unchecked')
+            ? 'indeterminate'
+            : 'unchecked';
+    }
+
+    function toggleChapterGroup(group: ChapterGroup) {
+        const shouldClear = chapterGroupState(group) === 'checked';
+
+        setSelected((current) => {
+            const next = { ...current };
+
+            for (const chapter of group.items) {
+                if (shouldClear) {
+                    delete next[chapter.id];
+                } else {
+                    next[chapter.id] =
+                        chapter.topics.length > 0
+                            ? new Set(chapter.topics.map((topic) => topic.id))
+                            : new Set([CHAPTER_ONLY_SELECTION]);
+                }
+            }
+
+            return next;
+        });
     }
 
     function toggleAllChapters() {
@@ -981,58 +1026,91 @@ export default function GeneratePaper({
                                 {!loadingChapters &&
                                     chapters &&
                                     chapters.length > 0 && (
-                                        <div className="space-y-6">
-                                            {chapterGroups.map(
-                                                (group, index) => (
-                                                    <div
-                                                        key={`${group.heading ?? 'none'}-${index}`}
-                                                    >
-                                                        {group.heading && (
-                                                            <h3 className="mb-2 text-[11px] font-semibold tracking-widest text-slate-400 uppercase dark:text-slate-500">
-                                                                {group.heading}
-                                                            </h3>
-                                                        )}
-                                                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                                            {group.items.map(
-                                                                (chapter) => (
-                                                                    <ChapterCard
-                                                                        key={
-                                                                            chapter.id
+                                        <>
+                                            {isChapterWiseSubject ? (
+                                                <div className="grid items-start gap-4 lg:grid-cols-2">
+                                                    {chapterGroups.map(
+                                                        (group, index) => (
+                                                            <DirectChapterGroup
+                                                                key={`${group.heading ?? 'none'}-${index}`}
+                                                                group={group}
+                                                                state={chapterGroupState(
+                                                                    group,
+                                                                )}
+                                                                selected={
+                                                                    selected
+                                                                }
+                                                                onToggleGroup={() =>
+                                                                    toggleChapterGroup(
+                                                                        group,
+                                                                    )
+                                                                }
+                                                                onToggleChapter={
+                                                                    toggleChapter
+                                                                }
+                                                            />
+                                                        ),
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-6">
+                                                    {chapterGroups.map(
+                                                        (group, index) => (
+                                                            <div
+                                                                key={`${group.heading ?? 'none'}-${index}`}
+                                                            >
+                                                                {group.heading && (
+                                                                    <h3 className="mb-2 text-[11px] font-semibold tracking-widest text-slate-400 uppercase dark:text-slate-500">
+                                                                        {
+                                                                            group.heading
                                                                         }
-                                                                        chapter={
-                                                                            chapter
-                                                                        }
-                                                                        state={chapterState(
+                                                                    </h3>
+                                                                )}
+                                                                <div className="grid gap-3 sm:grid-cols-2">
+                                                                    {group.items.map(
+                                                                        (
                                                                             chapter,
-                                                                        )}
-                                                                        selectedTopics={
-                                                                            selected[
-                                                                                chapter
-                                                                                    .id
-                                                                            ] ??
-                                                                            new Set()
-                                                                        }
-                                                                        onToggleChapter={() =>
-                                                                            toggleChapter(
-                                                                                chapter,
-                                                                            )
-                                                                        }
-                                                                        onToggleTopic={(
-                                                                            topicId,
-                                                                        ) =>
-                                                                            toggleTopic(
-                                                                                chapter.id,
-                                                                                topicId,
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                ),
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ),
+                                                                        ) => (
+                                                                            <ChapterCard
+                                                                                key={
+                                                                                    chapter.id
+                                                                                }
+                                                                                chapter={
+                                                                                    chapter
+                                                                                }
+                                                                                state={chapterState(
+                                                                                    chapter,
+                                                                                )}
+                                                                                selectedTopics={
+                                                                                    selected[
+                                                                                        chapter
+                                                                                            .id
+                                                                                    ] ??
+                                                                                    new Set()
+                                                                                }
+                                                                                onToggleChapter={() =>
+                                                                                    toggleChapter(
+                                                                                        chapter,
+                                                                                    )
+                                                                                }
+                                                                                onToggleTopic={(
+                                                                                    topicId,
+                                                                                ) =>
+                                                                                    toggleTopic(
+                                                                                        chapter.id,
+                                                                                        topicId,
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </div>
                                             )}
-                                        </div>
+                                        </>
                                     )}
                             </section>
                         )}
@@ -1222,6 +1300,136 @@ export default function GeneratePaper({
                 </div>
             </div>
         </>
+    );
+}
+
+function DirectChapterGroup({
+    group,
+    state,
+    selected,
+    onToggleGroup,
+    onToggleChapter,
+}: {
+    group: ChapterGroup;
+    state: 'unchecked' | 'checked' | 'indeterminate';
+    selected: Record<number, Set<number>>;
+    onToggleGroup: () => void;
+    onToggleChapter: (chapter: Chapter) => void;
+}) {
+    const isActive = state !== 'unchecked';
+    const heading = group.heading;
+
+    if (heading === null) {
+        return (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:col-span-2">
+                {group.items.map((chapter) => (
+                    <DirectChapterRow
+                        key={chapter.id}
+                        chapter={chapter}
+                        checked={
+                            selected[chapter.id]?.has(CHAPTER_ONLY_SELECTION) ??
+                            false
+                        }
+                        onToggleChapter={onToggleChapter}
+                        standalone
+                    />
+                ))}
+            </ul>
+        );
+    }
+
+    return (
+        <div
+            className={cn(
+                'overflow-hidden rounded-xl border bg-white transition-colors dark:bg-slate-900',
+                isActive
+                    ? 'border-teal-300 dark:border-teal-500/40'
+                    : 'border-slate-200 dark:border-slate-800',
+            )}
+        >
+            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                <TriCheckbox
+                    state={state}
+                    onChange={onToggleGroup}
+                    label={`Toggle all chapters in ${heading}`}
+                />
+                <h3 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400">
+                    {heading}
+                </h3>
+            </div>
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {group.items.map((chapter) => (
+                    <DirectChapterRow
+                        key={chapter.id}
+                        chapter={chapter}
+                        checked={
+                            selected[chapter.id]?.has(CHAPTER_ONLY_SELECTION) ??
+                            false
+                        }
+                        onToggleChapter={onToggleChapter}
+                    />
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+function DirectChapterRow({
+    chapter,
+    checked,
+    onToggleChapter,
+    standalone = false,
+}: {
+    chapter: Chapter;
+    checked: boolean;
+    onToggleChapter: (chapter: Chapter) => void;
+    standalone?: boolean;
+}) {
+    return (
+        <li
+            className={cn(
+                'flex items-center gap-3 bg-white px-4 py-3 dark:bg-slate-900',
+                standalone &&
+                    'rounded-xl border transition-colors dark:border-slate-800',
+                standalone &&
+                    (checked
+                        ? 'border-teal-300 dark:border-teal-500/40'
+                        : 'border-slate-200'),
+            )}
+        >
+            <TriCheckbox
+                state={checked ? 'checked' : 'unchecked'}
+                onChange={() => onToggleChapter(chapter)}
+                label={`Toggle ${chapter.name}`}
+                size="sm"
+            />
+            <button
+                type="button"
+                onClick={() => onToggleChapter(chapter)}
+                className={cn(
+                    'flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-sm transition-colors',
+                    checked
+                        ? 'text-teal-700 dark:text-teal-300'
+                        : 'text-slate-700 hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300',
+                )}
+            >
+                {chapter.chapter_number !== null && (
+                    <span
+                        className={cn(
+                            'shrink-0 whitespace-nowrap rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold',
+                            checked
+                                ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200'
+                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+                        )}
+                    >
+                        CH {String(chapter.chapter_number).padStart(2, '0')}
+                    </span>
+                )}
+                <span className="truncate" title={chapter.name}>
+                    {chapter.name}
+                </span>
+            </button>
+        </li>
     );
 }
 
