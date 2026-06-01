@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -14,7 +14,7 @@ import {
     SearchXIcon,
     Trash2Icon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
@@ -368,6 +368,8 @@ export default function GeneratePaper({
     const [chapters, setChapters] = useState<Chapter[] | null>(null);
     const [loadingChapters, setLoadingChapters] = useState(false);
     const [selected, setSelected] = useState<Record<number, Set<number>>>({});
+    const [isFooterSticky, setIsFooterSticky] = useState(false);
+    const footerSentinelRef = useRef<HTMLDivElement>(null);
     const [loadingQuestionSections, setLoadingQuestionSections] =
         useState(false);
     const [questionSectionError, setQuestionSectionError] = useState<
@@ -437,7 +439,6 @@ export default function GeneratePaper({
     );
 
     const selectedChapterCount = selectedChapterIds.length;
-    const selectedTopicCount = selectedTopicIds.length;
     const canContinueToQuestions = selectedChapterCount > 0;
 
     const stepStates: {
@@ -482,6 +483,22 @@ export default function GeneratePaper({
         chapters !== null &&
         chapters.length > 0 &&
         chapters.every((chapter) => chapter.topics.length === 0);
+
+    useEffect(() => {
+        const sentinel = footerSentinelRef.current;
+
+        if (!sentinel) {
+            return;
+        }
+
+        const observer = new IntersectionObserver(([entry]) => {
+            setIsFooterSticky(!entry.isIntersecting);
+        });
+
+        observer.observe(sentinel);
+
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         if (!pattern || !klass || !subject) {
@@ -906,7 +923,7 @@ export default function GeneratePaper({
         <>
             <Head title="Generate Paper" />
 
-            <div className="mx-auto max-w-7xl space-y-6 pb-24">
+            <div className="mx-auto max-w-7xl space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
                         Generate Paper
@@ -1223,32 +1240,18 @@ export default function GeneratePaper({
                 )}
             </div>
 
-            <div className="sticky bottom-0 -mx-4 mt-6 border-t border-slate-200 bg-white/85 px-4 py-3 backdrop-blur md:-mx-6 md:px-6 dark:border-slate-800 dark:bg-slate-900/85">
-                <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                        <span className="inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2 py-1 font-medium text-teal-700 dark:bg-teal-500/10 dark:text-teal-300">
-                            <CheckIcon className="size-3" strokeWidth={3} />
-                            {pluralize(
-                                selectedChapterCount,
-                                'chapter',
-                                'chapters',
-                            )}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                            {pluralize(selectedTopicCount, 'topic', 'topics')}{' '}
-                            selected
-                        </span>
-                    </div>
-
+            <div ref={footerSentinelRef} className="mt-4 h-px" aria-hidden />
+            <div
+                className={cn(
+                    'sticky bottom-0 z-20 -mx-4 px-4 md:-mx-6 md:px-6',
+                    isFooterSticky
+                        ? 'border-y border-slate-200 bg-white/95 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95'
+                        : 'py-2.5',
+                )}
+            >
+                <div className="mx-auto flex max-w-7xl justify-end">
                     {step === 'chapters' ? (
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => router.visit('/dashboard')}
-                                className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                            >
-                                Cancel
-                            </button>
                             <button
                                 type="button"
                                 onClick={reset}
