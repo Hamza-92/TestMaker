@@ -72,8 +72,10 @@ class GeneratePaperController extends Controller
                     ->orderBy('id')
                     ->select('id', 'chapter_id', 'name');
             }])
-            ->orderBy('sort_id')
+            ->orderBy('group_name')
+            ->orderBy('group_heading')
             ->orderBy('chapter_number')
+            ->orderBy('sort_id')
             ->orderBy('id')
             ->get(['id', 'name', 'chapter_number', 'group_name', 'group_heading'])
             ->map(fn (Chapter $c) => [
