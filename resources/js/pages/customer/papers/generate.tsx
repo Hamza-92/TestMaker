@@ -122,10 +122,6 @@ function createGlobalFilters(
     );
 }
 
-function pluralize(n: number, one: string, many: string) {
-    return n === 1 ? `${n} ${one}` : `${n} ${many}`;
-}
-
 function toNumber(value: string): number {
     const parsed = Number(value);
 
@@ -150,12 +146,6 @@ function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
             0,
         ),
     };
-}
-
-function categoryBadgeLabel(
-    category: SectionCategory,
-): 'Objective' | 'Subjective' {
-    return category === 'Objective Questions' ? 'Objective' : 'Subjective';
 }
 
 function mergeQuestionSections(
@@ -303,21 +293,12 @@ function StepPill({
     );
 }
 
-function CategoryDivider({
-    title,
-    count,
-}: {
-    title: SectionCategory;
-    count: number;
-}) {
+function CategoryDivider({ title }: { title: SectionCategory }) {
     return (
-        <div className="mb-3 mt-6 flex items-center justify-between gap-3">
+        <div className="border-b border-slate-100 pb-2 dark:border-slate-800">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {title}
             </h3>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {pluralize(count, 'type', 'types')}
-            </span>
         </div>
     );
 }
@@ -902,8 +883,8 @@ export default function GeneratePaper({
         }
 
         return (
-            <div>
-                <CategoryDivider title={category} count={sections.length} />
+            <div className="space-y-2.5">
+                <CategoryDivider title={category} />
                 <div className="space-y-2.5">
                     {sections.map((section) => (
                         <QuestionSelectionCard
@@ -1135,9 +1116,9 @@ export default function GeneratePaper({
                 )}
 
                 {step === 'questions' && (
-                    <section className="space-y-4">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.02] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/10">
-                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <section className="space-y-3">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.02] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/10">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
                                         <div className="flex size-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
@@ -1155,10 +1136,7 @@ export default function GeneratePaper({
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                                        <span className="mr-1 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                                            Sources
-                                        </span>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
                                         {sourceFilters.map((item) => (
                                             <SourceCheckbox
                                                 key={item.value}
@@ -1176,28 +1154,18 @@ export default function GeneratePaper({
                                     </div>
                                 </div>
 
-                                <div className="grid min-w-52 grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/60">
-                                    <div className="rounded-lg bg-white px-3 py-2 dark:bg-slate-900">
-                                        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                            Active sources
-                                        </p>
-                                        <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                            {activeSourceValues.length}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-lg bg-teal-600 px-3 py-2 text-white dark:bg-teal-500 dark:text-slate-950">
-                                        <p className="text-[11px] font-medium opacity-80">
-                                            Total marks
-                                        </p>
-                                        <p className="mt-1 text-xl font-semibold leading-none">
-                                            {questionSelection.totalMarks}
-                                        </p>
-                                    </div>
+                                <div className="min-w-28 rounded-xl bg-teal-600 px-4 py-3 text-white dark:bg-teal-500 dark:text-slate-950">
+                                    <p className="text-[11px] font-medium opacity-80">
+                                        Total marks
+                                    </p>
+                                    <p className="mt-1 text-xl font-semibold leading-none">
+                                        {questionSelection.totalMarks}
+                                    </p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.02] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/10 md:p-5">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.02] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/10">
                             {loadingQuestionSections && (
                                 <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-sm font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
                                     <Loader2Icon className="size-4 animate-spin" />
@@ -1226,7 +1194,7 @@ export default function GeneratePaper({
 
                             {!loadingQuestionSections &&
                                 questionSelection.sections.length > 0 && (
-                                    <div className="space-y-1">
+                                    <div className="space-y-5">
                                         {renderQuestionCategory(
                                             'Objective Questions',
                                         )}
@@ -1558,16 +1526,13 @@ function QuestionSelectionCard({
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                            {categoryBadgeLabel(section.category)}
-                        </span>
+                        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {section.title}
+                        </h4>
                         <span className="rounded-md bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700 dark:bg-teal-500/10 dark:text-teal-300">
                             {section.availableCount} available
                         </span>
                     </div>
-                    <h4 className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {section.title}
-                    </h4>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
@@ -1585,7 +1550,7 @@ function QuestionSelectionCard({
                 </div>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
                 <NumberField
                     label="Required"
                     value={section.requiredQuestions}
