@@ -77,15 +77,20 @@ type QuestionSectionField =
     | 'marksPerQuestion'
     | 'choiceQuestions';
 
+interface QuestionSelectionRow {
+    id: string;
+    requiredQuestions: string;
+    marksPerQuestion: string;
+    choiceQuestions: string;
+}
+
 interface QuestionSelectionSection {
     id: string;
     questionTypeId: number;
     category: SectionCategory;
     title: string;
     availableCount: number;
-    requiredQuestions: string;
-    marksPerQuestion: string;
-    choiceQuestions: string;
+    rows: QuestionSelectionRow[];
 }
 
 interface QuestionSelectionState {
@@ -132,17 +137,30 @@ function onlyDigits(value: string): string {
     return value.replace(/\D/g, '');
 }
 
-function lineTotal(section: QuestionSelectionSection): number {
+function createQuestionRow(id: string): QuestionSelectionRow {
+    return {
+        id,
+        requiredQuestions: '',
+        marksPerQuestion: '',
+        choiceQuestions: '',
+    };
+}
+
+function lineTotal(row: QuestionSelectionRow): number {
     return (
-        toNumber(section.requiredQuestions) * toNumber(section.marksPerQuestion)
+        toNumber(row.requiredQuestions) * toNumber(row.marksPerQuestion)
     );
+}
+
+function sectionTotal(section: QuestionSelectionSection): number {
+    return section.rows.reduce((sum, row) => sum + lineTotal(row), 0);
 }
 
 function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
     return {
         ...state,
         totalMarks: state.sections.reduce(
-            (sum, section) => sum + lineTotal(section),
+            (sum, section) => sum + sectionTotal(section),
             0,
         ),
     };
@@ -158,16 +176,17 @@ function mergeQuestionSections(
 
     return incoming.map((item, index) => {
         const current = existingByType.get(item.questionTypeId);
+        const sectionId = `sec_${String(index + 1).padStart(3, '0')}`;
 
         return {
-            id: `sec_${String(index + 1).padStart(3, '0')}`,
+            id: sectionId,
             questionTypeId: item.questionTypeId,
             category: item.category,
             title: item.title,
             availableCount: item.availableCount,
-            requiredQuestions: current?.requiredQuestions ?? '',
-            marksPerQuestion: current?.marksPerQuestion ?? '',
-            choiceQuestions: current?.choiceQuestions ?? '',
+            rows:
+                current?.rows ??
+                [createQuestionRow(`${sectionId}_row_001`)],
         };
     });
 }
@@ -351,6 +370,7 @@ export default function GeneratePaper({
     const [selected, setSelected] = useState<Record<number, Set<number>>>({});
     const [isFooterSticky, setIsFooterSticky] = useState(false);
     const footerSentinelRef = useRef<HTMLDivElement>(null);
+    const questionRowSequence = useRef(0);
     const [loadingQuestionSections, setLoadingQuestionSections] =
         useState(false);
     const [questionSectionError, setQuestionSectionError] = useState<
@@ -817,6 +837,7 @@ export default function GeneratePaper({
 
     function updateSectionValue(
         sectionId: string,
+        rowId: string,
         field: QuestionSectionField,
         value: string,
     ) {
@@ -825,24 +846,13 @@ export default function GeneratePaper({
                 ...current,
                 sections: current.sections.map((section) =>
                     section.id === sectionId
-                        ? { ...section, [field]: value }
-                        : section,
-                ),
-            }),
-        );
-    }
-
-    function clearSection(sectionId: string) {
-        setQuestionSelection((current) =>
-            withTotalMarks({
-                ...current,
-                sections: current.sections.map((section) =>
-                    section.id === sectionId
                         ? {
                               ...section,
-                              requiredQuestions: '',
-                              marksPerQuestion: '',
-                              choiceQuestions: '',
+                              rows: section.rows.map((row) =>
+                                  row.id === rowId
+                                      ? { ...row, [field]: value }
+                                      : row,
+                              ),
                           }
                         : section,
                 ),
@@ -850,25 +860,42 @@ export default function GeneratePaper({
         );
     }
 
-    function addOneQuestion(sectionId: string) {
+    function deleteQuestionRow(sectionId: string, rowId: string) {
         setQuestionSelection((current) =>
             withTotalMarks({
                 ...current,
-                sections: current.sections.map((section) => {
-                    if (section.id !== sectionId) {
-                        return section;
-                    }
+                sections: current.sections.map((section) =>
+                    section.id === sectionId && section.rows.length > 1
+                        ? {
+                              ...section,
+                              rows: section.rows.filter(
+                                  (row) => row.id !== rowId,
+                              ),
+                          }
+                        : section,
+                ),
+            }),
+        );
+    }
 
-                    const nextRequired = Math.min(
-                        section.availableCount,
-                        toNumber(section.requiredQuestions) + 1,
-                    );
+    function addQuestionRow(sectionId: string) {
+        questionRowSequence.current += 1;
+        const rowId = `${sectionId}_row_added_${questionRowSequence.current}`;
 
-                    return {
-                        ...section,
-                        requiredQuestions: String(nextRequired),
-                    };
-                }),
+        setQuestionSelection((current) =>
+            withTotalMarks({
+                ...current,
+                sections: current.sections.map((section) =>
+                    section.id === sectionId
+                        ? {
+                              ...section,
+                              rows: [
+                                  ...section.rows,
+                                  createQuestionRow(rowId),
+                              ],
+                          }
+                        : section,
+                ),
             }),
         );
     }
@@ -891,8 +918,8 @@ export default function GeneratePaper({
                             key={section.id}
                             section={section}
                             onChange={updateSectionValue}
-                            onClear={clearSection}
-                            onAddOne={addOneQuestion}
+                            onDeleteRow={deleteQuestionRow}
+                            onAddRow={addQuestionRow}
                         />
                     ))}
                 </div>
@@ -1507,84 +1534,111 @@ function ChapterCard({
 function QuestionSelectionCard({
     section,
     onChange,
-    onClear,
-    onAddOne,
+    onDeleteRow,
+    onAddRow,
 }: {
     section: QuestionSelectionSection;
     onChange: (
         sectionId: string,
+        rowId: string,
         field: QuestionSectionField,
         value: string,
     ) => void;
-    onClear: (sectionId: string) => void;
-    onAddOne: (sectionId: string) => void;
+    onDeleteRow: (sectionId: string, rowId: string) => void;
+    onAddRow: (sectionId: string) => void;
 }) {
-    const total = lineTotal(section);
+    const canDeleteRow = section.rows.length > 1;
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                            {section.title}
-                        </h4>
-                        <span className="rounded-md bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700 dark:bg-teal-500/10 dark:text-teal-300">
-                            {section.availableCount} available
-                        </span>
-                    </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
-                        {total} marks
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {section.title}
+                    </h4>
+                    <span className="rounded-md bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700 dark:bg-teal-500/10 dark:text-teal-300">
+                        {section.availableCount} available
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => onClear(section.id)}
-                        aria-label={`Clear ${section.title}`}
-                        className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
-                    >
-                        <Trash2Icon className="size-4" />
-                    </button>
                 </div>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
-                <NumberField
-                    label="Required"
-                    value={section.requiredQuestions}
-                    placeholder="0"
-                    onChange={(value) =>
-                        onChange(section.id, 'requiredQuestions', value)
-                    }
-                />
-                <NumberField
-                    label="Marks each"
-                    value={section.marksPerQuestion}
-                    placeholder="0"
-                    onChange={(value) =>
-                        onChange(section.id, 'marksPerQuestion', value)
-                    }
-                />
-                <NumberField
-                    label="Choice"
-                    value={section.choiceQuestions}
-                    placeholder="0"
-                    onChange={(value) =>
-                        onChange(section.id, 'choiceQuestions', value)
-                    }
-                />
                 <button
                     type="button"
-                    onClick={() => onAddOne(section.id)}
-                    aria-label={`Add one ${section.title} question`}
-                    title={`Add one ${section.title} question`}
-                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20"
+                    onClick={() => onAddRow(section.id)}
+                    aria-label={`Add another ${section.title} row`}
+                    title={`Add another ${section.title} row`}
+                    className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-teal-700 transition-colors hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20"
                 >
                     <PlusIcon className="size-4" />
-                    Add
                 </button>
+            </div>
+
+            <div className="mt-3 space-y-3">
+                {section.rows.map((row, index) => (
+                    <div
+                        key={row.id}
+                        className="grid gap-2.5 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end dark:border-slate-800"
+                    >
+                        <NumberField
+                            label="Required"
+                            value={row.requiredQuestions}
+                            placeholder="0"
+                            onChange={(value) =>
+                                onChange(
+                                    section.id,
+                                    row.id,
+                                    'requiredQuestions',
+                                    value,
+                                )
+                            }
+                        />
+                        <NumberField
+                            label="Marks each"
+                            value={row.marksPerQuestion}
+                            placeholder="0"
+                            onChange={(value) =>
+                                onChange(
+                                    section.id,
+                                    row.id,
+                                    'marksPerQuestion',
+                                    value,
+                                )
+                            }
+                        />
+                        <NumberField
+                            label="Choice"
+                            value={row.choiceQuestions}
+                            placeholder="0"
+                            onChange={(value) =>
+                                onChange(
+                                    section.id,
+                                    row.id,
+                                    'choiceQuestions',
+                                    value,
+                                )
+                            }
+                        />
+                        <div className="flex items-center gap-2">
+                            <span className="inline-flex h-9 min-w-20 items-center justify-center rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+                                {lineTotal(row)} marks
+                            </span>
+                            <button
+                                type="button"
+                                disabled={!canDeleteRow}
+                                onClick={() =>
+                                    onDeleteRow(section.id, row.id)
+                                }
+                                aria-label={`Delete row ${index + 1} from ${section.title}`}
+                                title={
+                                    canDeleteRow
+                                        ? `Delete row ${index + 1}`
+                                        : 'At least one row is required'
+                                }
+                                className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10 dark:hover:text-rose-300 dark:disabled:hover:border-slate-800 dark:disabled:hover:bg-slate-900 dark:disabled:hover:text-slate-400"
+                            >
+                                <Trash2Icon className="size-4" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
