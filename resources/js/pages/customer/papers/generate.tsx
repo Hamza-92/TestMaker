@@ -6,6 +6,7 @@ import {
     CheckIcon,
     FileTextIcon,
     GraduationCapIcon,
+    GripVerticalIcon,
     LayersIcon,
     Loader2Icon,
     MinusIcon,
@@ -15,6 +16,7 @@ import {
     Trash2Icon,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { DragEvent } from 'react';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
@@ -173,10 +175,21 @@ function mergeQuestionSections(
     const existingByType = new Map(
         existing.map((section) => [section.questionTypeId, section]),
     );
+    const incomingByType = new Map(
+        incoming.map((section) => [section.questionTypeId, section]),
+    );
+    const orderedIncoming = [
+        ...existing
+            .map((section) => incomingByType.get(section.questionTypeId))
+            .filter((section): section is QuestionTypeCount => Boolean(section)),
+        ...incoming.filter(
+            (section) => !existingByType.has(section.questionTypeId),
+        ),
+    ];
 
-    return incoming.map((item, index) => {
+    return orderedIncoming.map((item) => {
         const current = existingByType.get(item.questionTypeId);
-        const sectionId = `sec_${String(index + 1).padStart(3, '0')}`;
+        const sectionId = current?.id ?? `sec_type_${item.questionTypeId}`;
 
         return {
             id: sectionId,
@@ -371,6 +384,12 @@ export default function GeneratePaper({
     const [isFooterSticky, setIsFooterSticky] = useState(false);
     const footerSentinelRef = useRef<HTMLDivElement>(null);
     const questionRowSequence = useRef(0);
+    const [draggedQuestionTypeId, setDraggedQuestionTypeId] = useState<
+        string | null
+    >(null);
+    const [dragOverQuestionTypeId, setDragOverQuestionTypeId] = useState<
+        string | null
+    >(null);
     const [loadingQuestionSections, setLoadingQuestionSections] =
         useState(false);
     const [questionSectionError, setQuestionSectionError] = useState<
@@ -900,6 +919,112 @@ export default function GeneratePaper({
         );
     }
 
+    function reorderQuestionTypes(
+        category: SectionCategory,
+        draggedSectionId: string,
+        targetSectionId: string,
+    ) {
+        if (draggedSectionId === targetSectionId) {
+            return;
+        }
+
+        setQuestionSelection((current) => {
+            const categorySections = current.sections.filter(
+                (section) => section.category === category,
+            );
+            const draggedIndex = categorySections.findIndex(
+                (section) => section.id === draggedSectionId,
+            );
+            const targetIndex = categorySections.findIndex(
+                (section) => section.id === targetSectionId,
+            );
+
+            if (draggedIndex === -1 || targetIndex === -1) {
+                return current;
+            }
+
+            const reordered = [...categorySections];
+            const [draggedSection] = reordered.splice(draggedIndex, 1);
+
+            reordered.splice(targetIndex, 0, draggedSection);
+
+            let reorderedIndex = 0;
+
+            return {
+                ...current,
+                sections: current.sections.map((section) =>
+                    section.category === category
+                        ? reordered[reorderedIndex++]
+                        : section,
+                ),
+            };
+        });
+    }
+
+    function handleQuestionTypeDragStart(
+        event: DragEvent<HTMLDivElement>,
+        sectionId: string,
+    ) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', sectionId);
+        setDraggedQuestionTypeId(sectionId);
+    }
+
+    function handleQuestionTypeDragOver(
+        event: DragEvent<HTMLDivElement>,
+        section: QuestionSelectionSection,
+    ) {
+        const draggedSectionId =
+            event.dataTransfer.getData('text/plain') || draggedQuestionTypeId;
+        const draggedSection = questionSelection.sections.find(
+            (item) => item.id === draggedSectionId,
+        );
+
+        if (!draggedSection || draggedSection.category !== section.category) {
+            setDragOverQuestionTypeId(null);
+
+            return;
+        }
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        setDragOverQuestionTypeId(section.id);
+    }
+
+    function handleQuestionTypeDrop(
+        event: DragEvent<HTMLDivElement>,
+        section: QuestionSelectionSection,
+    ) {
+        event.preventDefault();
+
+        const draggedSectionId =
+            event.dataTransfer.getData('text/plain') || draggedQuestionTypeId;
+
+        if (!draggedSectionId) {
+            return;
+        }
+
+        const draggedSection = questionSelection.sections.find(
+            (item) => item.id === draggedSectionId,
+        );
+
+        if (draggedSection?.category === section.category) {
+            reorderQuestionTypes(
+                section.category,
+                draggedSectionId,
+                section.id,
+            );
+        }
+
+        setDraggedQuestionTypeId(null);
+        setDragOverQuestionTypeId(null);
+    }
+
+    function handleQuestionTypeDragEnd() {
+        setDraggedQuestionTypeId(null);
+        setDragOverQuestionTypeId(null);
+    }
+
     function renderQuestionCategory(category: SectionCategory) {
         const sections = questionSelection.sections.filter(
             (section) => section.category === category,
@@ -920,6 +1045,15 @@ export default function GeneratePaper({
                             onChange={updateSectionValue}
                             onDeleteRow={deleteQuestionRow}
                             onAddRow={addQuestionRow}
+                            isDragging={draggedQuestionTypeId === section.id}
+                            isDragTarget={
+                                dragOverQuestionTypeId === section.id &&
+                                draggedQuestionTypeId !== section.id
+                            }
+                            onDragStart={handleQuestionTypeDragStart}
+                            onDragOver={handleQuestionTypeDragOver}
+                            onDrop={handleQuestionTypeDrop}
+                            onDragEnd={handleQuestionTypeDragEnd}
                         />
                     ))}
                 </div>
@@ -1536,6 +1670,12 @@ function QuestionSelectionCard({
     onChange,
     onDeleteRow,
     onAddRow,
+    isDragging,
+    isDragTarget,
+    onDragStart,
+    onDragOver,
+    onDrop,
+    onDragEnd,
 }: {
     section: QuestionSelectionSection;
     onChange: (
@@ -1546,13 +1686,53 @@ function QuestionSelectionCard({
     ) => void;
     onDeleteRow: (sectionId: string, rowId: string) => void;
     onAddRow: (sectionId: string) => void;
+    isDragging: boolean;
+    isDragTarget: boolean;
+    onDragStart: (
+        event: DragEvent<HTMLDivElement>,
+        sectionId: string,
+    ) => void;
+    onDragOver: (
+        event: DragEvent<HTMLDivElement>,
+        section: QuestionSelectionSection,
+    ) => void;
+    onDrop: (
+        event: DragEvent<HTMLDivElement>,
+        section: QuestionSelectionSection,
+    ) => void;
+    onDragEnd: () => void;
 }) {
     const canDeleteRow = section.rows.length > 1;
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700">
+        <div
+            onDragOver={(event) => onDragOver(event, section)}
+            onDrop={(event) => onDrop(event, section)}
+            className={cn(
+                'rounded-xl border bg-white px-4 py-3 transition-colors dark:bg-slate-950/40',
+                isDragging
+                    ? 'border-slate-300 opacity-55 dark:border-slate-700'
+                    : isDragTarget
+                      ? 'border-teal-400 bg-teal-50/40 ring-2 ring-teal-500/10 dark:border-teal-500/60 dark:bg-teal-500/5'
+                      : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700',
+            )}
+        >
             <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <div
+                        draggable
+                        role="button"
+                        tabIndex={0}
+                        onDragStart={(event) =>
+                            onDragStart(event, section.id)
+                        }
+                        onDragEnd={onDragEnd}
+                        aria-label={`Drag to reorder ${section.title}`}
+                        title={`Drag to reorder ${section.title}`}
+                        className="flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                    >
+                        <GripVerticalIcon className="size-4" />
+                    </div>
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         {section.title}
                     </h4>
