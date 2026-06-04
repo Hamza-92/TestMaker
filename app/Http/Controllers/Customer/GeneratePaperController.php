@@ -7,10 +7,11 @@ use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
 use App\Models\Question;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class GeneratePaperController extends Controller
@@ -96,47 +97,15 @@ class GeneratePaperController extends Controller
 
     public function questionTypes(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'chapter_ids' => ['required', 'array', 'min:1'],
-            'chapter_ids.*' => ['integer', 'exists:chapters,id'],
-            'topic_ids' => ['array'],
-            'topic_ids.*' => ['integer', 'exists:topics,id'],
-            'sources' => ['array'],
-            'sources.*' => ['string', Rule::in(Question::sourceValues())],
-        ]);
-
-        $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
-        $topicIds = collect($data['topic_ids'] ?? [])
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-        $sources = collect($data['sources'] ?? [])
-            ->filter(fn ($source) => in_array($source, Question::sourceValues(), true))
-            ->values();
+        [$chapterIds, $validTopicIds, $sources] = $this->questionScope($request);
 
         if ($sources->isEmpty()) {
             return response()->json(['sections' => []]);
         }
 
-        $validTopicIds = $topicIds->isEmpty()
-            ? collect()
-            : DB::table('topics')
-                ->whereIn('id', $topicIds)
-                ->whereIn('chapter_id', $chapterIds)
-                ->pluck('id');
-
-        $rows = DB::table('questions')
+        $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
-            ->whereIn('questions.chapter_id', $chapterIds)
-            ->where('questions.status', 1)
             ->where('question_types.status', 1)
-            ->whereIn('questions.source', $sources)
-            ->when($validTopicIds->isNotEmpty(), function ($query) use ($validTopicIds) {
-                $query->where(function ($query) use ($validTopicIds) {
-                    $query->whereIn('questions.topic_id', $validTopicIds)
-                        ->orWhereNull('questions.topic_id');
-                });
-            })
             ->groupBy('question_types.id', 'question_types.name', 'question_types.is_objective')
             ->orderByDesc('question_types.is_objective')
             ->orderBy('question_types.name')
@@ -158,5 +127,98 @@ class GeneratePaperController extends Controller
         ]);
 
         return response()->json(['sections' => $sections]);
+    }
+
+    public function questions(Request $request): JsonResponse
+    {
+        [$chapterIds, $validTopicIds, $sources] = $this->questionScope($request);
+        $data = $request->validate([
+            'question_type_id' => ['required', 'integer', 'exists:question_types,id'],
+        ]);
+
+        if ($sources->isEmpty()) {
+            return response()->json(['questions' => []]);
+        }
+
+        $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources)
+            ->where('questions.question_type_id', $data['question_type_id'])
+            ->with([
+                'questionType',
+                'chapter:id,name,chapter_number',
+                'topic:id,name',
+            ])
+            ->orderBy('questions.chapter_id')
+            ->orderBy('questions.topic_id')
+            ->orderBy('questions.id')
+            ->get()
+            ->map(fn (Question $question) => [
+                'id' => $question->id,
+                'summaryText' => QuestionTypeSchemaRegistry::summarize(
+                    $question->questionType,
+                    QuestionTypeSchemaRegistry::contentFromQuestion(
+                        $question,
+                        $question->questionType,
+                    ),
+                ),
+                'source' => $question->source,
+                'sourceLabel' => Question::sourceLabel($question->source),
+                'chapter' => [
+                    'id' => $question->chapter->id,
+                    'name' => $question->chapter->name,
+                    'chapterNumber' => $question->chapter->chapter_number,
+                ],
+                'topic' => $question->topic
+                    ? [
+                        'id' => $question->topic->id,
+                        'name' => $question->topic->name,
+                    ]
+                    : null,
+            ])
+            ->values();
+
+        return response()->json(['questions' => $questions]);
+    }
+
+    private function questionScope(Request $request): array
+    {
+        $data = $request->validate([
+            'chapter_ids' => ['required', 'array', 'min:1'],
+            'chapter_ids.*' => ['integer', 'exists:chapters,id'],
+            'topic_ids' => ['array'],
+            'topic_ids.*' => ['integer', 'exists:topics,id'],
+            'sources' => ['array'],
+            'sources.*' => ['string', Rule::in(Question::sourceValues())],
+        ]);
+
+        $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        $topicIds = collect($data['topic_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $sources = collect($data['sources'] ?? [])
+            ->filter(fn ($source) => in_array($source, Question::sourceValues(), true))
+            ->values();
+        $validTopicIds = $topicIds->isEmpty()
+            ? collect()
+            : DB::table('topics')
+                ->whereIn('id', $topicIds)
+                ->whereIn('chapter_id', $chapterIds)
+                ->pluck('id');
+
+        return [$chapterIds, $validTopicIds, $sources];
+    }
+
+    private function scopedQuestionsQuery($chapterIds, $validTopicIds, $sources)
+    {
+        return Question::query()
+            ->whereIn('questions.chapter_id', $chapterIds)
+            ->where('questions.status', 1)
+            ->whereIn('questions.source', $sources)
+            ->when($validTopicIds->isNotEmpty(), function ($query) use ($validTopicIds) {
+                $query->where(function ($query) use ($validTopicIds) {
+                    $query->whereIn('questions.topic_id', $validTopicIds)
+                        ->orWhereNull('questions.topic_id');
+                });
+            });
     }
 }

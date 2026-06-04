@@ -8,12 +8,16 @@ import {
     GraduationCapIcon,
     GripVerticalIcon,
     LayersIcon,
+    ListChecksIcon,
     Loader2Icon,
     MinusIcon,
     PlusIcon,
     RotateCcwIcon,
+    SearchIcon,
     SearchXIcon,
+    SparklesIcon,
     Trash2Icon,
+    XIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
@@ -72,6 +76,7 @@ interface SourceOption {
 
 type StepState = 'active' | 'done' | 'upcoming';
 type FormStep = 'chapters' | 'questions';
+type SelectionMode = 'automatic' | 'manual';
 type SourceFilterKey = string;
 type SectionCategory = 'Objective Questions' | 'Subjective Questions';
 type QuestionSectionField =
@@ -84,6 +89,7 @@ interface QuestionSelectionRow {
     requiredQuestions: string;
     marksPerQuestion: string;
     choiceQuestions: string;
+    selectedQuestionIds: number[];
 }
 
 interface QuestionSelectionSection {
@@ -107,6 +113,33 @@ interface QuestionTypeCount {
     category: SectionCategory;
     title: string;
     availableCount: number;
+}
+
+interface ManualQuestion {
+    id: number;
+    summaryText: string;
+    source: string | null;
+    sourceLabel: string | null;
+    chapter: {
+        id: number;
+        name: string;
+        chapterNumber: number | null;
+    };
+    topic: {
+        id: number;
+        name: string;
+    } | null;
+}
+
+interface ManualPickerRow {
+    section: QuestionSelectionSection;
+    row: QuestionSelectionRow;
+    target: number;
+}
+
+interface ManualPickerTarget {
+    sectionId: string;
+    rowId: string;
 }
 
 const CHAPTER_ONLY_SELECTION = -1;
@@ -145,13 +178,77 @@ function createQuestionRow(id: string): QuestionSelectionRow {
         requiredQuestions: '',
         marksPerQuestion: '',
         choiceQuestions: '',
+        selectedQuestionIds: [],
     };
 }
 
+function rowTarget(row: QuestionSelectionRow): number {
+    return toNumber(row.choiceQuestions);
+}
+
 function lineTotal(row: QuestionSelectionRow): number {
-    return (
-        toNumber(row.requiredQuestions) * toNumber(row.marksPerQuestion)
+    return toNumber(row.requiredQuestions) * toNumber(row.marksPerQuestion);
+}
+
+function trimmedCount(value: string, maximum: number): string {
+    if (value === '') {
+        return '';
+    }
+
+    return String(Math.min(toNumber(value), Math.max(0, maximum)));
+}
+
+function normalizeQuestionRow(
+    row: QuestionSelectionRow,
+    availableCount: number,
+): QuestionSelectionRow {
+    const choiceQuestions = trimmedCount(row.choiceQuestions, availableCount);
+    const requiredQuestions = trimmedCount(
+        row.requiredQuestions,
+        toNumber(choiceQuestions),
     );
+    const normalized = {
+        ...row,
+        requiredQuestions,
+        marksPerQuestion:
+            toNumber(requiredQuestions) === 0 ? '' : row.marksPerQuestion,
+        choiceQuestions,
+    };
+
+    return {
+        ...normalized,
+        selectedQuestionIds: normalized.selectedQuestionIds.slice(
+            0,
+            rowTarget(normalized),
+        ),
+    };
+}
+
+function normalizeSectionRows(
+    rows: QuestionSelectionRow[],
+    availableCount: number,
+): QuestionSelectionRow[] {
+    let remaining = availableCount;
+
+    return rows.map((row) => {
+        const normalized = normalizeQuestionRow(row, remaining);
+
+        remaining = Math.max(0, remaining - rowTarget(normalized));
+
+        return normalized;
+    });
+}
+
+function availableForQuestionRow(
+    section: QuestionSelectionSection,
+    rowId: string,
+): number {
+    const usedByOtherRows = section.rows.reduce(
+        (sum, row) => sum + (row.id === rowId ? 0 : rowTarget(row)),
+        0,
+    );
+
+    return Math.max(0, section.availableCount - usedByOtherRows);
 }
 
 function sectionTotal(section: QuestionSelectionSection): number {
@@ -181,7 +278,9 @@ function mergeQuestionSections(
     const orderedIncoming = [
         ...existing
             .map((section) => incomingByType.get(section.questionTypeId))
-            .filter((section): section is QuestionTypeCount => Boolean(section)),
+            .filter((section): section is QuestionTypeCount =>
+                Boolean(section),
+            ),
         ...incoming.filter(
             (section) => !existingByType.has(section.questionTypeId),
         ),
@@ -197,9 +296,10 @@ function mergeQuestionSections(
             category: item.category,
             title: item.title,
             availableCount: item.availableCount,
-            rows:
-                current?.rows ??
-                [createQuestionRow(`${sectionId}_row_001`)],
+            rows: normalizeSectionRows(
+                current?.rows ?? [createQuestionRow(`${sectionId}_row_001`)],
+                item.availableCount,
+            ),
         };
     });
 }
@@ -283,6 +383,45 @@ function SourceCheckbox({
     );
 }
 
+function SelectionModeToggle({
+    value,
+    onChange,
+}: {
+    value: SelectionMode;
+    onChange: (mode: SelectionMode) => void;
+}) {
+    return (
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-950/60">
+            <button
+                type="button"
+                onClick={() => onChange('automatic')}
+                className={cn(
+                    'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors',
+                    value === 'automatic'
+                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+                )}
+            >
+                <SparklesIcon className="size-3.5" />
+                Auto Pick
+            </button>
+            <button
+                type="button"
+                onClick={() => onChange('manual')}
+                className={cn(
+                    'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors',
+                    value === 'manual'
+                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+                )}
+            >
+                <ListChecksIcon className="size-3.5" />
+                Pick Manually
+            </button>
+        </div>
+    );
+}
+
 function StepPill({
     index,
     label,
@@ -339,11 +478,15 @@ function NumberField({
     value,
     label,
     placeholder,
+    max,
+    disabled = false,
     onChange,
 }: {
     value: string;
     label: string;
     placeholder: string;
+    max?: number;
+    disabled?: boolean;
     onChange: (value: string) => void;
 }) {
     return (
@@ -355,10 +498,12 @@ function NumberField({
                 type="number"
                 inputMode="numeric"
                 min="0"
+                max={max}
+                disabled={disabled}
                 value={value}
                 placeholder={placeholder}
                 onChange={(event) => onChange(onlyDigits(event.target.value))}
-                className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-teal-400 dark:focus:ring-teal-400/20"
+                className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-teal-400 dark:focus:ring-teal-400/20 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
             />
         </label>
     );
@@ -381,6 +526,8 @@ export default function GeneratePaper({
     const [chapters, setChapters] = useState<Chapter[] | null>(null);
     const [loadingChapters, setLoadingChapters] = useState(false);
     const [selected, setSelected] = useState<Record<number, Set<number>>>({});
+    const [selectionMode, setSelectionMode] =
+        useState<SelectionMode>('automatic');
     const [isFooterSticky, setIsFooterSticky] = useState(false);
     const footerSentinelRef = useRef<HTMLDivElement>(null);
     const questionRowSequence = useRef(0);
@@ -395,6 +542,18 @@ export default function GeneratePaper({
     const [questionSectionError, setQuestionSectionError] = useState<
         string | null
     >(null);
+    const [manualPickerTarget, setManualPickerTarget] =
+        useState<ManualPickerTarget | null>(null);
+    const [manualQuestions, setManualQuestions] = useState<ManualQuestion[]>(
+        [],
+    );
+    const [loadingManualQuestions, setLoadingManualQuestions] = useState(false);
+    const [manualQuestionError, setManualQuestionError] = useState<
+        string | null
+    >(null);
+    const [manualSearch, setManualSearch] = useState('');
+    const [showSelectedManualQuestions, setShowSelectedManualQuestions] =
+        useState(false);
     const [questionSelection, setQuestionSelection] =
         useState<QuestionSelectionState>({
             globalFilters: createGlobalFilters(sourceFilters),
@@ -460,6 +619,80 @@ export default function GeneratePaper({
 
     const selectedChapterCount = selectedChapterIds.length;
     const canContinueToQuestions = selectedChapterCount > 0;
+    const manualPickerRows = useMemo(
+        () =>
+            questionSelection.sections.flatMap((section) =>
+                section.rows
+                    .map((row) => ({
+                        section,
+                        row,
+                        target: rowTarget(row),
+                    }))
+                    .filter((item) => item.target > 0),
+            ),
+        [questionSelection.sections],
+    );
+    const activeManualPickerRow = useMemo(
+        () =>
+            manualPickerTarget
+                ? (manualPickerRows.find(
+                      (item) =>
+                          item.section.id === manualPickerTarget.sectionId &&
+                          item.row.id === manualPickerTarget.rowId,
+                  ) ?? null)
+                : null,
+        [manualPickerRows, manualPickerTarget],
+    );
+    const selectedManualQuestionIds = useMemo(
+        () =>
+            new Set(
+                questionSelection.sections.flatMap((section) =>
+                    section.rows.flatMap((row) => row.selectedQuestionIds),
+                ),
+            ),
+        [questionSelection.sections],
+    );
+    const totalManualQuestionsRequired = manualPickerRows.reduce(
+        (sum, item) => sum + item.target,
+        0,
+    );
+    const isManualSelectionComplete =
+        totalManualQuestionsRequired > 0 &&
+        manualPickerRows.every(
+            (item) => item.row.selectedQuestionIds.length === item.target,
+        );
+    const canGeneratePaper =
+        selectionMode === 'manual'
+            ? questionSelection.totalMarks > 0 && isManualSelectionComplete
+            : questionSelection.totalMarks > 0;
+    const activeManualQuestionTypeId =
+        activeManualPickerRow?.section.questionTypeId ?? null;
+    const activeManualSelectedQuestionIds = useMemo(
+        () => new Set(activeManualPickerRow?.row.selectedQuestionIds ?? []),
+        [activeManualPickerRow?.row.selectedQuestionIds],
+    );
+    const filteredManualQuestions = useMemo(() => {
+        const search = manualSearch.trim().toLowerCase();
+
+        return manualQuestions.filter((question) => {
+            const matchesSelected =
+                !showSelectedManualQuestions ||
+                activeManualSelectedQuestionIds.has(question.id);
+            const matchesSearch =
+                search === '' ||
+                question.summaryText.toLowerCase().includes(search) ||
+                question.chapter.name.toLowerCase().includes(search) ||
+                question.topic?.name.toLowerCase().includes(search) ||
+                question.sourceLabel?.toLowerCase().includes(search);
+
+            return matchesSelected && matchesSearch;
+        });
+    }, [
+        activeManualSelectedQuestionIds,
+        manualQuestions,
+        manualSearch,
+        showSelectedManualQuestions,
+    ]);
 
     const stepStates: {
         scope: StepState;
@@ -627,12 +860,85 @@ export default function GeneratePaper({
         return () => abortController.abort();
     }, [activeSourceValues, selectedChapterIds, selectedTopicIds, step]);
 
+    useEffect(() => {
+        if (
+            !manualPickerTarget ||
+            activeManualQuestionTypeId === null ||
+            selectedChapterIds.length === 0
+        ) {
+            return;
+        }
+
+        const abortController = new AbortController();
+        const params = new URLSearchParams({
+            question_type_id: String(activeManualQuestionTypeId),
+        });
+
+        selectedChapterIds.forEach((id) =>
+            params.append('chapter_ids[]', String(id)),
+        );
+        selectedTopicIds.forEach((id) =>
+            params.append('topic_ids[]', String(id)),
+        );
+        activeSourceValues.forEach((source) =>
+            params.append('sources[]', source),
+        );
+
+        queueMicrotask(() => {
+            if (!abortController.signal.aborted) {
+                setLoadingManualQuestions(true);
+                setManualQuestionError(null);
+                setManualQuestions([]);
+            }
+        });
+
+        fetch(`/papers/generate/questions?${params.toString()}`, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            signal: abortController.signal,
+            credentials: 'same-origin',
+        })
+            .then((response) =>
+                response.ok
+                    ? response.json()
+                    : Promise.reject(response.statusText),
+            )
+            .then((data: { questions: ManualQuestion[] }) =>
+                setManualQuestions(data.questions),
+            )
+            .catch((error) => {
+                if (error?.name !== 'AbortError') {
+                    setManualQuestionError(
+                        'Unable to load questions. Please try again.',
+                    );
+                    setManualQuestions([]);
+                }
+            })
+            .finally(() => setLoadingManualQuestions(false));
+
+        return () => abortController.abort();
+    }, [
+        activeManualQuestionTypeId,
+        activeSourceValues,
+        manualPickerTarget,
+        selectedChapterIds,
+        selectedTopicIds,
+    ]);
+
     function resetQuestionSelection() {
         setQuestionSelection({
             globalFilters: createGlobalFilters(sourceFilters),
             sections: [],
             totalMarks: 0,
         });
+        setSelectionMode('automatic');
+        setManualPickerTarget(null);
+        setManualQuestions([]);
+        setManualQuestionError(null);
+        setManualSearch('');
+        setShowSelectedManualQuestions(false);
         setQuestionSectionError(null);
     }
 
@@ -663,6 +969,7 @@ export default function GeneratePaper({
     }
 
     function toggleTopic(chapterId: number, topicId: number) {
+        clearManualQuestionSelections();
         setSelected((current) => {
             const next = { ...current };
             const set = new Set(next[chapterId] ?? []);
@@ -684,6 +991,7 @@ export default function GeneratePaper({
     }
 
     function toggleChapter(chapter: Chapter) {
+        clearManualQuestionSelections();
         setSelected((current) => {
             const next = { ...current };
             const currentSet = next[chapter.id] ?? new Set<number>();
@@ -789,6 +1097,8 @@ export default function GeneratePaper({
             return;
         }
 
+        clearManualQuestionSelections();
+
         if (allChaptersState() === 'checked') {
             setSelected({});
 
@@ -829,6 +1139,34 @@ export default function GeneratePaper({
         setStep('chapters');
     }
 
+    function handleSelectionModeChange(mode: SelectionMode) {
+        setSelectionMode(mode);
+
+        if (mode === 'automatic') {
+            setManualPickerTarget(null);
+        }
+    }
+
+    function openManualQuestionPicker(sectionId: string, rowId: string) {
+        const row = manualPickerRows.find(
+            (item) => item.section.id === sectionId && item.row.id === rowId,
+        );
+
+        if (!row) {
+            return;
+        }
+
+        setManualSearch('');
+        setShowSelectedManualQuestions(false);
+        setManualPickerTarget({ sectionId, rowId });
+    }
+
+    function closeManualQuestionPicker() {
+        setManualPickerTarget(null);
+        setManualSearch('');
+        setShowSelectedManualQuestions(false);
+    }
+
     function handleGeneratePaper() {
         console.info('Generate paper payload', {
             pattern_id: pattern?.id,
@@ -836,8 +1174,65 @@ export default function GeneratePaper({
             subject_id: subject?.id,
             chapter_ids: selectedChapterIds,
             topic_ids: selectedTopicIds,
+            selectionMode,
             questionSelection,
         });
+    }
+
+    function toggleManualQuestion(questionId: number) {
+        if (!activeManualPickerRow) {
+            return;
+        }
+
+        const {
+            section: activeSection,
+            row: activeRow,
+            target,
+        } = activeManualPickerRow;
+
+        setQuestionSelection((current) => ({
+            ...current,
+            sections: current.sections.map((section) =>
+                section.id === activeSection.id
+                    ? {
+                          ...section,
+                          rows: section.rows.map((row) => {
+                              if (row.id !== activeRow.id) {
+                                  return row;
+                              }
+
+                              const isSelected =
+                                  row.selectedQuestionIds.includes(questionId);
+
+                              if (isSelected) {
+                                  return {
+                                      ...row,
+                                      selectedQuestionIds:
+                                          row.selectedQuestionIds.filter(
+                                              (id) => id !== questionId,
+                                          ),
+                                  };
+                              }
+
+                              if (
+                                  selectedManualQuestionIds.has(questionId) ||
+                                  row.selectedQuestionIds.length >= target
+                              ) {
+                                  return row;
+                              }
+
+                              return {
+                                  ...row,
+                                  selectedQuestionIds: [
+                                      ...row.selectedQuestionIds,
+                                      questionId,
+                                  ],
+                              };
+                          }),
+                      }
+                    : section,
+            ),
+        }));
     }
 
     function updateGlobalFilter(key: SourceFilterKey) {
@@ -847,6 +1242,26 @@ export default function GeneratePaper({
                 ...current.globalFilters,
                 [key]: !(current.globalFilters[key] ?? true),
             },
+            sections: current.sections.map((section) => ({
+                ...section,
+                rows: section.rows.map((row) => ({
+                    ...row,
+                    selectedQuestionIds: [],
+                })),
+            })),
+        }));
+    }
+
+    function clearManualQuestionSelections() {
+        setQuestionSelection((current) => ({
+            ...current,
+            sections: current.sections.map((section) => ({
+                ...section,
+                rows: section.rows.map((row) => ({
+                    ...row,
+                    selectedQuestionIds: [],
+                })),
+            })),
         }));
     }
 
@@ -867,11 +1282,19 @@ export default function GeneratePaper({
                     section.id === sectionId
                         ? {
                               ...section,
-                              rows: section.rows.map((row) =>
-                                  row.id === rowId
-                                      ? { ...row, [field]: value }
-                                      : row,
-                              ),
+                              rows: section.rows.map((row) => {
+                                  if (row.id !== rowId) {
+                                      return row;
+                                  }
+
+                                  return normalizeQuestionRow(
+                                      {
+                                          ...row,
+                                          [field]: value,
+                                      },
+                                      availableForQuestionRow(section, rowId),
+                                  );
+                              }),
                           }
                         : section,
                 ),
@@ -908,10 +1331,7 @@ export default function GeneratePaper({
                     section.id === sectionId
                         ? {
                               ...section,
-                              rows: [
-                                  ...section.rows,
-                                  createQuestionRow(rowId),
-                              ],
+                              rows: [...section.rows, createQuestionRow(rowId)],
                           }
                         : section,
                 ),
@@ -1042,9 +1462,11 @@ export default function GeneratePaper({
                         <QuestionSelectionCard
                             key={section.id}
                             section={section}
+                            selectionMode={selectionMode}
                             onChange={updateSectionValue}
                             onDeleteRow={deleteQuestionRow}
                             onAddRow={addQuestionRow}
+                            onOpenManualPicker={openManualQuestionPicker}
                             isDragging={draggedQuestionTypeId === section.id}
                             isDragTarget={
                                 dragOverQuestionTypeId === section.id &&
@@ -1297,21 +1719,27 @@ export default function GeneratePaper({
                                         </div>
                                     </div>
 
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        {sourceFilters.map((item) => (
-                                            <SourceCheckbox
-                                                key={item.value}
-                                                label={item.label}
-                                                checked={sourceChecked(
-                                                    item.value,
-                                                )}
-                                                onChange={() =>
-                                                    updateGlobalFilter(
+                                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                                        <SelectionModeToggle
+                                            value={selectionMode}
+                                            onChange={handleSelectionModeChange}
+                                        />
+                                        <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-800">
+                                            {sourceFilters.map((item) => (
+                                                <SourceCheckbox
+                                                    key={item.value}
+                                                    label={item.label}
+                                                    checked={sourceChecked(
                                                         item.value,
-                                                    )
-                                                }
-                                            />
-                                        ))}
+                                                    )}
+                                                    onChange={() =>
+                                                        updateGlobalFilter(
+                                                            item.value,
+                                                        )
+                                                    }
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1319,7 +1747,7 @@ export default function GeneratePaper({
                                     <p className="text-[11px] font-medium opacity-80">
                                         Total marks
                                     </p>
-                                    <p className="mt-1 text-xl font-semibold leading-none">
+                                    <p className="mt-1 text-xl leading-none font-semibold">
                                         {questionSelection.totalMarks}
                                     </p>
                                 </div>
@@ -1366,6 +1794,27 @@ export default function GeneratePaper({
                                 )}
                         </div>
                     </section>
+                )}
+
+                {activeManualPickerRow && (
+                    <ManualQuestionPickerModal
+                        activeRow={activeManualPickerRow}
+                        questions={filteredManualQuestions}
+                        loading={loadingManualQuestions}
+                        error={manualQuestionError}
+                        search={manualSearch}
+                        showSelectedOnly={showSelectedManualQuestions}
+                        selectedQuestionIds={activeManualSelectedQuestionIds}
+                        allSelectedQuestionIds={selectedManualQuestionIds}
+                        onSearchChange={setManualSearch}
+                        onSelectedOnlyChange={() =>
+                            setShowSelectedManualQuestions(
+                                (current) => !current,
+                            )
+                        }
+                        onToggleQuestion={toggleManualQuestion}
+                        onClose={closeManualQuestionPicker}
+                    />
                 )}
             </div>
 
@@ -1416,11 +1865,11 @@ export default function GeneratePaper({
                             </button>
                             <button
                                 type="button"
-                                disabled={questionSelection.totalMarks === 0}
+                                disabled={!canGeneratePaper}
                                 onClick={handleGeneratePaper}
                                 className={cn(
-                                    'cursor-pointer rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
-                                    questionSelection.totalMarks === 0
+                                    'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
+                                    !canGeneratePaper
                                         ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                                         : 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400',
                                 )}
@@ -1433,6 +1882,247 @@ export default function GeneratePaper({
             </div>
         </>
     );
+}
+
+function ManualQuestionPickerModal({
+    activeRow,
+    questions,
+    loading,
+    error,
+    search,
+    showSelectedOnly,
+    selectedQuestionIds,
+    allSelectedQuestionIds,
+    onSearchChange,
+    onSelectedOnlyChange,
+    onToggleQuestion,
+    onClose,
+}: {
+    activeRow: ManualPickerRow;
+    questions: ManualQuestion[];
+    loading: boolean;
+    error: string | null;
+    search: string;
+    showSelectedOnly: boolean;
+    selectedQuestionIds: Set<number>;
+    allSelectedQuestionIds: Set<number>;
+    onSearchChange: (value: string) => void;
+    onSelectedOnlyChange: () => void;
+    onToggleQuestion: (questionId: number) => void;
+    onClose: () => void;
+}) {
+    const activeSelectedCount = activeRow.row.selectedQuestionIds.length;
+    const isActiveRowComplete = activeSelectedCount === activeRow.target;
+
+    useEffect(() => {
+        function closeOnEscape(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        }
+
+        window.addEventListener('keydown', closeOnEscape);
+
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [onClose]);
+
+    return (
+        <div
+            role="presentation"
+            onMouseDown={onClose}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="manual-question-picker-title"
+                onMouseDown={(event) => event.stopPropagation()}
+                className="flex max-h-[min(48rem,calc(100vh-2rem))] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+                <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-3.5 dark:border-slate-800">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+                                <ListChecksIcon className="size-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <h2
+                                    id="manual-question-picker-title"
+                                    className="text-base font-semibold text-slate-900 dark:text-slate-100"
+                                >
+                                    Select questions
+                                </h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex h-9 items-center justify-center rounded-lg bg-teal-600 px-3 text-sm font-bold text-white dark:bg-teal-500 dark:text-slate-950">
+                            {activeSelectedCount}/{activeRow.target}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close question picker"
+                            title="Close"
+                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        >
+                            <XIcon className="size-4" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-2.5 border-b border-slate-100 p-4 sm:flex-row sm:items-center dark:border-slate-800">
+                    <label className="relative min-w-0 flex-1">
+                        <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={(event) =>
+                                onSearchChange(event.target.value)
+                            }
+                            placeholder="Search questions"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-teal-400"
+                        />
+                    </label>
+                    <button
+                        type="button"
+                        onClick={onSelectedOnlyChange}
+                        className={cn(
+                            'inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors',
+                            showSelectedOnly
+                                ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800',
+                        )}
+                    >
+                        <CheckIcon className="size-3.5" />
+                        Selected only
+                    </button>
+                </div>
+
+                <div className="flex-1 space-y-2 overflow-y-auto p-4">
+                    {loading && (
+                        <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 py-12 text-sm font-medium text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                            <Loader2Icon className="size-4 animate-spin" />
+                            Loading questions
+                        </div>
+                    )}
+
+                    {!loading && error && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                            {error}
+                        </div>
+                    )}
+
+                    {!loading && !error && questions.length === 0 && (
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-12 text-center dark:border-slate-700">
+                            <SearchXIcon className="mb-2 size-5 text-slate-400" />
+                            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                                No matching questions
+                            </p>
+                        </div>
+                    )}
+
+                    {!loading &&
+                        !error &&
+                        questions.map((question) => {
+                            const checked = selectedQuestionIds.has(
+                                question.id,
+                            );
+                            const selectedElsewhere =
+                                !checked &&
+                                allSelectedQuestionIds.has(question.id);
+                            const reachedLimit =
+                                !checked &&
+                                activeSelectedCount >= activeRow.target;
+                            const disabled = selectedElsewhere || reachedLimit;
+
+                            return (
+                                <button
+                                    key={question.id}
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={() =>
+                                        onToggleQuestion(question.id)
+                                    }
+                                    className={cn(
+                                        'flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
+                                        checked
+                                            ? 'border-teal-300 bg-teal-50/60 dark:border-teal-500/40 dark:bg-teal-500/10'
+                                            : 'border-slate-200 bg-white hover:border-teal-200 hover:bg-teal-50/30 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-teal-500/30 dark:hover:bg-teal-500/5',
+                                        disabled &&
+                                            'cursor-not-allowed opacity-50',
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            checked
+                                                ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                                                : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
+                                        )}
+                                    >
+                                        {checked && (
+                                            <CheckIcon
+                                                className="size-3"
+                                                strokeWidth={3}
+                                            />
+                                        )}
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
+                                            {question.summaryText}
+                                        </span>
+                                        <span className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                {question.sourceLabel ??
+                                                    question.source ??
+                                                    'No source'}
+                                            </span>
+                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                {manualQuestionChapterLabel(
+                                                    question,
+                                                )}
+                                            </span>
+                                            {question.topic && (
+                                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                    {question.topic.name}
+                                                </span>
+                                            )}
+                                            {selectedElsewhere && (
+                                                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                                    Used in another row
+                                                </span>
+                                            )}
+                                        </span>
+                                    </span>
+                                </button>
+                            );
+                        })}
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {isActiveRowComplete
+                            ? 'Selection complete'
+                            : `${activeRow.target - activeSelectedCount} more required`}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                    >
+                        Done
+                    </button>
+                </div>
+            </section>
+        </div>
+    );
+}
+
+function manualQuestionChapterLabel(question: ManualQuestion): string {
+    return question.chapter.chapterNumber === null
+        ? question.chapter.name
+        : `CH ${String(question.chapter.chapterNumber).padStart(2, '0')} ${question.chapter.name}`;
 }
 
 function DirectChapterGroup({
@@ -1548,7 +2238,7 @@ function DirectChapterRow({
                 {chapter.chapter_number !== null && (
                     <span
                         className={cn(
-                            'shrink-0 whitespace-nowrap rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold',
+                            'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold whitespace-nowrap',
                             checked
                                 ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200'
                                 : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
@@ -1601,7 +2291,7 @@ function ChapterCard({
                         {chapter.chapter_number !== null && (
                             <span
                                 className={cn(
-                                    'shrink-0 whitespace-nowrap rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold transition-colors',
+                                    'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold whitespace-nowrap transition-colors',
                                     isActive
                                         ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200'
                                         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
@@ -1667,9 +2357,11 @@ function ChapterCard({
 
 function QuestionSelectionCard({
     section,
+    selectionMode,
     onChange,
     onDeleteRow,
     onAddRow,
+    onOpenManualPicker,
     isDragging,
     isDragTarget,
     onDragStart,
@@ -1678,6 +2370,7 @@ function QuestionSelectionCard({
     onDragEnd,
 }: {
     section: QuestionSelectionSection;
+    selectionMode: SelectionMode;
     onChange: (
         sectionId: string,
         rowId: string,
@@ -1686,12 +2379,10 @@ function QuestionSelectionCard({
     ) => void;
     onDeleteRow: (sectionId: string, rowId: string) => void;
     onAddRow: (sectionId: string) => void;
+    onOpenManualPicker: (sectionId: string, rowId: string) => void;
     isDragging: boolean;
     isDragTarget: boolean;
-    onDragStart: (
-        event: DragEvent<HTMLDivElement>,
-        sectionId: string,
-    ) => void;
+    onDragStart: (event: DragEvent<HTMLDivElement>, sectionId: string) => void;
     onDragOver: (
         event: DragEvent<HTMLDivElement>,
         section: QuestionSelectionSection,
@@ -1723,9 +2414,7 @@ function QuestionSelectionCard({
                         draggable
                         role="button"
                         tabIndex={0}
-                        onDragStart={(event) =>
-                            onDragStart(event, section.id)
-                        }
+                        onDragStart={(event) => onDragStart(event, section.id)}
                         onDragEnd={onDragEnd}
                         aria-label={`Drag to reorder ${section.title}`}
                         title={`Drag to reorder ${section.title}`}
@@ -1755,12 +2444,28 @@ function QuestionSelectionCard({
                 {section.rows.map((row, index) => (
                     <div
                         key={row.id}
-                        className="grid gap-2.5 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end dark:border-slate-800"
+                        className="grid gap-2.5 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
                     >
+                        <NumberField
+                            label="Total questions (choice)"
+                            value={row.choiceQuestions}
+                            placeholder="0"
+                            max={availableForQuestionRow(section, row.id)}
+                            onChange={(value) =>
+                                onChange(
+                                    section.id,
+                                    row.id,
+                                    'choiceQuestions',
+                                    value,
+                                )
+                            }
+                        />
                         <NumberField
                             label="Required"
                             value={row.requiredQuestions}
                             placeholder="0"
+                            max={toNumber(row.choiceQuestions)}
+                            disabled={toNumber(row.choiceQuestions) === 0}
                             onChange={(value) =>
                                 onChange(
                                     section.id,
@@ -1774,6 +2479,7 @@ function QuestionSelectionCard({
                             label="Marks each"
                             value={row.marksPerQuestion}
                             placeholder="0"
+                            disabled={toNumber(row.requiredQuestions) === 0}
                             onChange={(value) =>
                                 onChange(
                                     section.id,
@@ -1783,29 +2489,39 @@ function QuestionSelectionCard({
                                 )
                             }
                         />
-                        <NumberField
-                            label="Choice"
-                            value={row.choiceQuestions}
-                            placeholder="0"
-                            onChange={(value) =>
-                                onChange(
-                                    section.id,
-                                    row.id,
-                                    'choiceQuestions',
-                                    value,
-                                )
-                            }
-                        />
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                            {selectionMode === 'manual' && (
+                                <button
+                                    type="button"
+                                    disabled={rowTarget(row) === 0}
+                                    onClick={() =>
+                                        onOpenManualPicker(section.id, row.id)
+                                    }
+                                    title={
+                                        rowTarget(row) === 0
+                                            ? 'Enter a total or required count first'
+                                            : `Select questions for row ${index + 1}`
+                                    }
+                                    className={cn(
+                                        'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors',
+                                        row.selectedQuestionIds.length ===
+                                            rowTarget(row) && rowTarget(row) > 0
+                                            ? 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-500/30 dark:hover:text-teal-300',
+                                    )}
+                                >
+                                    <ListChecksIcon className="size-3.5" />
+                                    {row.selectedQuestionIds.length}/
+                                    {rowTarget(row)} selected
+                                </button>
+                            )}
                             <span className="inline-flex h-9 min-w-20 items-center justify-center rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
                                 {lineTotal(row)} marks
                             </span>
                             <button
                                 type="button"
                                 disabled={!canDeleteRow}
-                                onClick={() =>
-                                    onDeleteRow(section.id, row.id)
-                                }
+                                onClick={() => onDeleteRow(section.id, row.id)}
                                 aria-label={`Delete row ${index + 1} from ${section.title}`}
                                 title={
                                     canDeleteRow
