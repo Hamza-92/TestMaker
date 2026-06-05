@@ -146,34 +146,51 @@ class GeneratePaperController extends Controller
                 'questionType',
                 'chapter:id,name,chapter_number',
                 'topic:id,name',
+                'options',
             ])
             ->orderBy('questions.chapter_id')
             ->orderBy('questions.topic_id')
             ->orderBy('questions.id')
             ->get()
-            ->map(fn (Question $question) => [
-                'id' => $question->id,
-                'summaryText' => QuestionTypeSchemaRegistry::summarize(
+            ->map(function (Question $question) {
+                $content = QuestionTypeSchemaRegistry::contentFromQuestion(
+                    $question,
                     $question->questionType,
-                    QuestionTypeSchemaRegistry::contentFromQuestion(
-                        $question,
+                );
+                $schema = QuestionTypeSchemaRegistry::resolve(
+                    $question->questionType->schema_key,
+                    $question->questionType->is_objective,
+                    [
+                        'objective_type_id' => $question->questionType->objective_type_id,
+                        'have_description' => $question->questionType->have_description,
+                        'have_answer' => $question->questionType->have_answer,
+                    ],
+                );
+
+                return [
+                    'id' => $question->id,
+                    'summaryText' => QuestionTypeSchemaRegistry::summarize(
                         $question->questionType,
+                        $content,
                     ),
-                ),
-                'source' => $question->source,
-                'sourceLabel' => Question::sourceLabel($question->source),
-                'chapter' => [
-                    'id' => $question->chapter->id,
-                    'name' => $question->chapter->name,
-                    'chapterNumber' => $question->chapter->chapter_number,
-                ],
-                'topic' => $question->topic
-                    ? [
-                        'id' => $question->topic->id,
-                        'name' => $question->topic->name,
-                    ]
-                    : null,
-            ])
+                    'schemaKey' => $schema['key'],
+                    'isObjective' => (bool) $question->questionType->is_objective,
+                    'content' => $content,
+                    'source' => $question->source,
+                    'sourceLabel' => Question::sourceLabel($question->source),
+                    'chapter' => [
+                        'id' => $question->chapter->id,
+                        'name' => $question->chapter->name,
+                        'chapterNumber' => $question->chapter->chapter_number,
+                    ],
+                    'topic' => $question->topic
+                        ? [
+                            'id' => $question->topic->id,
+                            'name' => $question->topic->name,
+                        ]
+                        : null,
+                ];
+            })
             ->values();
 
         return response()->json(['questions' => $questions]);

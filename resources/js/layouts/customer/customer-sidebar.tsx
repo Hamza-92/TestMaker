@@ -33,27 +33,35 @@ const NAV_GROUPS: NavGroup[] = [
     {
         title: 'Paper Generation',
         items: [
-            { label: 'Generate Paper', href: '/papers/generate', icon: FilePlusIcon },
-            { label: 'Question Bank',  href: '/questions',       icon: DatabaseIcon },
-            { label: 'Saved Papers',   href: '/papers',          icon: BookmarkIcon },
-            { label: 'My Templates',   href: '/templates',       icon: LayoutTemplateIcon },
+            {
+                label: 'Generate Paper',
+                href: '/papers/generate',
+                icon: FilePlusIcon,
+            },
+            { label: 'Question Bank', href: '/questions', icon: DatabaseIcon },
+            { label: 'Saved Papers', href: '/papers', icon: BookmarkIcon },
+            {
+                label: 'My Templates',
+                href: '/templates',
+                icon: LayoutTemplateIcon,
+            },
         ],
     },
     {
         title: 'Management',
         items: [
-            { label: 'Teachers',  href: '/teachers',  icon: UsersIcon },
-            { label: 'Classes',   href: '/classes',   icon: SchoolIcon },
-            { label: 'Subjects',  href: '/subjects',  icon: BookOpenIcon },
-            { label: 'Settings',  href: '/settings',  icon: SettingsIcon },
+            { label: 'Teachers', href: '/teachers', icon: UsersIcon },
+            { label: 'Classes', href: '/classes', icon: SchoolIcon },
+            { label: 'Subjects', href: '/subjects', icon: BookOpenIcon },
+            { label: 'Settings', href: '/settings', icon: SettingsIcon },
         ],
     },
     {
         title: 'Analytics',
         items: [
-            { label: 'Reports',      href: '/reports',   icon: BarChart3Icon },
-            { label: 'Activity Log', href: '/activity',  icon: ActivityIcon },
-            { label: 'Most Used',    href: '/most-used', icon: TrendingUpIcon },
+            { label: 'Reports', href: '/reports', icon: BarChart3Icon },
+            { label: 'Activity Log', href: '/activity', icon: ActivityIcon },
+            { label: 'Most Used', href: '/most-used', icon: TrendingUpIcon },
         ],
     },
 ];
@@ -85,7 +93,7 @@ function NavLink({
         >
             {/* Active indicator bar */}
             {active && !collapsed && (
-                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-teal-600 dark:bg-teal-400" />
+                <span className="absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-teal-600 dark:bg-teal-400" />
             )}
             <Icon
                 className={[
@@ -106,15 +114,18 @@ function resolveActiveHref(url: string, hrefs: string[]): string | null {
     const path = url.split('?')[0].split('#')[0].replace(/\/+$/, '') || '/';
 
     let best: string | null = null;
+
     for (const href of hrefs) {
         const candidate = href.replace(/\/+$/, '') || '/';
         const matches =
             path === candidate ||
             (candidate !== '/' && path.startsWith(candidate + '/'));
+
         if (matches && (best === null || candidate.length > best.length)) {
             best = candidate;
         }
     }
+
     return best;
 }
 
@@ -122,18 +133,23 @@ export function CustomerSidebar() {
     const { url } = usePage();
     const page = usePage<{ auth: { user: Record<string, unknown> } }>();
     const user = page.props.auth.user;
-    const schoolName = (user.school_name as string | null) ?? (user.name as string);
+    const schoolName =
+        (user.school_name as string | null) ?? (user.name as string);
 
     const [collapsed, setCollapsed] = useState(false);
 
     // Build the full href list (Dashboard + all groups) and pick the single
     // best match so longer paths win — e.g. `/papers/generate` activates only
     // "Generate Paper", not also "Saved Papers".
-    const allHrefs = ['/dashboard', ...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href))];
+    const allHrefs = [
+        '/dashboard',
+        ...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href)),
+    ];
     const activeHref = resolveActiveHref(url, allHrefs);
 
     return (
         <aside
+            data-customer-sidebar
             className={[
                 'flex h-screen shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-all duration-300 dark:border-slate-800 dark:bg-slate-900',
                 collapsed ? 'w-[60px]' : 'w-64',
@@ -141,19 +157,23 @@ export function CustomerSidebar() {
         >
             {/* ── Brand ─────────────────────────────────────────────────────── */}
             <div className="flex h-16 shrink-0 items-center gap-3 overflow-hidden border-b border-slate-200 px-3.5 dark:border-slate-800">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-sm font-bold text-white ring-1 ring-inset ring-teal-500/30 dark:bg-teal-500 dark:ring-teal-400/30">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-sm font-bold text-white ring-1 ring-teal-500/30 ring-inset dark:bg-teal-500 dark:ring-teal-400/30">
                     T
                 </div>
                 {!collapsed && (
                     <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">TestMaker</p>
-                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{schoolName}</p>
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                            TestMaker
+                        </p>
+                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                            {schoolName}
+                        </p>
                     </div>
                 )}
             </div>
 
             {/* ── Nav ───────────────────────────────────────────────────────── */}
-            <nav className="scrollbar-slim flex-1 space-y-5 overflow-y-auto px-2.5 pb-4 pt-4">
+            <nav className="scrollbar-slim flex-1 space-y-5 overflow-y-auto px-2.5 pt-4 pb-4">
                 {/* Dashboard */}
                 <div>
                     <NavLink
@@ -169,7 +189,7 @@ export function CustomerSidebar() {
                 {NAV_GROUPS.map((group) => (
                     <div key={group.title}>
                         {!collapsed && (
-                            <p className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                            <p className="mb-1.5 px-2.5 text-[10px] font-semibold tracking-widest text-slate-400 uppercase dark:text-slate-500">
                                 {group.title}
                             </p>
                         )}
@@ -199,12 +219,14 @@ export function CustomerSidebar() {
                         <div className="flex size-5 items-center justify-center rounded-md bg-amber-500 dark:bg-amber-400">
                             <SparklesIcon className="size-3 text-white dark:text-amber-950" />
                         </div>
-                        <span className="text-xs font-semibold text-amber-900 dark:text-amber-100">Upgrade Plan</span>
+                        <span className="text-xs font-semibold text-amber-900 dark:text-amber-100">
+                            Upgrade Plan
+                        </span>
                     </div>
                     <p className="mb-3 text-[11px] leading-relaxed text-amber-800/70 dark:text-amber-100/60">
                         Unlock unlimited questions and advanced analytics.
                     </p>
-                    <button className="w-full rounded-lg bg-teal-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:hover:bg-teal-400 dark:text-slate-950">
+                    <button className="w-full rounded-lg bg-teal-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400">
                         View Plans
                     </button>
                 </div>

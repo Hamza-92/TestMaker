@@ -10,9 +10,8 @@
 
 @theme {
     --font-sans:
-        'Montserrat', ui-sans-serif, system-ui, sans-serif,
-        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-        'Noto Color Emoji';
+        'Montserrat', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -88,14 +87,14 @@
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
     --radius: 0.625rem;
-    --sidebar: #0C3C60;
-    --sidebar-foreground: #FFFFFF;
+    --sidebar: #0c3c60;
+    --sidebar-foreground: #ffffff;
     --sidebar-primary: oklch(0.985 0 0);
     --sidebar-primary-foreground: oklch(0.344 0.087 247);
     --sidebar-accent: oklch(0.28 0.07 247);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.28 0.06 247);
-    --sidebar-ring: oklch(0.50 0.09 247);
+    --sidebar-ring: oklch(0.5 0.09 247);
     --progress: rgba(75, 85, 99, 0.15);
 }
 
@@ -107,7 +106,7 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.145 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.65 0.10 247);
+    --primary: oklch(0.65 0.1 247);
     --primary-foreground: oklch(0.145 0 0);
     --secondary: oklch(0.22 0.05 247);
     --secondary-foreground: oklch(0.985 0 0);
@@ -119,7 +118,7 @@
     --destructive-foreground: oklch(1 0 0);
     --border: oklch(0.269 0 0);
     --input: oklch(0.269 0 0);
-    --ring: oklch(0.65 0.10 247);
+    --ring: oklch(0.65 0.1 247);
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
@@ -149,7 +148,7 @@
     @apply text-2xl font-semibold;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type='date']::-webkit-calendar-picker-indicator {
     display: none;
 }
 
@@ -173,4 +172,122 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .scrollbar-slim::-webkit-scrollbar-thumb:hover {
     background: rgba(255 255 255 / 0.25);
+}
+
+.rich-question-editor :where(p, div) {
+    margin: 0 0 0.5rem;
+}
+
+.rich-question-editor :where(h3, h4) {
+    margin: 0.35rem 0 0.2rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.rich-question-editor :where(ul, ol) {
+    margin: 0.25rem 0 0.5rem 1.25rem;
+    padding-left: 1rem;
+}
+
+.rich-question-editor :where(ul) {
+    list-style: disc;
+}
+
+.rich-question-editor :where(ol) {
+    list-style: decimal;
+}
+
+.rich-question-editor :where(a) {
+    color: #0f766e;
+    text-decoration: underline;
+}
+
+.paper-rich-text :where(p, div) {
+    margin: 0;
+}
+
+.paper-rich-text :where(ul, ol) {
+    margin: 0.1rem 0 0.1rem 1.15rem;
+    padding-left: 0.9rem;
+}
+
+.paper-rich-text :where(ul) {
+    list-style: disc;
+}
+
+.paper-rich-text :where(ol) {
+    list-style: decimal;
+}
+
+.paper-rich-text :where(h3, h4) {
+    margin: 0;
+    font-weight: 700;
+}
+
+.paper-rich-text.inline,
+.paper-rich-text.inline :where(p, div) {
+    display: inline;
+}
+
+.paper-rich-text :where(a) {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.paper-rich-text :where(u) {
+    text-underline-offset: 2px;
+}
+
+.paper-formula {
+    display: inline-block;
+    border-radius: 0.25rem;
+    background: rgba(15, 118, 110, 0.08);
+    padding: 0 0.25rem;
+    font-family:
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        'Liberation Mono', 'Courier New', monospace;
+}
+
+@media print {
+    @page {
+        margin: 8mm;
+    }
+
+    body:has([data-print-paper]),
+    body:has([data-print-paper]) #app {
+        width: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    body:has([data-print-paper]) [data-customer-sidebar],
+    body:has([data-print-paper]) [data-customer-header] {
+        display: none !important;
+    }
+
+    body:has([data-print-paper]) [data-customer-layout],
+    body:has([data-print-paper]) [data-customer-main],
+    body:has([data-print-paper]) [data-customer-content],
+    body:has([data-print-paper]) [data-paper-shell] {
+        display: block !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    body:has([data-print-paper]) [data-print-paper] {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #000 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+    }
 }
