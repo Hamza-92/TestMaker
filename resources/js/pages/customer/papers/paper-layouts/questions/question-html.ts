@@ -1,3 +1,6 @@
+import DOMPurify from 'dompurify';
+import katex from 'katex';
+
 const HTML_TAG_PATTERN = /<\/?[a-z][\s\S]*>/i;
 
 export function escapeHtml(value: string): string {
@@ -9,6 +12,10 @@ export function escapeHtml(value: string): string {
         .replace(/'/g, '&#039;');
 }
 
+export function escapeAttribute(value: string): string {
+    return escapeHtml(value).replace(/`/g, '&#096;');
+}
+
 export function questionTextToHtml(value: string): string {
     const trimmed = value.trim();
 
@@ -17,7 +24,7 @@ export function questionTextToHtml(value: string): string {
     }
 
     if (HTML_TAG_PATTERN.test(trimmed)) {
-        return sanitizeQuestionHtml(trimmed);
+        return sanitizeQuestionHtml(renderEquationsInHtml(trimmed));
     }
 
     return escapeHtml(value).replace(/\r?\n/g, '<br />');
@@ -29,9 +36,51 @@ export function questionTextToEditorHtml(value: string): string {
     return html === '' ? '<p><br></p>' : html;
 }
 
+export function createEquationHtml({
+    latex,
+    displayMode,
+}: {
+    latex: string;
+    displayMode: boolean;
+}): string {
+    const cleanedLatex = latex.trim();
+    const rendered = renderLatex(cleanedLatex, displayMode);
+    const blockClass = displayMode ? ' tm-equation-block' : '';
+    const display = displayMode ? 'block' : 'inline';
+
+    return `<span class="tm-equation${blockClass}" data-latex="${escapeAttribute(cleanedLatex)}" data-display="${display}" contenteditable="false">${rendered}</span>${displayMode ? '<p><br></p>' : '&nbsp;'}`;
+}
+
 export function sanitizeQuestionHtml(html: string): string {
+    const renderedHtml = renderEquationsInHtml(html);
+
+    if (typeof window === 'undefined') {
+        return fallbackSanitizeHtml(renderedHtml);
+    }
+
+    return DOMPurify.sanitize(renderedHtml, {
+        ADD_ATTR: ['data-latex', 'data-display', 'contenteditable', 'target'],
+        ADD_TAGS: ['math', 'mrow', 'mi', 'mn', 'mo', 'msup', 'msub', 'mfrac'],
+    }).trim();
+}
+
+export function renderLatex(latex: string, displayMode = false): string {
+    if (latex.trim() === '') {
+        return '';
+    }
+
+    return katex.renderToString(latex, {
+        displayMode,
+        output: 'html',
+        strict: false,
+        throwOnError: false,
+        trust: false,
+    });
+}
+
+function renderEquationsInHtml(html: string): string {
     if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
-        return fallbackSanitizeHtml(html);
+        return html;
     }
 
     const doc = new DOMParser().parseFromString(
@@ -44,40 +93,19 @@ export function sanitizeQuestionHtml(html: string): string {
         return '';
     }
 
-    root.querySelectorAll(
-        'script, style, iframe, object, embed, form, input, button, textarea, select',
-    ).forEach((node) => node.remove());
+    root.querySelectorAll<HTMLElement>('.tm-equation[data-latex]').forEach(
+        (node) => {
+            const latex = node.dataset.latex ?? '';
+            const displayMode = node.dataset.display === 'block';
 
-    root.querySelectorAll('*').forEach((node) => {
-        Array.from(node.attributes).forEach((attribute) => {
-            const name = attribute.name.toLowerCase();
-            const value = attribute.value.trim();
+            node.classList.add('tm-equation');
+            node.classList.toggle('tm-equation-block', displayMode);
+            node.setAttribute('contenteditable', 'false');
+            node.innerHTML = renderLatex(latex, displayMode);
+        },
+    );
 
-            if (name.startsWith('on')) {
-                node.removeAttribute(attribute.name);
-
-                return;
-            }
-
-            if (
-                (name === 'href' || name === 'src') &&
-                /^(javascript:|data:text\/html)/i.test(value)
-            ) {
-                node.removeAttribute(attribute.name);
-
-                return;
-            }
-
-            if (
-                name === 'style' &&
-                /(expression|javascript:|url\s*\()/i.test(value)
-            ) {
-                node.removeAttribute(attribute.name);
-            }
-        });
-    });
-
-    return root.innerHTML.trim();
+    return root.innerHTML;
 }
 
 function fallbackSanitizeHtml(html: string): string {

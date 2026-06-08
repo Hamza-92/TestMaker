@@ -238,6 +238,27 @@ input[type='date']::-webkit-calendar-picker-indicator {
     text-underline-offset: 2px;
 }
 
+.paper-rich-text :where(.katex-display) {
+    margin: 0;
+}
+
+.tm-equation {
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: middle;
+}
+
+.tm-equation-block {
+    display: block;
+    margin: 0.35rem 0;
+    text-align: center;
+}
+
+.paper-rich-text.inline .tm-equation-block {
+    display: inline-block;
+    margin: 0;
+}
+
 .paper-formula {
     display: inline-block;
     border-radius: 0.25rem;
