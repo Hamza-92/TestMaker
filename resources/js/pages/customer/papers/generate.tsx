@@ -22,9 +22,9 @@ import {
     XIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { DragEvent } from 'react';
-import { FloatingCombobox } from '@/components/ui/floating-combobox';
+import type { DragEvent, ReactNode } from 'react';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
+import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { QuestionEditModal } from './paper-layouts/questions/question-edit-modal';
@@ -172,6 +172,21 @@ interface PaperSectionEditorTarget {
 interface PaperQuestionEditorTarget {
     sectionId: string;
     questionId: string;
+}
+
+interface PaperQuestionPoolFilters {
+    chapterIds: number[];
+    topicIds: number[];
+    sources: string[];
+}
+
+interface AddPaperSectionValues {
+    questionTypeId: number;
+    requiredQuestions: number;
+    totalQuestions: number;
+    marksEach: number;
+    selectedQuestions: ManualQuestion[];
+    poolQuestions: ManualQuestion[];
 }
 
 const CHAPTER_ONLY_SELECTION = -1;
@@ -688,6 +703,7 @@ export default function GeneratePaper({
         useState<PaperSectionEditorTarget | null>(null);
     const [paperQuestionEditorTarget, setPaperQuestionEditorTarget] =
         useState<PaperQuestionEditorTarget | null>(null);
+    const [isAddSectionModalOpen, setIsAddSectionModalOpen] = useState(false);
     const [questionSelection, setQuestionSelection] =
         useState<QuestionSelectionState>({
             globalFilters: createGlobalFilters(sourceFilters),
@@ -1412,27 +1428,30 @@ export default function GeneratePaper({
         return `${prefix}_${paperSectionSequence.current}`;
     }
 
-    function questionPoolParams(questionTypeId: number) {
+    function questionPoolParams(
+        questionTypeId: number,
+        filters?: PaperQuestionPoolFilters,
+    ) {
         const params = new URLSearchParams({
             question_type_id: String(questionTypeId),
         });
+        const chapterIds = filters?.chapterIds ?? selectedChapterIds;
+        const topicIds = filters?.topicIds ?? selectedTopicIds;
+        const sources = filters?.sources ?? activeSourceValues;
 
-        selectedChapterIds.forEach((id) =>
-            params.append('chapter_ids[]', String(id)),
-        );
-        selectedTopicIds.forEach((id) =>
-            params.append('topic_ids[]', String(id)),
-        );
-        activeSourceValues.forEach((source) =>
-            params.append('sources[]', source),
-        );
+        chapterIds.forEach((id) => params.append('chapter_ids[]', String(id)));
+        topicIds.forEach((id) => params.append('topic_ids[]', String(id)));
+        sources.forEach((source) => params.append('sources[]', source));
 
         return params;
     }
 
-    async function fetchQuestionPool(questionTypeId: number) {
+    async function fetchQuestionPool(
+        questionTypeId: number,
+        filters?: PaperQuestionPoolFilters,
+    ) {
         const response = await fetch(
-            `/papers/generate/questions?${questionPoolParams(questionTypeId).toString()}`,
+            `/papers/generate/questions?${questionPoolParams(questionTypeId, filters).toString()}`,
             {
                 headers: {
                     Accept: 'application/json',
@@ -1449,6 +1468,13 @@ export default function GeneratePaper({
         const data = (await response.json()) as { questions: ManualQuestion[] };
 
         return data.questions;
+    }
+
+    async function searchPaperQuestionPool(
+        questionTypeId: number,
+        filters: PaperQuestionPoolFilters,
+    ) {
+        return fetchQuestionPool(questionTypeId, filters);
     }
 
     async function handleGeneratePaper() {
@@ -1943,33 +1969,66 @@ export default function GeneratePaper({
         );
     }
 
-    function addCustomPaperSection() {
-        const sectionId = nextPaperSectionId('custom_sec');
+    function openAddPaperSectionModal() {
+        setIsAddSectionModalOpen(true);
+    }
+
+    function closeAddPaperSectionModal() {
+        setIsAddSectionModalOpen(false);
+    }
+
+    async function addPaperSection(values: AddPaperSectionValues) {
+        const questionType = questionSelection.sections.find(
+            (section) => section.questionTypeId === values.questionTypeId,
+        );
+
+        if (!questionType) {
+            throw new Error('Select a question type first.');
+        }
+
+        const totalQuestions = Math.max(1, values.totalQuestions);
+        const requiredQuestions = Math.min(
+            Math.max(1, values.requiredQuestions),
+            totalQuestions,
+        );
+        const marksEach = Math.max(0, values.marksEach);
+        const selectedQuestions = values.selectedQuestions.filter(
+            (question) => !generatedSourceQuestionIds.has(question.id),
+        );
+
+        if (selectedQuestions.length < totalQuestions) {
+            throw new Error(
+                `Select ${totalQuestions} unused questions for ${questionType.title}.`,
+            );
+        }
+
+        setQuestionPoolsByType((current) => ({
+            ...current,
+            [values.questionTypeId]: values.poolQuestions,
+        }));
+
+        const newSection: GeneratedPaperSection = {
+            id: nextPaperSectionId('paper_sec'),
+            questionTypeId: questionType.questionTypeId,
+            category: questionType.category,
+            title: questionType.title,
+            requiredQuestions,
+            totalQuestions,
+            marksEach,
+            questions: selectedQuestions.map((question) =>
+                paperQuestionFromManual(question, nextPaperQuestionId()),
+            ),
+        };
 
         setGeneratedPaper((current) =>
             current
                 ? {
                       ...current,
-                      sections: [
-                          ...current.sections,
-                          {
-                              id: sectionId,
-                              questionTypeId: null,
-                              category: 'Subjective Questions',
-                              title: 'New question section',
-                              requiredQuestions: 1,
-                              totalQuestions: 1,
-                              marksEach: 0,
-                              questions: [
-                                  createCustomPaperQuestion(
-                                      nextPaperQuestionId('custom_q'),
-                                  ),
-                              ],
-                          },
-                      ],
+                      sections: [...current.sections, newSection],
                   }
                 : current,
         );
+        closeAddPaperSectionModal();
     }
 
     function toggleManualQuestion(questionId: number) {
@@ -2293,7 +2352,7 @@ export default function GeneratePaper({
                         usedQuestionIds={generatedSourceQuestionIds}
                         onBackToSetup={returnToPaperSetup}
                         onHeaderChange={updatePaperHeader}
-                        onAddSection={addCustomPaperSection}
+                        onAddSection={openAddPaperSectionModal}
                         onQuestionImageSizeChange={updatePaperQuestionImageSize}
                         onQuestionAnswerLinesChange={
                             updatePaperQuestionAnswerLines
@@ -2326,6 +2385,21 @@ export default function GeneratePaper({
                             section={activePaperSectionEditorContext}
                             onClose={closePaperSectionEditor}
                             onSave={savePaperSectionEdit}
+                        />
+                    )}
+
+                    {isAddSectionModalOpen && (
+                        <AddPaperSectionModal
+                            questionTypes={questionSelection.sections}
+                            chapters={chapters ?? []}
+                            sourceOptions={sourceFilters}
+                            initialChapterIds={selectedChapterIds}
+                            initialTopicIds={selectedTopicIds}
+                            initialSources={activeSourceValues}
+                            usedQuestionIds={generatedSourceQuestionIds}
+                            onSearchQuestions={searchPaperQuestionPool}
+                            onClose={closeAddPaperSectionModal}
+                            onSubmit={addPaperSection}
                         />
                     )}
                 </>
@@ -3001,6 +3075,1001 @@ function ManualQuestionPickerModal({
                     </button>
                 </div>
             </section>
+        </div>
+    );
+}
+
+type AddSectionTab = 'show' | 'picked' | 'chapters';
+
+function AddPaperSectionModal({
+    questionTypes,
+    chapters,
+    sourceOptions,
+    initialChapterIds,
+    initialTopicIds,
+    initialSources,
+    usedQuestionIds,
+    onSearchQuestions,
+    onClose,
+    onSubmit,
+}: {
+    questionTypes: QuestionSelectionSection[];
+    chapters: Chapter[];
+    sourceOptions: SourceOption[];
+    initialChapterIds: number[];
+    initialTopicIds: number[];
+    initialSources: string[];
+    usedQuestionIds: Set<number>;
+    onSearchQuestions: (
+        questionTypeId: number,
+        filters: PaperQuestionPoolFilters,
+    ) => Promise<ManualQuestion[]>;
+    onClose: () => void;
+    onSubmit: (values: AddPaperSectionValues) => Promise<void>;
+}) {
+    const [questionTypeId, setQuestionTypeId] = useState(
+        questionTypes[0] ? String(questionTypes[0].questionTypeId) : '',
+    );
+    const [sourceValue, setSourceValue] = useState(
+        initialSources.length === 1 ? initialSources[0] : '__all__',
+    );
+    const [totalQuestions, setTotalQuestions] = useState('1');
+    const [requiredQuestions, setRequiredQuestions] = useState('1');
+    const [marksEach, setMarksEach] = useState('1');
+    const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>(
+        [],
+    );
+    const [resultQuestions, setResultQuestions] = useState<ManualQuestion[]>(
+        [],
+    );
+    const [activeTab, setActiveTab] = useState<AddSectionTab>('show');
+    const [hasSearched, setHasSearched] = useState(false);
+    const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [questionLoadError, setQuestionLoadError] = useState<string | null>(
+        null,
+    );
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [localChapterIds, setLocalChapterIds] = useState<Set<number>>(
+        () => new Set(initialChapterIds),
+    );
+    const [localTopicIds, setLocalTopicIds] = useState<Set<number>>(
+        () => new Set(initialTopicIds),
+    );
+    const typeOptions = useMemo<ComboboxOptionItem[]>(
+        () =>
+            questionTypes.map((type) => ({
+                id: type.questionTypeId,
+                label: type.title,
+                hint: type.category,
+            })),
+        [questionTypes],
+    );
+    const availableSources = sourceOptions.length
+        ? sourceOptions
+        : fallbackSourceOptions;
+    const sourceComboboxOptions = useMemo<ComboboxOptionItem[]>(
+        () => [
+            { id: '__all__', label: 'All sources' },
+            ...availableSources.map((source) => ({
+                id: source.value,
+                label: source.label,
+            })),
+        ],
+        [availableSources],
+    );
+    const selectedTypeOption = useMemo(
+        () =>
+            typeOptions.find(
+                (option) => String(option.id) === questionTypeId,
+            ) ?? null,
+        [questionTypeId, typeOptions],
+    );
+    const selectedSourceOption = useMemo(
+        () =>
+            sourceComboboxOptions.find(
+                (option) => String(option.id) === sourceValue,
+            ) ?? null,
+        [sourceComboboxOptions, sourceValue],
+    );
+    const selectedType = useMemo(
+        () =>
+            questionTypes.find(
+                (type) => type.questionTypeId === toNumber(questionTypeId),
+            ) ?? null,
+        [questionTypeId, questionTypes],
+    );
+    const selectedSources =
+        sourceValue === ''
+            ? []
+            : sourceValue === '__all__'
+              ? availableSources.map((source) => source.value)
+              : [sourceValue];
+    const modalChapterIds = useMemo(
+        () =>
+            chapters
+                .filter((chapter) =>
+                    chapter.topics.length === 0
+                        ? localChapterIds.has(chapter.id)
+                        : chapter.topics.some((topic) =>
+                              localTopicIds.has(topic.id),
+                          ),
+                )
+                .map((chapter) => chapter.id),
+        [chapters, localChapterIds, localTopicIds],
+    );
+    const modalTopicIds = useMemo(
+        () =>
+            chapters.flatMap((chapter) =>
+                chapter.topics
+                    .filter((topic) => localTopicIds.has(topic.id))
+                    .map((topic) => topic.id),
+            ),
+        [chapters, localTopicIds],
+    );
+    const filterSignature = `${questionTypeId}|${sourceValue}|${modalChapterIds.join(',')}|${modalTopicIds.join(',')}`;
+    const unusedQuestions = useMemo(
+        () =>
+            resultQuestions.filter(
+                (question) => !usedQuestionIds.has(question.id),
+            ),
+        [resultQuestions, usedQuestionIds],
+    );
+    const filteredQuestions = unusedQuestions;
+    const selectedQuestions = useMemo(
+        () =>
+            selectedQuestionIds
+                .map((id) =>
+                    resultQuestions.find((question) => question.id === id),
+                )
+                .filter((question): question is ManualQuestion =>
+                    Boolean(question),
+                ),
+        [resultQuestions, selectedQuestionIds],
+    );
+    const questionsByChapter = useMemo(() => {
+        const groups = new Map<string, ManualQuestion[]>();
+
+        filteredQuestions.forEach((question) => {
+            const label = manualQuestionChapterLabel(question);
+            groups.set(label, [...(groups.get(label) ?? []), question]);
+        });
+
+        return [...groups.entries()];
+    }, [filteredQuestions]);
+    const availableQuestionLimit = hasSearched
+        ? filteredQuestions.length
+        : (selectedType?.availableCount ?? 0);
+    const totalNumber = toNumber(totalQuestions);
+    const requiredNumber = toNumber(requiredQuestions);
+    const marksNumber = toNumber(marksEach);
+    const canSearch =
+        selectedType !== null &&
+        selectedSources.length > 0 &&
+        modalChapterIds.length > 0 &&
+        !loadingQuestions;
+    const canSubmit =
+        selectedType !== null &&
+        totalNumber > 0 &&
+        requiredNumber > 0 &&
+        marksNumber > 0 &&
+        availableQuestionLimit > 0 &&
+        totalNumber <= availableQuestionLimit &&
+        selectedQuestions.length === totalNumber &&
+        !submitting;
+
+    useEffect(() => {
+        function closeOnEscape(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        }
+
+        window.addEventListener('keydown', closeOnEscape);
+
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [onClose]);
+
+    useEffect(() => {
+        setHasSearched(false);
+        setResultQuestions([]);
+        setSelectedQuestionIds([]);
+        setQuestionLoadError(null);
+        setSubmitError(null);
+    }, [filterSignature]);
+
+    useEffect(() => {
+        setSelectedQuestionIds((current) => current.slice(0, totalNumber));
+        setRequiredQuestions((current) =>
+            boundedQuestionCount(current, Math.max(0, totalNumber)),
+        );
+    }, [totalNumber]);
+
+    useEffect(() => {
+        setTotalQuestions((current) =>
+            boundedQuestionCount(current, availableQuestionLimit),
+        );
+        setSelectedQuestionIds((current) =>
+            current.slice(0, availableQuestionLimit),
+        );
+    }, [availableQuestionLimit]);
+
+    function boundedQuestionCount(value: string, maximum: number): string {
+        const digits = onlyDigits(value);
+
+        if (digits === '' || maximum <= 0) {
+            return '';
+        }
+
+        return String(Math.min(Math.max(1, Number(digits)), maximum));
+    }
+
+    function updateTotalQuestions(value: string) {
+        const nextTotal = boundedQuestionCount(value, availableQuestionLimit);
+
+        setTotalQuestions(nextTotal);
+        setRequiredQuestions((current) =>
+            boundedQuestionCount(current, toNumber(nextTotal)),
+        );
+    }
+
+    function updateRequiredQuestions(value: string) {
+        setRequiredQuestions(
+            boundedQuestionCount(value, Math.max(0, totalNumber)),
+        );
+    }
+
+    function toggleChapter(chapter: Chapter) {
+        if (chapter.topics.length === 0) {
+            setLocalChapterIds((current) => {
+                const next = new Set(current);
+
+                if (next.has(chapter.id)) {
+                    next.delete(chapter.id);
+                } else {
+                    next.add(chapter.id);
+                }
+
+                return next;
+            });
+
+            return;
+        }
+
+        const chapterTopicIds = chapter.topics.map((topic) => topic.id);
+        const allSelected = chapterTopicIds.every((id) =>
+            localTopicIds.has(id),
+        );
+
+        setLocalTopicIds((current) => {
+            const next = new Set(current);
+
+            chapterTopicIds.forEach((id) => {
+                if (allSelected) {
+                    next.delete(id);
+                } else {
+                    next.add(id);
+                }
+            });
+
+            return next;
+        });
+    }
+
+    function toggleTopic(topicId: number) {
+        setLocalTopicIds((current) => {
+            const next = new Set(current);
+
+            if (next.has(topicId)) {
+                next.delete(topicId);
+            } else {
+                next.add(topicId);
+            }
+
+            return next;
+        });
+    }
+
+    function toggleQuestion(questionId: number) {
+        setSelectedQuestionIds((current) => {
+            if (current.includes(questionId)) {
+                return current.filter((id) => id !== questionId);
+            }
+
+            if (current.length >= totalNumber) {
+                return current;
+            }
+
+            return [...current, questionId];
+        });
+    }
+
+    async function searchQuestions() {
+        if (!selectedType || !canSearch) {
+            return [] as ManualQuestion[];
+        }
+
+        setLoadingQuestions(true);
+        setQuestionLoadError(null);
+        setSubmitError(null);
+
+        try {
+            const questions = await onSearchQuestions(
+                selectedType.questionTypeId,
+                {
+                    chapterIds: modalChapterIds,
+                    topicIds: modalTopicIds,
+                    sources: selectedSources,
+                },
+            );
+
+            setResultQuestions(questions);
+            setHasSearched(true);
+            setActiveTab('show');
+
+            return questions;
+        } catch (error) {
+            setQuestionLoadError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to load questions.',
+            );
+            setResultQuestions([]);
+            setHasSearched(true);
+
+            return [];
+        } finally {
+            setLoadingQuestions(false);
+        }
+    }
+
+    async function selectRandomQuestions() {
+        const questions = hasSearched
+            ? filteredQuestions
+            : await searchQuestions();
+        const candidates = questions.filter(
+            (question) => !usedQuestionIds.has(question.id),
+        );
+        const targetCount = Math.min(totalNumber, candidates.length);
+
+        if (targetCount <= 0) {
+            setSubmitError(
+                'No matching unused questions are available for these filters.',
+            );
+
+            return;
+        }
+
+        const picked = shuffledQuestions(candidates).slice(0, targetCount);
+
+        setTotalQuestions(String(targetCount));
+        setRequiredQuestions((current) =>
+            boundedQuestionCount(current, targetCount),
+        );
+        setSelectedQuestionIds(picked.map((question) => question.id));
+        setActiveTab('picked');
+        setSubmitError(null);
+    }
+
+    async function handleSubmit() {
+        if (!selectedType || !canSubmit) {
+            return;
+        }
+
+        setSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            await onSubmit({
+                questionTypeId: selectedType.questionTypeId,
+                requiredQuestions: requiredNumber,
+                totalQuestions: totalNumber,
+                marksEach: marksNumber,
+                selectedQuestions,
+                poolQuestions: resultQuestions,
+            });
+        } catch (error) {
+            setSubmitError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to add section.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div
+            role="presentation"
+            onMouseDown={onClose}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3"
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-paper-section-title"
+                onMouseDown={(event) => event.stopPropagation()}
+                className="flex h-[min(46rem,calc(100vh-1.5rem))] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+                <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <h2
+                                id="add-paper-section-title"
+                                className="text-base font-semibold text-slate-900 dark:text-slate-100"
+                            >
+                                Add section
+                            </h2>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close add section"
+                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        >
+                            <XIcon className="size-4" />
+                        </button>
+                    </div>
+
+                    <div className="grid gap-3 xl:grid-cols-[1.55fr_1.25fr_.75fr_.75fr_.75fr_auto]">
+                        <FloatingCombobox
+                            label="Type"
+                            leadingIcon={FileTextIcon}
+                            options={typeOptions}
+                            value={selectedTypeOption}
+                            onChange={(option) =>
+                                setQuestionTypeId(
+                                    option ? String(option.id) : '',
+                                )
+                            }
+                            disabled={questionTypes.length === 0}
+                            disabledHint="No question types available"
+                        />
+
+                        <FloatingCombobox
+                            label="Source"
+                            leadingIcon={LayersIcon}
+                            options={sourceComboboxOptions}
+                            value={selectedSourceOption}
+                            onChange={(option) =>
+                                setSourceValue(
+                                    option ? String(option.id) : '__all__',
+                                )
+                            }
+                        />
+
+                        <FloatingField label="Choice">
+                            <input
+                                type="number"
+                                min={1}
+                                max={availableQuestionLimit || undefined}
+                                value={totalQuestions}
+                                onChange={(event) =>
+                                    updateTotalQuestions(event.target.value)
+                                }
+                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-teal-400 dark:focus:ring-teal-400/15"
+                            />
+                        </FloatingField>
+
+                        <FloatingField label="Required">
+                            <input
+                                type="number"
+                                min={1}
+                                max={totalNumber || undefined}
+                                value={requiredQuestions}
+                                onChange={(event) =>
+                                    updateRequiredQuestions(event.target.value)
+                                }
+                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-teal-400 dark:focus:ring-teal-400/15"
+                            />
+                        </FloatingField>
+
+                        <FloatingField label="Marks">
+                            <input
+                                type="number"
+                                min={1}
+                                value={marksEach}
+                                onChange={(event) =>
+                                    setMarksEach(onlyDigits(event.target.value))
+                                }
+                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-teal-400 dark:focus:ring-teal-400/15"
+                            />
+                        </FloatingField>
+
+                        <button
+                            type="button"
+                            disabled={!canSearch}
+                            onClick={searchQuestions}
+                            className={cn(
+                                'inline-flex h-12 cursor-pointer items-center justify-center gap-2 self-end rounded-xl px-5 text-sm font-semibold transition-colors',
+                                canSearch
+                                    ? 'bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400'
+                                    : 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+                            )}
+                        >
+                            {loadingQuestions ? (
+                                <Loader2Icon className="size-4 animate-spin" />
+                            ) : (
+                                <SearchIcon className="size-4" />
+                            )}
+                            Search
+                        </button>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <AddSectionTabButton
+                            active={activeTab === 'show'}
+                            onClick={() => setActiveTab('show')}
+                        >
+                            Show {hasSearched ? filteredQuestions.length : 0}
+                        </AddSectionTabButton>
+                        <AddSectionTabButton
+                            active={activeTab === 'picked'}
+                            onClick={() => setActiveTab('picked')}
+                        >
+                            Picked Q.{selectedQuestionIds.length}
+                        </AddSectionTabButton>
+                        <AddSectionTabButton
+                            active={activeTab === 'chapters'}
+                            onClick={() => setActiveTab('chapters')}
+                        >
+                            Chapters &amp; topics
+                        </AddSectionTabButton>
+                        <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 dark:bg-teal-500/10 dark:text-teal-200">
+                            Marks ({requiredNumber}=
+                            {requiredNumber * marksNumber})
+                        </span>
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 p-4 dark:bg-slate-950/30">
+                    {activeTab === 'show' && (
+                        <QuestionResultPanel
+                            hasSearched={hasSearched}
+                            loading={loadingQuestions}
+                            error={questionLoadError}
+                            groups={questionsByChapter}
+                            selectedQuestionIds={selectedQuestionIds}
+                            selectedLimit={totalNumber}
+                            onToggleQuestion={toggleQuestion}
+                        />
+                    )}
+
+                    {activeTab === 'picked' && (
+                        <QuestionPickedPanel
+                            questions={selectedQuestions}
+                            selectedLimit={totalNumber}
+                            onToggleQuestion={toggleQuestion}
+                        />
+                    )}
+
+                    {activeTab === 'chapters' && (
+                        <ChapterTopicFilterPanel
+                            chapters={chapters}
+                            localChapterIds={localChapterIds}
+                            localTopicIds={localTopicIds}
+                            onToggleChapter={toggleChapter}
+                            onToggleTopic={toggleTopic}
+                        />
+                    )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm font-medium text-red-600 dark:text-red-300">
+                        {submitError}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        >
+                            Close
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!canSearch || totalNumber <= 0}
+                            onClick={selectRandomQuestions}
+                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-700 transition-colors hover:border-teal-300 hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200"
+                        >
+                            <SparklesIcon className="size-4" />
+                            Select randomly
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!canSubmit}
+                            onClick={handleSubmit}
+                            className={cn(
+                                'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+                                canSubmit
+                                    ? 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400'
+                                    : 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+                            )}
+                        >
+                            {submitting && (
+                                <Loader2Icon className="size-4 animate-spin" />
+                            )}
+                            Add to paper
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
+}
+
+function FloatingField({
+    children,
+    label,
+}: {
+    children: ReactNode;
+    label: string;
+}) {
+    return (
+        <label className="group/field relative block">
+            <span className="pointer-events-none absolute -top-2 left-3 z-10 bg-white px-1 text-[11px] font-medium text-slate-600 transition-colors group-focus-within/field:text-teal-600 dark:bg-slate-900 dark:text-slate-300 dark:group-focus-within/field:text-teal-400">
+                {label}
+            </span>
+            {children}
+        </label>
+    );
+}
+
+function AddSectionTabButton({
+    active,
+    children,
+    onClick,
+}: {
+    active: boolean;
+    children: ReactNode;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                'relative inline-flex h-10 cursor-pointer items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors',
+                active
+                    ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-500 dark:bg-teal-500 dark:text-slate-950'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+            )}
+        >
+            {children}
+        </button>
+    );
+}
+
+function QuestionResultPanel({
+    hasSearched,
+    loading,
+    error,
+    groups,
+    selectedQuestionIds,
+    selectedLimit,
+    onToggleQuestion,
+}: {
+    hasSearched: boolean;
+    loading: boolean;
+    error: string | null;
+    groups: Array<[string, ManualQuestion[]]>;
+    selectedQuestionIds: number[];
+    selectedLimit: number;
+    onToggleQuestion: (questionId: number) => void;
+}) {
+    if (loading) {
+        return (
+            <EmptyQuestionState
+                icon={<Loader2Icon className="size-8 animate-spin" />}
+                title="Loading questions"
+            />
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                {error}
+            </div>
+        );
+    }
+
+    if (!hasSearched) {
+        return (
+            <EmptyQuestionState
+                icon={<SearchIcon className="size-8" />}
+                title="Adjust filters and search to see records."
+            />
+        );
+    }
+
+    if (groups.length === 0) {
+        return (
+            <EmptyQuestionState
+                icon={<SearchXIcon className="size-8" />}
+                title="No questions found for these filters."
+            />
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {groups.map(([chapterLabel, questions]) => (
+                <section
+                    key={chapterLabel}
+                    className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                >
+                    <div className="mb-3 rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-950/60">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {chapterLabel}
+                        </h3>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {questions.map((question) => (
+                            <QuestionSearchRow
+                                key={question.id}
+                                question={question}
+                                checked={selectedQuestionIds.includes(
+                                    question.id,
+                                )}
+                                disabled={
+                                    !selectedQuestionIds.includes(
+                                        question.id,
+                                    ) &&
+                                    selectedQuestionIds.length >= selectedLimit
+                                }
+                                onToggle={() => onToggleQuestion(question.id)}
+                            />
+                        ))}
+                    </div>
+                </section>
+            ))}
+        </div>
+    );
+}
+
+function QuestionPickedPanel({
+    questions,
+    selectedLimit,
+    onToggleQuestion,
+}: {
+    questions: ManualQuestion[];
+    selectedLimit: number;
+    onToggleQuestion: (questionId: number) => void;
+}) {
+    if (questions.length === 0) {
+        return (
+            <EmptyQuestionState
+                icon={<ListChecksIcon className="size-8" />}
+                title={`Pick ${selectedLimit || 0} questions to add this section.`}
+            />
+        );
+    }
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-teal-50 px-4 py-3 text-teal-700 dark:bg-teal-500/10 dark:text-teal-200">
+                <h3 className="text-sm font-semibold">Picked questions</h3>
+                <span className="text-sm font-bold">
+                    {questions.length}/{selectedLimit}
+                </span>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {questions.map((question) => (
+                    <QuestionSearchRow
+                        key={question.id}
+                        question={question}
+                        checked
+                        disabled={false}
+                        onToggle={() => onToggleQuestion(question.id)}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function QuestionSearchRow({
+    checked,
+    disabled,
+    question,
+    onToggle,
+}: {
+    checked: boolean;
+    disabled: boolean;
+    question: ManualQuestion;
+    onToggle: () => void;
+}) {
+    const options = paperOptionsFromManual(question);
+
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={onToggle}
+            className={cn(
+                'block w-full cursor-pointer px-4 py-3 text-left transition-colors',
+                checked
+                    ? 'bg-teal-50/70 dark:bg-teal-500/10'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-950/60',
+                disabled && 'cursor-not-allowed opacity-50',
+            )}
+        >
+            <div className="flex items-start gap-3">
+                <span
+                    className={cn(
+                        'mt-1 flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                        checked
+                            ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                            : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
+                    )}
+                >
+                    {checked && (
+                        <CheckIcon className="size-3" strokeWidth={3} />
+                    )}
+                </span>
+                <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {question.summaryText}
+                    </span>
+                    {options.length > 0 && (
+                        <span className="mt-2 grid gap-2 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-4 dark:text-slate-300">
+                            {options.map((option) => (
+                                <span key={option.id}>{option.text}</span>
+                            ))}
+                        </span>
+                    )}
+                    <span className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                            {question.sourceLabel ??
+                                question.source ??
+                                'No source'}
+                        </span>
+                    </span>
+                </span>
+            </div>
+        </button>
+    );
+}
+
+function ChapterTopicFilterPanel({
+    chapters,
+    localChapterIds,
+    localTopicIds,
+    onToggleChapter,
+    onToggleTopic,
+}: {
+    chapters: Chapter[];
+    localChapterIds: Set<number>;
+    localTopicIds: Set<number>;
+    onToggleChapter: (chapter: Chapter) => void;
+    onToggleTopic: (topicId: number) => void;
+}) {
+    if (chapters.length === 0) {
+        return (
+            <EmptyQuestionState
+                icon={<SearchXIcon className="size-8" />}
+                title="No chapters available."
+            />
+        );
+    }
+
+    return (
+        <div className="grid gap-3 lg:grid-cols-2">
+            {chapters.map((chapter) => {
+                const chapterTopicIds = chapter.topics.map((topic) => topic.id);
+                const checked =
+                    chapter.topics.length === 0
+                        ? localChapterIds.has(chapter.id)
+                        : chapterTopicIds.length > 0 &&
+                          chapterTopicIds.every((id) => localTopicIds.has(id));
+                const partial =
+                    chapter.topics.length > 0 &&
+                    !checked &&
+                    chapterTopicIds.some((id) => localTopicIds.has(id));
+
+                return (
+                    <section
+                        key={chapter.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => onToggleChapter(chapter)}
+                            className="flex w-full cursor-pointer items-center gap-3 text-left"
+                        >
+                            <span
+                                className={cn(
+                                    'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                    checked || partial
+                                        ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                                        : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
+                                )}
+                            >
+                                {(checked || partial) && (
+                                    <CheckIcon
+                                        className="size-3"
+                                        strokeWidth={3}
+                                    />
+                                )}
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    {chapter.chapter_number !== null &&
+                                        `CH ${String(chapter.chapter_number).padStart(2, '0')} `}
+                                    {chapter.name}
+                                </span>
+                                {chapter.topics.length > 0 && (
+                                    <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        {
+                                            chapter.topics.filter((topic) =>
+                                                localTopicIds.has(topic.id),
+                                            ).length
+                                        }{' '}
+                                        selected
+                                    </span>
+                                )}
+                            </span>
+                        </button>
+
+                        {chapter.topics.length > 0 && (
+                            <div className="mt-3 grid gap-2 pl-7">
+                                {chapter.topics.map((topic) => {
+                                    const topicChecked = localTopicIds.has(
+                                        topic.id,
+                                    );
+
+                                    return (
+                                        <button
+                                            key={topic.id}
+                                            type="button"
+                                            onClick={() =>
+                                                onToggleTopic(topic.id)
+                                            }
+                                            className="flex cursor-pointer items-center gap-2 text-left text-sm text-slate-700 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300"
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                                    topicChecked
+                                                        ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                                                        : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
+                                                )}
+                                            >
+                                                {topicChecked && (
+                                                    <CheckIcon
+                                                        className="size-3"
+                                                        strokeWidth={3}
+                                                    />
+                                                )}
+                                            </span>
+                                            {topic.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
+                );
+            })}
+        </div>
+    );
+}
+
+function EmptyQuestionState({
+    icon,
+    title,
+}: {
+    icon: ReactNode;
+    title: string;
+}) {
+    return (
+        <div className="flex min-h-[22rem] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white text-center text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">
+            <div className="mb-3">{icon}</div>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                {title}
+            </p>
         </div>
     );
 }
