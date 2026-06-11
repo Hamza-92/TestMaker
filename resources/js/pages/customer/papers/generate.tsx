@@ -27,6 +27,7 @@ import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
+import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { QuestionEditModal } from './paper-layouts/questions/question-edit-modal';
 import { BoxedObjectiveSection } from './paper-layouts/sections/boxed-objective-section';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
@@ -1969,6 +1970,36 @@ export default function GeneratePaper({
         );
     }
 
+    function movePaperSection(sectionId: string, direction: -1 | 1) {
+        setGeneratedPaper((current) => {
+            if (!current) {
+                return current;
+            }
+
+            const currentIndex = current.sections.findIndex(
+                (section) => section.id === sectionId,
+            );
+            const nextIndex = currentIndex + direction;
+
+            if (
+                currentIndex === -1 ||
+                nextIndex < 0 ||
+                nextIndex >= current.sections.length
+            ) {
+                return current;
+            }
+
+            const sections = [...current.sections];
+            const [section] = sections.splice(currentIndex, 1);
+            sections.splice(nextIndex, 0, section);
+
+            return {
+                ...current,
+                sections,
+            };
+        });
+    }
+
     function openAddPaperSectionModal() {
         setIsAddSectionModalOpen(true);
     }
@@ -2359,6 +2390,7 @@ export default function GeneratePaper({
                         }
                         onEditSection={openPaperSectionEditor}
                         onDeleteSection={deletePaperSection}
+                        onMoveSection={movePaperSection}
                         onEditQuestion={openPaperQuestionEditor}
                         onRandomQuestion={replacePaperQuestionRandom}
                         onPickQuestion={openPaperQuestionPicker}
@@ -4086,6 +4118,7 @@ function GeneratedPaperView({
     onAddSection,
     onEditSection,
     onDeleteSection,
+    onMoveSection,
     onEditQuestion,
     onQuestionImageSizeChange,
     onQuestionAnswerLinesChange,
@@ -4108,10 +4141,12 @@ function GeneratedPaperView({
     pickerSearch: string;
     usedQuestionIds: Set<number>;
     onBackToSetup: () => void;
+
     onHeaderChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     onAddSection: () => void;
     onEditSection: (sectionId: string) => void;
     onDeleteSection: (sectionId: string) => void;
+    onMoveSection: (sectionId: string, direction: -1 | 1) => void;
     onEditQuestion: (sectionId: string, questionId: string) => void;
     onQuestionImageSizeChange: (
         sectionId: string,
@@ -4132,6 +4167,8 @@ function GeneratedPaperView({
     onPickerSelect: (question: ManualQuestion) => void;
     onPickerClose: () => void;
 }) {
+    const [isConfirmingBack, setIsConfirmingBack] = useState(false);
+
     return (
         <>
             <div data-paper-shell className="mx-auto max-w-[76rem] space-y-3">
@@ -4191,8 +4228,18 @@ function GeneratedPaperView({
                                     key={section.id}
                                     section={section}
                                     index={sectionIndex}
+                                    canMoveUp={sectionIndex > 0}
+                                    canMoveDown={
+                                        sectionIndex < paper.sections.length - 1
+                                    }
                                     onEditSection={onEditSection}
                                     onDeleteSection={onDeleteSection}
+                                    onMoveUp={(sectionId) =>
+                                        onMoveSection(sectionId, -1)
+                                    }
+                                    onMoveDown={(sectionId) =>
+                                        onMoveSection(sectionId, 1)
+                                    }
                                     onAddRandomQuestion={onAddRandomQuestion}
                                     onAddCustomQuestion={onAddCustomQuestion}
                                     onEditQuestion={onEditQuestion}
@@ -4211,8 +4258,18 @@ function GeneratedPaperView({
                                     key={section.id}
                                     section={section}
                                     index={sectionIndex}
+                                    canMoveUp={sectionIndex > 0}
+                                    canMoveDown={
+                                        sectionIndex < paper.sections.length - 1
+                                    }
                                     onEditSection={onEditSection}
                                     onDeleteSection={onDeleteSection}
+                                    onMoveUp={(sectionId) =>
+                                        onMoveSection(sectionId, -1)
+                                    }
+                                    onMoveDown={(sectionId) =>
+                                        onMoveSection(sectionId, 1)
+                                    }
                                     onAddRandomQuestion={onAddRandomQuestion}
                                     onAddCustomQuestion={onAddCustomQuestion}
                                     onEditQuestion={onEditQuestion}
@@ -4234,12 +4291,23 @@ function GeneratedPaperView({
                 <div className="flex justify-end gap-2 print:hidden">
                     <button
                         type="button"
-                        onClick={onBackToSetup}
+                        onClick={() => setIsConfirmingBack(true)}
                         className="cursor-pointer border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
                     >
                         Back
                     </button>
                 </div>
+
+                {isConfirmingBack && (
+                    <ConfirmDialog
+                        variant="danger"
+                        title="Go Back to Setup"
+                        message="Are you sure you want to go back? All paper changes will be discarded."
+                        confirmLabel="Go Back"
+                        onConfirm={onBackToSetup}
+                        onCancel={() => setIsConfirmingBack(false)}
+                    />
+                )}
             </div>
 
             {pickerTarget && (
@@ -4277,6 +4345,9 @@ function PaperQuestionPickerModal({
     onSelect: (question: ManualQuestion) => void;
     onClose: () => void;
 }) {
+    const [pendingReplacement, setPendingReplacement] =
+        useState<ManualQuestion | null>(null);
+
     useEffect(() => {
         function closeOnEscape(event: KeyboardEvent) {
             if (event.key === 'Escape') {
@@ -4340,6 +4411,20 @@ function PaperQuestionPickerModal({
                     </label>
                 </div>
 
+                {pendingReplacement && (
+                    <ConfirmDialog
+                        variant="warning"
+                        title="Replace Question"
+                        message="Are you sure you want to replace this question with the selected one?"
+                        confirmLabel="Replace"
+                        onConfirm={() => {
+                            onSelect(pendingReplacement);
+                            setPendingReplacement(null);
+                        }}
+                        onCancel={() => setPendingReplacement(null)}
+                    />
+                )}
+
                 <div className="flex-1 space-y-2 overflow-y-auto p-4">
                     {questions.length === 0 && (
                         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-12 text-center dark:border-slate-700">
@@ -4360,8 +4445,8 @@ function PaperQuestionPickerModal({
                             <button
                                 key={question.id}
                                 type="button"
-                                disabled={isUsed}
-                                onClick={() => onSelect(question)}
+                                disabled={isUsed || isCurrent}
+                                onClick={() => setPendingReplacement(question)}
                                 className={cn(
                                     'flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
                                     isCurrent

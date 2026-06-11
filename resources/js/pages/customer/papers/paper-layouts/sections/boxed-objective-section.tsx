@@ -9,8 +9,12 @@ import { QuestionHoverActions, SectionControls } from './section-actions';
 interface BoxedObjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
+    canMoveUp: boolean;
+    canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;
     onDeleteSection: (sectionId: string) => void;
+    onMoveUp: (sectionId: string) => void;
+    onMoveDown: (sectionId: string) => void;
     onAddRandomQuestion: (sectionId: string) => void;
     onAddCustomQuestion: (sectionId: string) => void;
     onEditQuestion: (sectionId: string, questionId: string) => void;
@@ -34,8 +38,12 @@ const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
 export function BoxedObjectiveSection({
     section,
     index,
+    canMoveUp,
+    canMoveDown,
     onEditSection,
     onDeleteSection,
+    onMoveUp,
+    onMoveDown,
     onAddRandomQuestion,
     onAddCustomQuestion,
     onEditQuestion,
@@ -79,7 +87,11 @@ export function BoxedObjectiveSection({
                 </div>
             </div>
             <SectionControls
+                canMoveUp={canMoveUp}
+                canMoveDown={canMoveDown}
                 canAddRandom={section.questionTypeId !== null}
+                onMoveUp={() => onMoveUp(section.id)}
+                onMoveDown={() => onMoveDown(section.id)}
                 onAddRandom={() => onAddRandomQuestion(section.id)}
                 onAddCustom={() => onAddCustomQuestion(section.id)}
                 onEdit={() => onEditSection(section.id)}
