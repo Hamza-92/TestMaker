@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Customer\GeneratePaperController;
+use App\Http\Controllers\Customer\PaperController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
@@ -37,6 +38,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
         Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
         Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
+
+        Route::get('papers', [PaperController::class, 'index'])->name('customer.papers.index');
+        Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
+        Route::get('papers/{paper}/edit', [PaperController::class, 'edit'])->name('customer.papers.edit');
+        Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
+        Route::delete('papers/{paper}', [PaperController::class, 'destroy'])->name('customer.papers.destroy');
     });
 
     // ─── Superadmin ───────────────────────────────────────────────────────────

@@ -102,4 +102,9 @@ class User extends Authenticatable
     {
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
     }
+
+    public function papers(): HasMany
+    {
+        return $this->hasMany(Paper::class);
+    }
 }

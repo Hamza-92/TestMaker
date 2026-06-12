@@ -44,6 +44,7 @@ export interface GeneratedPaperHeader {
     date: string;
     duration: string;
     marks: number;
+    passingMarks: number;
     rollNo: string;
 }
 

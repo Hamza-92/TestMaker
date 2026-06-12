@@ -16,9 +16,9 @@ use Inertia\Inertia;
 
 class GeneratePaperController extends Controller
 {
-    public function index()
+    public static function pageData(): array
     {
-        return Inertia::render('customer/papers/generate', [
+        return [
             'patterns' => Pattern::where('status', 1)
                 ->orderBy('name')
                 ->get(['id', 'name']),
@@ -47,7 +47,12 @@ class GeneratePaperController extends Controller
                     'label' => $label,
                 ])
                 ->values(),
-        ]);
+        ];
+    }
+
+    public function index()
+    {
+        return Inertia::render('customer/papers/generate', self::pageData());
     }
 
     /**

@@ -2,8 +2,10 @@ import { Head } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
+    BookmarkIcon,
     BookOpenIcon,
     CheckIcon,
+    ClockIcon,
     FileTextIcon,
     GraduationCapIcon,
     GripVerticalIcon,
@@ -28,6 +30,9 @@ import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
+import { GoBackDialog } from './paper-layouts/go-back-dialog';
+import { SavePaperModal } from './paper-layouts/save-paper-modal';
+import type { SavePaperValues } from './paper-layouts/save-paper-modal';
 import { QuestionEditModal } from './paper-layouts/questions/question-edit-modal';
 import { BoxedObjectiveSection } from './paper-layouts/sections/boxed-objective-section';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
@@ -78,11 +83,25 @@ interface ChapterGroup {
     items: Chapter[];
 }
 
+interface SavedPaperProp {
+    id: number;
+    name: string;
+    paper: GeneratedPaper;
+    questionPoolsByType: Record<number, ManualQuestion[]>;
+    questionSelection: QuestionSelectionState;
+    meta: {
+        pattern: ComboboxOptionItem;
+        klass: ComboboxOptionItem;
+        subject: ComboboxOptionItem;
+    } | null;
+}
+
 interface Props {
     patterns: Pattern[];
     patternClasses: PatternClass[];
     classSubjects: ClassSubject[];
     sourceOptions: SourceOption[];
+    savedPaper?: SavedPaperProp;
 }
 
 interface SourceOption {
@@ -191,6 +210,19 @@ interface AddPaperSectionValues {
 }
 
 const CHAPTER_ONLY_SELECTION = -1;
+const DRAFT_KEY = 'paper_active_draft';
+
+interface DraftPayload {
+    savedAt: number;
+    paper: GeneratedPaper;
+    questionPoolsByType: Record<number, ManualQuestion[]>;
+    questionSelection: QuestionSelectionState;
+    meta: {
+        pattern: ComboboxOptionItem;
+        klass: ComboboxOptionItem;
+        subject: ComboboxOptionItem;
+    };
+}
 
 const fallbackSourceOptions: SourceOption[] = [
     { value: 'exercise', label: 'Exercise' },
@@ -640,11 +672,22 @@ function NumberField({
     );
 }
 
+function draftTimeAgo(timestamp: number): string {
+    const diff = Date.now() - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
 export default function GeneratePaper({
     patterns,
     patternClasses,
     classSubjects,
     sourceOptions,
+    savedPaper,
 }: Props) {
     const sourceFilters = useMemo(
         () => normalizeSourceOptions(sourceOptions),
@@ -711,6 +754,21 @@ export default function GeneratePaper({
             sections: [],
             totalMarks: 0,
         });
+    const [draftStatus, setDraftStatus] = useState<
+        'idle' | 'saving' | 'saved'
+    >('idle');
+    const [recoveryDraft, setRecoveryDraft] = useState<DraftPayload | null>(
+        null,
+    );
+    const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSavedRef = useRef<number | null>(null);
+    const isRestoringRef = useRef(false);
+    const [savedPaperId, setSavedPaperId] = useState<number | null>(null);
+    const [savedPaperName, setSavedPaperName] = useState('');
+    const [isSavePaperModalOpen, setIsSavePaperModalOpen] = useState(false);
+    const [isSavingPaper, setIsSavingPaper] = useState(false);
+    const [savePaperError, setSavePaperError] = useState<string | null>(null);
+    const [isDirty, setIsDirty] = useState(false);
 
     const patternOptions = useMemo<ComboboxOptionItem[]>(
         () => patterns.map((item) => ({ id: item.id, label: item.name })),
@@ -1169,6 +1227,83 @@ export default function GeneratePaper({
         selectedTopicIds,
     ]);
 
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(DRAFT_KEY);
+            if (raw) setRecoveryDraft(JSON.parse(raw) as DraftPayload);
+        } catch {
+            // ignore corrupted draft
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!generatedPaper || !pattern || !klass || !subject) return;
+
+        setDraftStatus('saving');
+
+        if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+
+        autoSaveRef.current = setTimeout(() => {
+            try {
+                localStorage.setItem(
+                    DRAFT_KEY,
+                    JSON.stringify({
+                        savedAt: Date.now(),
+                        paper: generatedPaper,
+                        questionPoolsByType,
+                        questionSelection,
+                        meta: { pattern, klass, subject },
+                    } satisfies DraftPayload),
+                );
+                setDraftStatus('saved');
+            } catch {
+                setDraftStatus('idle');
+            }
+        }, 1500);
+
+        return () => {
+            if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+        };
+    }, [generatedPaper, questionPoolsByType, questionSelection, pattern, klass, subject]);
+
+    useEffect(() => {
+        if (draftStatus !== 'saved') return;
+        const timer = setTimeout(() => setDraftStatus('idle'), 3000);
+        return () => clearTimeout(timer);
+    }, [draftStatus]);
+
+    useEffect(() => {
+        if (!savedPaper) return;
+        isRestoringRef.current = true;
+        setGeneratedPaper(savedPaper.paper);
+        setQuestionPoolsByType(savedPaper.questionPoolsByType ?? {});
+        setQuestionSelection(
+            savedPaper.questionSelection ?? {
+                globalFilters: {},
+                sections: [],
+                totalMarks: 0,
+            },
+        );
+        if (savedPaper.meta) {
+            setPattern(savedPaper.meta.pattern ?? null);
+            setKlass(savedPaper.meta.klass ?? null);
+            setSubject(savedPaper.meta.subject ?? null);
+        }
+        setSavedPaperId(savedPaper.id);
+        setSavedPaperName(savedPaper.name);
+        lastSavedRef.current = Date.now();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (generatedPaper === null || lastSavedRef.current === null) return;
+        if (isRestoringRef.current) {
+            isRestoringRef.current = false;
+            return;
+        }
+        setIsDirty(true);
+    }, [generatedPaper]);
+
     function resetQuestionSelection() {
         setQuestionSelection({
             globalFilters: createGlobalFilters(sourceFilters),
@@ -1576,6 +1711,7 @@ export default function GeneratePaper({
                     date: '',
                     duration: '2 hours',
                     marks: questionSelection.totalMarks,
+                    passingMarks: 0,
                     rollNo: '',
                 },
                 sections,
@@ -1593,12 +1729,165 @@ export default function GeneratePaper({
     }
 
     function returnToPaperSetup() {
+        if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
         setGeneratedPaper(null);
         setPaperQuestionPickerTarget(null);
         setPaperQuestionSearch('');
         setPaperGenerationError(null);
         setPaperSectionEditorTarget(null);
         setPaperQuestionEditorTarget(null);
+        setDraftStatus('idle');
+        setSavedPaperId(null);
+        setSavedPaperName('');
+        setIsDirty(false);
+        setIsSavePaperModalOpen(false);
+        setIsSavingPaper(false);
+        setSavePaperError(null);
+        lastSavedRef.current = null;
+        isRestoringRef.current = false;
+    }
+
+    function saveDraft() {
+        if (!generatedPaper || !pattern || !klass || !subject) return;
+        try {
+            localStorage.setItem(
+                DRAFT_KEY,
+                JSON.stringify({
+                    savedAt: Date.now(),
+                    paper: generatedPaper,
+                    questionPoolsByType,
+                    questionSelection,
+                    meta: { pattern, klass, subject },
+                } satisfies DraftPayload),
+            );
+        } catch {
+            // localStorage unavailable
+        }
+    }
+
+    function clearDraft() {
+        localStorage.removeItem(DRAFT_KEY);
+        setRecoveryDraft(null);
+    }
+
+    function restoreDraft(draft: DraftPayload) {
+        setGeneratedPaper(draft.paper);
+        setQuestionPoolsByType(draft.questionPoolsByType);
+        setQuestionSelection(draft.questionSelection);
+        setPattern(draft.meta.pattern);
+        setKlass(draft.meta.klass);
+        setSubject(draft.meta.subject);
+        setRecoveryDraft(null);
+    }
+
+    function saveDraftAndBack() {
+        saveDraft();
+        returnToPaperSetup();
+    }
+
+    function discardAndBack() {
+        clearDraft();
+        returnToPaperSetup();
+    }
+
+    async function savePaperToServer(values: SavePaperValues) {
+        if (!generatedPaper || isSavingPaper) return;
+
+        setIsSavingPaper(true);
+        setSavePaperError(null);
+
+        const csrfToken =
+            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+                ?.content ?? '';
+
+        const updatedPaper: GeneratedPaper = {
+            ...generatedPaper,
+            header: {
+                ...generatedPaper.header,
+                exam: values.examType,
+                section: values.section,
+                date: values.date,
+                duration: values.timeAllowed,
+                marks: Number(values.examMarks) || generatedPaper.header.marks,
+                passingMarks: Number(values.passingMarks) || 0,
+            },
+        };
+
+        const payload = {
+            name: values.name,
+            subject: updatedPaper.header.subject || null,
+            class_name: updatedPaper.header.className || null,
+            total_marks: paperTotalMarks(updatedPaper),
+            paper_data: {
+                paper: updatedPaper,
+                questionPoolsByType,
+                questionSelection,
+                meta: { pattern, klass, subject },
+            },
+        };
+
+        try {
+            let newId = savedPaperId;
+
+            if (newId !== null) {
+                const res = await fetch(`/papers/${newId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(payload),
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error('Failed to save paper.');
+            } else {
+                const res = await fetch('/papers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(payload),
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error('Failed to save paper.');
+                const data = (await res.json()) as { id: number };
+                newId = data.id;
+                setSavedPaperId(newId);
+            }
+
+            // Apply the header changes to the paper view
+            isRestoringRef.current = true;
+            setGeneratedPaper(updatedPaper);
+            setSavedPaperName(values.name);
+            lastSavedRef.current = Date.now();
+            setIsDirty(false);
+            setIsSavePaperModalOpen(false);
+            clearDraft();
+        } catch (error) {
+            setSavePaperError(
+                error instanceof Error ? error.message : 'Failed to save paper.',
+            );
+        } finally {
+            setIsSavingPaper(false);
+        }
+    }
+
+    function defaultPaperName(): string {
+        if (!generatedPaper) return '';
+        return (
+            [
+                generatedPaper.header.exam,
+                generatedPaper.header.subject,
+                generatedPaper.header.className,
+            ]
+                .filter(Boolean)
+                .join(' – ') || 'My Paper'
+        );
     }
 
     function updatePaperHeader(
@@ -2381,7 +2670,13 @@ export default function GeneratePaper({
                         pickerQuestions={filteredPaperPickerQuestions}
                         pickerSearch={paperQuestionSearch}
                         usedQuestionIds={generatedSourceQuestionIds}
-                        onBackToSetup={returnToPaperSetup}
+                        savedPaperId={savedPaperId}
+                        isDirty={isDirty}
+                        isSavingPaper={isSavingPaper}
+                        onOpenSavePaperModal={() => setIsSavePaperModalOpen(true)}
+                        onGoBack={returnToPaperSetup}
+                        onSaveDraftAndBack={saveDraftAndBack}
+                        onDiscardAndBack={discardAndBack}
                         onHeaderChange={updatePaperHeader}
                         onAddSection={openAddPaperSectionModal}
                         onQuestionImageSizeChange={updatePaperQuestionImageSize}
@@ -2420,6 +2715,34 @@ export default function GeneratePaper({
                         />
                     )}
 
+                    {isSavePaperModalOpen && generatedPaper && (
+                        <SavePaperModal
+                            initial={{
+                                name: savedPaperName || defaultPaperName(),
+                                examType: generatedPaper.header.exam,
+                                section: generatedPaper.header.section,
+                                date: generatedPaper.header.date,
+                                timeAllowed: generatedPaper.header.duration,
+                                examMarks: String(
+                                    paperTotalMarks(generatedPaper) ||
+                                        generatedPaper.header.marks ||
+                                        '',
+                                ),
+                                passingMarks: String(
+                                    generatedPaper.header.passingMarks || '',
+                                ),
+                            }}
+                            isUpdate={savedPaperId !== null}
+                            isSaving={isSavingPaper}
+                            error={savePaperError}
+                            onSave={savePaperToServer}
+                            onCancel={() => {
+                                setIsSavePaperModalOpen(false);
+                                setSavePaperError(null);
+                            }}
+                        />
+                    )}
+
                     {isAddSectionModalOpen && (
                         <AddPaperSectionModal
                             questionTypes={questionSelection.sections}
@@ -2438,6 +2761,49 @@ export default function GeneratePaper({
             ) : (
                 <>
                     <div className="mx-auto max-w-7xl space-y-6">
+                        {recoveryDraft && (
+                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 dark:border-teal-500/30 dark:bg-teal-500/10">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400">
+                                        <BookmarkIcon className="size-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-teal-900 dark:text-teal-100">
+                                            Unsaved draft found
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-teal-700 dark:text-teal-300">
+                                            {recoveryDraft.meta.subject.label}{' '}
+                                            &middot;{' '}
+                                            {recoveryDraft.meta.klass.label}{' '}
+                                            &middot;{' '}
+                                            <ClockIcon className="mb-0.5 inline size-3" />{' '}
+                                            {draftTimeAgo(recoveryDraft.savedAt)}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            restoreDraft(recoveryDraft)
+                                        }
+                                        className="cursor-pointer rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                                    >
+                                        Restore Draft
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            clearDraft();
+                                        }}
+                                        className="cursor-pointer rounded-lg border border-teal-200 bg-white px-3 py-1.5 text-xs font-medium text-teal-700 transition-colors hover:bg-teal-50 dark:border-teal-500/30 dark:bg-transparent dark:text-teal-300 dark:hover:bg-teal-500/10"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex flex-wrap items-center justify-between gap-4">
                             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
                                 Generate Paper
@@ -4113,7 +4479,13 @@ function GeneratedPaperView({
     pickerQuestions,
     pickerSearch,
     usedQuestionIds,
-    onBackToSetup,
+    savedPaperId,
+    isDirty,
+    isSavingPaper,
+    onOpenSavePaperModal,
+    onGoBack,
+    onSaveDraftAndBack,
+    onDiscardAndBack,
     onHeaderChange,
     onAddSection,
     onEditSection,
@@ -4140,8 +4512,13 @@ function GeneratedPaperView({
     pickerQuestions: ManualQuestion[];
     pickerSearch: string;
     usedQuestionIds: Set<number>;
-    onBackToSetup: () => void;
-
+    savedPaperId: number | null;
+    isDirty: boolean;
+    isSavingPaper: boolean;
+    onOpenSavePaperModal: () => void;
+    onGoBack: () => void;
+    onSaveDraftAndBack: () => void;
+    onDiscardAndBack: () => void;
     onHeaderChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     onAddSection: () => void;
     onEditSection: (sectionId: string) => void;
@@ -4169,45 +4546,81 @@ function GeneratedPaperView({
 }) {
     const [isConfirmingBack, setIsConfirmingBack] = useState(false);
 
+    function handleBackClick() {
+        if (savedPaperId !== null && !isDirty) {
+            onGoBack();
+        } else {
+            setIsConfirmingBack(true);
+        }
+    }
+
     return (
         <>
             <div data-paper-shell className="mx-auto max-w-[76rem] space-y-3">
-                <div className="flex flex-wrap justify-end gap-2 print:hidden">
-                    <button
-                        type="button"
-                        onClick={onAddSection}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                    >
-                        <PlusIcon className="size-4" />
-                        Add Section
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() =>
-                            window.localStorage.setItem(
-                                `paper_draft_${paper.id}`,
-                                JSON.stringify({
-                                    ...paper,
-                                    header: {
-                                        ...paper.header,
-                                        marks: totalMarks,
-                                    },
-                                }),
-                            )
-                        }
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                    >
-                        <SaveIcon className="size-4" />
-                        Save
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950"
-                    >
-                        <PrinterIcon className="size-4" />
-                        Print
-                    </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+                    <div className="flex items-center gap-2">
+                        <a
+                            href="/papers"
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                        >
+                            <BookmarkIcon className="size-4" />
+                            My Papers
+                        </a>
+                        <button
+                            type="button"
+                            onClick={onAddSection}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                        >
+                            <PlusIcon className="size-4" />
+                            Add Section
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onOpenSavePaperModal}
+                            disabled={isSavingPaper}
+                            className={cn(
+                                'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                                savedPaperId !== null && !isDirty
+                                    ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-400'
+                                    : savedPaperId !== null && isDirty
+                                      ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400'
+                                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+                            )}
+                        >
+                            {isSavingPaper ? (
+                                <>
+                                    <Loader2Icon className="size-4 animate-spin" />
+                                    Saving…
+                                </>
+                            ) : savedPaperId !== null && !isDirty ? (
+                                <>
+                                    <CheckIcon className="size-4" />
+                                    Saved
+                                </>
+                            ) : savedPaperId !== null && isDirty ? (
+                                <>
+                                    <SaveIcon className="size-4" />
+                                    Save Paper
+                                    <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                                </>
+                            ) : (
+                                <>
+                                    <SaveIcon className="size-4" />
+                                    Save Paper
+                                </>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950"
+                        >
+                            <PrinterIcon className="size-4" />
+                            Print
+                        </button>
+                    </div>
                 </div>
 
                 <main
@@ -4291,20 +4704,23 @@ function GeneratedPaperView({
                 <div className="flex justify-end gap-2 print:hidden">
                     <button
                         type="button"
-                        onClick={() => setIsConfirmingBack(true)}
-                        className="cursor-pointer border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        onClick={handleBackClick}
+                        className="cursor-pointer rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
                     >
                         Back
                     </button>
                 </div>
 
                 {isConfirmingBack && (
-                    <ConfirmDialog
-                        variant="danger"
-                        title="Go Back to Setup"
-                        message="Are you sure you want to go back? All paper changes will be discarded."
-                        confirmLabel="Go Back"
-                        onConfirm={onBackToSetup}
+                    <GoBackDialog
+                        onSaveDraft={() => {
+                            setIsConfirmingBack(false);
+                            onSaveDraftAndBack();
+                        }}
+                        onDiscard={() => {
+                            setIsConfirmingBack(false);
+                            onDiscardAndBack();
+                        }}
                         onCancel={() => setIsConfirmingBack(false)}
                     />
                 )}

@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(Select-Object -Last 5)"
     ]
   }
 }
