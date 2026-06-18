@@ -14,11 +14,13 @@ class Paper extends Model
         'class_name',
         'total_marks',
         'paper_data',
+        'is_draft',
     ];
 
     protected $casts = [
-        'paper_data' => 'array',
+        'paper_data'  => 'array',
         'total_marks' => 'integer',
+        'is_draft'    => 'boolean',
     ];
 
     public function user(): BelongsTo

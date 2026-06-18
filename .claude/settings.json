@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx vite *)",
-      "Bash(Select-Object -Last 5)"
+      "Bash(Select-Object -Last 5)",
+      "Bash(Get-Content storage/logs/laravel.log -Tail 40)",
+      "Bash(php -r ' *)"
     ]
   }
 }

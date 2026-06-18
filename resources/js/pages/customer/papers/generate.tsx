@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
+import { toast } from 'sonner';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
@@ -86,6 +87,7 @@ interface ChapterGroup {
 interface SavedPaperProp {
     id: number;
     name: string;
+    is_draft: boolean;
     paper: GeneratedPaper;
     questionPoolsByType: Record<number, ManualQuestion[]>;
     questionSelection: QuestionSelectionState;
@@ -210,7 +212,15 @@ interface AddPaperSectionValues {
 }
 
 const CHAPTER_ONLY_SELECTION = -1;
-const DRAFT_KEY = 'paper_active_draft';
+/**
+ * Per-paper localStorage key. Using one key per paper id (and a "new" bucket
+ * for unsaved papers) prevents drafts from clobbering each other when the user
+ * edits multiple papers in sequence. The "new" bucket is also cleared whenever
+ * a new paper is saved, so it doesn't leak into a later session.
+ */
+function draftKey(paperId: number | null): string {
+    return `paper_active_draft:${paperId ?? 'new'}`;
+}
 
 interface DraftPayload {
     savedAt: number;
@@ -765,8 +775,10 @@ export default function GeneratePaper({
     const isRestoringRef = useRef(false);
     const [savedPaperId, setSavedPaperId] = useState<number | null>(null);
     const [savedPaperName, setSavedPaperName] = useState('');
+    const [savedPaperIsDraft, setSavedPaperIsDraft] = useState(false);
     const [isSavePaperModalOpen, setIsSavePaperModalOpen] = useState(false);
     const [isSavingPaper, setIsSavingPaper] = useState(false);
+    const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [savePaperError, setSavePaperError] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
 
@@ -1229,14 +1241,25 @@ export default function GeneratePaper({
 
     useEffect(() => {
         try {
-            const raw = localStorage.getItem(DRAFT_KEY);
+            // Look up the draft for the paper we're editing (or the "new" bucket
+            // if this is a fresh paper). savedPaper.id is read directly from the
+            // prop because the savedPaperId state hook hasn't been set yet on
+            // the first effect tick.
+            const raw = localStorage.getItem(draftKey(savedPaper?.id ?? null));
             if (raw) setRecoveryDraft(JSON.parse(raw) as DraftPayload);
         } catch {
             // ignore corrupted draft
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
+        // Only autosave when the user has actually changed something. Without
+        // this gate the mount-time restore of a saved paper would itself trip
+        // the autosave timer and immediately overwrite any genuine unsaved
+        // changes already sitting in localStorage with the server's last-saved
+        // state — silently destroying recovery data.
+        if (!isDirty) return;
         if (!generatedPaper || !pattern || !klass || !subject) return;
 
         setDraftStatus('saving');
@@ -1246,7 +1269,7 @@ export default function GeneratePaper({
         autoSaveRef.current = setTimeout(() => {
             try {
                 localStorage.setItem(
-                    DRAFT_KEY,
+                    draftKey(savedPaperId),
                     JSON.stringify({
                         savedAt: Date.now(),
                         paper: generatedPaper,
@@ -1264,7 +1287,16 @@ export default function GeneratePaper({
         return () => {
             if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
         };
-    }, [generatedPaper, questionPoolsByType, questionSelection, pattern, klass, subject]);
+    }, [
+        isDirty,
+        generatedPaper,
+        questionPoolsByType,
+        questionSelection,
+        pattern,
+        klass,
+        subject,
+        savedPaperId,
+    ]);
 
     useEffect(() => {
         if (draftStatus !== 'saved') return;
@@ -1291,12 +1323,17 @@ export default function GeneratePaper({
         }
         setSavedPaperId(savedPaper.id);
         setSavedPaperName(savedPaper.name);
+        setSavedPaperIsDraft(savedPaper.is_draft);
         lastSavedRef.current = Date.now();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
-        if (generatedPaper === null || lastSavedRef.current === null) return;
+        if (generatedPaper === null) return;
+        // Mount-time and post-save restores set isRestoringRef so the freshly
+        // applied server state doesn't get mis-flagged as dirty. Any other
+        // change to generatedPaper is the user editing — mark it dirty so the
+        // autosave effect can persist it to localStorage.
         if (isRestoringRef.current) {
             isRestoringRef.current = false;
             return;
@@ -1739,9 +1776,11 @@ export default function GeneratePaper({
         setDraftStatus('idle');
         setSavedPaperId(null);
         setSavedPaperName('');
+        setSavedPaperIsDraft(false);
         setIsDirty(false);
         setIsSavePaperModalOpen(false);
         setIsSavingPaper(false);
+        setIsSavingDraft(false);
         setSavePaperError(null);
         lastSavedRef.current = null;
         isRestoringRef.current = false;
@@ -1751,7 +1790,7 @@ export default function GeneratePaper({
         if (!generatedPaper || !pattern || !klass || !subject) return;
         try {
             localStorage.setItem(
-                DRAFT_KEY,
+                draftKey(savedPaperId),
                 JSON.stringify({
                     savedAt: Date.now(),
                     paper: generatedPaper,
@@ -1766,7 +1805,22 @@ export default function GeneratePaper({
     }
 
     function clearDraft() {
-        localStorage.removeItem(DRAFT_KEY);
+        // Clear the active paper's draft, plus the "new" bucket — that one
+        // accumulates edits before the first save and becomes stale the
+        // moment the paper gets an id.
+        localStorage.removeItem(draftKey(savedPaperId));
+        localStorage.removeItem(draftKey(null));
+        setRecoveryDraft(null);
+    }
+
+    // Used by the recovery banner's Dismiss button. Removes the persisted
+    // draft so it doesn't pop up again on the next reload.
+    function dismissRecoveryDraft() {
+        try {
+            localStorage.removeItem(draftKey(savedPaperId));
+        } catch {
+            // localStorage unavailable
+        }
         setRecoveryDraft(null);
     }
 
@@ -1780,14 +1834,137 @@ export default function GeneratePaper({
         setRecoveryDraft(null);
     }
 
-    function saveDraftAndBack() {
+    // Toolbar "Save as Draft" — persists current state to the server as a
+    // draft and stays on the page. Differs from `saveDraftAndBack` which
+    // also navigates back to setup after saving.
+    async function saveAsDraft() {
+        if (isSavingDraft) return;
+
+        setIsSavingDraft(true);
+
+        const ok = await saveDraftToServer();
+
+        setIsSavingDraft(false);
+
+        if (ok) {
+            // DB now has the latest state — flush dirty flag and wipe the
+            // localStorage recovery copy so a later reload doesn't dangle a
+            // stale "Unsaved changes" banner.
+            isRestoringRef.current = true;
+            setIsDirty(false);
+            lastSavedRef.current = Date.now();
+            clearDraft();
+            toast.success('Draft saved');
+        } else {
+            toast.error(
+                savePaperError ?? 'Could not save draft. Try again.',
+            );
+        }
+    }
+
+    async function saveDraftAndBack() {
+        if (isSavingDraft) return;
+
+        setIsSavingDraft(true);
         saveDraft();
-        returnToPaperSetup();
+
+        const ok = await saveDraftToServer();
+
+        setIsSavingDraft(false);
+
+        if (ok) {
+            toast.success('Draft saved');
+            returnToPaperSetup();
+        } else {
+            toast.error(
+                savePaperError ??
+                    'Could not save draft. Your work is still here.',
+            );
+        }
     }
 
     function discardAndBack() {
         clearDraft();
         returnToPaperSetup();
+    }
+
+    async function saveDraftToServer(): Promise<boolean> {
+        if (!generatedPaper || !pattern || !klass || !subject) {
+            return false;
+        }
+
+        const csrfToken =
+            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+                ?.content ?? '';
+
+        const payload = {
+            name: defaultPaperName() || 'Untitled Draft',
+            is_draft: true,
+            subject: generatedPaper.header.subject || null,
+            class_name: generatedPaper.header.className || null,
+            total_marks: paperTotalMarks(generatedPaper),
+            paper_data: {
+                paper: generatedPaper,
+                questionPoolsByType,
+                questionSelection,
+                meta: { pattern, klass, subject },
+            },
+        };
+
+        const headers = {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+
+        setSavePaperError(null);
+
+        try {
+            // Three branches:
+            //   - Existing record → PUT (covers both is_draft=true and is_draft=false;
+            //     the payload sets is_draft=true so a saved paper gets demoted to draft).
+            //   - No record yet → POST and capture the new id so subsequent saves update
+            //     the same row instead of creating duplicates.
+            const response =
+                savedPaperId !== null
+                    ? await fetch(`/papers/${savedPaperId}`, {
+                          method: 'PUT',
+                          headers,
+                          body: JSON.stringify(payload),
+                          credentials: 'same-origin',
+                      })
+                    : await fetch('/papers', {
+                          method: 'POST',
+                          headers,
+                          body: JSON.stringify(payload),
+                          credentials: 'same-origin',
+                      });
+
+            if (!response.ok) {
+                throw new Error(
+                    `Server returned ${response.status} ${response.statusText}`,
+                );
+            }
+
+            if (savedPaperId === null) {
+                const data = (await response.json()) as { id: number };
+
+                setSavedPaperId(data.id);
+            }
+
+            setSavedPaperIsDraft(true);
+
+            return true;
+        } catch (error) {
+            setSavePaperError(
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to save draft.',
+            );
+
+            return false;
+        }
     }
 
     async function savePaperToServer(values: SavePaperValues) {
@@ -1815,6 +1992,7 @@ export default function GeneratePaper({
 
         const payload = {
             name: values.name,
+            is_draft: false,
             subject: updatedPaper.header.subject || null,
             class_name: updatedPaper.header.className || null,
             total_marks: paperTotalMarks(updatedPaper),
@@ -1864,6 +2042,7 @@ export default function GeneratePaper({
             isRestoringRef.current = true;
             setGeneratedPaper(updatedPaper);
             setSavedPaperName(values.name);
+            setSavedPaperIsDraft(false);
             lastSavedRef.current = Date.now();
             setIsDirty(false);
             setIsSavePaperModalOpen(false);
@@ -2663,6 +2842,40 @@ export default function GeneratePaper({
 
             {generatedPaper ? (
                 <>
+                    {recoveryDraft && (
+                        <div className="mx-auto mb-3 flex max-w-[76rem] flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 print:hidden dark:border-amber-500/30 dark:bg-amber-500/10">
+                            <div className="flex items-center gap-3">
+                                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+                                    <ClockIcon className="size-4" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                                        Unsaved changes from your last session
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                                        Auto-saved{' '}
+                                        {draftTimeAgo(recoveryDraft.savedAt)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => restoreDraft(recoveryDraft)}
+                                    className="cursor-pointer rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-slate-950 dark:hover:bg-amber-400"
+                                >
+                                    Restore Changes
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={dismissRecoveryDraft}
+                                    className="cursor-pointer rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-500/30 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10"
+                                >
+                                    Discard
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     <GeneratedPaperView
                         paper={generatedPaper}
                         totalMarks={paperTotalMarks(generatedPaper)}
@@ -2671,11 +2884,14 @@ export default function GeneratePaper({
                         pickerSearch={paperQuestionSearch}
                         usedQuestionIds={generatedSourceQuestionIds}
                         savedPaperId={savedPaperId}
+                        isDraft={savedPaperIsDraft}
                         isDirty={isDirty}
                         isSavingPaper={isSavingPaper}
+                        isSavingDraft={isSavingDraft}
                         onOpenSavePaperModal={() => setIsSavePaperModalOpen(true)}
+                        onSaveDraft={() => void saveAsDraft()}
                         onGoBack={returnToPaperSetup}
-                        onSaveDraftAndBack={saveDraftAndBack}
+                        onSaveDraftAndBack={() => void saveDraftAndBack()}
                         onDiscardAndBack={discardAndBack}
                         onHeaderChange={updatePaperHeader}
                         onAddSection={openAddPaperSectionModal}
@@ -2793,9 +3009,7 @@ export default function GeneratePaper({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            clearDraft();
-                                        }}
+                                        onClick={dismissRecoveryDraft}
                                         className="cursor-pointer rounded-lg border border-teal-200 bg-white px-3 py-1.5 text-xs font-medium text-teal-700 transition-colors hover:bg-teal-50 dark:border-teal-500/30 dark:bg-transparent dark:text-teal-300 dark:hover:bg-teal-500/10"
                                     >
                                         Dismiss
@@ -4480,9 +4694,12 @@ function GeneratedPaperView({
     pickerSearch,
     usedQuestionIds,
     savedPaperId,
+    isDraft,
     isDirty,
     isSavingPaper,
+    isSavingDraft,
     onOpenSavePaperModal,
+    onSaveDraft,
     onGoBack,
     onSaveDraftAndBack,
     onDiscardAndBack,
@@ -4513,9 +4730,12 @@ function GeneratedPaperView({
     pickerSearch: string;
     usedQuestionIds: Set<number>;
     savedPaperId: number | null;
+    isDraft: boolean;
     isDirty: boolean;
     isSavingPaper: boolean;
+    isSavingDraft: boolean;
     onOpenSavePaperModal: () => void;
+    onSaveDraft: () => void;
     onGoBack: () => void;
     onSaveDraftAndBack: () => void;
     onDiscardAndBack: () => void;
@@ -4559,13 +4779,13 @@ function GeneratedPaperView({
             <div data-paper-shell className="mx-auto max-w-[76rem] space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
                     <div className="flex items-center gap-2">
-                        <a
+                        <Link
                             href="/papers"
                             className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                         >
                             <BookmarkIcon className="size-4" />
                             My Papers
-                        </a>
+                        </Link>
                         <button
                             type="button"
                             onClick={onAddSection}
@@ -4574,12 +4794,36 @@ function GeneratedPaperView({
                             <PlusIcon className="size-4" />
                             Add Section
                         </button>
+                        {isDraft && savedPaperId !== null && (
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                                <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                                Draft
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
+                            onClick={onSaveDraft}
+                            disabled={isSavingDraft || isSavingPaper}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                        >
+                            {isSavingDraft ? (
+                                <>
+                                    <Loader2Icon className="size-4 animate-spin" />
+                                    Saving…
+                                </>
+                            ) : (
+                                <>
+                                    <BookmarkIcon className="size-4" />
+                                    Save as Draft
+                                </>
+                            )}
+                        </button>
+                        <button
+                            type="button"
                             onClick={onOpenSavePaperModal}
-                            disabled={isSavingPaper}
+                            disabled={isSavingPaper || isSavingDraft}
                             className={cn(
                                 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                                 savedPaperId !== null && !isDirty
@@ -4705,9 +4949,13 @@ function GeneratedPaperView({
                     <button
                         type="button"
                         onClick={handleBackClick}
-                        className="cursor-pointer rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        disabled={isSavingDraft}
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
                     >
-                        Back
+                        {isSavingDraft && (
+                            <Loader2Icon className="size-4 animate-spin" />
+                        )}
+                        {isSavingDraft ? 'Saving Draft…' : 'Back'}
                     </button>
                 </div>
 
