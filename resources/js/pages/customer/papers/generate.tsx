@@ -91,11 +91,34 @@ interface SavedPaperProp {
     paper: GeneratedPaper;
     questionPoolsByType: Record<number, ManualQuestion[]>;
     questionSelection: QuestionSelectionState;
+    /** Plain-object form of the chapter→topic selection map (Sets are not JSON-serializable). */
+    chapterSelection: Record<string, number[]> | null;
     meta: {
         pattern: ComboboxOptionItem;
         klass: ComboboxOptionItem;
         subject: ComboboxOptionItem;
     } | null;
+}
+
+function serializeChapterSelection(
+    selected: Record<number, Set<number>>,
+): Record<number, number[]> {
+    const out: Record<number, number[]> = {};
+    for (const [key, value] of Object.entries(selected)) {
+        out[Number(key)] = [...value];
+    }
+    return out;
+}
+
+function deserializeChapterSelection(
+    plain: Record<string, number[]> | null | undefined,
+): Record<number, Set<number>> {
+    if (!plain) return {};
+    const out: Record<number, Set<number>> = {};
+    for (const [key, value] of Object.entries(plain)) {
+        out[Number(key)] = new Set(value);
+    }
+    return out;
 }
 
 interface Props {
@@ -227,6 +250,7 @@ interface DraftPayload {
     paper: GeneratedPaper;
     questionPoolsByType: Record<number, ManualQuestion[]>;
     questionSelection: QuestionSelectionState;
+    chapterSelection: Record<number, number[]>;
     meta: {
         pattern: ComboboxOptionItem;
         klass: ComboboxOptionItem;
@@ -1275,6 +1299,7 @@ export default function GeneratePaper({
                         paper: generatedPaper,
                         questionPoolsByType,
                         questionSelection,
+                        chapterSelection: serializeChapterSelection(selected),
                         meta: { pattern, klass, subject },
                     } satisfies DraftPayload),
                 );
@@ -1292,6 +1317,7 @@ export default function GeneratePaper({
         generatedPaper,
         questionPoolsByType,
         questionSelection,
+        selected,
         pattern,
         klass,
         subject,
@@ -1316,6 +1342,7 @@ export default function GeneratePaper({
                 totalMarks: 0,
             },
         );
+        setSelected(deserializeChapterSelection(savedPaper.chapterSelection));
         if (savedPaper.meta) {
             setPattern(savedPaper.meta.pattern ?? null);
             setKlass(savedPaper.meta.klass ?? null);
@@ -1796,6 +1823,7 @@ export default function GeneratePaper({
                     paper: generatedPaper,
                     questionPoolsByType,
                     questionSelection,
+                    chapterSelection: serializeChapterSelection(selected),
                     meta: { pattern, klass, subject },
                 } satisfies DraftPayload),
             );
@@ -1828,6 +1856,7 @@ export default function GeneratePaper({
         setGeneratedPaper(draft.paper);
         setQuestionPoolsByType(draft.questionPoolsByType);
         setQuestionSelection(draft.questionSelection);
+        setSelected(deserializeChapterSelection(draft.chapterSelection));
         setPattern(draft.meta.pattern);
         setKlass(draft.meta.klass);
         setSubject(draft.meta.subject);
@@ -1907,6 +1936,7 @@ export default function GeneratePaper({
                 paper: generatedPaper,
                 questionPoolsByType,
                 questionSelection,
+                chapterSelection: serializeChapterSelection(selected),
                 meta: { pattern, klass, subject },
             },
         };
@@ -2000,6 +2030,7 @@ export default function GeneratePaper({
                 paper: updatedPaper,
                 questionPoolsByType,
                 questionSelection,
+                chapterSelection: serializeChapterSelection(selected),
                 meta: { pattern, klass, subject },
             },
         };

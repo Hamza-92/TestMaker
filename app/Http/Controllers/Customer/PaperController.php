@@ -95,6 +95,7 @@ class PaperController extends Controller
             'paper'               => $paperData['paper'] ?? null,
             'questionPoolsByType' => $paperData['questionPoolsByType'] ?? [],
             'questionSelection'   => $paperData['questionSelection'] ?? null,
+            'chapterSelection'    => $paperData['chapterSelection'] ?? null,
             'meta'                => $paperData['meta'] ?? null,
         ];
 
