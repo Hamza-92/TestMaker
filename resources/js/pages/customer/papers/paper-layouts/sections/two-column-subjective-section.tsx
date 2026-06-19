@@ -69,7 +69,10 @@ export function TwoColumnSubjectiveSection({
     return (
         <section className="paper-section">
             <div className="border border-black text-black">
-                <div className="grid grid-cols-[3rem_1fr_8rem] border-b border-black text-sm font-bold">
+                <div
+                    data-paper-heading
+                    className="grid grid-cols-[3rem_1fr_8rem] border-b border-black text-sm font-bold"
+                >
                     <div className="border-r border-black px-1 py-1">
                         Q.{index + 1}
                     </div>
@@ -144,7 +147,10 @@ function SubjectiveQuestionItem({
     ) => void;
 }) {
     return (
-        <div className="group/question relative flex gap-3 pr-28 text-sm leading-6">
+        <div
+            data-paper-question
+            className="group/question relative flex gap-3 pr-28 text-sm leading-6"
+        >
             <span className="w-8 shrink-0 font-bold">
                 ({roman[index] ?? index + 1})
             </span>

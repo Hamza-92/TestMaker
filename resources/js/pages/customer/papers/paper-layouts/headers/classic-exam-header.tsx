@@ -65,7 +65,10 @@ function HeaderColumn({
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
 }) {
     return (
-        <div className="grid grid-rows-5 border-r border-black last:border-r-0">
+        <div
+            data-paper-header
+            className="grid grid-rows-5 border-r border-black last:border-r-0"
+        >
             {fields.map(([field, label]) => (
                 <div
                     key={field}

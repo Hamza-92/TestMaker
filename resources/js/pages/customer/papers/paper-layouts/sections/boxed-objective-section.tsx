@@ -56,7 +56,10 @@ export function BoxedObjectiveSection({
     return (
         <section className="paper-section">
             <div className="border border-black text-black">
-                <div className="grid grid-cols-[3rem_1fr_8rem] border-b border-black text-sm font-bold">
+                <div
+                    data-paper-heading
+                    className="grid grid-cols-[3rem_1fr_8rem] border-b border-black text-sm font-bold"
+                >
                     <div className="border-r border-black px-1 py-1">
                         Q.{index + 1}
                     </div>
@@ -133,7 +136,10 @@ function ObjectiveQuestionRow({
     const options = question.options.slice(0, 4);
 
     return (
-        <div className="group/question relative border-b border-black last:border-b-0">
+        <div
+            data-paper-question
+            className="group/question relative border-b border-black last:border-b-0"
+        >
             <div className="grid grid-cols-[3rem_1fr] text-sm">
                 <div className="border-r border-black px-2 py-1 text-center font-bold">
                     {index + 1}

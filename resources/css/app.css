@@ -269,6 +269,37 @@ input[type='date']::-webkit-calendar-picker-indicator {
         'Liberation Mono', 'Courier New', monospace;
 }
 
+/* ── Paper Settings: font sizing ───────────────────────────────────────── */
+/* CSS variables on [data-print-paper] are written by the React component.
+   The `*` selector forces nested Tailwind text-utility classes to inherit
+   instead of overriding our user-chosen size. */
+[data-print-paper] [data-paper-header] {
+    font-size: var(--paper-header-size, 0.875rem);
+    line-height: var(--paper-header-line-height, 1.5);
+}
+[data-print-paper] [data-paper-header] * {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+[data-print-paper] [data-paper-heading] {
+    font-size: var(--paper-heading-size, 0.875rem);
+    line-height: var(--paper-heading-line-height, 1.5);
+}
+[data-print-paper] [data-paper-heading] * {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+[data-print-paper] [data-paper-question] {
+    font-size: var(--paper-question-size, 0.875rem);
+    line-height: var(--paper-question-line-height, 1.5);
+}
+[data-print-paper] [data-paper-question] * {
+    font-size: inherit;
+    line-height: inherit;
+}
+
 @media print {
     @page {
         margin: 8mm;

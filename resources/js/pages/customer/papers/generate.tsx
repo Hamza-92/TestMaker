@@ -19,6 +19,7 @@ import {
     SaveIcon,
     SearchIcon,
     SearchXIcon,
+    SettingsIcon,
     SparklesIcon,
     Trash2Icon,
     XIcon,
@@ -32,19 +33,23 @@ import { cn } from '@/lib/utils';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
+import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
 import type { SavePaperValues } from './paper-layouts/save-paper-modal';
 import { QuestionEditModal } from './paper-layouts/questions/question-edit-modal';
 import { BoxedObjectiveSection } from './paper-layouts/sections/boxed-objective-section';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
 import { TwoColumnSubjectiveSection } from './paper-layouts/sections/two-column-subjective-section';
-import type {
-    GeneratedPaper,
-    GeneratedPaperHeader,
-    GeneratedPaperQuestion,
-    GeneratedPaperSection,
-    PaperImageSize,
-    PaperQuestionOption,
+import {
+    DEFAULT_PAPER_SETTINGS,
+    normalizePaperSettings,
+    type GeneratedPaper,
+    type GeneratedPaperHeader,
+    type GeneratedPaperQuestion,
+    type GeneratedPaperSection,
+    type PaperImageSize,
+    type PaperQuestionOption,
+    type PaperSettings,
 } from './paper-layouts/types';
 
 interface Pattern {
@@ -1333,7 +1338,12 @@ export default function GeneratePaper({
     useEffect(() => {
         if (!savedPaper) return;
         isRestoringRef.current = true;
-        setGeneratedPaper(savedPaper.paper);
+        // Backfill / migrate settings: handles the original single-fontFamily
+        // shape and any missing/unrecognized fields.
+        setGeneratedPaper({
+            ...savedPaper.paper,
+            settings: normalizePaperSettings(savedPaper.paper.settings),
+        });
         setQuestionPoolsByType(savedPaper.questionPoolsByType ?? {});
         setQuestionSelection(
             savedPaper.questionSelection ?? {
@@ -1779,6 +1789,7 @@ export default function GeneratePaper({
                     rollNo: '',
                 },
                 sections,
+                settings: { ...DEFAULT_PAPER_SETTINGS },
             });
             setPaperQuestionPickerTarget(null);
         } catch (error) {
@@ -1853,7 +1864,10 @@ export default function GeneratePaper({
     }
 
     function restoreDraft(draft: DraftPayload) {
-        setGeneratedPaper(draft.paper);
+        setGeneratedPaper({
+            ...draft.paper,
+            settings: normalizePaperSettings(draft.paper.settings),
+        });
         setQuestionPoolsByType(draft.questionPoolsByType);
         setQuestionSelection(draft.questionSelection);
         setSelected(deserializeChapterSelection(draft.chapterSelection));
@@ -2111,6 +2125,20 @@ export default function GeneratePaper({
                       header: {
                           ...current.header,
                           [field]: field === 'marks' ? toNumber(value) : value,
+                      },
+                  }
+                : current,
+        );
+    }
+
+    function updatePaperSettings(patch: Partial<PaperSettings>) {
+        setGeneratedPaper((current) =>
+            current
+                ? {
+                      ...current,
+                      settings: {
+                          ...(current.settings ?? DEFAULT_PAPER_SETTINGS),
+                          ...patch,
                       },
                   }
                 : current,
@@ -2925,6 +2953,8 @@ export default function GeneratePaper({
                         onSaveDraftAndBack={() => void saveDraftAndBack()}
                         onDiscardAndBack={discardAndBack}
                         onHeaderChange={updatePaperHeader}
+                        settings={generatedPaper.settings ?? DEFAULT_PAPER_SETTINGS}
+                        onSettingsChange={updatePaperSettings}
                         onAddSection={openAddPaperSectionModal}
                         onQuestionImageSizeChange={updatePaperQuestionImageSize}
                         onQuestionAnswerLinesChange={
@@ -4735,6 +4765,8 @@ function GeneratedPaperView({
     onSaveDraftAndBack,
     onDiscardAndBack,
     onHeaderChange,
+    settings,
+    onSettingsChange,
     onAddSection,
     onEditSection,
     onDeleteSection,
@@ -4771,6 +4803,8 @@ function GeneratedPaperView({
     onSaveDraftAndBack: () => void;
     onDiscardAndBack: () => void;
     onHeaderChange: (field: keyof GeneratedPaperHeader, value: string) => void;
+    settings: PaperSettings;
+    onSettingsChange: (patch: Partial<PaperSettings>) => void;
     onAddSection: () => void;
     onEditSection: (sectionId: string) => void;
     onDeleteSection: (sectionId: string) => void;
@@ -4796,6 +4830,32 @@ function GeneratedPaperView({
     onPickerClose: () => void;
 }) {
     const [isConfirmingBack, setIsConfirmingBack] = useState(false);
+    const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+
+    // Compose a per-character font-family cascade — Latin glyphs get the
+    // English font, Urdu glyphs fall through to the Urdu font automatically.
+    const englishStack: Record<string, string> = {
+        sans: '"Montserrat", system-ui, -apple-system, sans-serif',
+        serif: 'Cambria, Georgia, "Times New Roman", serif',
+        mono: 'ui-monospace, "Cascadia Code", Consolas, "Liberation Mono", monospace',
+    };
+    const urduStack: Record<string, string> = {
+        'jameel-noori':
+            '"Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", "Urdu Typesetting", serif',
+        'noto-nastaliq':
+            '"Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Urdu Typesetting", serif',
+        'mehr-nastaliq':
+            '"Mehr Nastaliq Web", "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif',
+    };
+    const paperShellStyle = {
+        fontFamily: `${englishStack[settings.englishFont]}, ${urduStack[settings.urduFont]}`,
+        '--paper-header-size': `${settings.headerSize}px`,
+        '--paper-header-line-height': settings.headerLineHeight,
+        '--paper-heading-size': `${settings.headingSize}px`,
+        '--paper-heading-line-height': settings.headingLineHeight,
+        '--paper-question-size': `${settings.questionSize}px`,
+        '--paper-question-line-height': settings.questionLineHeight,
+    } as React.CSSProperties;
 
     function handleBackClick() {
         if (savedPaperId !== null && !isDirty) {
@@ -4900,6 +4960,7 @@ function GeneratedPaperView({
 
                 <main
                     data-print-paper
+                    style={paperShellStyle}
                     className="bg-white p-2 text-black shadow-sm shadow-slate-900/10 print:p-0 print:shadow-none"
                 >
                     <ClassicExamHeader
@@ -5016,6 +5077,24 @@ function GeneratedPaperView({
                     onClose={onPickerClose}
                 />
             )}
+
+            {/* Floating right-edge gear → opens the live paper settings drawer. */}
+            <button
+                type="button"
+                onClick={() => setIsSettingsDrawerOpen(true)}
+                aria-label="Open paper settings"
+                title="Paper settings"
+                className="fixed top-1/2 right-3 z-30 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg shadow-slate-900/10 transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700 print:hidden dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-500/40 dark:hover:bg-teal-500/10 dark:hover:text-teal-300"
+            >
+                <SettingsIcon className="size-5" />
+            </button>
+
+            <PaperSettingsDrawer
+                open={isSettingsDrawerOpen}
+                settings={settings}
+                onChange={onSettingsChange}
+                onClose={() => setIsSettingsDrawerOpen(false)}
+            />
         </>
     );
 }
