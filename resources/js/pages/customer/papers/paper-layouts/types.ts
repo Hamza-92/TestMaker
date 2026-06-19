@@ -66,6 +66,12 @@ export interface PaperSettings {
     questionSize: number;
     /** Question line-height (unitless multiplier). */
     questionLineHeight: number;
+    /** Paper border enabled state. */
+    paperBorderEnabled: boolean;
+    /** Paper border width in pixels. */
+    paperBorderWidth: number;
+    /** Paper border style for the paper frame. */
+    paperBorderStyle: 'solid' | 'dashed' | 'dotted';
 }
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
@@ -77,6 +83,9 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     headingLineHeight: 1.5,
     questionSize: 14,
     questionLineHeight: 1.5,
+    paperBorderEnabled: true,
+    paperBorderWidth: 1,
+    paperBorderStyle: 'solid',
 };
 
 const ENGLISH_FONT_VALUES = new Set<PaperEnglishFont>(['sans', 'serif', 'mono']);
@@ -140,6 +149,20 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             typeof source.questionLineHeight === 'number'
                 ? source.questionLineHeight
                 : DEFAULT_PAPER_SETTINGS.questionLineHeight,
+        paperBorderEnabled:
+            typeof source.paperBorderEnabled === 'boolean'
+                ? source.paperBorderEnabled
+                : DEFAULT_PAPER_SETTINGS.paperBorderEnabled,
+        paperBorderWidth:
+            typeof source.paperBorderWidth === 'number'
+                ? source.paperBorderWidth
+                : DEFAULT_PAPER_SETTINGS.paperBorderWidth,
+        paperBorderStyle:
+            source.paperBorderStyle === 'dashed' ||
+            source.paperBorderStyle === 'dotted' ||
+            source.paperBorderStyle === 'solid'
+                ? (source.paperBorderStyle as 'solid' | 'dashed' | 'dotted')
+                : DEFAULT_PAPER_SETTINGS.paperBorderStyle,
     };
 }
 

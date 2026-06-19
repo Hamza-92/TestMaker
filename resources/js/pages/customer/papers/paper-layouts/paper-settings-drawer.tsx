@@ -20,6 +20,7 @@ import type {
     PaperSettings,
     PaperUrduFont,
 } from './types';
+import { DEFAULT_PAPER_SETTINGS } from './types';
 
 interface PaperSettingsDrawerProps {
     open: boolean;
@@ -80,6 +81,12 @@ const SIZE_BOUNDS = {
     question: { min: 10, max: 24 },
 };
 
+const BORDER_STYLE_OPTIONS = [
+    { value: 'solid', label: 'Solid', previewFontFamily: 'inherit' },
+    { value: 'dashed', label: 'Dashed', previewFontFamily: 'inherit' },
+    { value: 'dotted', label: 'Dotted', previewFontFamily: 'inherit' },
+] as const;
+
 const LINE_HEIGHT_BOUNDS = { min: 1, max: 3 };
 
 export function PaperSettingsDrawer({
@@ -99,6 +106,13 @@ export function PaperSettingsDrawer({
 
         return () => window.removeEventListener('keydown', onKey);
     }, [open, onClose]);
+
+    const paperBorderEnabled =
+        settings.paperBorderEnabled ?? DEFAULT_PAPER_SETTINGS.paperBorderEnabled;
+    const paperBorderWidth =
+        settings.paperBorderWidth ?? DEFAULT_PAPER_SETTINGS.paperBorderWidth;
+    const paperBorderStyle =
+        settings.paperBorderStyle ?? DEFAULT_PAPER_SETTINGS.paperBorderStyle;
 
     return (
         <>
@@ -137,7 +151,7 @@ export function PaperSettingsDrawer({
                     {/* ── Fonts — English + Urdu, separate searchable pickers ── */}
                     <Group title="Font Family">
                         <div className="space-y-3 grid grid-cols-2 gap-2">
-                            <div class="mb-0">
+                            <div className="mb-0">
                                 <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                     English
                                 </p>
@@ -149,7 +163,7 @@ export function PaperSettingsDrawer({
                                     }
                                 />
                             </div>
-                            <div class="mb-0">
+                            <div className="mb-0">
                                 <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                     Urdu
                                 </p>
@@ -212,6 +226,53 @@ export function PaperSettingsDrawer({
                                 step={0.1}
                                 onChange={(v) => onChange({ questionLineHeight: v })}
                             />
+                        </div>
+                    </Group>
+
+                    {/* ── Border Layout ── */}
+                    <Group title="Paper Borders">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    Show Border
+                                </p>
+                                <label className="inline-flex w-full cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
+                                    <input
+                                        type="checkbox"
+                                        checked={paperBorderEnabled}
+                                        onChange={(event) =>
+                                            onChange({
+                                                paperBorderEnabled:
+                                                    event.target.checked,
+                                            })
+                                        }
+                                        className="mr-2 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                    />
+                                    Enabled
+                                </label>
+                            </div>
+                            <LabeledStepper
+                                label="Border Width"
+                                value={paperBorderWidth}
+                                min={0}
+                                max={10}
+                                step={0.5}
+                                onChange={(v) => onChange({ paperBorderWidth: v })}
+                            />
+                            <div className="col-span-2">
+                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    Border Style
+                                </p>
+                                <FontPicker
+                                    value={paperBorderStyle}
+                                    options={BORDER_STYLE_OPTIONS}
+                                    onChange={(value) =>
+                                        onChange({
+                                            paperBorderStyle: value,
+                                        })
+                                    }
+                                />
+                            </div>
                         </div>
                     </Group>
                 </div>
