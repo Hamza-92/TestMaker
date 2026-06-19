@@ -179,6 +179,7 @@ export function PaperSettingsDrawer({
                                 value={settings.headerLineHeight}
                                 min={LINE_HEIGHT_BOUNDS.min}
                                 max={LINE_HEIGHT_BOUNDS.max}
+                                step={0.1}
                                 onChange={(v) => onChange({ headerLineHeight: v })}
                             />
                             <LabeledStepper
@@ -193,6 +194,7 @@ export function PaperSettingsDrawer({
                                 value={settings.headingLineHeight}
                                 min={LINE_HEIGHT_BOUNDS.min}
                                 max={LINE_HEIGHT_BOUNDS.max}
+                                step={0.1}
                                 onChange={(v) => onChange({ headingLineHeight: v })}
                             />
                             <LabeledStepper
@@ -207,6 +209,7 @@ export function PaperSettingsDrawer({
                                 value={settings.questionLineHeight}
                                 min={LINE_HEIGHT_BOUNDS.min}
                                 max={LINE_HEIGHT_BOUNDS.max}
+                                step={0.1}
                                 onChange={(v) => onChange({ questionLineHeight: v })}
                             />
                         </div>
@@ -239,20 +242,30 @@ function LabeledStepper({
     value,
     min,
     max,
+    step = 1,
     onChange,
 }: {
     label: string;
     value: number;
     min: number;
     max: number;
+    step?: number;
     onChange: (next: number) => void;
 }) {
-    const canDecrement = value > min;
-    const canIncrement = value < max;
+    const precision = Number.isFinite(step) && step < 1 ? -Math.floor(Math.log10(step)) : 0;
+    const factor = 10 ** precision;
+
+    function roundToStep(next: number) {
+        if (precision === 0) return Math.round(next);
+        return Math.round(next * factor) / factor;
+    }
 
     function clamp(next: number) {
-        return Math.min(Math.max(next, min), max);
+        return Math.min(Math.max(roundToStep(next), min), max);
     }
+
+    const canDecrement = value > min;
+    const canIncrement = value < max;
 
     return (
         <div>
@@ -262,7 +275,7 @@ function LabeledStepper({
             <div className="flex h-10 items-stretch overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
                 <StepperButton
                     disabled={!canDecrement}
-                    onClick={() => onChange(clamp(value - 1))}
+                    onClick={() => onChange(clamp(value - step))}
                     aria-label={`Decrease ${label.toLowerCase()} size`}
                 >
                     <MinusIcon className="size-3.5" />
@@ -274,6 +287,7 @@ function LabeledStepper({
                     value={value}
                     min={min}
                     max={max}
+                    step={step}
                     onChange={(event) => {
                         const next = Number(event.target.value);
                         if (Number.isFinite(next)) onChange(clamp(next));
@@ -283,7 +297,7 @@ function LabeledStepper({
 
                 <StepperButton
                     disabled={!canIncrement}
-                    onClick={() => onChange(clamp(value + 1))}
+                    onClick={() => onChange(clamp(value + step))}
                     aria-label={`Increase ${label.toLowerCase()} size`}
                 >
                     <PlusIcon className="size-3.5" />
