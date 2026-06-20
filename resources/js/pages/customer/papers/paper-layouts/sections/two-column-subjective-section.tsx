@@ -1,14 +1,17 @@
 import { QuestionContent } from '../questions/question-content';
+import { formatQuestionLabel } from '../types';
 import type {
     GeneratedPaperQuestion,
     GeneratedPaperSection,
     PaperImageSize,
+    PaperQuestionNumberingFormat,
 } from '../types';
 import { QuestionHoverActions, SectionControls } from './section-actions';
 
 interface TwoColumnSubjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
+    numberingFormat: PaperQuestionNumberingFormat;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;
@@ -33,24 +36,10 @@ interface TwoColumnSubjectiveSectionProps {
     ) => void;
 }
 
-const roman = [
-    'i',
-    'ii',
-    'iii',
-    'iv',
-    'v',
-    'vi',
-    'vii',
-    'viii',
-    'ix',
-    'x',
-    'xi',
-    'xii',
-];
-
 export function TwoColumnSubjectiveSection({
     section,
     index,
+    numberingFormat,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -68,39 +57,48 @@ export function TwoColumnSubjectiveSection({
 }: TwoColumnSubjectiveSectionProps) {
     return (
         <section className="paper-section">
-            <div className="border border-black text-black">
+            {/* Heading is a standalone box — border on all 4 sides controlled by --paper-heading-border-*. */}
+            <div
+                data-paper-heading
+                className="grid grid-cols-[3rem_1fr_8rem] text-sm font-bold"
+            >
+                <div data-paper-heading-divider className="px-1 py-1">
+                    Q.{index + 1}
+                </div>
+                <div data-paper-heading-divider className="px-2 py-1">
+                    {section.title}
+                </div>
                 <div
-                    data-paper-heading
-                    className="grid grid-cols-[3rem_1fr_8rem] border-b border-black text-sm font-bold"
+                    data-paper-heading-divider
+                    className="px-2 py-1 text-right"
                 >
-                    <div className="border-r border-black px-1 py-1">
-                        Q.{index + 1}
-                    </div>
-                    <div className="px-2 py-1">{section.title}</div>
-                    <div className="border-l border-black px-2 py-1 text-right">
-                        ({section.requiredQuestions}x{section.marksEach}=
-                        {section.requiredQuestions * section.marksEach})
-                    </div>
+                    ({section.requiredQuestions}x{section.marksEach}=
+                    {section.requiredQuestions * section.marksEach})
                 </div>
+            </div>
 
-                <div className="grid gap-x-8 gap-y-2 px-4 py-3 md:grid-cols-2">
-                    {section.questions.map((question, questionIndex) => (
-                        <SubjectiveQuestionItem
-                            key={question.id}
-                            question={question}
-                            index={questionIndex}
-                            section={section}
-                            onEditQuestion={onEditQuestion}
-                            onRandomQuestion={onRandomQuestion}
-                            onPickQuestion={onPickQuestion}
-                            onRemoveQuestion={onRemoveQuestion}
-                            onAnswerLinesChange={onAnswerLinesChange}
-                            onQuestionImageSizeChange={
-                                onQuestionImageSizeChange
-                            }
-                        />
-                    ))}
-                </div>
+            {/* Question container — border on all 4 sides; subjective items sit
+                in a 2-column grid (no inter-row dividers — collapsed-table mode
+                only applies to the "stacked" group variant). */}
+            <div
+                data-paper-question-group="grid"
+                className="grid gap-x-8 gap-y-2 px-4 py-3 md:grid-cols-2"
+            >
+                {section.questions.map((question, questionIndex) => (
+                    <SubjectiveQuestionItem
+                        key={question.id}
+                        question={question}
+                        index={questionIndex}
+                        numberingFormat={numberingFormat}
+                        section={section}
+                        onEditQuestion={onEditQuestion}
+                        onRandomQuestion={onRandomQuestion}
+                        onPickQuestion={onPickQuestion}
+                        onRemoveQuestion={onRemoveQuestion}
+                        onAnswerLinesChange={onAnswerLinesChange}
+                        onQuestionImageSizeChange={onQuestionImageSizeChange}
+                    />
+                ))}
             </div>
             <SectionControls
                 canMoveUp={canMoveUp}
@@ -120,6 +118,7 @@ export function TwoColumnSubjectiveSection({
 function SubjectiveQuestionItem({
     question,
     index,
+    numberingFormat,
     section,
     onEditQuestion,
     onRandomQuestion,
@@ -130,6 +129,7 @@ function SubjectiveQuestionItem({
 }: {
     question: GeneratedPaperQuestion;
     index: number;
+    numberingFormat: PaperQuestionNumberingFormat;
     section: GeneratedPaperSection;
     onEditQuestion: (sectionId: string, questionId: string) => void;
     onRandomQuestion: (sectionId: string, questionId: string) => void;
@@ -152,7 +152,7 @@ function SubjectiveQuestionItem({
             className="group/question relative flex gap-3 pr-28 text-sm leading-6"
         >
             <span className="w-8 shrink-0 font-bold">
-                ({roman[index] ?? index + 1})
+                ({formatQuestionLabel(index, numberingFormat, 'roman')})
             </span>
             <div className="min-w-0 flex-1">
                 <QuestionContent value={question.text} />

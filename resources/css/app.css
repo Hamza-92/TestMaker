@@ -273,6 +273,8 @@ input[type='date']::-webkit-calendar-picker-indicator {
 /* CSS variables on [data-print-paper] are written by the React component.
    The `*` selector forces nested Tailwind text-utility classes to inherit
    instead of overriding our user-chosen size. */
+/* ── HEADER ────────────────────────────────────────────────────────────── */
+/* Font sizing (already in place from the typography work). */
 [data-print-paper] [data-paper-header] {
     font-size: var(--paper-header-size, 0.875rem);
     line-height: var(--paper-header-line-height, 1.5);
@@ -282,13 +284,85 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: inherit;
 }
 
+/* Outer frame of the exam header block (school + fields). The configured
+   width/style applies to all four sides; width=0 removes the frame entirely. */
+[data-print-paper] [data-paper-header-frame] {
+    border-width: var(--paper-header-border-width, 2px);
+    border-style: var(--paper-header-border-style, solid);
+    border-color: currentColor;
+}
+
+/* All internal dividers (logo separator, between field columns, between field
+   rows, between label/value cells) follow the same header border setting, so
+   setting width=0 wipes the entire header out — not just the outer frame. */
+[data-print-paper]
+    [data-paper-header-frame]
+    [data-paper-header-divider~='r']:not(:last-child) {
+    border-right-width: var(--paper-header-border-width, 2px);
+    border-right-style: var(--paper-header-border-style, solid);
+    border-right-color: currentColor;
+}
+[data-print-paper]
+    [data-paper-header-frame]
+    [data-paper-header-divider~='b']:not(:last-child) {
+    border-bottom-width: var(--paper-header-border-width, 2px);
+    border-bottom-style: var(--paper-header-border-style, solid);
+    border-bottom-color: currentColor;
+}
+
+/* ── HEADING (section "Q.1 Title (5×1=5)" row) ─────────────────────────── */
+/* Standalone bordered block — all 4 sides controlled by --paper-heading-border-*. */
 [data-print-paper] [data-paper-heading] {
     font-size: var(--paper-heading-size, 0.875rem);
     line-height: var(--paper-heading-line-height, 1.5);
+    border-width: var(--paper-heading-border-width, 1px);
+    border-style: var(--paper-heading-border-style, solid);
+    border-color: currentColor;
 }
 [data-print-paper] [data-paper-heading] * {
     font-size: inherit;
     line-height: inherit;
+}
+/* Internal column dividers inside the heading row use the same heading border. */
+[data-print-paper]
+    [data-paper-heading]
+    [data-paper-heading-divider]:not(:last-child) {
+    border-right-width: var(--paper-heading-border-width, 1px);
+    border-right-style: var(--paper-heading-border-style, solid);
+    border-right-color: currentColor;
+}
+
+/* ── QUESTIONS ─────────────────────────────────────────────────────────── */
+/* The question container is bordered on all 4 sides; collapsed-table style
+   means individual rows only need bottom dividers, with the last row's bottom
+   merging into the container's own bottom border. */
+[data-print-paper] [data-paper-question-group] {
+    border-width: var(--paper-question-border-width, 1px);
+    border-style: var(--paper-question-border-style, solid);
+    border-color: currentColor;
+}
+
+/* Stacked layout (objective): inter-row dividers. */
+[data-print-paper]
+    [data-paper-question-group='stacked']
+    > [data-paper-question]:not(:last-child) {
+    border-bottom-width: var(--paper-question-border-width, 1px);
+    border-bottom-style: var(--paper-question-border-style, solid);
+    border-bottom-color: currentColor;
+}
+
+/* Question text (both layouts) — font sizing only; subjective grid layout
+   intentionally has no inter-item border. */
+[data-print-paper] [data-paper-question-divider~='r']:not(:last-child) {
+    border-right-width: var(--paper-question-border-width, 1px);
+    border-right-style: var(--paper-question-border-style, solid);
+    border-right-color: currentColor;
+}
+
+[data-print-paper] [data-paper-question-divider~='t'] {
+    border-top-width: var(--paper-question-border-width, 1px);
+    border-top-style: var(--paper-question-border-style, solid);
+    border-top-color: currentColor;
 }
 
 [data-print-paper] [data-paper-question] {
@@ -301,9 +375,8 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 @media print {
-    @page {
-        margin: 8mm;
-    }
+    /* The @page size/margin rule is injected per-paper by the React component
+       so it can react to the user's paper-size + margin settings. */
 
     body:has([data-print-paper]),
     body:has([data-print-paper]) #app {
@@ -338,7 +411,6 @@ input[type='date']::-webkit-calendar-picker-indicator {
         max-width: none !important;
         margin: 0 !important;
         padding: 0 !important;
-        color: #000 !important;
         background: #fff !important;
         box-shadow: none !important;
     }

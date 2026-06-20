@@ -1,14 +1,17 @@
 import { QuestionContent } from '../questions/question-content';
+import { formatQuestionLabel } from '../types';
 import type {
     GeneratedPaperQuestion,
     GeneratedPaperSection,
     PaperImageSize,
+    PaperQuestionNumberingFormat,
 } from '../types';
 import { QuestionHoverActions, SectionControls } from './section-actions';
 
 interface BoxedObjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
+    numberingFormat: PaperQuestionNumberingFormat;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;
@@ -38,6 +41,7 @@ const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
 export function BoxedObjectiveSection({
     section,
     index,
+    numberingFormat,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -55,39 +59,44 @@ export function BoxedObjectiveSection({
 }: BoxedObjectiveSectionProps) {
     return (
         <section className="paper-section">
-            <div className="border border-black text-black">
+            {/* Heading is a standalone box — border on all 4 sides controlled by --paper-heading-border-*. */}
+            <div
+                data-paper-heading
+                className="grid grid-cols-[3rem_1fr_8rem] text-sm font-bold"
+            >
+                <div data-paper-heading-divider className="px-1 py-1">
+                    Q.{index + 1}
+                </div>
+                <div data-paper-heading-divider className="px-2 py-1">
+                    {section.title}
+                </div>
                 <div
-                    data-paper-heading
-                    className="grid grid-cols-[3rem_1fr_8rem] border-b border-black text-sm font-bold"
+                    data-paper-heading-divider
+                    className="px-2 py-1 text-right"
                 >
-                    <div className="border-r border-black px-1 py-1">
-                        Q.{index + 1}
-                    </div>
-                    <div className="px-2 py-1">{section.title}</div>
-                    <div className="border-l border-black px-2 py-1 text-right">
-                        ({section.requiredQuestions}x{section.marksEach}=
-                        {section.requiredQuestions * section.marksEach})
-                    </div>
+                    ({section.requiredQuestions}x{section.marksEach}=
+                    {section.requiredQuestions * section.marksEach})
                 </div>
+            </div>
 
-                <div>
-                    {section.questions.map((question, questionIndex) => (
-                        <ObjectiveQuestionRow
-                            key={question.id}
-                            question={question}
-                            index={questionIndex}
-                            section={section}
-                            onEditQuestion={onEditQuestion}
-                            onRandomQuestion={onRandomQuestion}
-                            onPickQuestion={onPickQuestion}
-                            onRemoveQuestion={onRemoveQuestion}
-                            onAnswerLinesChange={onAnswerLinesChange}
-                            onQuestionImageSizeChange={
-                                onQuestionImageSizeChange
-                            }
-                        />
-                    ))}
-                </div>
+            {/* Question container — border on all 4 sides; question rows act as
+                collapsed-table rows, sharing one divider between each. */}
+            <div data-paper-question-group="stacked">
+                {section.questions.map((question, questionIndex) => (
+                    <ObjectiveQuestionRow
+                        key={question.id}
+                        question={question}
+                        index={questionIndex}
+                        numberingFormat={numberingFormat}
+                        section={section}
+                        onEditQuestion={onEditQuestion}
+                        onRandomQuestion={onRandomQuestion}
+                        onPickQuestion={onPickQuestion}
+                        onRemoveQuestion={onRemoveQuestion}
+                        onAnswerLinesChange={onAnswerLinesChange}
+                        onQuestionImageSizeChange={onQuestionImageSizeChange}
+                    />
+                ))}
             </div>
             <SectionControls
                 canMoveUp={canMoveUp}
@@ -107,6 +116,7 @@ export function BoxedObjectiveSection({
 function ObjectiveQuestionRow({
     question,
     index,
+    numberingFormat,
     section,
     onEditQuestion,
     onRandomQuestion,
@@ -117,6 +127,7 @@ function ObjectiveQuestionRow({
 }: {
     question: GeneratedPaperQuestion;
     index: number;
+    numberingFormat: PaperQuestionNumberingFormat;
     section: GeneratedPaperSection;
     onEditQuestion: (sectionId: string, questionId: string) => void;
     onRandomQuestion: (sectionId: string, questionId: string) => void;
@@ -136,13 +147,13 @@ function ObjectiveQuestionRow({
     const options = question.options.slice(0, 4);
 
     return (
-        <div
-            data-paper-question
-            className="group/question relative border-b border-black last:border-b-0"
-        >
+        <div data-paper-question className="group/question relative">
             <div className="grid grid-cols-[3rem_1fr] text-sm">
-                <div className="border-r border-black px-2 py-1 text-center font-bold">
-                    {index + 1}
+                <div
+                    data-paper-question-divider="r"
+                    className="px-2 py-1 text-center font-bold"
+                >
+                    {formatQuestionLabel(index, numberingFormat, 'numeric')}
                 </div>
                 <QuestionContent
                     value={question.text}
@@ -151,7 +162,7 @@ function ObjectiveQuestionRow({
             </div>
 
             {question.imageUrl && (
-                <div className="border-t border-black px-12 py-2">
+                <div data-paper-question-divider="t" className="px-12 py-2">
                     <img
                         src={question.imageUrl}
                         alt=""
@@ -185,11 +196,15 @@ function ObjectiveQuestionRow({
             )}
 
             {options.length > 0 && (
-                <div className="grid grid-cols-4 border-t border-black text-sm">
+                <div
+                    data-paper-question-divider="t"
+                    className="grid grid-cols-4 text-sm"
+                >
                     {options.map((option, optionIndex) => (
                         <div
                             key={option.id}
-                            className="border-r border-black px-2 py-1 last:border-r-0"
+                            data-paper-question-divider="r"
+                            className="px-2 py-1"
                         >
                             <span className="font-semibold">
                                 ({optionLabels[optionIndex]})

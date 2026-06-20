@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
+import type { Auth } from '@/types/auth';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
@@ -42,6 +43,7 @@ import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
 import { TwoColumnSubjectiveSection } from './paper-layouts/sections/two-column-subjective-section';
 import {
     DEFAULT_PAPER_SETTINGS,
+    getPageDimensions,
     normalizePaperSettings,
     type GeneratedPaper,
     type GeneratedPaperHeader,
@@ -721,6 +723,24 @@ function draftTimeAgo(timestamp: number): string {
     return `${Math.floor(hours / 24)}d ago`;
 }
 
+function storageAssetUrl(value: unknown): string {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    const path = value.trim();
+
+    if (path === '') {
+        return '';
+    }
+
+    if (/^(https?:|data:|blob:)/i.test(path) || path.startsWith('/')) {
+        return path;
+    }
+
+    return `/storage/${path}`;
+}
+
 export default function GeneratePaper({
     patterns,
     patternClasses,
@@ -728,6 +748,8 @@ export default function GeneratePaper({
     sourceOptions,
     savedPaper,
 }: Props) {
+    const { auth } = usePage().props as { auth: Auth };
+    const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
     const sourceFilters = useMemo(
         () => normalizeSourceOptions(sourceOptions),
         [sourceOptions],
@@ -793,9 +815,9 @@ export default function GeneratePaper({
             sections: [],
             totalMarks: 0,
         });
-    const [draftStatus, setDraftStatus] = useState<
-        'idle' | 'saving' | 'saved'
-    >('idle');
+    const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>(
+        'idle',
+    );
     const [recoveryDraft, setRecoveryDraft] = useState<DraftPayload | null>(
         null,
     );
@@ -1899,9 +1921,7 @@ export default function GeneratePaper({
             clearDraft();
             toast.success('Draft saved');
         } else {
-            toast.error(
-                savePaperError ?? 'Could not save draft. Try again.',
-            );
+            toast.error(savePaperError ?? 'Could not save draft. Try again.');
         }
     }
 
@@ -1937,8 +1957,11 @@ export default function GeneratePaper({
         }
 
         const csrfToken =
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                ?.content ?? '';
+            (
+                document.querySelector(
+                    'meta[name="csrf-token"]',
+                ) as HTMLMetaElement
+            )?.content ?? '';
 
         const payload = {
             name: defaultPaperName() || 'Untitled Draft',
@@ -2018,8 +2041,11 @@ export default function GeneratePaper({
         setSavePaperError(null);
 
         const csrfToken =
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
-                ?.content ?? '';
+            (
+                document.querySelector(
+                    'meta[name="csrf-token"]',
+                ) as HTMLMetaElement
+            )?.content ?? '';
 
         const updatedPaper: GeneratedPaper = {
             ...generatedPaper,
@@ -2094,7 +2120,9 @@ export default function GeneratePaper({
             clearDraft();
         } catch (error) {
             setSavePaperError(
-                error instanceof Error ? error.message : 'Failed to save paper.',
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to save paper.',
             );
         } finally {
             setIsSavingPaper(false);
@@ -2136,8 +2164,12 @@ export default function GeneratePaper({
             current
                 ? {
                       ...current,
+                      // Spread DEFAULT first so any field missing from an
+                      // older in-memory settings object gets backfilled, then
+                      // the loaded settings, then the patch wins.
                       settings: {
-                          ...(current.settings ?? DEFAULT_PAPER_SETTINGS),
+                          ...DEFAULT_PAPER_SETTINGS,
+                          ...(current.settings ?? {}),
                           ...patch,
                       },
                   }
@@ -2902,7 +2934,7 @@ export default function GeneratePaper({
             {generatedPaper ? (
                 <>
                     {recoveryDraft && (
-                        <div className="mx-auto mb-3 flex max-w-[76rem] flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 print:hidden dark:border-amber-500/30 dark:bg-amber-500/10">
+                        <div className="mx-auto mb-3 flex max-w-[76rem] flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10 print:hidden">
                             <div className="flex items-center gap-3">
                                 <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
                                     <ClockIcon className="size-4" />
@@ -2938,6 +2970,7 @@ export default function GeneratePaper({
                     <GeneratedPaperView
                         paper={generatedPaper}
                         totalMarks={paperTotalMarks(generatedPaper)}
+                        defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                         pickerTarget={activePaperPickerContext}
                         pickerQuestions={filteredPaperPickerQuestions}
                         pickerSearch={paperQuestionSearch}
@@ -2947,13 +2980,18 @@ export default function GeneratePaper({
                         isDirty={isDirty}
                         isSavingPaper={isSavingPaper}
                         isSavingDraft={isSavingDraft}
-                        onOpenSavePaperModal={() => setIsSavePaperModalOpen(true)}
+                        onOpenSavePaperModal={() =>
+                            setIsSavePaperModalOpen(true)
+                        }
                         onSaveDraft={() => void saveAsDraft()}
                         onGoBack={returnToPaperSetup}
                         onSaveDraftAndBack={() => void saveDraftAndBack()}
                         onDiscardAndBack={discardAndBack}
                         onHeaderChange={updatePaperHeader}
-                        settings={generatedPaper.settings ?? DEFAULT_PAPER_SETTINGS}
+                        settings={{
+                            ...DEFAULT_PAPER_SETTINGS,
+                            ...(generatedPaper.settings ?? {}),
+                        }}
                         onSettingsChange={updatePaperSettings}
                         onAddSection={openAddPaperSectionModal}
                         onQuestionImageSizeChange={updatePaperQuestionImageSize}
@@ -3054,7 +3092,9 @@ export default function GeneratePaper({
                                             {recoveryDraft.meta.klass.label}{' '}
                                             &middot;{' '}
                                             <ClockIcon className="mb-0.5 inline size-3" />{' '}
-                                            {draftTimeAgo(recoveryDraft.savedAt)}
+                                            {draftTimeAgo(
+                                                recoveryDraft.savedAt,
+                                            )}
                                         </p>
                                     </div>
                                 </div>
@@ -4750,6 +4790,7 @@ function EmptyQuestionState({
 function GeneratedPaperView({
     paper,
     totalMarks,
+    defaultWatermarkLogoUrl,
     pickerTarget,
     pickerQuestions,
     pickerSearch,
@@ -4785,6 +4826,7 @@ function GeneratedPaperView({
 }: {
     paper: GeneratedPaper;
     totalMarks: number;
+    defaultWatermarkLogoUrl: string;
     pickerTarget: {
         section: GeneratedPaperSection;
         question: GeneratedPaperQuestion;
@@ -4847,15 +4889,74 @@ function GeneratedPaperView({
         'mehr-nastaliq':
             '"Mehr Nastaliq Web", "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif',
     };
+    const pageDims = getPageDimensions(
+        settings.paperSize,
+        settings.orientation,
+    );
     const paperShellStyle = {
         fontFamily: `${englishStack[settings.englishFont]}, ${urduStack[settings.urduFont]}`,
+        color: settings.textColor,
+        width: `${pageDims.width}mm`,
+        minHeight: `${pageDims.height}mm`,
+        paddingTop: `${settings.marginTop}mm`,
+        paddingRight: `${settings.marginRight}mm`,
+        paddingBottom: `${settings.marginBottom}mm`,
+        paddingLeft: `${settings.marginLeft}mm`,
         '--paper-header-size': `${settings.headerSize}px`,
         '--paper-header-line-height': settings.headerLineHeight,
         '--paper-heading-size': `${settings.headingSize}px`,
         '--paper-heading-line-height': settings.headingLineHeight,
         '--paper-question-size': `${settings.questionSize}px`,
         '--paper-question-line-height': settings.questionLineHeight,
+        '--paper-header-border-width': `${settings.headerBorderWidth}px`,
+        '--paper-header-border-style': settings.headerBorderStyle,
+        '--paper-heading-border-width': `${settings.headingBorderWidth}px`,
+        '--paper-heading-border-style': settings.headingBorderStyle,
+        '--paper-question-border-width': `${settings.questionBorderWidth}px`,
+        '--paper-question-border-style': settings.questionBorderStyle,
     } as React.CSSProperties;
+
+    // ── Print-time @page rules ────────────────────────────────────────────
+    // React 19 hoists this <style> to <head>, so it wins over the print
+    // fallback in app.css whenever a paper is on screen.
+    const pageNumberContent = (() => {
+        if (!settings.pageNumbersEnabled) return null;
+        if (settings.pageNumberFormat === 'n-of-m') {
+            return '"" counter(page) " of " counter(pages)';
+        }
+        if (settings.pageNumberFormat === 'page-n') {
+            return '"Page " counter(page)';
+        }
+        return 'counter(page)';
+    })();
+    const pageNumberSlot = (() => {
+        if (settings.pageNumberPosition === 'header-right') {
+            return '@top-right';
+        }
+
+        if (settings.pageNumberPosition === 'footer-right') {
+            return '@bottom-right';
+        }
+
+        return '@bottom-center';
+    })();
+    const pageRule = [
+        `@page { size: ${pageDims.width}mm ${pageDims.height}mm; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm;`,
+        pageNumberContent
+            ? `${pageNumberSlot} { content: ${pageNumberContent}; font-size: 10pt; }`
+            : '',
+        '}',
+    ].join(' ');
+
+    const watermarkOpacity =
+        Math.max(0, Math.min(100, settings.watermarkOpacity)) / 100;
+    const activeWatermarkLogoUrl =
+        settings.watermarkLogoUrl.trim() || defaultWatermarkLogoUrl;
+    const shouldShowTextWatermark =
+        settings.watermarkType === 'text' &&
+        settings.watermarkText.trim() !== '';
+    const shouldShowLogoWatermark =
+        settings.watermarkType === 'logo' && activeWatermarkLogoUrl !== '';
 
     function handleBackClick() {
         if (savedPaperId !== null && !isDirty) {
@@ -4958,82 +5059,153 @@ function GeneratedPaperView({
                     </div>
                 </div>
 
+                <style>{pageRule}</style>
+                {/* Print-only repeat-header rule. With `position: fixed`,
+                    Chromium-based browsers re-paint the element at the top of
+                    every printed page. The padding-top on main keeps the
+                    first-page content from sliding under the fixed header. */}
+                {settings.repeatHeaderOnEachPage && (
+                    <style>{`@media print {
+                        [data-paper-header-frame] {
+                            position: fixed;
+                            top: 0;
+                            left: ${settings.marginLeft}mm;
+                            right: ${settings.marginRight}mm;
+                            background: #fff;
+                            z-index: 10;
+                        }
+                    }`}</style>
+                )}
                 <main
                     data-print-paper
                     style={paperShellStyle}
-                    className="bg-white p-2 text-black shadow-sm shadow-slate-900/10 print:p-0 print:shadow-none"
+                    className="relative mx-auto overflow-hidden bg-white shadow-sm shadow-slate-900/10 print:overflow-visible print:shadow-none"
                 >
-                    <ClassicExamHeader
-                        header={{
-                            ...paper.header,
-                            marks: totalMarks,
-                        }}
-                        onChange={onHeaderChange}
-                    />
-                    <div className="mt-1 space-y-1">
-                        {paper.sections.map((section, sectionIndex) =>
-                            section.category === 'Objective Questions' ? (
-                                <BoxedObjectiveSection
-                                    key={section.id}
-                                    section={section}
-                                    index={sectionIndex}
-                                    canMoveUp={sectionIndex > 0}
-                                    canMoveDown={
-                                        sectionIndex < paper.sections.length - 1
-                                    }
-                                    onEditSection={onEditSection}
-                                    onDeleteSection={onDeleteSection}
-                                    onMoveUp={(sectionId) =>
-                                        onMoveSection(sectionId, -1)
-                                    }
-                                    onMoveDown={(sectionId) =>
-                                        onMoveSection(sectionId, 1)
-                                    }
-                                    onAddRandomQuestion={onAddRandomQuestion}
-                                    onAddCustomQuestion={onAddCustomQuestion}
-                                    onEditQuestion={onEditQuestion}
-                                    onRandomQuestion={onRandomQuestion}
-                                    onPickQuestion={onPickQuestion}
-                                    onRemoveQuestion={onRemoveQuestion}
-                                    onAnswerLinesChange={
-                                        onQuestionAnswerLinesChange
-                                    }
-                                    onQuestionImageSizeChange={
-                                        onQuestionImageSizeChange
-                                    }
-                                />
+                    {/* Watermark — sits behind everything; hidden when inactive. */}
+                    {(shouldShowTextWatermark || shouldShowLogoWatermark) && (
+                        <div
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
+                            style={{
+                                opacity: watermarkOpacity,
+                            }}
+                        >
+                            {shouldShowTextWatermark ? (
+                                <span
+                                    className="text-center font-bold uppercase select-none"
+                                    style={{
+                                        fontSize: '5.5rem',
+                                        transform: 'rotate(-30deg)',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {settings.watermarkText}
+                                </span>
                             ) : (
-                                <TwoColumnSubjectiveSection
-                                    key={section.id}
-                                    section={section}
-                                    index={sectionIndex}
-                                    canMoveUp={sectionIndex > 0}
-                                    canMoveDown={
-                                        sectionIndex < paper.sections.length - 1
-                                    }
-                                    onEditSection={onEditSection}
-                                    onDeleteSection={onDeleteSection}
-                                    onMoveUp={(sectionId) =>
-                                        onMoveSection(sectionId, -1)
-                                    }
-                                    onMoveDown={(sectionId) =>
-                                        onMoveSection(sectionId, 1)
-                                    }
-                                    onAddRandomQuestion={onAddRandomQuestion}
-                                    onAddCustomQuestion={onAddCustomQuestion}
-                                    onEditQuestion={onEditQuestion}
-                                    onRandomQuestion={onRandomQuestion}
-                                    onPickQuestion={onPickQuestion}
-                                    onRemoveQuestion={onRemoveQuestion}
-                                    onAnswerLinesChange={
-                                        onQuestionAnswerLinesChange
-                                    }
-                                    onQuestionImageSizeChange={
-                                        onQuestionImageSizeChange
-                                    }
+                                <img
+                                    src={activeWatermarkLogoUrl}
+                                    alt=""
+                                    draggable={false}
+                                    className="max-h-[45%] max-w-[45%] object-contain select-none"
                                 />
-                            ),
-                        )}
+                            )}
+                        </div>
+                    )}
+                    <div className="relative z-10">
+                        <ClassicExamHeader
+                            header={{
+                                ...paper.header,
+                                marks: totalMarks,
+                            }}
+                            onChange={onHeaderChange}
+                        />
+                        <div
+                            className="flex flex-col"
+                            style={{
+                                marginTop: `${settings.sectionSpacing}mm`,
+                                gap: `${settings.sectionSpacing}mm`,
+                            }}
+                        >
+                            {paper.sections.map((section, sectionIndex) =>
+                                section.category === 'Objective Questions' ? (
+                                    <BoxedObjectiveSection
+                                        key={section.id}
+                                        section={section}
+                                        index={sectionIndex}
+                                        numberingFormat={
+                                            settings.questionNumberingFormat
+                                        }
+                                        canMoveUp={sectionIndex > 0}
+                                        canMoveDown={
+                                            sectionIndex <
+                                            paper.sections.length - 1
+                                        }
+                                        onEditSection={onEditSection}
+                                        onDeleteSection={onDeleteSection}
+                                        onMoveUp={(sectionId) =>
+                                            onMoveSection(sectionId, -1)
+                                        }
+                                        onMoveDown={(sectionId) =>
+                                            onMoveSection(sectionId, 1)
+                                        }
+                                        onAddRandomQuestion={
+                                            onAddRandomQuestion
+                                        }
+                                        onAddCustomQuestion={
+                                            onAddCustomQuestion
+                                        }
+                                        onEditQuestion={onEditQuestion}
+                                        onRandomQuestion={onRandomQuestion}
+                                        onPickQuestion={onPickQuestion}
+                                        onRemoveQuestion={onRemoveQuestion}
+                                        onAnswerLinesChange={
+                                            onQuestionAnswerLinesChange
+                                        }
+                                        onQuestionImageSizeChange={
+                                            onQuestionImageSizeChange
+                                        }
+                                    />
+                                ) : (
+                                    <TwoColumnSubjectiveSection
+                                        key={section.id}
+                                        section={section}
+                                        index={sectionIndex}
+                                        numberingFormat={
+                                            settings.questionNumberingFormat
+                                        }
+                                        canMoveUp={sectionIndex > 0}
+                                        canMoveDown={
+                                            sectionIndex <
+                                            paper.sections.length - 1
+                                        }
+                                        onEditSection={onEditSection}
+                                        onDeleteSection={onDeleteSection}
+                                        onMoveUp={(sectionId) =>
+                                            onMoveSection(sectionId, -1)
+                                        }
+                                        onMoveDown={(sectionId) =>
+                                            onMoveSection(sectionId, 1)
+                                        }
+                                        onAddRandomQuestion={
+                                            onAddRandomQuestion
+                                        }
+                                        onAddCustomQuestion={
+                                            onAddCustomQuestion
+                                        }
+                                        onEditQuestion={onEditQuestion}
+                                        onRandomQuestion={onRandomQuestion}
+                                        onPickQuestion={onPickQuestion}
+                                        onRemoveQuestion={onRemoveQuestion}
+                                        onAnswerLinesChange={
+                                            onQuestionAnswerLinesChange
+                                        }
+                                        onQuestionImageSizeChange={
+                                            onQuestionImageSizeChange
+                                        }
+                                    />
+                                ),
+                            )}
+                        </div>
                     </div>
                 </main>
 
@@ -5084,7 +5256,7 @@ function GeneratedPaperView({
                 onClick={() => setIsSettingsDrawerOpen(true)}
                 aria-label="Open paper settings"
                 title="Paper settings"
-                className="fixed top-1/2 right-3 z-30 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg shadow-slate-900/10 transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700 print:hidden dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-500/40 dark:hover:bg-teal-500/10 dark:hover:text-teal-300"
+                className="fixed top-1/2 right-3 z-30 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg shadow-slate-900/10 transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-500/40 dark:hover:bg-teal-500/10 dark:hover:text-teal-300 print:hidden"
             >
                 <SettingsIcon className="size-5" />
             </button>
@@ -5092,6 +5264,7 @@ function GeneratedPaperView({
             <PaperSettingsDrawer
                 open={isSettingsDrawerOpen}
                 settings={settings}
+                defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                 onChange={onSettingsChange}
                 onClose={() => setIsSettingsDrawerOpen(false)}
             />

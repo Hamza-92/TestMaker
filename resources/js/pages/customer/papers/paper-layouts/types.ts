@@ -50,6 +50,19 @@ export interface GeneratedPaperHeader {
 
 export type PaperEnglishFont = 'sans' | 'serif' | 'mono';
 export type PaperUrduFont = 'jameel-noori' | 'noto-nastaliq' | 'mehr-nastaliq';
+export type PaperSize = 'A4' | 'Letter' | 'Legal';
+export type PaperOrientation = 'portrait' | 'landscape';
+export type PageNumberPosition =
+    | 'footer-center'
+    | 'footer-right'
+    | 'header-right';
+export type PageNumberFormat = 'page-n' | 'n-of-m' | 'just-n';
+export type PaperQuestionNumberingFormat =
+    | 'default'
+    | 'numeric'
+    | 'roman'
+    | 'alpha';
+export type PaperWatermarkType = 'text' | 'logo';
 
 export interface PaperSettings {
     englishFont: PaperEnglishFont;
@@ -66,13 +79,48 @@ export interface PaperSettings {
     questionSize: number;
     /** Question line-height (unitless multiplier). */
     questionLineHeight: number;
-    /** Paper border enabled state. */
-    paperBorderEnabled: boolean;
-    /** Paper border width in pixels. */
-    paperBorderWidth: number;
-    /** Paper border style for the paper frame. */
-    paperBorderStyle: 'solid' | 'dashed' | 'dotted';
+    /** Header frame border width in px (0 = no border). */
+    headerBorderWidth: number;
+    headerBorderStyle: PaperBorderStyle;
+    /** Bottom border under each section heading row (the "Q.1 Title (5x1=5)" rule). */
+    headingBorderWidth: number;
+    headingBorderStyle: PaperBorderStyle;
+    /** Divider between question rows inside a section. */
+    questionBorderWidth: number;
+    questionBorderStyle: PaperBorderStyle;
+    /** Paper size — affects on-screen dimensions and the printed @page size. */
+    paperSize: PaperSize;
+    /** Page orientation — swaps the long/short dimension. */
+    orientation: PaperOrientation;
+    /** Page margins in millimetres (4 sides). 0 = no margin (content runs to the edge). */
+    marginTop: number;
+    marginRight: number;
+    marginBottom: number;
+    marginLeft: number;
+    /** Vertical gap between the header→first-section and between adjacent sections, in mm. */
+    sectionSpacing: number;
+    /** Default text colour for everything on the paper (header/heading/questions). */
+    textColor: string;
+    watermarkType: PaperWatermarkType;
+    /** Empty string = no watermark; otherwise this text shows faintly behind the content. */
+    watermarkText: string;
+    watermarkLogoUrl: string;
+    /** 0–100; lower = fainter. Only used when watermarkText is non-empty. */
+    watermarkOpacity: number;
+    /** Toggle printed page numbers (print-only). */
+    pageNumbersEnabled: boolean;
+    pageNumberPosition: PageNumberPosition;
+    pageNumberFormat: PageNumberFormat;
+    /** Print-only: repeat the exam-info header at the top of every printed page. */
+    repeatHeaderOnEachPage: boolean;
+    /**
+     * Overrides the per-section convention (objective=numeric, subjective=roman).
+     * 'default' = keep the per-section convention.
+     */
+    questionNumberingFormat: PaperQuestionNumberingFormat;
 }
+
+export type PaperBorderStyle = 'solid' | 'dashed' | 'dotted';
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     englishFont: 'sans',
@@ -83,12 +131,102 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     headingLineHeight: 1.5,
     questionSize: 14,
     questionLineHeight: 1.5,
-    paperBorderEnabled: true,
-    paperBorderWidth: 1,
-    paperBorderStyle: 'solid',
+    headerBorderWidth: 2,
+    headerBorderStyle: 'solid',
+    headingBorderWidth: 1,
+    headingBorderStyle: 'solid',
+    questionBorderWidth: 1,
+    questionBorderStyle: 'solid',
+    paperSize: 'A4',
+    orientation: 'portrait',
+    marginTop: 10,
+    marginRight: 10,
+    marginBottom: 10,
+    marginLeft: 10,
+    sectionSpacing: 1,
+    textColor: '#000000',
+    watermarkType: 'text',
+    watermarkText: '',
+    watermarkLogoUrl: '',
+    watermarkOpacity: 8,
+    pageNumbersEnabled: false,
+    pageNumberPosition: 'footer-center',
+    pageNumberFormat: 'page-n',
+    repeatHeaderOnEachPage: false,
+    questionNumberingFormat: 'default',
 };
 
-const ENGLISH_FONT_VALUES = new Set<PaperEnglishFont>(['sans', 'serif', 'mono']);
+const PAGE_NUMBER_POSITION_VALUES = new Set<PageNumberPosition>([
+    'footer-center',
+    'footer-right',
+    'header-right',
+]);
+const PAGE_NUMBER_FORMAT_VALUES = new Set<PageNumberFormat>([
+    'page-n',
+    'n-of-m',
+    'just-n',
+]);
+const QUESTION_NUMBERING_FORMAT_VALUES = new Set<PaperQuestionNumberingFormat>([
+    'default',
+    'numeric',
+    'roman',
+    'alpha',
+]);
+const WATERMARK_TYPE_VALUES = new Set<PaperWatermarkType>(['text', 'logo']);
+
+function pickEnum<T extends string>(
+    value: unknown,
+    allowed: Set<T>,
+    fallback: T,
+): T {
+    return typeof value === 'string' && allowed.has(value as T)
+        ? (value as T)
+        : fallback;
+}
+
+/** Standard page dimensions in millimetres (portrait orientation). */
+export const PAGE_SIZES: Record<PaperSize, { width: number; height: number }> =
+    {
+        A4: { width: 210, height: 297 },
+        Letter: { width: 215.9, height: 279.4 },
+        Legal: { width: 215.9, height: 355.6 },
+    };
+
+export function getPageDimensions(
+    size: PaperSize,
+    orientation: PaperOrientation,
+): { width: number; height: number } {
+    const { width, height } = PAGE_SIZES[size];
+
+    return orientation === 'landscape'
+        ? { width: height, height: width }
+        : { width, height };
+}
+
+const PAPER_SIZE_VALUES = new Set<PaperSize>(['A4', 'Letter', 'Legal']);
+const ORIENTATION_VALUES = new Set<PaperOrientation>(['portrait', 'landscape']);
+
+const BORDER_STYLE_VALUES = new Set<PaperBorderStyle>([
+    'solid',
+    'dashed',
+    'dotted',
+]);
+
+function pickBorderStyle(
+    value: unknown,
+    fallback: PaperBorderStyle,
+): PaperBorderStyle {
+    return typeof value === 'string' &&
+        BORDER_STYLE_VALUES.has(value as PaperBorderStyle)
+        ? (value as PaperBorderStyle)
+        : fallback;
+}
+
+const ENGLISH_FONT_VALUES = new Set<PaperEnglishFont>([
+    'sans',
+    'serif',
+    'mono',
+]);
 const URDU_FONT_VALUES = new Set<PaperUrduFont>([
     'jameel-noori',
     'noto-nastaliq',
@@ -149,20 +287,106 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             typeof source.questionLineHeight === 'number'
                 ? source.questionLineHeight
                 : DEFAULT_PAPER_SETTINGS.questionLineHeight,
-        paperBorderEnabled:
-            typeof source.paperBorderEnabled === 'boolean'
-                ? source.paperBorderEnabled
-                : DEFAULT_PAPER_SETTINGS.paperBorderEnabled,
-        paperBorderWidth:
-            typeof source.paperBorderWidth === 'number'
-                ? source.paperBorderWidth
-                : DEFAULT_PAPER_SETTINGS.paperBorderWidth,
-        paperBorderStyle:
-            source.paperBorderStyle === 'dashed' ||
-            source.paperBorderStyle === 'dotted' ||
-            source.paperBorderStyle === 'solid'
-                ? (source.paperBorderStyle as 'solid' | 'dashed' | 'dotted')
-                : DEFAULT_PAPER_SETTINGS.paperBorderStyle,
+        headerBorderWidth:
+            typeof source.headerBorderWidth === 'number'
+                ? source.headerBorderWidth
+                : DEFAULT_PAPER_SETTINGS.headerBorderWidth,
+        headerBorderStyle: pickBorderStyle(
+            source.headerBorderStyle,
+            DEFAULT_PAPER_SETTINGS.headerBorderStyle,
+        ),
+        headingBorderWidth:
+            typeof source.headingBorderWidth === 'number'
+                ? source.headingBorderWidth
+                : DEFAULT_PAPER_SETTINGS.headingBorderWidth,
+        headingBorderStyle: pickBorderStyle(
+            source.headingBorderStyle,
+            DEFAULT_PAPER_SETTINGS.headingBorderStyle,
+        ),
+        questionBorderWidth:
+            typeof source.questionBorderWidth === 'number'
+                ? source.questionBorderWidth
+                : DEFAULT_PAPER_SETTINGS.questionBorderWidth,
+        questionBorderStyle: pickBorderStyle(
+            source.questionBorderStyle,
+            DEFAULT_PAPER_SETTINGS.questionBorderStyle,
+        ),
+        paperSize:
+            typeof source.paperSize === 'string' &&
+            PAPER_SIZE_VALUES.has(source.paperSize as PaperSize)
+                ? (source.paperSize as PaperSize)
+                : DEFAULT_PAPER_SETTINGS.paperSize,
+        orientation:
+            typeof source.orientation === 'string' &&
+            ORIENTATION_VALUES.has(source.orientation as PaperOrientation)
+                ? (source.orientation as PaperOrientation)
+                : DEFAULT_PAPER_SETTINGS.orientation,
+        marginTop:
+            typeof source.marginTop === 'number'
+                ? source.marginTop
+                : DEFAULT_PAPER_SETTINGS.marginTop,
+        marginRight:
+            typeof source.marginRight === 'number'
+                ? source.marginRight
+                : DEFAULT_PAPER_SETTINGS.marginRight,
+        marginBottom:
+            typeof source.marginBottom === 'number'
+                ? source.marginBottom
+                : DEFAULT_PAPER_SETTINGS.marginBottom,
+        marginLeft:
+            typeof source.marginLeft === 'number'
+                ? source.marginLeft
+                : DEFAULT_PAPER_SETTINGS.marginLeft,
+        sectionSpacing:
+            typeof source.sectionSpacing === 'number'
+                ? source.sectionSpacing
+                : DEFAULT_PAPER_SETTINGS.sectionSpacing,
+        textColor:
+            typeof source.textColor === 'string'
+                ? source.textColor
+                : DEFAULT_PAPER_SETTINGS.textColor,
+        watermarkType: pickEnum(
+            source.watermarkType,
+            WATERMARK_TYPE_VALUES,
+            DEFAULT_PAPER_SETTINGS.watermarkType,
+        ),
+        watermarkText:
+            typeof source.watermarkText === 'string'
+                ? source.watermarkText
+                : DEFAULT_PAPER_SETTINGS.watermarkText,
+        watermarkLogoUrl:
+            typeof source.watermarkLogoUrl === 'string'
+                ? source.watermarkLogoUrl
+                : typeof source.watermarkLogoDataUrl === 'string'
+                  ? source.watermarkLogoDataUrl
+                  : DEFAULT_PAPER_SETTINGS.watermarkLogoUrl,
+        watermarkOpacity:
+            typeof source.watermarkOpacity === 'number'
+                ? source.watermarkOpacity
+                : DEFAULT_PAPER_SETTINGS.watermarkOpacity,
+        pageNumbersEnabled:
+            typeof source.pageNumbersEnabled === 'boolean'
+                ? source.pageNumbersEnabled
+                : DEFAULT_PAPER_SETTINGS.pageNumbersEnabled,
+        pageNumberPosition: pickEnum(
+            source.pageNumberPosition,
+            PAGE_NUMBER_POSITION_VALUES,
+            DEFAULT_PAPER_SETTINGS.pageNumberPosition,
+        ),
+        pageNumberFormat: pickEnum(
+            source.pageNumberFormat,
+            PAGE_NUMBER_FORMAT_VALUES,
+            DEFAULT_PAPER_SETTINGS.pageNumberFormat,
+        ),
+        repeatHeaderOnEachPage:
+            typeof source.repeatHeaderOnEachPage === 'boolean'
+                ? source.repeatHeaderOnEachPage
+                : DEFAULT_PAPER_SETTINGS.repeatHeaderOnEachPage,
+        questionNumberingFormat: pickEnum(
+            source.questionNumberingFormat,
+            QUESTION_NUMBERING_FORMAT_VALUES,
+            DEFAULT_PAPER_SETTINGS.questionNumberingFormat,
+        ),
     };
 }
 
@@ -172,4 +396,55 @@ export interface GeneratedPaper {
     sections: GeneratedPaperSection[];
     /** Optional — older papers won't have this. Restore code should fall back to DEFAULT_PAPER_SETTINGS. */
     settings?: PaperSettings;
+}
+
+const ROMAN_NUMERALS = [
+    'i',
+    'ii',
+    'iii',
+    'iv',
+    'v',
+    'vi',
+    'vii',
+    'viii',
+    'ix',
+    'x',
+    'xi',
+    'xii',
+    'xiii',
+    'xiv',
+    'xv',
+    'xvi',
+    'xvii',
+    'xviii',
+    'xix',
+    'xx',
+];
+
+/**
+ * Format a per-question label given a 0-based index, the paper-wide override
+ * setting, and what the section would have used by default. 'default' falls
+ * through to the section-native convention (objective=numeric, subjective=roman).
+ */
+export function formatQuestionLabel(
+    index: number,
+    override: PaperQuestionNumberingFormat,
+    sectionDefault: 'numeric' | 'roman',
+): string {
+    const format = override === 'default' ? sectionDefault : override;
+
+    if (format === 'roman') {
+        return ROMAN_NUMERALS[index] ?? String(index + 1);
+    }
+
+    if (format === 'alpha') {
+        // a, b, c, ..., z, aa, ab ... (wrap after 26)
+        const n = index;
+        const first = String.fromCharCode(97 + (n % 26));
+        const repeat = Math.floor(n / 26);
+
+        return repeat > 0 ? String.fromCharCode(96 + repeat) + first : first;
+    }
+
+    return String(index + 1);
 }

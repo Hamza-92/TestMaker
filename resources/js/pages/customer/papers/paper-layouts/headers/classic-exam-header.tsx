@@ -26,10 +26,15 @@ export function ClassicExamHeader({
     onChange,
 }: ClassicExamHeaderProps) {
     return (
-        <div className="border-2 border-black text-black">
+        <div data-paper-header-frame>
             <div className="grid min-h-36 grid-cols-[12rem_1fr_1fr]">
-                <div className="flex items-center justify-center border-r-2 border-black p-3">
-                    <div className="flex size-28 items-center justify-center rounded-full border-2 border-black text-center text-3xl leading-none font-bold">
+                <div
+                    data-paper-header-divider="r"
+                    className="flex items-center justify-center p-3"
+                >
+                    {/* Initials circle keeps its own decorative 2px outline so
+                        it doesn't disappear when the user sets header border to 0. */}
+                    <div className="flex size-28 items-center justify-center rounded-full border-2 border-current text-center text-3xl leading-none font-bold">
                         {header.schoolName
                             .split(/\s+/)
                             .filter(Boolean)
@@ -67,14 +72,19 @@ function HeaderColumn({
     return (
         <div
             data-paper-header
-            className="grid grid-rows-5 border-r border-black last:border-r-0"
+            data-paper-header-divider="r"
+            className="grid grid-rows-5"
         >
             {fields.map(([field, label]) => (
                 <div
                     key={field}
-                    className="grid grid-cols-[7rem_1fr] border-b border-black last:border-b-0"
+                    data-paper-header-divider="b"
+                    className="grid grid-cols-[7rem_1fr]"
                 >
-                    <div className="border-r border-black bg-slate-100 px-2 py-1 text-sm font-bold uppercase">
+                    <div
+                        data-paper-header-divider="r"
+                        className="bg-slate-100 px-2 py-1 text-sm font-bold uppercase"
+                    >
                         {label}
                     </div>
                     <input
