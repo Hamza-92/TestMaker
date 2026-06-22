@@ -26,6 +26,7 @@ import type {
     PaperBorderStyle,
     PaperEnglishFont,
     PaperOrientation,
+    PaperQuestionLayout,
     PaperQuestionNumberingFormat,
     PaperSettings,
     PaperSize,
@@ -139,6 +140,13 @@ const QUESTION_NUMBERING_FORMAT_OPTIONS = [
     { value: 'numeric', label: '1, 2, 3', previewFontFamily: 'inherit' },
     { value: 'roman', label: 'i, ii, iii', previewFontFamily: 'inherit' },
     { value: 'alpha', label: 'a, b, c', previewFontFamily: 'inherit' },
+] as const;
+
+const QUESTION_LAYOUT_OPTIONS = [
+    { value: 'default', label: 'Default', previewFontFamily: 'inherit' },
+    { value: 'stacked', label: 'Single Lines', previewFontFamily: 'inherit' },
+    { value: 'columns', label: 'Columns (2)', previewFontFamily: 'inherit' },
+    { value: 'inline', label: 'Inline', previewFontFamily: 'inherit' },
 ] as const;
 
 const MARGIN_BOUNDS = { min: 0, max: 50 };
@@ -486,6 +494,18 @@ export function PaperSettingsDrawer({
                     <CollapsibleSection title="Questions">
                         <div className="mb-3">
                             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Layout
+                            </p>
+                            <FontPicker
+                                value={settings.questionLayout}
+                                options={QUESTION_LAYOUT_OPTIONS}
+                                onChange={(value: PaperQuestionLayout) =>
+                                    onChange({ questionLayout: value })
+                                }
+                            />
+                        </div>
+                        <div className="mb-3">
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                 Numbering
                             </p>
                             <FontPicker
@@ -622,7 +642,7 @@ function BorderControls({
                 value={width}
                 min={BORDER_WIDTH_BOUNDS.min}
                 max={BORDER_WIDTH_BOUNDS.max}
-                step={0.5}
+                step={1}
                 onChange={onWidthChange}
             />
             <div>

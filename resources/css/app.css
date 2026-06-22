@@ -333,37 +333,23 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 /* ── QUESTIONS ─────────────────────────────────────────────────────────── */
-/* The question container is bordered on all 4 sides; collapsed-table style
-   means individual rows only need bottom dividers, with the last row's bottom
-   merging into the container's own bottom border. */
+/* Both layouts wrap their questions in one outer border — the user setting
+   controls a single rectangle around the whole question block. Individual
+   questions inside the block carry no borders. */
 [data-print-paper] [data-paper-question-group] {
     border-width: var(--paper-question-border-width, 1px);
     border-style: var(--paper-question-border-style, solid);
     border-color: currentColor;
 }
-
-/* Stacked layout (objective): inter-row dividers. */
-[data-print-paper]
-    [data-paper-question-group='stacked']
-    > [data-paper-question]:not(:last-child) {
-    border-bottom-width: var(--paper-question-border-width, 1px);
-    border-bottom-style: var(--paper-question-border-style, solid);
-    border-bottom-color: currentColor;
+[data-print-paper] [data-paper-question-group] > [data-paper-question] {
+    border-width: 0;
 }
 
-/* Question text (both layouts) — font sizing only; subjective grid layout
-   intentionally has no inter-item border. */
-[data-print-paper] [data-paper-question-divider~='r']:not(:last-child) {
-    border-right-width: var(--paper-question-border-width, 1px);
-    border-right-style: var(--paper-question-border-style, solid);
-    border-right-color: currentColor;
-}
-
-[data-print-paper] [data-paper-question-divider~='t'] {
-    border-top-width: var(--paper-question-border-width, 1px);
-    border-top-style: var(--paper-question-border-style, solid);
-    border-top-color: currentColor;
-}
+/* Internal dividers (Q# right, between options, between text → options →
+   answer-lines) are intentionally NOT styled in stacked layout — the
+   question list reads as a clean column of text inside the single outer
+   border, with the question number simply offset by the column's column
+   gap rather than a visible rule. */
 
 [data-print-paper] [data-paper-question] {
     font-size: var(--paper-question-size, 0.875rem);

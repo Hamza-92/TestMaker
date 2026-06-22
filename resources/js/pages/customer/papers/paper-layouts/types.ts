@@ -20,6 +20,8 @@ export interface GeneratedPaperQuestion {
     imageSize: PaperImageSize;
     options: PaperQuestionOption[];
     answerLines: number;
+    /** Vertical gap (px) between answer lines. Optional — falls back to 4px. */
+    answerLineSpacing?: number;
 }
 
 export interface GeneratedPaperSection {
@@ -62,6 +64,11 @@ export type PaperQuestionNumberingFormat =
     | 'numeric'
     | 'roman'
     | 'alpha';
+export type PaperQuestionLayout =
+    | 'default'
+    | 'stacked'
+    | 'columns'
+    | 'inline';
 export type PaperWatermarkType = 'text' | 'logo';
 
 export interface PaperSettings {
@@ -118,6 +125,12 @@ export interface PaperSettings {
      * 'default' = keep the per-section convention.
      */
     questionNumberingFormat: PaperQuestionNumberingFormat;
+    /**
+     * Question rendering template applied paper-wide.
+     * 'default' = per-category convention (objective→stacked boxed, subjective→2-col grid).
+     * Other values force the same template for all sections.
+     */
+    questionLayout: PaperQuestionLayout;
 }
 
 export type PaperBorderStyle = 'solid' | 'dashed' | 'dotted';
@@ -154,6 +167,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     pageNumberFormat: 'page-n',
     repeatHeaderOnEachPage: false,
     questionNumberingFormat: 'default',
+    questionLayout: 'default',
 };
 
 const PAGE_NUMBER_POSITION_VALUES = new Set<PageNumberPosition>([
@@ -171,6 +185,12 @@ const QUESTION_NUMBERING_FORMAT_VALUES = new Set<PaperQuestionNumberingFormat>([
     'numeric',
     'roman',
     'alpha',
+]);
+const QUESTION_LAYOUT_VALUES = new Set<PaperQuestionLayout>([
+    'default',
+    'stacked',
+    'columns',
+    'inline',
 ]);
 const WATERMARK_TYPE_VALUES = new Set<PaperWatermarkType>(['text', 'logo']);
 
@@ -386,6 +406,11 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             source.questionNumberingFormat,
             QUESTION_NUMBERING_FORMAT_VALUES,
             DEFAULT_PAPER_SETTINGS.questionNumberingFormat,
+        ),
+        questionLayout: pickEnum(
+            source.questionLayout,
+            QUESTION_LAYOUT_VALUES,
+            DEFAULT_PAPER_SETTINGS.questionLayout,
         ),
     };
 }

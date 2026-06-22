@@ -29,6 +29,11 @@ interface TwoColumnSubjectiveSectionProps {
         questionId: string,
         value: number,
     ) => void;
+    onAnswerLineSpacingChange: (
+        sectionId: string,
+        questionId: string,
+        value: number,
+    ) => void;
     onQuestionImageSizeChange: (
         sectionId: string,
         questionId: string,
@@ -53,6 +58,7 @@ export function TwoColumnSubjectiveSection({
     onPickQuestion,
     onRemoveQuestion,
     onAnswerLinesChange,
+    onAnswerLineSpacingChange,
     onQuestionImageSizeChange,
 }: TwoColumnSubjectiveSectionProps) {
     return (
@@ -96,6 +102,7 @@ export function TwoColumnSubjectiveSection({
                         onPickQuestion={onPickQuestion}
                         onRemoveQuestion={onRemoveQuestion}
                         onAnswerLinesChange={onAnswerLinesChange}
+                        onAnswerLineSpacingChange={onAnswerLineSpacingChange}
                         onQuestionImageSizeChange={onQuestionImageSizeChange}
                     />
                 ))}
@@ -125,6 +132,7 @@ function SubjectiveQuestionItem({
     onPickQuestion,
     onRemoveQuestion,
     onAnswerLinesChange,
+    onAnswerLineSpacingChange,
     onQuestionImageSizeChange,
 }: {
     question: GeneratedPaperQuestion;
@@ -136,6 +144,11 @@ function SubjectiveQuestionItem({
     onPickQuestion: (sectionId: string, questionId: string) => void;
     onRemoveQuestion: (sectionId: string, questionId: string) => void;
     onAnswerLinesChange: (
+        sectionId: string,
+        questionId: string,
+        value: number,
+    ) => void;
+    onAnswerLineSpacingChange: (
         sectionId: string,
         questionId: string,
         value: number,
@@ -190,12 +203,19 @@ function SubjectiveQuestionItem({
                     </div>
                 )}
                 {question.answerLines > 0 && (
-                    <div className="mt-2 space-y-1">
+                    <div className="mt-2 flex flex-col">
                         {Array.from({ length: question.answerLines }).map(
                             (_, lineIndex) => (
                                 <div
                                     key={lineIndex}
-                                    className="h-4 border-b border-dotted border-slate-400"
+                                    style={{
+                                        // Per-line height drives both writing
+                                        // space and inter-line gap; height=0
+                                        // collapses every line's bottom border
+                                        // onto the same Y, merging into one rule.
+                                        height: `${question.answerLineSpacing ?? 20}px`,
+                                    }}
+                                    className="border-b border-dotted border-slate-400"
                                 />
                             ),
                         )}
@@ -206,12 +226,16 @@ function SubjectiveQuestionItem({
                 canSwap={section.questionTypeId !== null}
                 showAnswerLines
                 answerLines={question.answerLines}
+                answerLineSpacing={question.answerLineSpacing ?? 20}
                 onRandom={() => onRandomQuestion(section.id, question.id)}
                 onPick={() => onPickQuestion(section.id, question.id)}
                 onEdit={() => onEditQuestion(section.id, question.id)}
                 onDelete={() => onRemoveQuestion(section.id, question.id)}
                 onAnswerLinesChange={(value) =>
                     onAnswerLinesChange(section.id, question.id, value)
+                }
+                onAnswerLineSpacingChange={(value) =>
+                    onAnswerLineSpacingChange(section.id, question.id, value)
                 }
             />
         </div>

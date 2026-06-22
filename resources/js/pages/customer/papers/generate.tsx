@@ -38,9 +38,8 @@ import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
 import type { SavePaperValues } from './paper-layouts/save-paper-modal';
 import { QuestionEditModal } from './paper-layouts/questions/question-edit-modal';
-import { BoxedObjectiveSection } from './paper-layouts/sections/boxed-objective-section';
+import { pickSectionTemplate } from './paper-layouts/templates';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
-import { TwoColumnSubjectiveSection } from './paper-layouts/sections/two-column-subjective-section';
 import {
     DEFAULT_PAPER_SETTINGS,
     getPageDimensions,
@@ -2261,6 +2260,36 @@ export default function GeneratePaper({
         );
     }
 
+    function updatePaperQuestionAnswerLineSpacing(
+        sectionId: string,
+        questionId: string,
+        answerLineSpacing: number,
+    ) {
+        setGeneratedPaper((current) =>
+            current
+                ? {
+                      ...current,
+                      sections: current.sections.map((section) =>
+                          section.id === sectionId
+                              ? {
+                                    ...section,
+                                    questions: section.questions.map(
+                                        (question) =>
+                                            question.id === questionId
+                                                ? {
+                                                      ...question,
+                                                      answerLineSpacing,
+                                                  }
+                                                : question,
+                                    ),
+                                }
+                              : section,
+                      ),
+                  }
+                : current,
+        );
+    }
+
     function openPaperQuestionEditor(sectionId: string, questionId: string) {
         setPaperQuestionEditorTarget({ sectionId, questionId });
     }
@@ -2997,6 +3026,9 @@ export default function GeneratePaper({
                         onQuestionImageSizeChange={updatePaperQuestionImageSize}
                         onQuestionAnswerLinesChange={
                             updatePaperQuestionAnswerLines
+                        }
+                        onQuestionAnswerLineSpacingChange={
+                            updatePaperQuestionAnswerLineSpacing
                         }
                         onEditSection={openPaperSectionEditor}
                         onDeleteSection={deletePaperSection}
@@ -4815,6 +4847,7 @@ function GeneratedPaperView({
     onEditQuestion,
     onQuestionImageSizeChange,
     onQuestionAnswerLinesChange,
+    onQuestionAnswerLineSpacingChange,
     onRandomQuestion,
     onPickQuestion,
     onAddRandomQuestion,
@@ -4858,6 +4891,11 @@ function GeneratedPaperView({
         imageSize: PaperImageSize,
     ) => void;
     onQuestionAnswerLinesChange: (
+        sectionId: string,
+        questionId: string,
+        value: number,
+    ) => void;
+    onQuestionAnswerLineSpacingChange: (
         sectionId: string,
         questionId: string,
         value: number,
@@ -5126,9 +5164,13 @@ function GeneratedPaperView({
                                 gap: `${settings.sectionSpacing}mm`,
                             }}
                         >
-                            {paper.sections.map((section, sectionIndex) =>
-                                section.category === 'Objective Questions' ? (
-                                    <BoxedObjectiveSection
+                            {paper.sections.map((section, sectionIndex) => {
+                                const Template = pickSectionTemplate(
+                                    settings.questionLayout,
+                                    section.category,
+                                );
+                                return (
+                                    <Template
                                         key={section.id}
                                         section={section}
                                         index={sectionIndex}
@@ -5161,50 +5203,15 @@ function GeneratedPaperView({
                                         onAnswerLinesChange={
                                             onQuestionAnswerLinesChange
                                         }
-                                        onQuestionImageSizeChange={
-                                            onQuestionImageSizeChange
-                                        }
-                                    />
-                                ) : (
-                                    <TwoColumnSubjectiveSection
-                                        key={section.id}
-                                        section={section}
-                                        index={sectionIndex}
-                                        numberingFormat={
-                                            settings.questionNumberingFormat
-                                        }
-                                        canMoveUp={sectionIndex > 0}
-                                        canMoveDown={
-                                            sectionIndex <
-                                            paper.sections.length - 1
-                                        }
-                                        onEditSection={onEditSection}
-                                        onDeleteSection={onDeleteSection}
-                                        onMoveUp={(sectionId) =>
-                                            onMoveSection(sectionId, -1)
-                                        }
-                                        onMoveDown={(sectionId) =>
-                                            onMoveSection(sectionId, 1)
-                                        }
-                                        onAddRandomQuestion={
-                                            onAddRandomQuestion
-                                        }
-                                        onAddCustomQuestion={
-                                            onAddCustomQuestion
-                                        }
-                                        onEditQuestion={onEditQuestion}
-                                        onRandomQuestion={onRandomQuestion}
-                                        onPickQuestion={onPickQuestion}
-                                        onRemoveQuestion={onRemoveQuestion}
-                                        onAnswerLinesChange={
-                                            onQuestionAnswerLinesChange
+                                        onAnswerLineSpacingChange={
+                                            onQuestionAnswerLineSpacingChange
                                         }
                                         onQuestionImageSizeChange={
                                             onQuestionImageSizeChange
                                         }
                                     />
-                                ),
-                            )}
+                                );
+                            })}
                         </div>
                     </div>
                 </main>

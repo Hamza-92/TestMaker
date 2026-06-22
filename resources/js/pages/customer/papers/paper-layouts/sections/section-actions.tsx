@@ -17,22 +17,29 @@ interface QuestionHoverActionsProps {
     canSwap: boolean;
     showAnswerLines?: boolean;
     answerLines: number;
+    answerLineSpacing?: number;
     onRandom: () => void;
     onPick: () => void;
     onEdit: () => void;
     onDelete: () => void;
     onAnswerLinesChange: (value: number) => void;
+    onAnswerLineSpacingChange?: (value: number) => void;
 }
+
+const SPACING_MIN = 0;
+const SPACING_MAX = 40;
 
 export function QuestionHoverActions({
     canSwap,
     showAnswerLines = false,
     answerLines,
+    answerLineSpacing,
     onRandom,
     onPick,
     onEdit,
     onDelete,
     onAnswerLinesChange,
+    onAnswerLineSpacingChange,
 }: QuestionHoverActionsProps) {
     const [confirmAction, setConfirmAction] = useState<
         'delete' | 'random' | null
@@ -69,7 +76,10 @@ export function QuestionHoverActions({
                     <FilePenLineIcon className="size-4" />
                 </ActionButton>
                 {showAnswerLines && (
-                    <div className="ml-1 flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-700 dark:bg-slate-950/60">
+                    <div
+                        className="ml-1 flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-700 dark:bg-slate-950/60"
+                        title="Number of answer lines"
+                    >
                         <button
                             type="button"
                             onClick={() =>
@@ -92,6 +102,51 @@ export function QuestionHoverActions({
                         </button>
                     </div>
                 )}
+                {showAnswerLines &&
+                    answerLines > 0 &&
+                    onAnswerLineSpacingChange && (
+                        <div
+                            className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-700 dark:bg-slate-950/60"
+                            title="Spacing between answer lines (px)"
+                        >
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    onAnswerLineSpacingChange(
+                                        Math.max(
+                                            SPACING_MIN,
+                                            (answerLineSpacing ?? 20) - 1,
+                                        ),
+                                    )
+                                }
+                                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                disabled={(answerLineSpacing ?? 20) <= SPACING_MIN}
+                            >
+                                <MinusIcon className="size-3.5" />
+                            </button>
+                            <span className="min-w-10 text-center text-xs font-bold text-slate-700 tabular-nums dark:text-slate-200">
+                                {answerLineSpacing ?? 20}
+                                <span className="ml-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                    px
+                                </span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    onAnswerLineSpacingChange(
+                                        Math.min(
+                                            SPACING_MAX,
+                                            (answerLineSpacing ?? 20) + 1,
+                                        ),
+                                    )
+                                }
+                                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-teal-700 transition-colors hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-teal-300 dark:hover:bg-teal-500/10"
+                                disabled={(answerLineSpacing ?? 20) >= SPACING_MAX}
+                            >
+                                <PlusIcon className="size-3.5" />
+                            </button>
+                        </div>
+                    )}
             </div>
 
             {confirmAction === 'delete' && (

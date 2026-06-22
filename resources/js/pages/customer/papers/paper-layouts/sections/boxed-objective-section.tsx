@@ -29,6 +29,11 @@ interface BoxedObjectiveSectionProps {
         questionId: string,
         value: number,
     ) => void;
+    onAnswerLineSpacingChange: (
+        sectionId: string,
+        questionId: string,
+        value: number,
+    ) => void;
     onQuestionImageSizeChange: (
         sectionId: string,
         questionId: string,
@@ -55,6 +60,7 @@ export function BoxedObjectiveSection({
     onPickQuestion,
     onRemoveQuestion,
     onAnswerLinesChange,
+    onAnswerLineSpacingChange,
     onQuestionImageSizeChange,
 }: BoxedObjectiveSectionProps) {
     return (
@@ -94,6 +100,7 @@ export function BoxedObjectiveSection({
                         onPickQuestion={onPickQuestion}
                         onRemoveQuestion={onRemoveQuestion}
                         onAnswerLinesChange={onAnswerLinesChange}
+                        onAnswerLineSpacingChange={onAnswerLineSpacingChange}
                         onQuestionImageSizeChange={onQuestionImageSizeChange}
                     />
                 ))}
@@ -123,6 +130,7 @@ function ObjectiveQuestionRow({
     onPickQuestion,
     onRemoveQuestion,
     onAnswerLinesChange,
+    onAnswerLineSpacingChange,
     onQuestionImageSizeChange,
 }: {
     question: GeneratedPaperQuestion;
@@ -134,6 +142,11 @@ function ObjectiveQuestionRow({
     onPickQuestion: (sectionId: string, questionId: string) => void;
     onRemoveQuestion: (sectionId: string, questionId: string) => void;
     onAnswerLinesChange: (
+        sectionId: string,
+        questionId: string,
+        value: number,
+    ) => void;
+    onAnswerLineSpacingChange: (
         sectionId: string,
         questionId: string,
         value: number,
@@ -219,15 +232,36 @@ function ObjectiveQuestionRow({
                 </div>
             )}
 
+            {question.answerLines > 0 && (
+                <div data-paper-question-divider="t" className="flex flex-col">
+                    {Array.from({ length: question.answerLines }).map(
+                        (_, lineIndex) => (
+                            <div
+                                key={lineIndex}
+                                style={{
+                                    height: `${question.answerLineSpacing ?? 20}px`,
+                                }}
+                                className="border-b border-dotted border-slate-400"
+                            />
+                        ),
+                    )}
+                </div>
+            )}
+
             <QuestionHoverActions
                 canSwap={section.questionTypeId !== null}
+                showAnswerLines
                 answerLines={question.answerLines}
+                answerLineSpacing={question.answerLineSpacing ?? 20}
                 onRandom={() => onRandomQuestion(section.id, question.id)}
                 onPick={() => onPickQuestion(section.id, question.id)}
                 onEdit={() => onEditQuestion(section.id, question.id)}
                 onDelete={() => onRemoveQuestion(section.id, question.id)}
                 onAnswerLinesChange={(value) =>
                     onAnswerLinesChange(section.id, question.id, value)
+                }
+                onAnswerLineSpacingChange={(value) =>
+                    onAnswerLineSpacingChange(section.id, question.id, value)
                 }
             />
         </div>
