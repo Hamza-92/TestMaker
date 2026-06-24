@@ -25,6 +25,7 @@ import type {
     PageNumberPosition,
     PaperBorderStyle,
     PaperEnglishFont,
+    PaperHeaderTemplate,
     PaperOrientation,
     PaperQuestionLayout,
     PaperQuestionNumberingFormat,
@@ -148,6 +149,13 @@ const QUESTION_LAYOUT_OPTIONS = [
     { value: 'columns', label: 'Columns (2)', previewFontFamily: 'inherit' },
     { value: 'inline', label: 'Inline', previewFontFamily: 'inherit' },
 ] as const;
+
+const HEADER_TEMPLATE_OPTIONS: Array<FontOption<PaperHeaderTemplate>> = [
+    { value: 'classic',  label: '1 – Classic',  previewFontFamily: 'inherit' },
+    { value: 'banner',   label: '2 – Banner',   previewFontFamily: 'inherit' },
+    { value: 'formal',   label: '3 – Formal',   previewFontFamily: 'inherit' },
+    { value: 'centered', label: '4 – Centered', previewFontFamily: 'inherit' },
+];
 
 const MARGIN_BOUNDS = { min: 0, max: 50 };
 const SECTION_SPACING_BOUNDS = { min: 0, max: 20 };
@@ -446,6 +454,16 @@ export function PaperSettingsDrawer({
                     </CollapsibleSection>
 
                     <CollapsibleSection title="Header">
+                        <div className="mb-3">
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Template
+                            </p>
+                            <FontPicker
+                                value={settings.headerTemplate}
+                                options={HEADER_TEMPLATE_OPTIONS}
+                                onChange={(v) => onChange({ headerTemplate: v })}
+                            />
+                        </div>
                         <TypographyControls
                             size={settings.headerSize}
                             sizeMin={SIZE_BOUNDS.header.min}

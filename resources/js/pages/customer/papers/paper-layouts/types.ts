@@ -131,9 +131,12 @@ export interface PaperSettings {
      * Other values force the same template for all sections.
      */
     questionLayout: PaperQuestionLayout;
+    /** Which header layout template to use for the exam paper. */
+    headerTemplate: PaperHeaderTemplate;
 }
 
 export type PaperBorderStyle = 'solid' | 'dashed' | 'dotted';
+export type PaperHeaderTemplate = 'classic' | 'banner' | 'formal' | 'centered';
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     englishFont: 'sans',
@@ -168,6 +171,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     repeatHeaderOnEachPage: false,
     questionNumberingFormat: 'default',
     questionLayout: 'default',
+    headerTemplate: 'classic',
 };
 
 const PAGE_NUMBER_POSITION_VALUES = new Set<PageNumberPosition>([
@@ -193,6 +197,12 @@ const QUESTION_LAYOUT_VALUES = new Set<PaperQuestionLayout>([
     'inline',
 ]);
 const WATERMARK_TYPE_VALUES = new Set<PaperWatermarkType>(['text', 'logo']);
+const HEADER_TEMPLATE_VALUES = new Set<PaperHeaderTemplate>([
+    'classic',
+    'banner',
+    'formal',
+    'centered',
+]);
 
 function pickEnum<T extends string>(
     value: unknown,
@@ -411,6 +421,11 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             source.questionLayout,
             QUESTION_LAYOUT_VALUES,
             DEFAULT_PAPER_SETTINGS.questionLayout,
+        ),
+        headerTemplate: pickEnum(
+            source.headerTemplate,
+            HEADER_TEMPLATE_VALUES,
+            DEFAULT_PAPER_SETTINGS.headerTemplate,
         ),
     };
 }

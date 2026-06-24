@@ -32,6 +32,10 @@ import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
+import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
+import { CenteredExamHeader } from './paper-layouts/headers/centered-exam-header';
+import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
+import type { PaperHeaderTemplate } from './paper-layouts/types';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
@@ -740,6 +744,33 @@ function storageAssetUrl(value: unknown): string {
     return `/storage/${path}`;
 }
 
+function PaperHeader({
+    template,
+    header,
+    logoUrl,
+    address,
+    showAddress,
+    onChange,
+}: {
+    template: PaperHeaderTemplate;
+    header: Parameters<typeof ClassicExamHeader>[0]['header'];
+    logoUrl: string;
+    address: string;
+    showAddress: boolean;
+    onChange: Parameters<typeof ClassicExamHeader>[0]['onChange'];
+}) {
+    if (template === 'banner') {
+        return <BannerExamHeader header={header} onChange={onChange} />;
+    }
+    if (template === 'formal') {
+        return <FormalExamHeader header={header} onChange={onChange} />;
+    }
+    if (template === 'centered') {
+        return <CenteredExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} onChange={onChange} />;
+    }
+    return <ClassicExamHeader header={header} onChange={onChange} />;
+}
+
 export default function GeneratePaper({
     patterns,
     patternClasses,
@@ -749,6 +780,8 @@ export default function GeneratePaper({
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
+    const schoolAddress = typeof auth.user.address === 'string' ? auth.user.address : '';
+    const showSchoolAddress = Boolean(auth.user.is_show_address);
     const sourceFilters = useMemo(
         () => normalizeSourceOptions(sourceOptions),
         [sourceOptions],
@@ -1796,7 +1829,7 @@ export default function GeneratePaper({
             setGeneratedPaper({
                 id: `paper_${Date.now()}`,
                 header: {
-                    schoolName: 'School Name',
+                    schoolName: (auth.user.school_name as string) || auth.user.name || 'School Name',
                     exam: '',
                     className: klass?.label ?? '',
                     section: '',
@@ -3000,6 +3033,8 @@ export default function GeneratePaper({
                         paper={generatedPaper}
                         totalMarks={paperTotalMarks(generatedPaper)}
                         defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
+                        schoolAddress={schoolAddress}
+                        showSchoolAddress={showSchoolAddress}
                         pickerTarget={activePaperPickerContext}
                         pickerQuestions={filteredPaperPickerQuestions}
                         pickerSearch={paperQuestionSearch}
@@ -4823,6 +4858,8 @@ function GeneratedPaperView({
     paper,
     totalMarks,
     defaultWatermarkLogoUrl,
+    schoolAddress,
+    showSchoolAddress,
     pickerTarget,
     pickerQuestions,
     pickerSearch,
@@ -4860,6 +4897,8 @@ function GeneratedPaperView({
     paper: GeneratedPaper;
     totalMarks: number;
     defaultWatermarkLogoUrl: string;
+    schoolAddress: string;
+    showSchoolAddress: boolean;
     pickerTarget: {
         section: GeneratedPaperSection;
         question: GeneratedPaperQuestion;
@@ -5150,11 +5189,15 @@ function GeneratedPaperView({
                         </div>
                     )}
                     <div className="relative z-10">
-                        <ClassicExamHeader
+                        <PaperHeader
+                            template={settings.headerTemplate}
                             header={{
                                 ...paper.header,
                                 marks: totalMarks,
                             }}
+                            logoUrl={defaultWatermarkLogoUrl}
+                            address={schoolAddress}
+                            showAddress={showSchoolAddress}
                             onChange={onHeaderChange}
                         />
                         <div
