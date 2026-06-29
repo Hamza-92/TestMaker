@@ -1,4 +1,4 @@
-import { Editor } from '@tinymce/tinymce-react';
+﻿import { Editor } from '@tinymce/tinymce-react';
 import { ExternalLinkIcon, KeyboardIcon, XIcon } from 'lucide-react';
 import { MathfieldElement } from 'mathlive';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -415,7 +415,7 @@ function EquationDialog({
 
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            <input
+                            <input autoComplete="off"
                                 type="checkbox"
                                 checked={displayMode}
                                 onChange={(event) =>

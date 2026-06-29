@@ -1,4 +1,4 @@
-import { BookmarkIcon } from 'lucide-react';
+﻿import { BookmarkIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -93,7 +93,7 @@ export function SavePaperModal({
                 <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
                     {/* Paper Name — full width */}
                     <Field label="Paper Name" required>
-                        <input
+                        <input autoComplete="off"
                             ref={nameRef}
                             type="text"
                             value={values.name}
@@ -107,7 +107,7 @@ export function SavePaperModal({
                     {/* Row: Exam Type | Section Name */}
                     <div className="grid grid-cols-2 gap-4">
                         <Field label="Exam Type">
-                            <input
+                            <input autoComplete="off"
                                 type="text"
                                 value={values.examType}
                                 onChange={set('examType')}
@@ -117,7 +117,7 @@ export function SavePaperModal({
                             />
                         </Field>
                         <Field label="Section Name">
-                            <input
+                            <input autoComplete="off"
                                 type="text"
                                 value={values.section}
                                 onChange={set('section')}
@@ -131,7 +131,7 @@ export function SavePaperModal({
                     {/* Row: Paper Date | Time Allowed */}
                     <div className="grid grid-cols-2 gap-4">
                         <Field label="Paper Date">
-                            <input
+                            <input autoComplete="off"
                                 type="date"
                                 value={values.date}
                                 onChange={set('date')}
@@ -147,7 +147,7 @@ export function SavePaperModal({
                             />
                         </Field>
                         <Field label="Time Allowed">
-                            <input
+                            <input autoComplete="off"
                                 type="text"
                                 value={values.timeAllowed}
                                 onChange={set('timeAllowed')}
@@ -161,7 +161,7 @@ export function SavePaperModal({
                     {/* Row: Exam Marks | Passing Marks */}
                     <div className="grid grid-cols-2 gap-4">
                         <Field label="Exam Marks">
-                            <input
+                            <input autoComplete="off"
                                 type="number"
                                 min={0}
                                 value={values.examMarks}
@@ -172,7 +172,7 @@ export function SavePaperModal({
                             />
                         </Field>
                         <Field label="Passing Marks">
-                            <input
+                            <input autoComplete="off"
                                 type="number"
                                 min={0}
                                 value={values.passingMarks}

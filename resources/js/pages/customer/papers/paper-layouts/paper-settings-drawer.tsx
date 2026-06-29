@@ -1,4 +1,4 @@
-import {
+﻿import {
     Combobox,
     ComboboxButton,
     ComboboxInput,
@@ -155,6 +155,7 @@ const HEADER_TEMPLATE_OPTIONS: Array<FontOption<PaperHeaderTemplate>> = [
     { value: 'banner',   label: '2 – Banner',   previewFontFamily: 'inherit' },
     { value: 'formal',   label: '3 – Formal',   previewFontFamily: 'inherit' },
     { value: 'centered', label: '4 – Centered', previewFontFamily: 'inherit' },
+    { value: 'tabular',  label: '5 – Tabular',  previewFontFamily: 'inherit' },
 ];
 
 const MARGIN_BOUNDS = { min: 0, max: 50 };
@@ -726,7 +727,7 @@ function LabeledStepper({
                     <MinusIcon className="size-3.5" />
                 </StepperButton>
 
-                <input
+                <input autoComplete="off"
                     type="number"
                     inputMode={inputMode}
                     value={value}
@@ -874,7 +875,7 @@ function LogoInput({
                         No school logo found
                     </p>
                 )}
-                <input
+                <input autoComplete="off"
                     ref={inputRef}
                     type="file"
                     accept="image/*"
@@ -927,7 +928,7 @@ function TextInput({
             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 {label}
             </p>
-            <input
+            <input autoComplete="off"
                 type="text"
                 value={value}
                 placeholder={placeholder}
@@ -956,7 +957,7 @@ function CheckboxField({
                     : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-800/70',
             )}
         >
-            <input
+            <input autoComplete="off"
                 type="checkbox"
                 checked={checked}
                 onChange={(event) => onChange(event.target.checked)}

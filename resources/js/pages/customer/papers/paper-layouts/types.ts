@@ -136,7 +136,7 @@ export interface PaperSettings {
 }
 
 export type PaperBorderStyle = 'solid' | 'dashed' | 'dotted';
-export type PaperHeaderTemplate = 'classic' | 'banner' | 'formal' | 'centered';
+export type PaperHeaderTemplate = 'classic' | 'banner' | 'formal' | 'centered' | 'tabular';
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     englishFont: 'sans',
@@ -202,6 +202,7 @@ const HEADER_TEMPLATE_VALUES = new Set<PaperHeaderTemplate>([
     'banner',
     'formal',
     'centered',
+    'tabular',
 ]);
 
 function pickEnum<T extends string>(

@@ -111,6 +111,7 @@ export function FloatingCombobox({
 
                     <ComboboxInput
                         ref={inputRef}
+                        autoComplete="off"
                         aria-label={label}
                         className={cn(
                             'h-full w-full bg-transparent text-sm text-slate-900 placeholder:text-transparent outline-none dark:text-slate-100',

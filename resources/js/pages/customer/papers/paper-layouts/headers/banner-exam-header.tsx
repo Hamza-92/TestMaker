@@ -1,4 +1,4 @@
-import type { GeneratedPaperHeader } from '../types';
+﻿import type { GeneratedPaperHeader } from '../types';
 
 interface BannerExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -26,16 +26,16 @@ export function BannerExamHeader({ header, onChange }: BannerExamHeaderProps) {
                     {initials}
                 </div>
                 <div className="flex-1 text-center">
-                    <input
+                    <input autoComplete="off"
                         value={header.schoolName}
                         onChange={(e) => onChange('schoolName', e.target.value)}
                         className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
                         placeholder="School Name"
                     />
-                    <input
+                    <input autoComplete="off"
                         value={header.exam}
                         onChange={(e) => onChange('exam', e.target.value)}
-                        className="w-full bg-transparent text-center text-sm font-semibold text-slate-500 outline-none"
+                        className="w-full bg-transparent text-center text-sm font-normal text-slate-500 outline-none"
                         placeholder="Exam / Year"
                     />
                 </div>
@@ -51,10 +51,10 @@ export function BannerExamHeader({ header, onChange }: BannerExamHeaderProps) {
                     data-paper-header-divider="r"
                     className="flex items-center justify-center px-3 py-1.5"
                 >
-                    <input
+                    <input autoComplete="off"
                         value={header.subject}
                         onChange={(e) => onChange('subject', e.target.value)}
-                        className="w-full bg-transparent text-center font-bold outline-none print:font-extrabold"
+                        className="w-full bg-transparent text-center font-normal outline-none"
                         placeholder="Subject"
                     />
                 </div>
@@ -100,10 +100,10 @@ function InlineField({
             className="flex items-center gap-1 overflow-hidden px-3 py-1.5"
         >
             <span className="shrink-0 font-bold">{label}:</span>
-            <input
+            <input autoComplete="off"
                 value={String(header[field] ?? '')}
                 onChange={(e) => onChange(field, e.target.value)}
-                className="min-w-0 flex-1 border-b border-current bg-transparent font-semibold outline-none print:font-bold"
+                className="min-w-0 flex-1 border-b border-current bg-transparent font-normal outline-none"
             />
         </div>
     );

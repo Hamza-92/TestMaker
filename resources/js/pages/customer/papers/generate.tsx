@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+﻿import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -35,6 +35,7 @@ import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
 import { CenteredExamHeader } from './paper-layouts/headers/centered-exam-header';
 import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
+import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import type { PaperHeaderTemplate } from './paper-layouts/types';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
@@ -701,7 +702,7 @@ function NumberField({
             <span className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 {label}
             </span>
-            <input
+            <input autoComplete="off"
                 type="number"
                 inputMode="numeric"
                 min="0"
@@ -767,6 +768,9 @@ function PaperHeader({
     }
     if (template === 'centered') {
         return <CenteredExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} onChange={onChange} />;
+    }
+    if (template === 'tabular') {
+        return <TabularExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} onChange={onChange} />;
     }
     return <ClassicExamHeader header={header} onChange={onChange} />;
 }
@@ -3714,7 +3718,7 @@ function ManualQuestionPickerModal({
                 <div className="flex flex-col gap-2.5 border-b border-slate-100 p-4 sm:flex-row sm:items-center dark:border-slate-800">
                     <label className="relative min-w-0 flex-1">
                         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                        <input
+                        <input autoComplete="off"
                             type="search"
                             value={search}
                             onChange={(event) =>
@@ -4320,7 +4324,7 @@ function AddPaperSectionModal({
                         />
 
                         <FloatingField label="Choice">
-                            <input
+                            <input autoComplete="off"
                                 type="number"
                                 min={1}
                                 max={availableQuestionLimit || undefined}
@@ -4333,7 +4337,7 @@ function AddPaperSectionModal({
                         </FloatingField>
 
                         <FloatingField label="Required">
-                            <input
+                            <input autoComplete="off"
                                 type="number"
                                 min={1}
                                 max={totalNumber || undefined}
@@ -4346,7 +4350,7 @@ function AddPaperSectionModal({
                         </FloatingField>
 
                         <FloatingField label="Marks">
-                            <input
+                            <input autoComplete="off"
                                 type="number"
                                 min={1}
                                 value={marksEach}
@@ -5396,7 +5400,7 @@ function PaperQuestionPickerModal({
                 <div className="border-b border-slate-100 p-4 dark:border-slate-800">
                     <label className="relative block">
                         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                        <input
+                        <input autoComplete="off"
                             type="search"
                             value={search}
                             onChange={(event) =>

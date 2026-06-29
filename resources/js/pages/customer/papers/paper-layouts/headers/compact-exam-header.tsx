@@ -1,4 +1,4 @@
-import type { GeneratedPaperHeader } from '../types';
+﻿import type { GeneratedPaperHeader } from '../types';
 
 interface CompactExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -16,13 +16,13 @@ export function CompactExamHeader({
                 data-paper-header-divider="b"
                 className="grid grid-cols-3 items-center"
             >
-                <input
+                <input autoComplete="off"
                     value={header.schoolName}
                     onChange={(e) => onChange('schoolName', e.target.value)}
                     className="bg-transparent px-3 py-1.5 text-lg font-bold uppercase outline-none print:font-extrabold"
                     placeholder="School Name"
                 />
-                <input
+                <input autoComplete="off"
                     value={header.subject}
                     onChange={(e) => onChange('subject', e.target.value)}
                     className="bg-transparent px-3 py-1.5 text-center font-bold outline-none print:font-extrabold"
@@ -75,10 +75,10 @@ function CompactField({
             <span className="shrink-0 text-xs font-bold uppercase text-slate-500">
                 {label}
             </span>
-            <input
+            <input autoComplete="off"
                 value={String(header[field] ?? '')}
                 onChange={(e) => onChange(field, e.target.value)}
-                className="w-full min-w-0 border-b border-current bg-transparent text-sm font-semibold outline-none print:font-bold"
+                className="w-full min-w-0 border-b border-current bg-transparent text-sm font-normal outline-none"
             />
         </div>
     );

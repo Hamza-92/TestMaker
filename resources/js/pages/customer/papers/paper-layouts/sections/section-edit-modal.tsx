@@ -1,4 +1,4 @@
-import { XIcon } from 'lucide-react';
+﻿import { XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { GeneratedPaperSection } from '../types';
 
@@ -70,7 +70,7 @@ export function SectionEditModal({
                         <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                             Title
                         </span>
-                        <input
+                        <input autoComplete="off"
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
                             className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
@@ -81,7 +81,7 @@ export function SectionEditModal({
                             <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                                 Required
                             </span>
-                            <input
+                            <input autoComplete="off"
                                 type="number"
                                 min="0"
                                 max={section.questions.length}
@@ -98,7 +98,7 @@ export function SectionEditModal({
                             <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                                 Marks each
                             </span>
-                            <input
+                            <input autoComplete="off"
                                 type="number"
                                 min="0"
                                 value={marksEach}

@@ -1,4 +1,4 @@
-import type { GeneratedPaperHeader } from '../types';
+﻿import type { GeneratedPaperHeader } from '../types';
 
 interface CenteredExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -40,7 +40,7 @@ export function CenteredExamHeader({
                         {initials}
                     </div>
                 )}
-                <input
+                <input autoComplete="off"
                     value={header.schoolName}
                     onChange={(e) => onChange('schoolName', e.target.value)}
                     className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
@@ -63,10 +63,10 @@ export function CenteredExamHeader({
                         className="flex items-center gap-1 px-3 py-1.5"
                     >
                         <span className="shrink-0 font-bold">Subject:</span>
-                        <input
+                        <input autoComplete="off"
                             value={header.subject}
                             onChange={(e) => onChange('subject', e.target.value)}
-                            className="min-w-0 flex-1 bg-transparent font-semibold text-white outline-none print:font-bold"
+                            className="min-w-0 flex-1 bg-transparent font-normal text-white outline-none"
                             placeholder="Subject"
                         />
                     </div>
@@ -75,19 +75,19 @@ export function CenteredExamHeader({
                         className="flex items-center justify-center gap-1 px-3 py-1.5"
                     >
                         <span className="shrink-0 font-bold">Class:</span>
-                        <input
+                        <input autoComplete="off"
                             value={header.className}
                             onChange={(e) => onChange('className', e.target.value)}
-                            className="min-w-0 flex-1 bg-transparent font-semibold text-white outline-none print:font-bold"
+                            className="min-w-0 flex-1 bg-transparent font-normal text-white outline-none"
                             placeholder="Class"
                         />
                     </div>
                     <div className="flex items-center justify-end gap-1 px-3 py-1.5">
                         <span className="shrink-0 font-bold">Marks:</span>
-                        <input
+                        <input autoComplete="off"
                             value={String(header.marks ?? '')}
                             onChange={(e) => onChange('marks', e.target.value)}
-                            className="w-10 min-w-0 bg-transparent text-center font-bold text-white outline-none print:font-bold"
+                            className="w-10 min-w-0 bg-transparent text-center font-normal text-white outline-none"
                         />
                     </div>
                 </div>
@@ -165,10 +165,10 @@ function UnderlineField({
     return (
         <div className={`flex items-center gap-1 ${className}`}>
             <span className="shrink-0 font-bold">{label}:</span>
-            <input
+            <input autoComplete="off"
                 value={String(header[field] ?? '')}
                 onChange={(e) => onChange(field, e.target.value)}
-                className="min-w-0 flex-1 border-b border-current bg-transparent font-semibold outline-none print:font-bold"
+                className="min-w-0 flex-1 border-b border-current bg-transparent font-normal outline-none"
             />
         </div>
     );

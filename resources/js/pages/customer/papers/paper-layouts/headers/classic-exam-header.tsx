@@ -1,4 +1,4 @@
-import type { GeneratedPaperHeader } from '../types';
+﻿import type { GeneratedPaperHeader } from '../types';
 
 interface ClassicExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -87,12 +87,12 @@ function HeaderColumn({
                     >
                         {label}
                     </div>
-                    <input
+                    <input autoComplete="off"
                         value={String(header[field] ?? '')}
                         onChange={(event) =>
                             onChange(field, event.target.value)
                         }
-                        className="h-full min-w-0 bg-transparent px-2 py-1 text-sm font-semibold outline-none print:font-bold"
+                        className="h-full min-w-0 bg-transparent px-2 py-1 text-sm font-normal outline-none"
                     />
                 </div>
             ))}

@@ -1,4 +1,4 @@
-import type { GeneratedPaperHeader } from '../types';
+﻿import type { GeneratedPaperHeader } from '../types';
 
 interface FormalExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -29,24 +29,24 @@ export function FormalExamHeader({ header, onChange }: FormalExamHeaderProps) {
                 </div>
 
                 <div className="flex flex-col items-center justify-center px-4 py-2 text-center">
-                    <input
+                    <input autoComplete="off"
                         value={header.schoolName}
                         onChange={(e) => onChange('schoolName', e.target.value)}
                         className="w-full bg-transparent text-center text-2xl font-extrabold uppercase outline-none"
                         placeholder="School Name"
                     />
                     <div className="mt-0.5 flex items-center gap-4">
-                        <input
+                        <input autoComplete="off"
                             value={header.subject}
                             onChange={(e) => onChange('subject', e.target.value)}
-                            className="bg-transparent text-center font-bold outline-none"
+                            className="bg-transparent text-center font-normal outline-none"
                             placeholder="Subject"
                         />
                         <span className="text-slate-400">|</span>
-                        <input
+                        <input autoComplete="off"
                             value={header.exam}
                             onChange={(e) => onChange('exam', e.target.value)}
-                            className="bg-transparent text-center font-semibold outline-none"
+                            className="bg-transparent text-center font-normal outline-none"
                             placeholder="Exam / Year"
                         />
                     </div>
@@ -60,10 +60,10 @@ export function FormalExamHeader({ header, onChange }: FormalExamHeaderProps) {
                     <span className="text-xs font-bold uppercase text-slate-500">
                         Marks
                     </span>
-                    <input
+                    <input autoComplete="off"
                         value={String(header.marks ?? '')}
                         onChange={(e) => onChange('marks', e.target.value)}
-                        className="w-full bg-transparent text-center text-xl font-extrabold outline-none print:font-black"
+                        className="w-full bg-transparent text-center text-xl font-normal outline-none"
                     />
                 </div>
             </div>
@@ -110,10 +110,10 @@ function LabeledCell({
             <div className="bg-slate-100 px-2 py-1 text-xs font-bold uppercase">
                 {label}
             </div>
-            <input
+            <input autoComplete="off"
                 value={String(header[field] ?? '')}
                 onChange={(e) => onChange(field, e.target.value)}
-                className="h-full min-w-0 bg-transparent px-2 py-1 font-semibold outline-none print:font-bold"
+                className="h-full min-w-0 bg-transparent px-2 py-1 font-normal outline-none"
             />
         </div>
     );
