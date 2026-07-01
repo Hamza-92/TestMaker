@@ -24,7 +24,7 @@ import {
     Trash2Icon,
     XIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
@@ -42,7 +42,16 @@ import { GoBackDialog } from './paper-layouts/go-back-dialog';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
 import type { SavePaperValues } from './paper-layouts/save-paper-modal';
-import { QuestionEditModal } from './paper-layouts/questions/question-edit-modal';
+// Lazy-loaded: this modal pulls in browser-only editors (tinymce, mathlive)
+// that have no SSR-safe exports. A static import drags them into the SSR
+// module graph and crashes server rendering of /papers/generate with
+// "mathlive does not provide an export named 'MathfieldElement'". Lazy loading
+// keeps them out of SSR — the modal only ever mounts client-side on demand.
+const QuestionEditModal = lazy(() =>
+    import('./paper-layouts/questions/question-edit-modal').then((module) => ({
+        default: module.QuestionEditModal,
+    })),
+);
 import { pickSectionTemplate } from './paper-layouts/templates';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
 import {
@@ -3084,12 +3093,16 @@ export default function GeneratePaper({
                     />
 
                     {activePaperQuestionEditorContext && (
-                        <QuestionEditModal
-                            key={activePaperQuestionEditorContext.question.id}
-                            question={activePaperQuestionEditorContext.question}
-                            onClose={closePaperQuestionEditor}
-                            onSave={savePaperQuestionEdit}
-                        />
+                        <Suspense fallback={null}>
+                            <QuestionEditModal
+                                key={activePaperQuestionEditorContext.question.id}
+                                question={
+                                    activePaperQuestionEditorContext.question
+                                }
+                                onClose={closePaperQuestionEditor}
+                                onSave={savePaperQuestionEdit}
+                            />
+                        </Suspense>
                     )}
 
                     {activePaperSectionEditorContext && (
