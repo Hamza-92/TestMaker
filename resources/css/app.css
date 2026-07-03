@@ -59,6 +59,22 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    /* ── Customer brand scale ──────────────────────────────────────────
+       The single source of truth for the customer app's color. Swap this
+       block to rebrand the whole customer side (Tailwind blue today).
+       Usage: bg-brand-600, text-brand-700, border-brand-200, … */
+    --color-brand-50: oklch(0.97 0.014 254.604);
+    --color-brand-100: oklch(0.932 0.032 255.585);
+    --color-brand-200: oklch(0.882 0.059 254.128);
+    --color-brand-300: oklch(0.809 0.105 251.813);
+    --color-brand-400: oklch(0.707 0.165 254.624);
+    --color-brand-500: oklch(0.623 0.214 259.815);
+    --color-brand-600: oklch(0.546 0.245 262.881);
+    --color-brand-700: oklch(0.488 0.243 264.376);
+    --color-brand-800: oklch(0.424 0.199 265.638);
+    --color-brand-900: oklch(0.379 0.146 265.522);
+    --color-brand-950: oklch(0.282 0.091 267.935);
 }
 
 :root {
@@ -132,6 +148,32 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
+}
+
+/* ── Customer app theme ────────────────────────────────────────────────
+   Applied to <body> by CustomerLayout so Radix portals (dialogs, menus,
+   selects) inherit it too. Re-points the semantic shadcn tokens at the
+   brand scale — customer pages and ui/* components pick it up with zero
+   changes, while the superadmin side keeps the :root values above. */
+.theme-customer {
+    --primary: var(--color-brand-600);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: var(--color-brand-50);
+    --secondary-foreground: var(--color-brand-700);
+    --accent: var(--color-brand-50);
+    --accent-foreground: var(--color-brand-700);
+    --ring: var(--color-brand-500);
+    --radius: 0.5rem;
+}
+
+.dark .theme-customer {
+    --primary: var(--color-brand-500);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.28 0.06 262);
+    --secondary-foreground: var(--color-brand-100);
+    --accent: oklch(0.28 0.06 262);
+    --accent-foreground: var(--color-brand-100);
+    --ring: var(--color-brand-400);
 }
 
 @layer base {

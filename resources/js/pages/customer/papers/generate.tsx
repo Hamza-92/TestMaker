@@ -31,14 +31,13 @@ import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
-import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
-import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
-import { CenteredExamHeader } from './paper-layouts/headers/centered-exam-header';
-import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
-import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
-import type { PaperHeaderTemplate } from './paper-layouts/types';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
+import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
+import { CenteredExamHeader } from './paper-layouts/headers/centered-exam-header';
+import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
+import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
+import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
 import type { SavePaperValues } from './paper-layouts/save-paper-modal';
@@ -52,20 +51,22 @@ const QuestionEditModal = lazy(() =>
         default: module.QuestionEditModal,
     })),
 );
-import { pickSectionTemplate } from './paper-layouts/templates';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
+import { pickSectionTemplate } from './paper-layouts/templates';
 import {
     DEFAULT_PAPER_SETTINGS,
     getPageDimensions,
-    normalizePaperSettings,
-    type GeneratedPaper,
-    type GeneratedPaperHeader,
-    type GeneratedPaperQuestion,
-    type GeneratedPaperSection,
-    type PaperImageSize,
-    type PaperQuestionOption,
-    type PaperSettings,
+    normalizePaperSettings
+    
+    
+    
+    
+    
+    
+    
 } from './paper-layouts/types';
+import type { PaperHeaderTemplate } from './paper-layouts/types';
+import type {GeneratedPaper, GeneratedPaperHeader, GeneratedPaperQuestion, GeneratedPaperSection, PaperImageSize, PaperQuestionOption, PaperSettings} from './paper-layouts/types';
 
 interface Pattern {
     id: number;
@@ -124,20 +125,27 @@ function serializeChapterSelection(
     selected: Record<number, Set<number>>,
 ): Record<number, number[]> {
     const out: Record<number, number[]> = {};
+
     for (const [key, value] of Object.entries(selected)) {
         out[Number(key)] = [...value];
     }
+
     return out;
 }
 
 function deserializeChapterSelection(
     plain: Record<string, number[]> | null | undefined,
 ): Record<number, Set<number>> {
-    if (!plain) return {};
+    if (!plain) {
+return {};
+}
+
     const out: Record<number, Set<number>> = {};
+
     for (const [key, value] of Object.entries(plain)) {
         out[Number(key)] = new Set(value);
     }
+
     return out;
 }
 
@@ -547,10 +555,10 @@ function TriCheckbox({
                 'flex shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-all',
                 checkboxSize,
                 state === 'checked'
-                    ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                    ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                     : state === 'indeterminate'
-                      ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
-                      : 'border-slate-300 bg-white hover:border-teal-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-teal-400',
+                      ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
+                      : 'border-slate-300 bg-white hover:border-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-400',
             )}
         >
             {state === 'checked' && (
@@ -581,7 +589,7 @@ function SourceCheckbox({
             className={cn(
                 'inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors',
                 checked
-                    ? 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200'
+                    ? 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-slate-100',
             )}
         >
@@ -589,7 +597,7 @@ function SourceCheckbox({
                 className={cn(
                     'flex size-4 items-center justify-center rounded-[5px] border transition-colors',
                     checked
-                        ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                        ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                         : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950',
                 )}
             >
@@ -654,9 +662,9 @@ function StepPill({
                 className={cn(
                     'flex size-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors',
                     state === 'active' &&
-                        'bg-teal-600 text-white ring-4 ring-teal-500/15 dark:bg-teal-500 dark:text-slate-950 dark:ring-teal-400/15',
+                        'bg-brand-600 text-white ring-4 ring-brand-500/15 dark:bg-brand-500 dark:text-white dark:ring-brand-400/15',
                     state === 'done' &&
-                        'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
+                        'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300',
                     state === 'upcoming' &&
                         'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
                 )}
@@ -720,7 +728,7 @@ function NumberField({
                 value={value}
                 placeholder={placeholder}
                 onChange={(event) => onChange(onlyDigits(event.target.value))}
-                className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-teal-400 dark:focus:ring-teal-400/20 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
+                className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-400 dark:focus:ring-brand-400/20 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
             />
         </label>
     );
@@ -729,10 +737,21 @@ function NumberField({
 function draftTimeAgo(timestamp: number): string {
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
+
+    if (minutes < 1) {
+return 'just now';
+}
+
+    if (minutes < 60) {
+return `${minutes}m ago`;
+}
+
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+
+    if (hours < 24) {
+return `${hours}h ago`;
+}
+
     return `${Math.floor(hours / 24)}d ago`;
 }
 
@@ -772,15 +791,19 @@ function PaperHeader({
     if (template === 'banner') {
         return <BannerExamHeader header={header} onChange={onChange} />;
     }
+
     if (template === 'formal') {
         return <FormalExamHeader header={header} onChange={onChange} />;
     }
+
     if (template === 'centered') {
         return <CenteredExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} onChange={onChange} />;
     }
+
     if (template === 'tabular') {
         return <TabularExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} onChange={onChange} />;
     }
+
     return <ClassicExamHeader header={header} onChange={onChange} />;
 }
 
@@ -1342,7 +1365,10 @@ export default function GeneratePaper({
             // prop because the savedPaperId state hook hasn't been set yet on
             // the first effect tick.
             const raw = localStorage.getItem(draftKey(savedPaper?.id ?? null));
-            if (raw) setRecoveryDraft(JSON.parse(raw) as DraftPayload);
+
+            if (raw) {
+setRecoveryDraft(JSON.parse(raw) as DraftPayload);
+}
         } catch {
             // ignore corrupted draft
         }
@@ -1355,12 +1381,19 @@ export default function GeneratePaper({
         // the autosave timer and immediately overwrite any genuine unsaved
         // changes already sitting in localStorage with the server's last-saved
         // state — silently destroying recovery data.
-        if (!isDirty) return;
-        if (!generatedPaper || !pattern || !klass || !subject) return;
+        if (!isDirty) {
+return;
+}
+
+        if (!generatedPaper || !pattern || !klass || !subject) {
+return;
+}
 
         setDraftStatus('saving');
 
-        if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+        if (autoSaveRef.current) {
+clearTimeout(autoSaveRef.current);
+}
 
         autoSaveRef.current = setTimeout(() => {
             try {
@@ -1382,7 +1415,9 @@ export default function GeneratePaper({
         }, 1500);
 
         return () => {
-            if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+            if (autoSaveRef.current) {
+clearTimeout(autoSaveRef.current);
+}
         };
     }, [
         isDirty,
@@ -1397,13 +1432,20 @@ export default function GeneratePaper({
     ]);
 
     useEffect(() => {
-        if (draftStatus !== 'saved') return;
+        if (draftStatus !== 'saved') {
+return;
+}
+
         const timer = setTimeout(() => setDraftStatus('idle'), 3000);
+
         return () => clearTimeout(timer);
     }, [draftStatus]);
 
     useEffect(() => {
-        if (!savedPaper) return;
+        if (!savedPaper) {
+return;
+}
+
         isRestoringRef.current = true;
         // Backfill / migrate settings: handles the original single-fontFamily
         // shape and any missing/unrecognized fields.
@@ -1420,11 +1462,13 @@ export default function GeneratePaper({
             },
         );
         setSelected(deserializeChapterSelection(savedPaper.chapterSelection));
+
         if (savedPaper.meta) {
             setPattern(savedPaper.meta.pattern ?? null);
             setKlass(savedPaper.meta.klass ?? null);
             setSubject(savedPaper.meta.subject ?? null);
         }
+
         setSavedPaperId(savedPaper.id);
         setSavedPaperName(savedPaper.name);
         setSavedPaperIsDraft(savedPaper.is_draft);
@@ -1433,15 +1477,20 @@ export default function GeneratePaper({
     }, []);
 
     useEffect(() => {
-        if (generatedPaper === null) return;
+        if (generatedPaper === null) {
+return;
+}
+
         // Mount-time and post-save restores set isRestoringRef so the freshly
         // applied server state doesn't get mis-flagged as dirty. Any other
         // change to generatedPaper is the user editing — mark it dirty so the
         // autosave effect can persist it to localStorage.
         if (isRestoringRef.current) {
             isRestoringRef.current = false;
+
             return;
         }
+
         setIsDirty(true);
     }, [generatedPaper]);
 
@@ -1871,7 +1920,10 @@ export default function GeneratePaper({
     }
 
     function returnToPaperSetup() {
-        if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+        if (autoSaveRef.current) {
+clearTimeout(autoSaveRef.current);
+}
+
         setGeneratedPaper(null);
         setPaperQuestionPickerTarget(null);
         setPaperQuestionSearch('');
@@ -1892,7 +1944,10 @@ export default function GeneratePaper({
     }
 
     function saveDraft() {
-        if (!generatedPaper || !pattern || !klass || !subject) return;
+        if (!generatedPaper || !pattern || !klass || !subject) {
+return;
+}
+
         try {
             localStorage.setItem(
                 draftKey(savedPaperId),
@@ -1927,6 +1982,7 @@ export default function GeneratePaper({
         } catch {
             // localStorage unavailable
         }
+
         setRecoveryDraft(null);
     }
 
@@ -1948,7 +2004,9 @@ export default function GeneratePaper({
     // draft and stays on the page. Differs from `saveDraftAndBack` which
     // also navigates back to setup after saving.
     async function saveAsDraft() {
-        if (isSavingDraft) return;
+        if (isSavingDraft) {
+return;
+}
 
         setIsSavingDraft(true);
 
@@ -1971,7 +2029,9 @@ export default function GeneratePaper({
     }
 
     async function saveDraftAndBack() {
-        if (isSavingDraft) return;
+        if (isSavingDraft) {
+return;
+}
 
         setIsSavingDraft(true);
         saveDraft();
@@ -2080,7 +2140,9 @@ export default function GeneratePaper({
     }
 
     async function savePaperToServer(values: SavePaperValues) {
-        if (!generatedPaper || isSavingPaper) return;
+        if (!generatedPaper || isSavingPaper) {
+return;
+}
 
         setIsSavingPaper(true);
         setSavePaperError(null);
@@ -2135,7 +2197,10 @@ export default function GeneratePaper({
                     body: JSON.stringify(payload),
                     credentials: 'same-origin',
                 });
-                if (!res.ok) throw new Error('Failed to save paper.');
+
+                if (!res.ok) {
+throw new Error('Failed to save paper.');
+}
             } else {
                 const res = await fetch('/papers', {
                     method: 'POST',
@@ -2148,7 +2213,11 @@ export default function GeneratePaper({
                     body: JSON.stringify(payload),
                     credentials: 'same-origin',
                 });
-                if (!res.ok) throw new Error('Failed to save paper.');
+
+                if (!res.ok) {
+throw new Error('Failed to save paper.');
+}
+
                 const data = (await res.json()) as { id: number };
                 newId = data.id;
                 setSavedPaperId(newId);
@@ -2175,7 +2244,10 @@ export default function GeneratePaper({
     }
 
     function defaultPaperName(): string {
-        if (!generatedPaper) return '';
+        if (!generatedPaper) {
+return '';
+}
+
         return (
             [
                 generatedPaper.header.exam,
@@ -3161,16 +3233,16 @@ export default function GeneratePaper({
                 <>
                     <div className="mx-auto max-w-7xl space-y-6">
                         {recoveryDraft && (
-                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 dark:border-teal-500/30 dark:bg-teal-500/10">
+                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-500/30 dark:bg-brand-500/10">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400">
+                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400">
                                         <BookmarkIcon className="size-4" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-teal-900 dark:text-teal-100">
+                                        <p className="text-sm font-semibold text-brand-900 dark:text-brand-100">
                                             Unsaved draft found
                                         </p>
-                                        <p className="mt-0.5 text-xs text-teal-700 dark:text-teal-300">
+                                        <p className="mt-0.5 text-xs text-brand-700 dark:text-brand-300">
                                             {recoveryDraft.meta.subject.label}{' '}
                                             &middot;{' '}
                                             {recoveryDraft.meta.klass.label}{' '}
@@ -3188,14 +3260,14 @@ export default function GeneratePaper({
                                         onClick={() =>
                                             restoreDraft(recoveryDraft)
                                         }
-                                        className="cursor-pointer rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                                        className="cursor-pointer rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                                     >
                                         Restore Draft
                                     </button>
                                     <button
                                         type="button"
                                         onClick={dismissRecoveryDraft}
-                                        className="cursor-pointer rounded-lg border border-teal-200 bg-white px-3 py-1.5 text-xs font-medium text-teal-700 transition-colors hover:bg-teal-50 dark:border-teal-500/30 dark:bg-transparent dark:text-teal-300 dark:hover:bg-teal-500/10"
+                                        className="cursor-pointer rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-transparent dark:text-brand-300 dark:hover:bg-brand-500/10"
                                     >
                                         Dismiss
                                     </button>
@@ -3233,7 +3305,7 @@ export default function GeneratePaper({
                             <>
                                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.02] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/10">
                                     <div className="mb-4 flex items-center gap-2">
-                                        <div className="flex size-7 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+                                        <div className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
                                             <LayersIcon className="size-4" />
                                         </div>
                                         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -3290,7 +3362,7 @@ export default function GeneratePaper({
                                                             onClick={
                                                                 toggleAllChapters
                                                             }
-                                                            className="cursor-pointer text-xs font-medium text-slate-700 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300"
+                                                            className="cursor-pointer text-xs font-medium text-slate-700 transition-colors hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300"
                                                         >
                                                             Select all
                                                         </button>
@@ -3432,7 +3504,7 @@ export default function GeneratePaper({
                                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <div className="flex size-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+                                                <div className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
                                                     <FileTextIcon className="size-4" />
                                                 </div>
                                                 <div>
@@ -3477,7 +3549,7 @@ export default function GeneratePaper({
                                             </div>
                                         </div>
 
-                                        <div className="min-w-28 rounded-xl bg-teal-600 px-4 py-3 text-white dark:bg-teal-500 dark:text-slate-950">
+                                        <div className="min-w-28 rounded-xl bg-brand-600 px-4 py-3 text-white dark:bg-brand-500 dark:text-white">
                                             <p className="text-[11px] font-medium opacity-80">
                                                 Total marks
                                             </p>
@@ -3596,7 +3668,7 @@ export default function GeneratePaper({
                                             'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
                                             !canContinueToQuestions
                                                 ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-                                                : 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400',
+                                                : 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400',
                                         )}
                                     >
                                         Next
@@ -3623,7 +3695,7 @@ export default function GeneratePaper({
                                             'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
                                             !canGeneratePaper || generatingPaper
                                                 ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-                                                : 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400',
+                                                : 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400',
                                         )}
                                     >
                                         {generatingPaper && (
@@ -3699,7 +3771,7 @@ function ManualQuestionPickerModal({
                 <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-3.5 dark:border-slate-800">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                            <div className="flex size-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
                                 <ListChecksIcon className="size-4" />
                             </div>
                             <div className="min-w-0">
@@ -3713,7 +3785,7 @@ function ManualQuestionPickerModal({
                         </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        <div className="flex h-9 items-center justify-center rounded-lg bg-teal-600 px-3 text-sm font-bold text-white dark:bg-teal-500 dark:text-slate-950">
+                        <div className="flex h-9 items-center justify-center rounded-lg bg-brand-600 px-3 text-sm font-bold text-white dark:bg-brand-500 dark:text-white">
                             {activeSelectedCount}/{activeRow.target}
                         </div>
                         <button
@@ -3738,7 +3810,7 @@ function ManualQuestionPickerModal({
                                 onSearchChange(event.target.value)
                             }
                             placeholder="Search questions"
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-teal-400"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-400"
                         />
                     </label>
                     <button
@@ -3747,7 +3819,7 @@ function ManualQuestionPickerModal({
                         className={cn(
                             'inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors',
                             showSelectedOnly
-                                ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200'
+                                ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800',
                         )}
                     >
@@ -3804,8 +3876,8 @@ function ManualQuestionPickerModal({
                                     className={cn(
                                         'flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
                                         checked
-                                            ? 'border-teal-300 bg-teal-50/60 dark:border-teal-500/40 dark:bg-teal-500/10'
-                                            : 'border-slate-200 bg-white hover:border-teal-200 hover:bg-teal-50/30 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-teal-500/30 dark:hover:bg-teal-500/5',
+                                            ? 'border-brand-300 bg-brand-50/60 dark:border-brand-500/40 dark:bg-brand-500/10'
+                                            : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/30 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/5',
                                         disabled &&
                                             'cursor-not-allowed opacity-50',
                                     )}
@@ -3814,7 +3886,7 @@ function ManualQuestionPickerModal({
                                         className={cn(
                                             'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
                                             checked
-                                                ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                                                ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                                                 : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
                                         )}
                                     >
@@ -3866,7 +3938,7 @@ function ManualQuestionPickerModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                        className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                     >
                         Done
                     </button>
@@ -4345,7 +4417,7 @@ function AddPaperSectionModal({
                                 onChange={(event) =>
                                     updateTotalQuestions(event.target.value)
                                 }
-                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-teal-400 dark:focus:ring-teal-400/15"
+                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-brand-400 dark:focus:ring-brand-400/15"
                             />
                         </FloatingField>
 
@@ -4358,7 +4430,7 @@ function AddPaperSectionModal({
                                 onChange={(event) =>
                                     updateRequiredQuestions(event.target.value)
                                 }
-                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-teal-400 dark:focus:ring-teal-400/15"
+                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-brand-400 dark:focus:ring-brand-400/15"
                             />
                         </FloatingField>
 
@@ -4370,7 +4442,7 @@ function AddPaperSectionModal({
                                 onChange={(event) =>
                                     setMarksEach(onlyDigits(event.target.value))
                                 }
-                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-teal-400 dark:focus:ring-teal-400/15"
+                                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-brand-400 dark:focus:ring-brand-400/15"
                             />
                         </FloatingField>
 
@@ -4381,7 +4453,7 @@ function AddPaperSectionModal({
                             className={cn(
                                 'inline-flex h-12 cursor-pointer items-center justify-center gap-2 self-end rounded-xl px-5 text-sm font-semibold transition-colors',
                                 canSearch
-                                    ? 'bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400'
+                                    ? 'bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400'
                                     : 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
                             )}
                         >
@@ -4413,7 +4485,7 @@ function AddPaperSectionModal({
                         >
                             Chapters &amp; topics
                         </AddSectionTabButton>
-                        <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 dark:bg-teal-500/10 dark:text-teal-200">
+                        <span className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand-700 dark:bg-brand-500/10 dark:text-brand-200">
                             Marks ({requiredNumber}=
                             {requiredNumber * marksNumber})
                         </span>
@@ -4468,7 +4540,7 @@ function AddPaperSectionModal({
                             type="button"
                             disabled={!canSearch || totalNumber <= 0}
                             onClick={selectRandomQuestions}
-                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-700 transition-colors hover:border-teal-300 hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200"
+                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200"
                         >
                             <SparklesIcon className="size-4" />
                             Select randomly
@@ -4480,7 +4552,7 @@ function AddPaperSectionModal({
                             className={cn(
                                 'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
                                 canSubmit
-                                    ? 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400'
+                                    ? 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400'
                                     : 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
                             )}
                         >
@@ -4505,7 +4577,7 @@ function FloatingField({
 }) {
     return (
         <label className="group/field relative block">
-            <span className="pointer-events-none absolute -top-2 left-3 z-10 bg-white px-1 text-[11px] font-medium text-slate-600 transition-colors group-focus-within/field:text-teal-600 dark:bg-slate-900 dark:text-slate-300 dark:group-focus-within/field:text-teal-400">
+            <span className="pointer-events-none absolute -top-2 left-3 z-10 bg-white px-1 text-[11px] font-medium text-slate-600 transition-colors group-focus-within/field:text-brand-600 dark:bg-slate-900 dark:text-slate-300 dark:group-focus-within/field:text-brand-400">
                 {label}
             </span>
             {children}
@@ -4529,7 +4601,7 @@ function AddSectionTabButton({
             className={cn(
                 'relative inline-flex h-10 cursor-pointer items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors',
                 active
-                    ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-500 dark:bg-teal-500 dark:text-slate-950'
+                    ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-500 dark:bg-brand-500 dark:text-white'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
             )}
         >
@@ -4646,7 +4718,7 @@ function QuestionPickedPanel({
 
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-teal-50 px-4 py-3 text-teal-700 dark:bg-teal-500/10 dark:text-teal-200">
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3 text-brand-700 dark:bg-brand-500/10 dark:text-brand-200">
                 <h3 className="text-sm font-semibold">Picked questions</h3>
                 <span className="text-sm font-bold">
                     {questions.length}/{selectedLimit}
@@ -4688,7 +4760,7 @@ function QuestionSearchRow({
             className={cn(
                 'block w-full cursor-pointer px-4 py-3 text-left transition-colors',
                 checked
-                    ? 'bg-teal-50/70 dark:bg-teal-500/10'
+                    ? 'bg-brand-50/70 dark:bg-brand-500/10'
                     : 'hover:bg-slate-50 dark:hover:bg-slate-950/60',
                 disabled && 'cursor-not-allowed opacity-50',
             )}
@@ -4698,7 +4770,7 @@ function QuestionSearchRow({
                     className={cn(
                         'mt-1 flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
                         checked
-                            ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                            ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                             : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
                     )}
                 >
@@ -4780,7 +4852,7 @@ function ChapterTopicFilterPanel({
                                 className={cn(
                                     'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
                                     checked || partial
-                                        ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                                        ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                                         : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
                                 )}
                             >
@@ -4824,13 +4896,13 @@ function ChapterTopicFilterPanel({
                                             onClick={() =>
                                                 onToggleTopic(topic.id)
                                             }
-                                            className="flex cursor-pointer items-center gap-2 text-left text-sm text-slate-700 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300"
+                                            className="flex cursor-pointer items-center gap-2 text-left text-sm text-slate-700 transition-colors hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300"
                                         >
                                             <span
                                                 className={cn(
                                                     'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
                                                     topicChecked
-                                                        ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                                                        ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                                                         : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
                                                 )}
                                             >
@@ -5014,13 +5086,18 @@ function GeneratedPaperView({
     // React 19 hoists this <style> to <head>, so it wins over the print
     // fallback in app.css whenever a paper is on screen.
     const pageNumberContent = (() => {
-        if (!settings.pageNumbersEnabled) return null;
+        if (!settings.pageNumbersEnabled) {
+return null;
+}
+
         if (settings.pageNumberFormat === 'n-of-m') {
             return '"" counter(page) " of " counter(pages)';
         }
+
         if (settings.pageNumberFormat === 'page-n') {
             return '"Page " counter(page)';
         }
+
         return 'counter(page)';
     })();
     const pageNumberSlot = (() => {
@@ -5113,7 +5190,7 @@ function GeneratedPaperView({
                             className={cn(
                                 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                                 savedPaperId !== null && !isDirty
-                                    ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-400'
+                                    ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400'
                                     : savedPaperId !== null && isDirty
                                       ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400'
                                       : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
@@ -5145,7 +5222,7 @@ function GeneratedPaperView({
                         <button
                             type="button"
                             onClick={() => window.print()}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950"
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white"
                         >
                             <PrinterIcon className="size-4" />
                             Print
@@ -5229,6 +5306,7 @@ function GeneratedPaperView({
                                     settings.questionLayout,
                                     section.category,
                                 );
+
                                 return (
                                     <Template
                                         key={section.id}
@@ -5323,7 +5401,7 @@ function GeneratedPaperView({
                 onClick={() => setIsSettingsDrawerOpen(true)}
                 aria-label="Open paper settings"
                 title="Paper settings"
-                className="fixed top-1/2 right-3 z-30 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg shadow-slate-900/10 transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-500/40 dark:hover:bg-teal-500/10 dark:hover:text-teal-300 print:hidden"
+                className="fixed top-1/2 right-3 z-30 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg shadow-slate-900/10 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/10 dark:hover:text-brand-300 print:hidden"
             >
                 <SettingsIcon className="size-5" />
             </button>
@@ -5420,7 +5498,7 @@ function PaperQuestionPickerModal({
                                 onSearchChange(event.target.value)
                             }
                             placeholder="Search questions"
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-teal-400"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-400"
                         />
                     </label>
                 </div>
@@ -5464,8 +5542,8 @@ function PaperQuestionPickerModal({
                                 className={cn(
                                     'flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
                                     isCurrent
-                                        ? 'border-teal-300 bg-teal-50/60 dark:border-teal-500/40 dark:bg-teal-500/10'
-                                        : 'border-slate-200 bg-white hover:border-teal-200 hover:bg-teal-50/30 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-teal-500/30 dark:hover:bg-teal-500/5',
+                                        ? 'border-brand-300 bg-brand-50/60 dark:border-brand-500/40 dark:bg-brand-500/10'
+                                        : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/30 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/5',
                                     isUsed && 'cursor-not-allowed opacity-50',
                                 )}
                             >
@@ -5473,7 +5551,7 @@ function PaperQuestionPickerModal({
                                     className={cn(
                                         'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
                                         isCurrent
-                                            ? 'border-teal-600 bg-teal-600 text-white dark:border-teal-400 dark:bg-teal-400 dark:text-slate-950'
+                                            ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                                             : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
                                     )}
                                 >
@@ -5566,7 +5644,7 @@ function DirectChapterGroup({
             className={cn(
                 'overflow-hidden rounded-xl border bg-white transition-colors dark:bg-slate-900',
                 isActive
-                    ? 'border-teal-300 dark:border-teal-500/40'
+                    ? 'border-brand-300 dark:border-brand-500/40'
                     : 'border-slate-200 dark:border-slate-800',
             )}
         >
@@ -5616,7 +5694,7 @@ function DirectChapterRow({
                     'rounded-xl border transition-colors dark:border-slate-800',
                 standalone &&
                     (checked
-                        ? 'border-teal-300 dark:border-teal-500/40'
+                        ? 'border-brand-300 dark:border-brand-500/40'
                         : 'border-slate-200'),
             )}
         >
@@ -5632,8 +5710,8 @@ function DirectChapterRow({
                 className={cn(
                     'flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-sm transition-colors',
                     checked
-                        ? 'text-teal-700 dark:text-teal-300'
-                        : 'text-slate-700 hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300',
+                        ? 'text-brand-700 dark:text-brand-300'
+                        : 'text-slate-700 hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300',
                 )}
             >
                 {chapter.chapter_number !== null && (
@@ -5641,7 +5719,7 @@ function DirectChapterRow({
                         className={cn(
                             'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold whitespace-nowrap',
                             checked
-                                ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200'
+                                ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200'
                                 : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
                         )}
                     >
@@ -5676,7 +5754,7 @@ function ChapterCard({
             className={cn(
                 'group rounded-2xl border bg-white p-4 transition-all',
                 isActive
-                    ? 'border-teal-300 ring-2 ring-teal-500/10 dark:border-teal-500/40 dark:ring-teal-400/10'
+                    ? 'border-brand-300 ring-2 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
                     : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700',
                 'dark:bg-slate-900',
             )}
@@ -5694,7 +5772,7 @@ function ChapterCard({
                                 className={cn(
                                     'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold whitespace-nowrap transition-colors',
                                     isActive
-                                        ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200'
+                                        ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200'
                                         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
                                 )}
                             >
@@ -5730,7 +5808,7 @@ function ChapterCard({
                                 className={cn(
                                     'flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors',
                                     checked
-                                        ? 'text-teal-700 dark:text-teal-300'
+                                        ? 'text-brand-700 dark:text-brand-300'
                                         : 'text-slate-600 dark:text-slate-300',
                                 )}
                             >
@@ -5805,7 +5883,7 @@ function QuestionSelectionCard({
                 isDragging
                     ? 'border-slate-300 opacity-55 dark:border-slate-700'
                     : isDragTarget
-                      ? 'border-teal-400 bg-teal-50/40 ring-2 ring-teal-500/10 dark:border-teal-500/60 dark:bg-teal-500/5'
+                      ? 'border-brand-400 bg-brand-50/40 ring-2 ring-brand-500/10 dark:border-brand-500/60 dark:bg-brand-500/5'
                       : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700',
             )}
         >
@@ -5826,7 +5904,7 @@ function QuestionSelectionCard({
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         {section.title}
                     </h4>
-                    <span className="rounded-md bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700 dark:bg-teal-500/10 dark:text-teal-300">
+                    <span className="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
                         {section.availableCount} available
                     </span>
                 </div>
@@ -5835,7 +5913,7 @@ function QuestionSelectionCard({
                     onClick={() => onAddRow(section.id)}
                     aria-label={`Add another ${section.title} row`}
                     title={`Add another ${section.title} row`}
-                    className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-teal-700 transition-colors hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20"
+                    className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-brand-50 text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200 dark:hover:bg-brand-500/20"
                 >
                     <PlusIcon className="size-4" />
                 </button>
@@ -5907,8 +5985,8 @@ function QuestionSelectionCard({
                                         'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors',
                                         row.selectedQuestionIds.length ===
                                             rowTarget(row) && rowTarget(row) > 0
-                                            ? 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/20'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-teal-500/30 dark:hover:text-teal-300',
+                                            ? 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200 dark:hover:bg-brand-500/20'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-brand-500/30 dark:hover:text-brand-300',
                                     )}
                                 >
                                     <ListChecksIcon className="size-3.5" />

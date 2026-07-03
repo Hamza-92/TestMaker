@@ -39,9 +39,12 @@ export function SavePaperModal({
 
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.key === 'Escape') onCancel();
+            if (event.key === 'Escape') {
+onCancel();
+}
         }
         window.addEventListener('keydown', onKeyDown);
+
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [onCancel]);
 
@@ -52,7 +55,11 @@ export function SavePaperModal({
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!values.name.trim() || isSaving) return;
+
+        if (!values.name.trim() || isSaving) {
+return;
+}
+
         onSave({ ...values, name: values.name.trim() });
     }
 
@@ -71,7 +78,7 @@ export function SavePaperModal({
             >
                 {/* Header */}
                 <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
                         <BookmarkIcon className="size-5" />
                     </div>
                     <div>
@@ -201,7 +208,7 @@ export function SavePaperModal({
                         <button
                             type="submit"
                             disabled={!values.name.trim() || isSaving}
-                            className="flex-1 cursor-pointer rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                            className="flex-1 cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                         >
                             {isSaving ? 'Saving…' : isUpdate ? 'Update' : 'Save Paper'}
                         </button>
@@ -213,7 +220,7 @@ export function SavePaperModal({
 }
 
 const inputClass =
-    'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-teal-400';
+    'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400';
 
 function Field({
     label,

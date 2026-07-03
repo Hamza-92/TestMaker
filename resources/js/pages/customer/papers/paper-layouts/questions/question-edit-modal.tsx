@@ -255,7 +255,7 @@ export function QuestionEditModal({
                     <button
                         type="button"
                         onClick={handleSave}
-                        className="cursor-pointer rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                        className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                     >
                         Update
                     </button>
@@ -312,7 +312,7 @@ function EquationDialog({
         const mathfield = new MathfieldElement();
         mathfield.value = initialLatex;
         mathfield.className =
-            'min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xl shadow-sm outline-none focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20 dark:border-slate-700 dark:bg-slate-950';
+            'min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xl shadow-sm outline-none focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950';
         mathfield.mathVirtualKeyboardPolicy = 'manual';
         mathfield.setAttribute('smart-fence', 'on');
         mathfield.addEventListener('input', () => {
@@ -369,7 +369,7 @@ function EquationDialog({
                         <button
                             type="button"
                             onClick={() => setShowImathEqEditor(true)}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-700 transition-colors hover:border-teal-300 hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200"
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200"
                         >
                             <ExternalLinkIcon className="size-4" />
                             Extended editor
@@ -377,7 +377,7 @@ function EquationDialog({
                         <button
                             type="button"
                             onClick={toggleVirtualKeyboard}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-teal-500/30 dark:hover:bg-teal-500/10 dark:hover:text-teal-200"
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/10 dark:hover:text-brand-200"
                         >
                             <KeyboardIcon className="size-4" />
                             Keyboard
@@ -409,7 +409,7 @@ function EquationDialog({
                                 updateLatex(event.target.value)
                             }
                             rows={3}
-                            className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 transition-colors outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 transition-colors outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         />
                     </label>
 
@@ -421,7 +421,7 @@ function EquationDialog({
                                 onChange={(event) =>
                                     setDisplayMode(event.target.checked)
                                 }
-                                className="size-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                             />
                             Display as separate equation line
                         </label>
@@ -452,7 +452,7 @@ function EquationDialog({
                         type="button"
                         disabled={latex.trim() === ''}
                         onClick={() => onSave(latex, displayMode)}
-                        className="cursor-pointer rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                        className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
                     >
                         Insert Equation
                     </button>
@@ -500,7 +500,7 @@ function ImathEqHelperModal({ onClose }: { onClose: () => void }) {
                             href={imathEqEditorUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-700 transition-colors hover:border-teal-300 hover:bg-teal-100 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-200"
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200"
                         >
                             <ExternalLinkIcon className="size-4" />
                             New tab

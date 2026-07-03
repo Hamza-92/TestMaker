@@ -31,9 +31,9 @@ interface FloatingComboboxProps {
 /**
  * Searchable smart select with a floating label.
  *
- * - Label floats up and turns teal on focus or when a value is selected.
+ * - Label floats up and takes the brand color on focus or when a value is selected.
  * - Built on HeadlessUI Combobox — keyboard navigation, ARIA, and search filter included.
- * - Solid colors only; no gradients (matches the customer "Studio" palette).
+ * - Solid brand colors only; follows the central customer theme.
  */
 export function FloatingCombobox({
     label,
@@ -76,18 +76,25 @@ export function FloatingCombobox({
             >
                 <div
                     className={cn(
-                        'group/field relative flex h-12 items-center rounded-xl border bg-white transition-colors',
+                        'group/field relative flex h-11 items-center rounded-lg border bg-white transition-colors',
                         'border-slate-200 hover:border-slate-300',
-                        'focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-500/15',
+                        'focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:hover:border-brand-500',
                         'dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700',
-                        'dark:focus-within:border-teal-400 dark:focus-within:ring-teal-400/15',
+                        'dark:focus-within:border-brand-400 dark:focus-within:ring-brand-400/20 dark:focus-within:hover:border-brand-400',
                         disabled &&
                             'cursor-not-allowed bg-slate-50 opacity-70 hover:border-slate-200 dark:bg-slate-900/40 dark:hover:border-slate-800',
                     )}
                 >
                     {/* Leading icon */}
                     {LeadingIcon && (
-                        <div className="pl-3 text-slate-400 dark:text-slate-500">
+                        <div
+                            className={cn(
+                                'pl-3 text-slate-400 transition-colors dark:text-slate-500',
+                                isFilled &&
+                                    'text-brand-600 dark:text-brand-400',
+                                'group-focus-within/field:text-brand-600 dark:group-focus-within/field:text-brand-400',
+                            )}
+                        >
                             <LeadingIcon className="size-4" />
                         </div>
                     )}
@@ -100,10 +107,10 @@ export function FloatingCombobox({
                             LeadingIcon ? 'left-8' : 'left-3',
                             // Resting state
                             isFilled
-                                ? '-top-2 text-[11px] text-slate-600 dark:text-slate-300'
+                                ? '-top-2 text-[11px] text-slate-500 dark:text-slate-400'
                                 : 'top-1/2 -translate-y-1/2 text-sm text-slate-400 dark:text-slate-500',
-                            // Focused state — always floats up + turns teal
-                            'group-focus-within/field:-top-2 group-focus-within/field:translate-y-0 group-focus-within/field:text-[11px] group-focus-within/field:text-teal-600 dark:group-focus-within/field:text-teal-400',
+                            // Focused state — always floats up + takes brand color
+                            'group-focus-within/field:-top-2 group-focus-within/field:translate-y-0 group-focus-within/field:text-[11px] group-focus-within/field:text-brand-600 dark:group-focus-within/field:text-brand-400',
                         )}
                     >
                         {label}
@@ -114,7 +121,7 @@ export function FloatingCombobox({
                         autoComplete="off"
                         aria-label={label}
                         className={cn(
-                            'h-full w-full bg-transparent text-sm text-slate-900 placeholder:text-transparent outline-none dark:text-slate-100',
+                            'h-full w-full bg-transparent text-sm font-medium text-slate-900 placeholder:text-transparent outline-none dark:text-slate-100',
                             LeadingIcon ? 'pl-2' : 'pl-3',
                             'pr-2',
                             disabled && 'cursor-not-allowed',
@@ -144,7 +151,7 @@ export function FloatingCombobox({
                             }}
                             tabIndex={-1}
                             aria-label={`Clear ${label}`}
-                            className="mr-0.5 flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            className="mr-0.5 flex size-6 cursor-pointer items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                         >
                             <XIcon className="size-3.5" />
                         </button>
@@ -153,7 +160,7 @@ export function FloatingCombobox({
                     <ComboboxButton
                         ref={buttonRef}
                         className={cn(
-                            'group/btn flex h-full w-10 items-center justify-center rounded-r-xl text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200',
+                            'group/btn flex h-full w-9 cursor-pointer items-center justify-center rounded-r-lg text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200',
                             disabled && 'cursor-not-allowed',
                         )}
                     >
@@ -166,7 +173,7 @@ export function FloatingCombobox({
                     className={cn(
                         // Positioned inline (no portal) so the panel always matches
                         // the input's exact width via the parent's relative box.
-                        'absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/[0.08] outline-none',
+                        'absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/[0.08] outline-none',
                         'dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40',
                         'origin-top transition duration-100 ease-out',
                         'data-[closed]:scale-95 data-[closed]:opacity-0',
@@ -189,11 +196,12 @@ export function FloatingCombobox({
                             value={option}
                             className={({ focus, selected }) =>
                                 cn(
-                                    'flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                                    'flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2 text-sm transition-colors',
                                     focus
-                                        ? 'bg-teal-50 text-teal-800 dark:bg-teal-500/10 dark:text-teal-100'
+                                        ? 'bg-brand-50 text-brand-900 dark:bg-brand-500/10 dark:text-brand-100'
                                         : 'text-slate-700 dark:text-slate-300',
-                                    selected && 'font-semibold',
+                                    selected &&
+                                        'bg-brand-50/60 font-semibold text-brand-800 dark:bg-brand-500/[0.07] dark:text-brand-200',
                                 )
                             }
                         >
@@ -202,13 +210,16 @@ export function FloatingCombobox({
                                     <span className="flex min-w-0 flex-col">
                                         <span className="truncate">{option.label}</span>
                                         {option.hint && (
-                                            <span className="truncate text-[11px] text-slate-400 dark:text-slate-500">
+                                            <span className="truncate text-[11px] font-normal text-slate-400 dark:text-slate-500">
                                                 {option.hint}
                                             </span>
                                         )}
                                     </span>
                                     {selected && (
-                                        <CheckIcon className="size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+                                        <CheckIcon
+                                            className="size-4 shrink-0 text-brand-600 dark:text-brand-400"
+                                            strokeWidth={2.5}
+                                        />
                                     )}
                                 </>
                             )}

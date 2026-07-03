@@ -37,7 +37,10 @@ export default function PapersIndex({ papers, drafts = [] }: Props) {
     }
 
     function handleDelete() {
-        if (deletingId === null || isDeleting) return;
+        if (deletingId === null || isDeleting) {
+return;
+}
+
         setIsDeleting(true);
 
         const csrfToken =
@@ -85,7 +88,7 @@ export default function PapersIndex({ papers, drafts = [] }: Props) {
                     </div>
                     <Link
                         href="/papers/generate"
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                     >
                         <PlusIcon className="size-4" />
                         Generate New Paper
@@ -127,7 +130,7 @@ export default function PapersIndex({ papers, drafts = [] }: Props) {
                         {activeTab === 'papers' && (
                             <Link
                                 href="/papers/generate"
-                                className="mt-6 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+                                className="mt-6 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                             >
                                 <PlusIcon className="size-4" />
                                 Generate Paper
@@ -149,7 +152,7 @@ export default function PapersIndex({ papers, drafts = [] }: Props) {
                                         'flex size-10 shrink-0 items-center justify-center rounded-lg',
                                         activeTab === 'drafts'
                                             ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
-                                            : 'bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400',
+                                            : 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400',
                                     )}>
                                         <BookmarkIcon className="size-5" />
                                     </div>
@@ -197,7 +200,7 @@ export default function PapersIndex({ papers, drafts = [] }: Props) {
                                             'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors',
                                             activeTab === 'drafts'
                                                 ? 'border-amber-400 text-amber-700 hover:bg-amber-50 dark:border-amber-500/50 dark:text-amber-400 dark:hover:bg-amber-500/10'
-                                                : 'border-teal-600 text-teal-700 hover:bg-teal-50 dark:border-teal-500 dark:text-teal-400 dark:hover:bg-teal-500/10',
+                                                : 'border-brand-600 text-brand-700 hover:bg-brand-50 dark:border-brand-500 dark:text-brand-400 dark:hover:bg-brand-500/10',
                                         )}
                                     >
                                         {activeTab === 'drafts' ? 'Continue' : 'Open'}
@@ -260,7 +263,7 @@ function TabButton({
             <span className={cn(
                 'rounded-full px-2 py-0.5 text-xs font-semibold',
                 active
-                    ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300'
+                    ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300'
                     : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400',
             )}>
                 {count}

@@ -1,18 +1,29 @@
-import { usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BellIcon,
-    MoonIcon,
-    SearchIcon,
-    SunIcon,
-    MonitorIcon,
-    LogOutIcon,
-    UserIcon,
-    SettingsIcon,
     ChevronDownIcon,
+    LogOutIcon,
+    MenuIcon,
+    MonitorIcon,
+    MoonIcon,
+    PanelLeftCloseIcon,
+    PanelLeftOpenIcon,
+    SearchIcon,
+    SettingsIcon,
+    SunIcon,
+    UserIcon,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
 import type { Appearance } from '@/hooks/use-appearance';
+import { useCustomerSidebar } from './customer-layout';
 
 function greeting(): string {
     const h = new Date().getHours();
@@ -26,6 +37,40 @@ function greeting(): string {
     }
 
     return 'Good evening';
+}
+
+const iconButtonClasses =
+    'flex size-8 cursor-pointer items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100';
+
+function SidebarToggle() {
+    const { collapsed, toggleCollapsed, setMobileOpen } = useCustomerSidebar();
+
+    return (
+        <>
+            {/* Mobile: open the drawer */}
+            <button
+                onClick={() => setMobileOpen(true)}
+                className={`${iconButtonClasses} md:hidden`}
+                aria-label="Open menu"
+            >
+                <MenuIcon className="size-4" />
+            </button>
+
+            {/* Desktop: collapse / expand */}
+            <button
+                onClick={toggleCollapsed}
+                className={`${iconButtonClasses} hidden md:flex`}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+                {collapsed ? (
+                    <PanelLeftOpenIcon className="size-4" />
+                ) : (
+                    <PanelLeftCloseIcon className="size-4" />
+                )}
+            </button>
+        </>
+    );
 }
 
 function AppearanceToggle() {
@@ -43,7 +88,7 @@ function AppearanceToggle() {
     return (
         <button
             onClick={() => updateAppearance(next)}
-            className="flex size-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            className={iconButtonClasses}
             title={`Switch to ${next} mode`}
         >
             <Icon className="size-4" />
@@ -55,12 +100,36 @@ function NotificationBell() {
     const count = 0;
 
     return (
-        <button className="relative flex size-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+        <button className={`${iconButtonClasses} relative`}>
             <BellIcon className="size-4" />
             {count > 0 && (
-                <span className="absolute top-2 right-2 flex size-2 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
+                <span className="absolute top-1.5 right-1.5 flex size-2 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
             )}
         </button>
+    );
+}
+
+function LogoutMenuItem() {
+    return (
+        <form action="/logout" method="post">
+            <input
+                type="hidden"
+                name="_token"
+                value={
+                    (
+                        document.querySelector(
+                            'meta[name=csrf-token]',
+                        ) as HTMLMetaElement
+                    )?.content ?? ''
+                }
+            />
+            <DropdownMenuItem asChild variant="destructive">
+                <button type="submit" className="w-full cursor-pointer">
+                    <LogOutIcon />
+                    Log out
+                </button>
+            </DropdownMenuItem>
+        </form>
     );
 }
 
@@ -76,127 +145,48 @@ function UserMenu() {
         .join('')
         .toUpperCase();
 
-    const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
     return (
-        <div ref={ref} className="relative">
-            <button
-                onClick={() => setOpen((o) => !o)}
-                className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-                <div className="flex size-8 items-center justify-center rounded-full bg-teal-600 text-xs font-semibold text-white ring-1 ring-teal-500/30 ring-inset dark:bg-teal-500 dark:ring-teal-400/30">
+        <DropdownMenu>
+            <DropdownMenuTrigger className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 transition-colors outline-none hover:bg-slate-100 data-[state=open]:bg-slate-100 dark:hover:bg-slate-800 dark:data-[state=open]:bg-slate-800">
+                <div className="flex size-7 items-center justify-center rounded-full bg-brand-600 text-[11px] font-semibold text-white">
                     {initials}
                 </div>
                 <div className="hidden text-left sm:block">
-                    <p className="text-sm leading-none font-medium text-slate-800 dark:text-slate-100">
+                    <p className="text-[13px] leading-none font-medium text-slate-800 dark:text-slate-100">
                         {name}
                     </p>
                     {schoolName && (
-                        <p className="mt-0.5 text-xs leading-none text-slate-500 dark:text-slate-400">
+                        <p className="mt-0.5 text-[11px] leading-none text-slate-500 dark:text-slate-400">
                             {schoolName}
                         </p>
                     )}
                 </div>
                 <ChevronDownIcon className="size-3.5 text-slate-400" />
-            </button>
-
-            {open && (
-                <>
-                    <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setOpen(false)}
-                    />
-                    <div className="absolute top-full right-0 z-20 mt-1.5 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900">
-                        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/40">
-                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                                {name}
-                            </p>
-                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                                {user.email as string}
-                            </p>
-                        </div>
-                        <div className="p-1">
-                            <MenuItem
-                                href="/profile"
-                                icon={UserIcon}
-                                label="Profile"
-                            />
-                            <MenuItem
-                                href="/settings"
-                                icon={SettingsIcon}
-                                label="Settings"
-                            />
-                            <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
-                            <MenuItem
-                                href="/logout"
-                                icon={LogOutIcon}
-                                label="Log out"
-                                method="post"
-                                danger
-                            />
-                        </div>
-                    </div>
-                </>
-            )}
-        </div>
-    );
-}
-
-function MenuItem({
-    href,
-    icon: Icon,
-    label,
-    method,
-    danger,
-}: {
-    href: string;
-    icon: React.ElementType;
-    label: string;
-    method?: string;
-    danger?: boolean;
-}) {
-    const baseClasses = [
-        'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
-        danger
-            ? 'text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10'
-            : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800',
-    ].join(' ');
-
-    const iconClasses = [
-        'size-4',
-        danger
-            ? 'text-rose-500 dark:text-rose-400'
-            : 'text-slate-400 dark:text-slate-500',
-    ].join(' ');
-
-    if (method === 'post') {
-        return (
-            <form action={href} method="post">
-                <input
-                    type="hidden"
-                    name="_token"
-                    value={
-                        (
-                            document.querySelector(
-                                'meta[name=csrf-token]',
-                            ) as HTMLMetaElement
-                        )?.content ?? ''
-                    }
-                />
-                <button type="submit" className={baseClasses}>
-                    <Icon className={iconClasses} />
-                    {label}
-                </button>
-            </form>
-        );
-    }
-
-    return (
-        <a href={href} className={baseClasses}>
-            <Icon className={iconClasses} />
-            {label}
-        </a>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                    <p className="text-sm font-medium">{name}</p>
+                    <p className="truncate text-xs font-normal text-muted-foreground">
+                        {user.email as string}
+                    </p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <Link href="/profile" className="cursor-pointer">
+                        <UserIcon />
+                        Profile
+                    </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link href="/settings" className="cursor-pointer">
+                        <SettingsIcon />
+                        Settings
+                    </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <LogoutMenuItem />
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -209,36 +199,33 @@ export function CustomerHeader() {
     return (
         <header
             data-customer-header
-            className="flex h-16 shrink-0 items-center gap-4 border-b border-slate-200 bg-white px-4 md:px-6 dark:border-slate-800 dark:bg-slate-900"
+            className="flex h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 md:px-5 dark:border-slate-800 dark:bg-slate-900"
         >
-            {/* ── Greeting ──────────────────────────────────────────────────── */}
-            <div className="hidden min-w-0 flex-1 lg:block">
-                <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {greeting()},{' '}
-                    <span className="text-teal-700 dark:text-teal-400">
-                        {schoolName}
-                    </span>
-                </p>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    Welcome back to your dashboard
-                </p>
-            </div>
+            <SidebarToggle />
 
-            {/* ── Search ────────────────────────────────────────────────────── */}
-            <div className="relative flex-1 lg:max-w-sm">
-                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            {/* ── Greeting ──────────────────────────────────────────────── */}
+            <p className="hidden min-w-0 flex-1 truncate text-sm text-slate-500 lg:block dark:text-slate-400">
+                {greeting()},{' '}
+                <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    {schoolName}
+                </span>
+            </p>
+
+            {/* ── Search ────────────────────────────────────────────────── */}
+            <div className="relative flex-1 lg:max-w-xs">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400" />
                 <input
                     type="search"
-                    placeholder="Search papers, questions, templates…"
-                    className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-9 text-sm text-slate-800 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-500/20 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-teal-400 dark:focus:bg-slate-900 dark:focus:ring-teal-400/20"
+                    placeholder="Search papers, questions…"
+                    className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:bg-slate-900 dark:focus:ring-brand-400/20"
                 />
             </div>
 
-            {/* ── Actions ───────────────────────────────────────────────────── */}
-            <div className="flex items-center gap-1">
+            {/* ── Actions ───────────────────────────────────────────────── */}
+            <div className="flex items-center gap-0.5">
                 <NotificationBell />
                 <AppearanceToggle />
-                <div className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-800" />
+                <div className="mx-1.5 h-5 w-px bg-slate-200 dark:bg-slate-700" />
                 <UserMenu />
             </div>
         </header>

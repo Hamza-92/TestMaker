@@ -22,7 +22,9 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.key === 'Escape') onCancel();
+            if (event.key === 'Escape') {
+onCancel();
+}
         }
 
         window.addEventListener('keydown', onKeyDown);
@@ -80,7 +82,7 @@ export function ConfirmDialog({
                                 ? 'cursor-pointer rounded-lg bg-rose-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-500'
                                 : variant === 'warning'
                                   ? 'cursor-pointer rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400'
-                                  : 'cursor-pointer rounded-lg bg-teal-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400'
+                                  : 'cursor-pointer rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400'
                         }
                     >
                         {confirmLabel}

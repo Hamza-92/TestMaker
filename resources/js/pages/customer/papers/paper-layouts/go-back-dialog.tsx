@@ -16,7 +16,9 @@ export function GoBackDialog({
 }: GoBackDialogProps) {
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.key === 'Escape') onCancel();
+            if (event.key === 'Escape') {
+onCancel();
+}
         }
 
         window.addEventListener('keydown', onKeyDown);
@@ -52,7 +54,7 @@ export function GoBackDialog({
                 <div className="space-y-2 px-4 pb-4">
                     <OptionButton
                         icon={<BookmarkIcon className="size-4.5" />}
-                        iconClass="bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400"
+                        iconClass="bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
                         label="Save as Draft"
                         description="Continue editing later"
                         onClick={onSaveDraft}

@@ -1,11 +1,11 @@
-import { ColumnsQuestionsTemplate } from './columns-questions-template';
-import { InlineQuestionsTemplate } from './inline-questions-template';
-import { StackedQuestionsTemplate } from './stacked-questions-template';
-import type { SectionTemplate } from './template-props';
 import type {
     PaperQuestionLayout,
     PaperSectionCategory,
 } from '../types';
+import { ColumnsQuestionsTemplate } from './columns-questions-template';
+import { InlineQuestionsTemplate } from './inline-questions-template';
+import { StackedQuestionsTemplate } from './stacked-questions-template';
+import type { SectionTemplate } from './template-props';
 
 export type { SectionTemplate, SectionTemplateProps } from './template-props';
 export {
@@ -26,9 +26,18 @@ export function pickSectionTemplate(
     layout: PaperQuestionLayout,
     category: PaperSectionCategory,
 ): SectionTemplate {
-    if (layout === 'stacked') return StackedQuestionsTemplate;
-    if (layout === 'columns') return ColumnsQuestionsTemplate;
-    if (layout === 'inline') return InlineQuestionsTemplate;
+    if (layout === 'stacked') {
+return StackedQuestionsTemplate;
+}
+
+    if (layout === 'columns') {
+return ColumnsQuestionsTemplate;
+}
+
+    if (layout === 'inline') {
+return InlineQuestionsTemplate;
+}
+
     return category === 'Objective Questions'
         ? StackedQuestionsTemplate
         : ColumnsQuestionsTemplate;

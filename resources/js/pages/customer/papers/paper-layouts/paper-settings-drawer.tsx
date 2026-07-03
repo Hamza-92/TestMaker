@@ -8,11 +8,16 @@
 import {
     CheckIcon,
     ChevronDownIcon,
+    DropletsIcon,
+    HeadingIcon,
     ImageIcon,
+    LayoutPanelTopIcon,
+    ListOrderedIcon,
     MinusIcon,
     PlusIcon,
     SearchXIcon,
     RotateCcwIcon,
+    SlidersHorizontalIcon,
     Trash2Icon,
     TypeIcon,
     UploadIcon,
@@ -208,25 +213,36 @@ export function PaperSettingsDrawer({
                 )}
             >
                 <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-                    <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        Paper Settings
-                    </h2>
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+                            <SlidersHorizontalIcon className="size-4" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm leading-tight font-semibold text-slate-900 dark:text-slate-100">
+                                Paper Settings
+                            </h2>
+                            <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                                Layout, typography &amp; branding
+                            </p>
+                        </div>
+                    </div>
                     <div className="flex items-center gap-1">
                         <button
                             type="button"
                             onClick={() =>
                                 onChange({ ...DEFAULT_PAPER_SETTINGS })
                             }
-                            className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                             aria-label="Reset paper settings"
                             title="Reset paper settings"
                         >
-                            <RotateCcwIcon className="size-4" />
+                            <RotateCcwIcon className="size-3.5" />
+                            Reset
                         </button>
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            className="flex size-7 cursor-pointer items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                             aria-label="Close settings"
                             title="Close settings"
                         >
@@ -235,9 +251,13 @@ export function PaperSettingsDrawer({
                     </div>
                 </header>
 
-                <div className="scrollbar-slim flex-1 overflow-y-auto py-4">
+                <div className="scrollbar-slim flex-1 space-y-2 overflow-y-auto bg-slate-50/60 p-3 dark:bg-slate-950/30">
                     {/* ── Collapsible per-section cards ──────────────── */}
-                    <CollapsibleSection title="General" defaultOpen>
+                    <CollapsibleSection
+                        title="General"
+                        icon={SlidersHorizontalIcon}
+                        defaultOpen
+                    >
                         {/* Paper-wide font family — applied across header,
                             headings and questions via a single CSS cascade. */}
                         <div>
@@ -412,7 +432,7 @@ export function PaperSettingsDrawer({
                         )}
                     </CollapsibleSection>
 
-                    <CollapsibleSection title="Watermark">
+                    <CollapsibleSection title="Watermark" icon={DropletsIcon}>
                         <WatermarkTypeSelector
                             value={settings.watermarkType}
                             onChange={(value) =>
@@ -454,7 +474,10 @@ export function PaperSettingsDrawer({
                         </div>
                     </CollapsibleSection>
 
-                    <CollapsibleSection title="Header">
+                    <CollapsibleSection
+                        title="Header"
+                        icon={LayoutPanelTopIcon}
+                    >
                         <div className="mb-3">
                             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                 Template
@@ -487,7 +510,7 @@ export function PaperSettingsDrawer({
                         />
                     </CollapsibleSection>
 
-                    <CollapsibleSection title="Type Heading">
+                    <CollapsibleSection title="Type Heading" icon={HeadingIcon}>
                         <TypographyControls
                             size={settings.headingSize}
                             sizeMin={SIZE_BOUNDS.heading.min}
@@ -510,7 +533,10 @@ export function PaperSettingsDrawer({
                         />
                     </CollapsibleSection>
 
-                    <CollapsibleSection title="Questions">
+                    <CollapsibleSection
+                        title="Questions"
+                        icon={ListOrderedIcon}
+                    >
                         <div className="mb-3">
                             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                 Layout
@@ -573,24 +599,43 @@ export function PaperSettingsDrawer({
  */
 function CollapsibleSection({
     title,
+    icon: Icon,
     defaultOpen = false,
     children,
 }: {
     title: string;
+    icon: React.ElementType;
     defaultOpen?: boolean;
     children: React.ReactNode;
 }) {
     const [open, setOpen] = useState(defaultOpen);
 
     return (
-        <section className="mb-2">
+        <section
+            className={cn(
+                'overflow-hidden rounded-lg border bg-white transition-colors dark:bg-slate-900',
+                open
+                    ? 'border-slate-200 shadow-sm shadow-slate-900/[0.03] dark:border-slate-700'
+                    : 'border-slate-200 dark:border-slate-800',
+            )}
+        >
             <button
                 type="button"
                 onClick={() => setOpen((value) => !value)}
                 aria-expanded={open}
-                className="group flex w-full cursor-pointer items-center justify-between bg-slate-100 px-4 py-2.5 text-left transition-colors hover:bg-slate-200/70 dark:bg-slate-800/60 dark:hover:bg-slate-800"
+                className="group flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
             >
-                <span className="text-[13px] font-semibold text-slate-800 group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white">
+                <span
+                    className={cn(
+                        'flex size-6 shrink-0 items-center justify-center rounded-md transition-colors',
+                        open
+                            ? 'bg-brand-600 text-white'
+                            : 'bg-slate-100 text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-600 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-brand-500/10 dark:group-hover:text-brand-400',
+                    )}
+                >
+                    <Icon className="size-3.5" />
+                </span>
+                <span className="flex-1 text-[13px] font-semibold text-slate-800 group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white">
                     {title}
                 </span>
                 <ChevronDownIcon
@@ -600,7 +645,11 @@ function CollapsibleSection({
                     )}
                 />
             </button>
-            {open && <div className="px-4 pt-3 pb-2">{children}</div>}
+            {open && (
+                <div className="border-t border-slate-100 px-3 pt-3 pb-3 dark:border-slate-800">
+                    {children}
+                </div>
+            )}
         </section>
     );
 }
@@ -718,7 +767,7 @@ function LabeledStepper({
             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 {label}
             </p>
-            <div className="flex h-10 items-stretch overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+            <div className="flex h-9 items-stretch overflow-hidden rounded-lg border border-slate-200 transition-colors focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 dark:border-slate-800 dark:focus-within:border-brand-400 dark:focus-within:ring-brand-400/20">
                 <StepperButton
                     disabled={!canDecrement}
                     onClick={() => onChange(clamp(value - step))}
@@ -741,7 +790,7 @@ function LabeledStepper({
                             onChange(clamp(next));
                         }
                     }}
-                    className="w-full min-w-0 [appearance:textfield] border-x border-slate-200 bg-white text-center text-sm font-semibold text-slate-900 outline-none [-moz-appearance:textfield] focus:bg-teal-50/50 focus:text-teal-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:bg-teal-500/10 dark:focus:text-teal-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="w-full min-w-0 [appearance:textfield] border-x border-slate-200 bg-white text-center text-sm font-semibold text-slate-900 outline-none [-moz-appearance:textfield] focus:bg-brand-50/50 focus:text-brand-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:bg-brand-500/10 dark:focus:text-brand-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
 
                 <StepperButton
@@ -805,9 +854,9 @@ function WatermarkTypeButton({
             aria-pressed={active}
             onClick={onClick}
             className={cn(
-                'flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors',
+                'flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-[13px] font-semibold transition-colors',
                 active
-                    ? 'border-teal-500 bg-teal-50 text-teal-700 dark:border-teal-400 dark:bg-teal-500/10 dark:text-teal-200'
+                    ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70',
             )}
         >
@@ -933,7 +982,7 @@ function TextInput({
                 value={value}
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-teal-400"
+                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:ring-brand-400/20"
             />
         </div>
     );
@@ -949,22 +998,30 @@ function CheckboxField({
     onChange: (next: boolean) => void;
 }) {
     return (
-        <label
+        <button
+            type="button"
+            role="checkbox"
+            aria-checked={checked}
+            onClick={() => onChange(!checked)}
             className={cn(
-                'flex h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors',
+                'flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 text-[13px] font-medium transition-colors',
                 checked
-                    ? 'border-teal-500 bg-teal-50 text-teal-700 dark:border-teal-400 dark:bg-teal-500/10 dark:text-teal-200'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-800/70',
+                    ? 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70',
             )}
         >
-            <input autoComplete="off"
-                type="checkbox"
-                checked={checked}
-                onChange={(event) => onChange(event.target.checked)}
-                className="size-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 dark:border-slate-700 dark:bg-slate-950"
-            />
+            <span
+                className={cn(
+                    'flex size-4 shrink-0 items-center justify-center rounded-[5px] border transition-colors',
+                    checked
+                        ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400'
+                        : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950',
+                )}
+            >
+                {checked && <CheckIcon className="size-3" strokeWidth={3} />}
+            </span>
             <span className="min-w-0 truncate">{label}</span>
-        </label>
+        </button>
     );
 }
 
@@ -1004,7 +1061,7 @@ function FontPicker<T extends string>({
                 onClose={() => setQuery('')}
                 immediate
             >
-                <div className="group/field flex h-10 items-center rounded-lg border border-slate-200 bg-white transition-colors focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/15 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:focus-within:border-teal-400 dark:hover:border-slate-700">
+                <div className="group/field flex h-9 items-center rounded-lg border border-slate-200 bg-white transition-colors focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:focus-within:border-brand-400 dark:focus-within:ring-brand-400/20 dark:hover:border-slate-700">
                     <ComboboxInput
                         ref={inputRef}
                         style={{ fontFamily: selected.previewFontFamily }}
@@ -1053,7 +1110,7 @@ function FontPicker<T extends string>({
                                 cn(
                                     'flex cursor-pointer items-center justify-between rounded-md px-2.5 py-2 text-sm transition-colors',
                                     focus
-                                        ? 'bg-teal-50 text-teal-900 dark:bg-teal-500/10 dark:text-teal-100'
+                                        ? 'bg-brand-50 text-brand-900 dark:bg-brand-500/10 dark:text-brand-100'
                                         : 'text-slate-700 dark:text-slate-300',
                                     selected && 'font-semibold',
                                 )
@@ -1070,7 +1127,7 @@ function FontPicker<T extends string>({
                                         {option.label}
                                     </span>
                                     {selected && (
-                                        <CheckIcon className="size-4 text-teal-600 dark:text-teal-400" />
+                                        <CheckIcon className="size-4 text-brand-600 dark:text-brand-400" />
                                     )}
                                 </>
                             )}

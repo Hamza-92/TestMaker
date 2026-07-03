@@ -36,6 +36,14 @@ export default defineConfig({
         // via `<Form {...store.form()}>`. Without it, every Form-using page
         // crashes with `store.form is not a function`, which in turn brings
         // down the Vite dev server and the whole `composer run dev` process.
-        wayfinderClientOnly({ formVariants: true }),
+        //
+        // `wayfinder:generate-safe` wraps wayfinder:generate with retries:
+        // the vendor command deletes resources/js/actions + routes and
+        // instantly recreates them, which races against editor file watchers
+        // holding handles on Windows ("Permission denied" build failures).
+        wayfinderClientOnly({
+            formVariants: true,
+            command: 'php artisan wayfinder:generate-safe',
+        }),
     ],
 });

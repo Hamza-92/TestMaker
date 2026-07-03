@@ -96,7 +96,7 @@ export function QuestionHoverActions({
                         <button
                             type="button"
                             onClick={() => onAnswerLinesChange(answerLines + 1)}
-                            className="flex size-6 cursor-pointer items-center justify-center rounded-md text-teal-700 transition-colors hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-500/10"
+                            className="flex size-6 cursor-pointer items-center justify-center rounded-md text-brand-700 transition-colors hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10"
                         >
                             <PlusIcon className="size-3.5" />
                         </button>
@@ -140,7 +140,7 @@ export function QuestionHoverActions({
                                         ),
                                     )
                                 }
-                                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-teal-700 transition-colors hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-teal-300 dark:hover:bg-teal-500/10"
+                                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-brand-700 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/10"
                                 disabled={(answerLineSpacing ?? 20) >= SPACING_MAX}
                             >
                                 <PlusIcon className="size-3.5" />
@@ -287,9 +287,9 @@ function ActionButton({
             className={cn(
                 'flex size-8 cursor-pointer items-center justify-center rounded-lg border text-slate-500 transition-colors dark:text-slate-300',
                 variant === 'default' &&
-                    'border-slate-200 bg-white hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-teal-500/30 dark:hover:bg-teal-500/10 dark:hover:text-teal-200',
+                    'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/10 dark:hover:text-brand-200',
                 variant === 'primary' &&
-                    'border-teal-600 bg-teal-600 text-white hover:border-teal-700 hover:bg-teal-700 dark:border-teal-500 dark:bg-teal-500 dark:text-slate-950 dark:hover:border-teal-400 dark:hover:bg-teal-400',
+                    'border-brand-600 bg-brand-600 text-white hover:border-brand-700 hover:bg-brand-700 dark:border-brand-500 dark:bg-brand-500 dark:text-white dark:hover:border-brand-400 dark:hover:bg-brand-400',
                 variant === 'danger' &&
                     'border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10 dark:hover:text-rose-300',
                 className,
@@ -329,9 +329,9 @@ function SectionButton({
                 variant === 'default' &&
                     'border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
                 variant === 'accent' &&
-                    'border-transparent bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/15',
+                    'border-transparent bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-200 dark:hover:bg-brand-500/15',
                 variant === 'primary' &&
-                    'border-teal-600 bg-teal-600 text-white shadow-sm shadow-teal-900/10 hover:border-teal-700 hover:bg-teal-700 dark:border-teal-500 dark:bg-teal-500 dark:text-slate-950 dark:hover:border-teal-400 dark:hover:bg-teal-400',
+                    'border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-900/10 hover:border-brand-700 hover:bg-brand-700 dark:border-brand-500 dark:bg-brand-500 dark:text-white dark:hover:border-brand-400 dark:hover:bg-brand-400',
                 variant === 'danger' &&
                     'border-transparent bg-transparent text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10',
             )}
