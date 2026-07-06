@@ -164,6 +164,7 @@
     --accent-foreground: var(--color-brand-700);
     --ring: var(--color-brand-500);
     --radius: 0.5rem;
+    --progress: var(--color-brand-600);
 }
 
 .dark .theme-customer {
@@ -174,6 +175,7 @@
     --accent: oklch(0.28 0.06 262);
     --accent-foreground: var(--color-brand-100);
     --ring: var(--color-brand-400);
+    --progress: var(--color-brand-400);
 }
 
 @layer base {
