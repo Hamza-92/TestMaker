@@ -170,6 +170,25 @@ const LINE_HEIGHT_BOUNDS = { min: 1, max: 3 };
 const BORDER_WIDTH_BOUNDS = { min: 0, max: 6 };
 const WATERMARK_OPACITY_BOUNDS = { min: 0, max: 100 };
 
+const DRAWER_WIDTH_STORAGE_KEY = 'paper-settings-drawer-width';
+const DEFAULT_DRAWER_WIDTH = 372;
+const MIN_DRAWER_WIDTH = 320;
+const MAX_DRAWER_WIDTH = 640;
+
+function readStoredDrawerWidth(): number {
+    if (typeof window === 'undefined') {
+        return DEFAULT_DRAWER_WIDTH;
+    }
+
+    const stored = Number(localStorage.getItem(DRAWER_WIDTH_STORAGE_KEY));
+
+    if (!Number.isFinite(stored) || stored <= 0) {
+        return DEFAULT_DRAWER_WIDTH;
+    }
+
+    return Math.min(Math.max(stored, MIN_DRAWER_WIDTH), MAX_DRAWER_WIDTH);
+}
+
 export function PaperSettingsDrawer({
     open,
     settings,
@@ -177,6 +196,12 @@ export function PaperSettingsDrawer({
     onChange,
     onClose,
 }: PaperSettingsDrawerProps) {
+    const [width, setWidth] = useState(readStoredDrawerWidth);
+    const [isResizing, setIsResizing] = useState(false);
+    const dragState = useRef<{ startX: number; startWidth: number } | null>(
+        null,
+    );
+
     useEffect(() => {
         if (!open) {
             return;
@@ -193,6 +218,62 @@ export function PaperSettingsDrawer({
         return () => window.removeEventListener('keydown', onKey);
     }, [open, onClose]);
 
+    useEffect(() => {
+        if (!isResizing) {
+            return;
+        }
+
+        function clampWidth(next: number): number {
+            const viewportMax = window.innerWidth - 80;
+
+            return Math.min(
+                Math.max(next, MIN_DRAWER_WIDTH),
+                Math.min(MAX_DRAWER_WIDTH, viewportMax),
+            );
+        }
+
+        function onMove(event: PointerEvent) {
+            if (!dragState.current) {
+                return;
+            }
+
+            // Drawer is anchored to the right edge, so dragging the handle
+            // left (clientX decreasing) should grow the width.
+            const delta = dragState.current.startX - event.clientX;
+
+            setWidth(clampWidth(dragState.current.startWidth + delta));
+        }
+
+        function onUp() {
+            setIsResizing(false);
+            dragState.current = null;
+        }
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+
+        const previousCursor = document.body.style.cursor;
+        const previousUserSelect = document.body.style.userSelect;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        return () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            document.body.style.cursor = previousCursor;
+            document.body.style.userSelect = previousUserSelect;
+        };
+    }, [isResizing]);
+
+    // Persist only once dragging ends, not on every pointermove.
+    useEffect(() => {
+        if (isResizing || typeof window === 'undefined') {
+            return;
+        }
+
+        localStorage.setItem(DRAWER_WIDTH_STORAGE_KEY, String(width));
+    }, [isResizing, width]);
+
     return (
         <>
             {/* Backdrop */}
@@ -207,11 +288,41 @@ export function PaperSettingsDrawer({
             {/* Drawer panel */}
             <aside
                 aria-hidden={!open}
+                style={{ width }}
                 className={cn(
-                    'fixed top-0 right-0 z-50 flex h-full w-93 flex-col border-l border-slate-200 bg-white shadow-2xl shadow-slate-900/10 transition-transform duration-200 dark:border-slate-800 dark:bg-slate-900 print:hidden',
+                    'fixed top-0 right-0 z-50 flex h-full flex-col border-l border-slate-200 bg-white shadow-2xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 print:hidden',
                     open ? 'translate-x-0' : 'translate-x-full',
+                    isResizing
+                        ? 'transition-none'
+                        : 'transition-transform duration-200',
                 )}
             >
+                {/* Resize handle */}
+                <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize settings panel"
+                    onPointerDown={(event) => {
+                        event.preventDefault();
+                        dragState.current = {
+                            startX: event.clientX,
+                            startWidth: width,
+                        };
+                        setIsResizing(true);
+                    }}
+                    onDoubleClick={() => setWidth(DEFAULT_DRAWER_WIDTH)}
+                    className={cn(
+                        'group absolute top-0 bottom-0 left-0 z-10 w-1.5 -translate-x-1/2 cursor-col-resize touch-none print:hidden',
+                        !open && 'pointer-events-none',
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-brand-400 dark:group-hover:bg-brand-500',
+                            isResizing && 'bg-brand-500 dark:bg-brand-400',
+                        )}
+                    />
+                </div>
                 <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
                     <div className="flex items-center gap-2.5">
                         <div className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
