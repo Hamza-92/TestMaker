@@ -33,6 +33,33 @@ export interface GeneratedPaperSection {
     totalQuestions: number;
     marksEach: number;
     questions: GeneratedPaperQuestion[];
+    /**
+     * How many columns this block's questions render in (1–5). Seeded from
+     * the question type's `column_per_row` DB value when the section is
+     * created; the user can override it per-block from then on. Optional so
+     * papers saved before this setting existed still load — renderers fall
+     * back per-template via `clampSectionColumns`.
+     */
+    columns?: number;
+}
+
+export const MIN_SECTION_COLUMNS = 1;
+export const MAX_SECTION_COLUMNS = 5;
+
+/** Clamp a section's column count into the supported 1–5 range, falling back
+ * to `fallback` when the value is missing (older saved papers) or invalid. */
+export function clampSectionColumns(
+    value: number | null | undefined,
+    fallback = MIN_SECTION_COLUMNS,
+): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return fallback;
+    }
+
+    return Math.min(
+        Math.max(Math.round(value), MIN_SECTION_COLUMNS),
+        MAX_SECTION_COLUMNS,
+    );
 }
 
 export interface GeneratedPaperHeader {

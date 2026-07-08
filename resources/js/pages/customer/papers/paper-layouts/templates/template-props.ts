@@ -41,6 +41,8 @@ export interface SectionTemplateProps {
         questionId: string,
         imageSize: PaperImageSize,
     ) => void;
+    /** How many columns (1–5) to arrange this block's questions into. */
+    onColumnsChange: (sectionId: string, value: number) => void;
 }
 
 export type SectionTemplate = (props: SectionTemplateProps) => React.ReactNode;

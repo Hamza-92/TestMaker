@@ -54,16 +54,10 @@ const QuestionEditModal = lazy(() =>
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
 import { pickSectionTemplate } from './paper-layouts/templates';
 import {
+    clampSectionColumns,
     DEFAULT_PAPER_SETTINGS,
     getPageDimensions,
     normalizePaperSettings
-    
-    
-    
-    
-    
-    
-    
 } from './paper-layouts/types';
 import type { PaperHeaderTemplate } from './paper-layouts/types';
 import type {GeneratedPaper, GeneratedPaperHeader, GeneratedPaperQuestion, GeneratedPaperSection, PaperImageSize, PaperQuestionOption, PaperSettings} from './paper-layouts/types';
@@ -186,6 +180,8 @@ interface QuestionSelectionSection {
     category: SectionCategory;
     title: string;
     availableCount: number;
+    /** Default column count (1–5) for this question type, from the DB. */
+    columnPerRow: number;
     rows: QuestionSelectionRow[];
 }
 
@@ -201,6 +197,7 @@ interface QuestionTypeCount {
     category: SectionCategory;
     title: string;
     availableCount: number;
+    columnPerRow: number;
 }
 
 interface ManualQuestion {
@@ -521,6 +518,7 @@ function mergeQuestionSections(
             category: item.category,
             title: item.title,
             availableCount: item.availableCount,
+            columnPerRow: item.columnPerRow,
             rows: normalizeSectionRows(
                 current?.rows ?? [createQuestionRow(`${sectionId}_row_001`)],
                 item.availableCount,
@@ -1884,6 +1882,7 @@ return;
                             nextPaperQuestionId(),
                         ),
                     ),
+                    columns: clampSectionColumns(section.columnPerRow, 1),
                 };
             });
 
@@ -2706,6 +2705,24 @@ return '';
         });
     }
 
+    function updatePaperSectionColumns(sectionId: string, value: number) {
+        setGeneratedPaper((current) =>
+            current
+                ? {
+                      ...current,
+                      sections: current.sections.map((section) =>
+                          section.id === sectionId
+                              ? {
+                                    ...section,
+                                    columns: clampSectionColumns(value),
+                                }
+                              : section,
+                      ),
+                  }
+                : current,
+        );
+    }
+
     function openAddPaperSectionModal() {
         setIsAddSectionModalOpen(true);
     }
@@ -2755,6 +2772,7 @@ return '';
             questions: selectedQuestions.map((question) =>
                 paperQuestionFromManual(question, nextPaperQuestionId()),
             ),
+            columns: clampSectionColumns(questionType.columnPerRow, 1),
         };
 
         setGeneratedPaper((current) =>
@@ -3159,6 +3177,7 @@ return '';
                         onAddRandomQuestion={addRandomPaperQuestion}
                         onAddCustomQuestion={addCustomPaperQuestion}
                         onRemoveQuestion={removePaperQuestion}
+                        onColumnsChange={updatePaperSectionColumns}
                         onPickerSearchChange={setPaperQuestionSearch}
                         onPickerSelect={pickPaperQuestion}
                         onPickerClose={closePaperQuestionPicker}
@@ -4979,6 +4998,7 @@ function GeneratedPaperView({
     onAddRandomQuestion,
     onAddCustomQuestion,
     onRemoveQuestion,
+    onColumnsChange,
     onPickerSearchChange,
     onPickerSelect,
     onPickerClose,
@@ -5033,6 +5053,7 @@ function GeneratedPaperView({
     onAddRandomQuestion: (sectionId: string) => void;
     onAddCustomQuestion: (sectionId: string) => void;
     onRemoveQuestion: (sectionId: string, questionId: string) => void;
+    onColumnsChange: (sectionId: string, value: number) => void;
     onPickerSearchChange: (value: string) => void;
     onPickerSelect: (question: ManualQuestion) => void;
     onPickerClose: () => void;
@@ -5347,6 +5368,7 @@ return null;
                                         onQuestionImageSizeChange={
                                             onQuestionImageSizeChange
                                         }
+                                        onColumnsChange={onColumnsChange}
                                     />
                                 );
                             })}

@@ -1,5 +1,5 @@
 import { QuestionContent } from '../questions/question-content';
-import { formatQuestionLabel } from '../types';
+import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type {
     GeneratedPaperQuestion,
     GeneratedPaperSection,
@@ -39,6 +39,7 @@ interface BoxedObjectiveSectionProps {
         questionId: string,
         imageSize: PaperImageSize,
     ) => void;
+    onColumnsChange: (sectionId: string, value: number) => void;
 }
 
 const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -62,7 +63,12 @@ export function BoxedObjectiveSection({
     onAnswerLinesChange,
     onAnswerLineSpacingChange,
     onQuestionImageSizeChange,
+    onColumnsChange,
 }: BoxedObjectiveSectionProps) {
+    // Legacy default of 1 preserves the original single-column stacked look
+    // for papers saved before per-block columns existed.
+    const columns = clampSectionColumns(section.columns, 1);
+
     return (
         <section className="paper-section">
             {/* Heading is a standalone box — border on all 4 sides controlled by --paper-heading-border-*. */}
@@ -86,8 +92,17 @@ export function BoxedObjectiveSection({
             </div>
 
             {/* Question container — border on all 4 sides; question rows act as
-                collapsed-table rows, sharing one divider between each. */}
-            <div data-paper-question-group="stacked">
+                collapsed-table rows, sharing one divider between each. Columns
+                >1 arrange the boxed rows into a grid instead of one long stack. */}
+            <div
+                data-paper-question-group="stacked"
+                className={columns > 1 ? 'grid gap-x-6' : undefined}
+                style={
+                    columns > 1
+                        ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }
+                        : undefined
+                }
+            >
                 {section.questions.map((question, questionIndex) => (
                     <ObjectiveQuestionRow
                         key={question.id}
@@ -109,12 +124,14 @@ export function BoxedObjectiveSection({
                 canMoveUp={canMoveUp}
                 canMoveDown={canMoveDown}
                 canAddRandom={section.questionTypeId !== null}
+                columns={columns}
                 onMoveUp={() => onMoveUp(section.id)}
                 onMoveDown={() => onMoveDown(section.id)}
                 onAddRandom={() => onAddRandomQuestion(section.id)}
                 onAddCustom={() => onAddCustomQuestion(section.id)}
                 onEdit={() => onEditSection(section.id)}
                 onDelete={() => onDeleteSection(section.id)}
+                onColumnsChange={(value) => onColumnsChange(section.id, value)}
             />
         </section>
     );

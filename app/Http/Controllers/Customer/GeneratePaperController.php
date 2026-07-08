@@ -111,13 +111,14 @@ class GeneratePaperController extends Controller
         $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.is_objective')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.is_objective', 'question_types.column_per_row')
             ->orderByDesc('question_types.is_objective')
             ->orderBy('question_types.name')
             ->select([
                 'question_types.id',
                 'question_types.name',
                 'question_types.is_objective',
+                'question_types.column_per_row',
                 DB::raw('COUNT(questions.id) as available_count'),
             ])
             ->get()
@@ -129,6 +130,7 @@ class GeneratePaperController extends Controller
             'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
             'title' => $row->name,
             'availableCount' => (int) $row->available_count,
+            'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
         ]);
 
         return response()->json(['sections' => $sections]);

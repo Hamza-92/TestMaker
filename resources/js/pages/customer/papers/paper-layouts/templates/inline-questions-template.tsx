@@ -1,6 +1,6 @@
 import { QuestionContent } from '../questions/question-content';
 import { SectionControls } from '../sections/section-actions';
-import { formatQuestionLabel } from '../types';
+import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type { SectionTemplate } from './template-props';
 
 const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -9,6 +9,7 @@ const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
  * Inline layout — every question prints as running text in a single flowing
  * paragraph, separated by their question label. Useful for compact "fill in
  * the blanks" or "MCQ list" styles where vertical space is at a premium.
+ * Columns >1 flow the text into newspaper-style CSS columns.
  */
 export const InlineQuestionsTemplate: SectionTemplate = ({
     section,
@@ -22,9 +23,13 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     onMoveDown,
     onAddRandomQuestion,
     onAddCustomQuestion,
+    onColumnsChange,
 }) => {
     const isObjective = section.category === 'Objective Questions';
     const fallbackFormat = isObjective ? 'numeric' : 'roman';
+    // Legacy default of 1 preserves the original single-flow look for papers
+    // saved before per-block columns existed.
+    const columns = clampSectionColumns(section.columns, 1);
 
     return (
         <section className="paper-section text-black">
@@ -48,8 +53,17 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
             </div>
 
             {/* Inline question stream — each question rendered as a span with a
-                bold label prefix, separated by a generous gap. Wraps naturally. */}
-            <div data-paper-question-group="inline" className="px-3 py-2 leading-7">
+                bold label prefix, separated by a generous gap. Wraps naturally.
+                Columns >1 flow this into CSS newspaper-style columns. */}
+            <div
+                data-paper-question-group="inline"
+                className="px-3 py-2 leading-7"
+                style={
+                    columns > 1
+                        ? { columnCount: columns, columnGap: '1.5rem' }
+                        : undefined
+                }
+            >
                 {section.questions.map((question, qIndex) => {
                     const label = formatQuestionLabel(
                         qIndex,
@@ -63,6 +77,11 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                             key={question.id}
                             data-paper-question
                             className="mr-4 inline align-baseline"
+                            style={
+                                columns > 1
+                                    ? { breakInside: 'avoid' }
+                                    : undefined
+                            }
                         >
                             <span className="font-bold">({label})</span>{' '}
                             <QuestionContent
@@ -98,12 +117,14 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                 canMoveUp={canMoveUp}
                 canMoveDown={canMoveDown}
                 canAddRandom={section.questionTypeId !== null}
+                columns={columns}
                 onMoveUp={() => onMoveUp(section.id)}
                 onMoveDown={() => onMoveDown(section.id)}
                 onAddRandom={() => onAddRandomQuestion(section.id)}
                 onAddCustom={() => onAddCustomQuestion(section.id)}
                 onEdit={() => onEditSection(section.id)}
                 onDelete={() => onDeleteSection(section.id)}
+                onColumnsChange={(value) => onColumnsChange(section.id, value)}
             />
         </section>
     );

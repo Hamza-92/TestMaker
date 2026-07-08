@@ -6,11 +6,16 @@ import {
     MinusIcon,
     PlusIcon,
     ShuffleIcon,
+    SlidersHorizontalIcon,
     Trash2Icon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import {
+    MAX_SECTION_COLUMNS,
+    MIN_SECTION_COLUMNS,
+} from '../types';
 import { ConfirmDialog } from '../confirm-dialog';
 
 interface QuestionHoverActionsProps {
@@ -184,24 +189,29 @@ export function SectionControls({
     canMoveUp,
     canMoveDown,
     canAddRandom,
+    columns,
     onMoveUp,
     onMoveDown,
     onAddRandom,
     onAddCustom,
     onEdit,
     onDelete,
+    onColumnsChange,
 }: {
     canMoveUp: boolean;
     canMoveDown: boolean;
     canAddRandom: boolean;
+    columns: number;
     onMoveUp: () => void;
     onMoveDown: () => void;
     onAddRandom: () => void;
     onAddCustom: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    onColumnsChange: (value: number) => void;
 }) {
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     return (
         <>
@@ -239,6 +249,21 @@ export function SectionControls({
                         icon={<FilePenLineIcon className="size-4" />}
                         onClick={onEdit}
                     />
+                    <div className="relative">
+                        <SectionButton
+                            label="Block settings"
+                            variant={isSettingsOpen ? 'primary' : 'default'}
+                            icon={<SlidersHorizontalIcon className="size-4" />}
+                            onClick={() => setIsSettingsOpen((open) => !open)}
+                        />
+                        {isSettingsOpen && (
+                            <BlockSettingsPopover
+                                columns={columns}
+                                onChange={onColumnsChange}
+                                onClose={() => setIsSettingsOpen(false)}
+                            />
+                        )}
+                    </div>
                     <SectionButton
                         label="Delete section"
                         variant="danger"
@@ -262,6 +287,93 @@ export function SectionControls({
                 />
             )}
         </>
+    );
+}
+
+/**
+ * Small popover anchored to the "Block settings" toolbar button — a relative
+ * panel (not a centered modal) so it reads as a direct extension of the
+ * button that opened it. Closes on outside click or Escape.
+ */
+function BlockSettingsPopover({
+    columns,
+    onChange,
+    onClose,
+}: {
+    columns: number;
+    onChange: (value: number) => void;
+    onClose: () => void;
+}) {
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function onPointerDown(event: PointerEvent) {
+            if (
+                panelRef.current &&
+                !panelRef.current.contains(event.target as Node)
+            ) {
+                onClose();
+            }
+        }
+
+        function onKey(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        }
+
+        window.addEventListener('pointerdown', onPointerDown);
+        window.addEventListener('keydown', onKey);
+
+        return () => {
+            window.removeEventListener('pointerdown', onPointerDown);
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [onClose]);
+
+    const columnOptions = Array.from(
+        { length: MAX_SECTION_COLUMNS - MIN_SECTION_COLUMNS + 1 },
+        (_, i) => MIN_SECTION_COLUMNS + i,
+    );
+
+    return (
+        <div
+            ref={panelRef}
+            className="absolute bottom-full left-1/2 z-30 mb-2.5 w-60 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40 print:hidden"
+        >
+            <span className="absolute -bottom-[5px] left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-r border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" />
+
+            <div className="relative mb-2.5 flex items-center gap-2">
+                <div className="flex size-6 items-center justify-center rounded-md bg-brand-600 text-white">
+                    <SlidersHorizontalIcon className="size-3.5" />
+                </div>
+                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                    Block Settings
+                </p>
+            </div>
+
+            <p className="relative mb-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                Columns
+            </p>
+            <div className="relative grid grid-cols-5 gap-1">
+                {columnOptions.map((value) => (
+                    <button
+                        key={value}
+                        type="button"
+                        aria-pressed={columns === value}
+                        onClick={() => onChange(value)}
+                        className={cn(
+                            'flex h-8 cursor-pointer items-center justify-center rounded-lg border text-xs font-bold transition-colors',
+                            columns === value
+                                ? 'border-brand-600 bg-brand-600 text-white'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/10 dark:hover:text-brand-200',
+                        )}
+                    >
+                        {value}
+                    </button>
+                ))}
+            </div>
+        </div>
     );
 }
 
