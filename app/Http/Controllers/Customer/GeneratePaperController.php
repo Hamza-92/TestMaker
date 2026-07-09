@@ -7,6 +7,7 @@ use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
 use App\Models\Question;
+use App\Support\AppUserAccess;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,30 +19,53 @@ class GeneratePaperController extends Controller
 {
     public static function pageData(): array
     {
+        $access = AppUserAccess::resolve(auth()->user());
+        $patternIds = $access['ids']['pattern_access'];
+        $classIds   = $access['ids']['class_access'];
+        $subjectIds = $access['ids']['subject_access'];
+
+        $patterns = Pattern::where('status', 1)
+            ->when($patternIds !== null, fn ($q) => $q->whereIn('id', $patternIds))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $patternClasses = DB::table('pattern_classes')
+            ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
+            ->where('classes.status', 1)
+            ->when($patternIds !== null, fn ($q) => $q->whereIn('pattern_classes.pattern_id', $patternIds))
+            ->when($classIds !== null, fn ($q) => $q->whereIn('pattern_classes.class_id', $classIds))
+            ->orderBy('classes.name')
+            ->select('pattern_classes.pattern_id', 'classes.id', 'classes.name')
+            ->get()
+            ->filter(fn ($row) => AppUserAccess::allowsClass($access, (int) $row->pattern_id, (int) $row->id))
+            ->values();
+
+        $classSubjects = ClassSubject::join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
+            ->where('subjects.status', 1)
+            ->when($patternIds !== null, fn ($q) => $q->whereIn('class_subjects.pattern_id', $patternIds))
+            ->when($classIds !== null, fn ($q) => $q->whereIn('class_subjects.class_id', $classIds))
+            ->when($subjectIds !== null, fn ($q) => $q->whereIn('class_subjects.subject_id', $subjectIds))
+            ->orderBy('subjects.name_eng')
+            ->select(
+                'class_subjects.class_id',
+                'class_subjects.pattern_id',
+                'class_subjects.subject_id',
+                'subjects.name_eng as name'
+            )
+            ->get()
+            ->filter(fn ($row) => AppUserAccess::allowsSubject(
+                $access,
+                (int) $row->pattern_id,
+                (int) $row->class_id,
+                (int) $row->subject_id,
+            ))
+            ->values();
+
         return [
-            'patterns' => Pattern::where('status', 1)
-                ->orderBy('name')
-                ->get(['id', 'name']),
-
-            'patternClasses' => DB::table('pattern_classes')
-                ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
-                ->where('classes.status', 1)
-                ->orderBy('classes.name')
-                ->select('pattern_classes.pattern_id', 'classes.id', 'classes.name')
-                ->get(),
-
-            'classSubjects' => ClassSubject::join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
-                ->where('subjects.status', 1)
-                ->orderBy('subjects.name_eng')
-                ->select(
-                    'class_subjects.class_id',
-                    'class_subjects.pattern_id',
-                    'class_subjects.subject_id',
-                    'subjects.name_eng as name'
-                )
-                ->get(),
-
-            'sourceOptions' => collect(Question::sourceOptions())
+            'patterns'       => $patterns,
+            'patternClasses' => $patternClasses,
+            'classSubjects'  => $classSubjects,
+            'sourceOptions'  => collect(Question::sourceOptions())
                 ->map(fn (string $label, string $value) => [
                     'value' => $value,
                     'label' => $label,
@@ -66,6 +90,17 @@ class GeneratePaperController extends Controller
             'class_id'   => 'required|integer|exists:classes,id',
             'subject_id' => 'required|integer|exists:subjects,id',
         ]);
+
+        $access = AppUserAccess::resolve(auth()->user());
+        abort_unless(
+            AppUserAccess::allowsSubject(
+                $access,
+                (int) $data['pattern_id'],
+                (int) $data['class_id'],
+                (int) $data['subject_id'],
+            ),
+            403,
+        );
 
         $chapters = Chapter::query()
             ->where('pattern_id', $data['pattern_id'])
@@ -215,6 +250,22 @@ class GeneratePaperController extends Controller
         ]);
 
         $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+
+        $access = AppUserAccess::resolve(auth()->user());
+        $allowedChapterIds = DB::table('chapters')
+            ->whereIn('id', $chapterIds)
+            ->get(['id', 'pattern_id', 'class_id', 'subject_id'])
+            ->filter(fn ($row) => AppUserAccess::allowsSubject(
+                $access,
+                (int) $row->pattern_id,
+                (int) $row->class_id,
+                (int) $row->subject_id,
+            ))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        abort_if($allowedChapterIds->count() !== $chapterIds->count(), 403);
+
         $topicIds = collect($data['topic_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
             ->unique()

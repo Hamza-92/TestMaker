@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,11 +42,38 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user'        => $user,
-                'permissions' => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],
-                'is_master'   => $user?->isMasterSuperAdmin() ?? false,
+                'user'                => $user,
+                'permissions'         => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],
+                'is_master'           => $user?->isMasterSuperAdmin() ?? false,
+                'teacher_permissions' => $user?->isTeacher() ? (array) ($user->teacher_permissions ?? []) : [],
+                'school_context'      => $this->schoolContext($user),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+        ];
+    }
+
+    private function schoolContext(?User $user): ?array
+    {
+        if ($user === null || (! $user->isSchoolOwner() && ! $user->isTeacher())) {
+            return null;
+        }
+
+        $owner = $user->schoolOwner();
+
+        if ($owner === null) {
+            return null;
+        }
+
+        $subscription = $user->activeSchoolSubscription();
+        $teacherCount = $owner->teachers()->count();
+
+        return [
+            'school_name'         => $owner->school_name ?? $owner->name,
+            'is_owner'            => $user->isSchoolOwner(),
+            'allow_teachers'      => (bool) ($subscription?->allow_teachers ?? false),
+            'max_teachers'        => $subscription?->max_teachers,
+            'teachers_used'       => $teacherCount,
+            'has_subscription'    => $subscription !== null,
         ];
     }
 }

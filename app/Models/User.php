@@ -23,6 +23,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'address', 'city', 'province', 'is_show_address',
     'school_name', 'logo',
     'user_type', 'school_id', 'status', 'account_type', 'created_by',
+    'teacher_permissions', 'access_scope',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
@@ -40,6 +41,8 @@ class User extends Authenticatable
             'user_type'                => UserType::class,
             'status'                   => UserStatus::class,
             'account_type'             => AccountType::class,
+            'teacher_permissions'      => 'array',
+            'access_scope'             => 'array',
         ];
     }
 
@@ -50,9 +53,60 @@ class User extends Authenticatable
         return $this->user_type === UserType::SuperAdmin;
     }
 
+    public function isCustomer(): bool
+    {
+        return $this->user_type === UserType::Customer;
+    }
+
+    public function isTeacher(): bool
+    {
+        return $this->user_type === UserType::Teacher;
+    }
+
+    public function isSchoolOwner(): bool
+    {
+        return $this->isCustomer();
+    }
+
     public function isActive(): bool
     {
         return $this->status === UserStatus::Active;
+    }
+
+    public function hasTeacherPermission(string $permission): bool
+    {
+        if (! $this->isTeacher()) {
+            return false;
+        }
+
+        return in_array($permission, (array) ($this->teacher_permissions ?? []), true);
+    }
+
+    public function schoolOwner(): ?User
+    {
+        if ($this->isSchoolOwner()) {
+            return $this;
+        }
+
+        if ($this->isTeacher()) {
+            return $this->school;
+        }
+
+        return null;
+    }
+
+    public function activeSchoolSubscription(): ?Subscription
+    {
+        $owner = $this->schoolOwner();
+
+        if ($owner === null) {
+            return null;
+        }
+
+        return $owner->subscriptions()
+            ->where('status', 'active')
+            ->latest('started_at')
+            ->first();
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────
@@ -67,6 +121,12 @@ class User extends Authenticatable
     public function members(): HasMany
     {
         return $this->hasMany(User::class, 'school_id');
+    }
+
+    public function teachers(): HasMany
+    {
+        return $this->hasMany(User::class, 'school_id')
+            ->where('user_type', UserType::Teacher);
     }
 
     /** Who created this user. */

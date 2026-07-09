@@ -20,6 +20,8 @@ interface Paper {
     total_marks: number;
     created_at: string;
     updated_at: string;
+    author_name?: string | null;
+    is_mine?: boolean;
 }
 
 interface Props {
@@ -166,6 +168,11 @@ return;
                                                     Draft
                                                 </span>
                                             )}
+                                            {paper.is_mine === false && paper.author_name && (
+                                                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                    by {paper.author_name}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                                             {paper.subject && (
@@ -194,24 +201,32 @@ return;
                                 </div>
 
                                 <div className="flex shrink-0 items-center gap-2">
-                                    <Link
-                                        href={`/papers/${paper.id}/edit`}
-                                        className={cn(
-                                            'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors',
-                                            activeTab === 'drafts'
-                                                ? 'border-amber-400 text-amber-700 hover:bg-amber-50 dark:border-amber-500/50 dark:text-amber-400 dark:hover:bg-amber-500/10'
-                                                : 'border-brand-600 text-brand-700 hover:bg-brand-50 dark:border-brand-500 dark:text-brand-400 dark:hover:bg-brand-500/10',
-                                        )}
-                                    >
-                                        {activeTab === 'drafts' ? 'Continue' : 'Open'}
-                                    </Link>
-                                    <button
-                                        type="button"
-                                        onClick={() => confirmDelete(paper.id)}
-                                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
-                                    >
-                                        <Trash2Icon className="size-3.5" />
-                                    </button>
+                                    {paper.is_mine !== false ? (
+                                        <>
+                                            <Link
+                                                href={`/papers/${paper.id}/edit`}
+                                                className={cn(
+                                                    'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                    activeTab === 'drafts'
+                                                        ? 'border-amber-400 text-amber-700 hover:bg-amber-50 dark:border-amber-500/50 dark:text-amber-400 dark:hover:bg-amber-500/10'
+                                                        : 'border-brand-600 text-brand-700 hover:bg-brand-50 dark:border-brand-500 dark:text-brand-400 dark:hover:bg-brand-500/10',
+                                                )}
+                                            >
+                                                {activeTab === 'drafts' ? 'Continue' : 'Open'}
+                                            </Link>
+                                            <button
+                                                type="button"
+                                                onClick={() => confirmDelete(paper.id)}
+                                                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+                                            >
+                                                <Trash2Icon className="size-3.5" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <span className="rounded-lg border border-dashed border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-400 dark:border-slate-800 dark:text-slate-500">
+                                            View only
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         ))}

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Customer\GeneratePaperController;
 use App\Http\Controllers\Customer\PaperController;
+use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
@@ -34,16 +35,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ─── Customer / Teacher app ───────────────────────────────────────────────
     Route::middleware('app.user')->group(function () {
-        Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
-        Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
-        Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
-        Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
+        Route::middleware('teacher.feature:generate_papers')->group(function () {
+            Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
+            Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
+            Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
+            Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
+        });
 
-        Route::get('papers', [PaperController::class, 'index'])->name('customer.papers.index');
-        Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
-        Route::get('papers/{paper}/edit', [PaperController::class, 'edit'])->name('customer.papers.edit');
-        Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
-        Route::delete('papers/{paper}', [PaperController::class, 'destroy'])->name('customer.papers.destroy');
+        Route::middleware('teacher.feature:manage_own_papers,view_school_papers')->group(function () {
+            Route::get('papers', [PaperController::class, 'index'])->name('customer.papers.index');
+        });
+
+        Route::middleware('teacher.feature:manage_own_papers')->group(function () {
+            Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
+            Route::get('papers/{paper}/edit', [PaperController::class, 'edit'])->name('customer.papers.edit');
+            Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
+            Route::delete('papers/{paper}', [PaperController::class, 'destroy'])->name('customer.papers.destroy');
+        });
+
+        // ─── Teachers (school owner only) ─────────────────────────────────────
+        Route::middleware('school.owner')->group(function () {
+            Route::get('teachers', [TeacherController::class, 'index'])->name('customer.teachers.index');
+            Route::get('teachers/add', [TeacherController::class, 'create'])->name('customer.teachers.add');
+            Route::post('teachers', [TeacherController::class, 'store'])->name('customer.teachers.store');
+            Route::get('teachers/{teacher}/edit', [TeacherController::class, 'edit'])->name('customer.teachers.edit');
+            Route::put('teachers/{teacher}', [TeacherController::class, 'update'])->name('customer.teachers.update');
+            Route::delete('teachers/{teacher}', [TeacherController::class, 'destroy'])->name('customer.teachers.destroy');
+            Route::get('teachers/{teacher}/permissions', [TeacherController::class, 'permissions'])->name('customer.teachers.permissions');
+            Route::put('teachers/{teacher}/permissions', [TeacherController::class, 'updatePermissions'])->name('customer.teachers.permissions.update');
+        });
     });
 
     // ─── Superadmin ───────────────────────────────────────────────────────────

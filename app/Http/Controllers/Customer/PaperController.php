@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Enums\TeacherPermission;
 use App\Http\Controllers\Controller;
 use App\Models\Paper;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,9 @@ class PaperController extends Controller
 {
     public function index(): Response
     {
-        $cols = ['id', 'name', 'subject', 'class_name', 'total_marks', 'created_at', 'updated_at'];
+        $cols = ['id', 'name', 'subject', 'class_name', 'total_marks', 'user_id', 'created_at', 'updated_at'];
+        $user = auth()->user();
+        $userIds = $this->visibleUserIds($user);
         $map  = fn (Paper $paper) => [
             'id'          => $paper->id,
             'name'        => $paper->name,
@@ -23,13 +26,15 @@ class PaperController extends Controller
             'total_marks' => $paper->total_marks,
             'created_at'  => $paper->created_at->toISOString(),
             'updated_at'  => $paper->updated_at->toISOString(),
+            'author_name' => $paper->relationLoaded('user') ? $paper->user?->name : null,
+            'is_mine'     => (int) $paper->user_id === (int) $user->id,
         ];
 
-        $user = auth()->user();
+        $base = Paper::query()->whereIn('user_id', $userIds)->with('user:id,name')->orderByDesc('updated_at');
 
         return Inertia::render('customer/papers/index', [
-            'papers' => $user->papers()->where('is_draft', false)->orderByDesc('updated_at')->get($cols)->map($map),
-            'drafts' => $user->papers()->where('is_draft', true)->orderByDesc('updated_at')->get($cols)->map($map),
+            'papers' => (clone $base)->where('is_draft', false)->get($cols)->map($map),
+            'drafts' => (clone $base)->where('is_draft', true)->get($cols)->map($map),
         ]);
     }
 
@@ -103,5 +108,33 @@ class PaperController extends Controller
             GeneratePaperController::pageData(),
             ['savedPaper' => $savedPaper]
         ));
+    }
+
+    private function visibleUserIds($user): array
+    {
+        $ids = [$user->id];
+
+        if ($user->isSchoolOwner()) {
+            $ids = array_values(array_unique([
+                ...$ids,
+                ...$user->teachers()->pluck('id')->all(),
+            ]));
+
+            return $ids;
+        }
+
+        if ($user->isTeacher() && $user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
+            $owner = $user->schoolOwner();
+
+            if ($owner !== null) {
+                $ids = array_values(array_unique([
+                    ...$ids,
+                    $owner->id,
+                    ...$owner->teachers()->pluck('id')->all(),
+                ]));
+            }
+        }
+
+        return $ids;
     }
 }

@@ -21,11 +21,31 @@ interface NavItem {
     label: string;
     href: string;
     icon: React.ElementType;
+    requires?: string;
 }
 
 interface NavGroup {
     title: string;
     items: NavItem[];
+    ownerOnly?: boolean;
+}
+
+interface SchoolContext {
+    school_name: string | null;
+    is_owner: boolean;
+    allow_teachers: boolean;
+    max_teachers: number | null;
+    teachers_used: number;
+    has_subscription: boolean;
+}
+
+interface AuthPageProps {
+    auth: {
+        user: Record<string, unknown>;
+        teacher_permissions?: string[];
+        school_context?: SchoolContext | null;
+    };
+    [key: string]: unknown;
 }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -36,9 +56,20 @@ const NAV_GROUPS: NavGroup[] = [
                 label: 'Generate Paper',
                 href: '/papers/generate',
                 icon: FilePlusIcon,
+                requires: 'generate_papers',
             },
-            { label: 'Question Bank', href: '/questions', icon: DatabaseIcon },
-            { label: 'Saved Papers', href: '/papers', icon: BookmarkIcon },
+            {
+                label: 'Question Bank',
+                href: '/questions',
+                icon: DatabaseIcon,
+                requires: 'view_question_bank',
+            },
+            {
+                label: 'Saved Papers',
+                href: '/papers',
+                icon: BookmarkIcon,
+                requires: 'manage_own_papers',
+            },
             {
                 label: 'My Templates',
                 href: '/templates',
@@ -48,6 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
     },
     {
         title: 'Management',
+        ownerOnly: true,
         items: [
             { label: 'Teachers', href: '/teachers', icon: UsersIcon },
             { label: 'Classes', href: '/classes', icon: SchoolIcon },
@@ -57,6 +89,7 @@ const NAV_GROUPS: NavGroup[] = [
     },
     {
         title: 'Analytics',
+        ownerOnly: true,
         items: [
             { label: 'Reports', href: '/reports', icon: BarChart3Icon },
             { label: 'Activity Log', href: '/activity', icon: ActivityIcon },
@@ -135,17 +168,29 @@ function SidebarContent({
     onNavigate?: () => void;
 }) {
     const { url } = usePage();
-    const page = usePage<{ auth: { user: Record<string, unknown> } }>();
+    const page = usePage<AuthPageProps>();
     const user = page.props.auth.user;
+    const teacherPermissions = page.props.auth.teacher_permissions ?? [];
+    const schoolContext = page.props.auth.school_context ?? null;
+    const isOwner = schoolContext?.is_owner ?? false;
     const schoolName =
-        (user.school_name as string | null) ?? (user.name as string);
+        schoolContext?.school_name ??
+        (user.school_name as string | null) ??
+        (user.name as string);
 
-    // Build the full href list (Dashboard + all groups) and pick the single
-    // best match so longer paths win — e.g. `/papers/generate` activates only
-    // "Generate Paper", not also "Saved Papers".
+    const visibleGroups = NAV_GROUPS.map((group) => {
+        if (group.ownerOnly && !isOwner) return null;
+        const items = group.items.filter((item) => {
+            if (isOwner) return true;
+            if (!item.requires) return false;
+            return teacherPermissions.includes(item.requires);
+        });
+        return items.length > 0 ? { ...group, items } : null;
+    }).filter((g): g is NavGroup => g !== null);
+
     const allHrefs = [
         '/dashboard',
-        ...NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href)),
+        ...visibleGroups.flatMap((g) => g.items.map((i) => i.href)),
     ];
     const activeHref = resolveActiveHref(url, allHrefs);
 
@@ -191,7 +236,7 @@ function SidebarContent({
                 />
 
                 {/* Groups */}
-                {NAV_GROUPS.map((group) => (
+                {visibleGroups.map((group) => (
                     <div key={group.title}>
                         {collapsed ? (
                             <div className="mx-auto mb-2 h-px w-5 bg-white/10" />
