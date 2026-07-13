@@ -9,7 +9,9 @@ import {
     FileTextIcon,
     GraduationCapIcon,
     GripVerticalIcon,
+    KeyRoundIcon,
     LayersIcon,
+    LayoutTemplateIcon,
     ListChecksIcon,
     Loader2Icon,
     MinusIcon,
@@ -20,6 +22,7 @@ import {
     SearchIcon,
     SearchXIcon,
     SettingsIcon,
+    ShuffleIcon,
     SparklesIcon,
     Trash2Icon,
     XIcon,
@@ -41,6 +44,10 @@ import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
 import type { SavePaperValues } from './paper-layouts/save-paper-modal';
+import { SaveAsTemplateModal } from './paper-layouts/save-as-template-modal';
+import type { SaveAsTemplateValues } from './paper-layouts/save-as-template-modal';
+import { AnswerKeySheet } from './paper-layouts/answer-key-sheet';
+import { SET_LABELS, setLabelFor, variantForSet } from './paper-layouts/paper-variant';
 // Lazy-loaded: this modal pulls in browser-only editors (tinymce, mathlive)
 // that have no SSR-safe exports. A static import drags them into the SSR
 // module graph and crashes server rendering of /papers/generate with
@@ -83,6 +90,7 @@ interface ClassSubject {
 interface Topic {
     id: number;
     name: string;
+    question_count?: number;
 }
 
 interface Chapter {
@@ -91,6 +99,7 @@ interface Chapter {
     chapter_number: number | null;
     group_name: string | null;
     group_heading: string | null;
+    question_count?: number;
     topics: Topic[];
 }
 
@@ -143,18 +152,55 @@ return {};
     return out;
 }
 
+interface AppliedTemplate {
+    id: number;
+    name: string;
+    settings: Partial<PaperSettings>;
+    structure: {
+        sections: Array<{
+            questionTypeId: number | null;
+            category: string;
+            title: string;
+            requiredQuestions: number;
+            totalQuestions: number;
+            marksEach: number;
+            columns?: number;
+        }>;
+        total_marks?: number;
+    };
+}
+
 interface Props {
     patterns: Pattern[];
     patternClasses: PatternClass[];
     classSubjects: ClassSubject[];
     sourceOptions: SourceOption[];
+    difficultyOptions?: DifficultyOption[];
     savedPaper?: SavedPaperProp;
+    appliedTemplate?: AppliedTemplate;
 }
 
 interface SourceOption {
     value: string;
     label: string;
 }
+
+interface DifficultyOption {
+    value: string;
+    label: string;
+}
+
+const FALLBACK_DIFFICULTY_OPTIONS: DifficultyOption[] = [
+    { value: 'easy', label: 'Easy' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'hard', label: 'Hard' },
+];
+
+const DIFFICULTY_STYLES: Record<string, string> = {
+    easy: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
+    medium: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+    hard: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30',
+};
 
 type StepState = 'active' | 'done' | 'upcoming';
 type FormStep = 'chapters' | 'questions';
@@ -208,6 +254,7 @@ interface ManualQuestion {
     content: Record<string, unknown>;
     source: string | null;
     sourceLabel: string | null;
+    difficulty: string | null;
     chapter: {
         id: number;
         name: string;
@@ -410,7 +457,26 @@ function paperQuestionFromManual(
         imageSize: 'md',
         options: paperOptionsFromManual(question),
         answerLines: question.isObjective ? 0 : 0,
+        answerText: answerTextFromManual(question),
     };
+}
+
+function answerTextFromManual(question: ManualQuestion): string | null {
+    const content = question.content as Record<string, unknown> | null;
+    if (!content) return null;
+
+    if (question.schemaKey === 'objective_true_false') {
+        const flag = String(content.correct_boolean ?? '').toLowerCase();
+        if (flag === 'true') return 'True';
+        if (flag === 'false') return 'False';
+        return null;
+    }
+
+    const en = typeof content.answer_en === 'string' ? content.answer_en.trim() : '';
+    if (en !== '') return en;
+    const ur = typeof content.answer_ur === 'string' ? content.answer_ur.trim() : '';
+    if (ur !== '') return ur;
+    return null;
 }
 
 function createCustomPaperQuestion(id: string): GeneratedPaperQuestion {
@@ -433,9 +499,10 @@ function paperOptionsFromManual(
     question: ManualQuestion,
 ): PaperQuestionOption[] {
     if (question.schemaKey === 'objective_true_false') {
+        const flag = String((question.content as Record<string, unknown>).correct_boolean ?? '').toLowerCase();
         return [
-            { id: `${question.id}_true`, text: 'True' },
-            { id: `${question.id}_false`, text: 'False' },
+            { id: `${question.id}_true`, text: 'True', isCorrect: flag === 'true' },
+            { id: `${question.id}_false`, text: 'False', isCorrect: flag === 'false' },
         ];
     }
 
@@ -446,7 +513,7 @@ function paperOptionsFromManual(
     }
 
     return options
-        .map((option, index) => {
+        .map((option, index): PaperQuestionOption | null => {
             if (!option || typeof option !== 'object') {
                 return null;
             }
@@ -461,6 +528,7 @@ function paperOptionsFromManual(
             return {
                 id: `${question.id}_option_${index}`,
                 text,
+                isCorrect: Boolean(value.is_correct),
             };
         })
         .filter((option): option is PaperQuestionOption => option !== null);
@@ -810,8 +878,15 @@ export default function GeneratePaper({
     patternClasses,
     classSubjects,
     sourceOptions,
+    difficultyOptions,
     savedPaper,
+    appliedTemplate,
 }: Props) {
+    const difficultyFilters = useMemo(
+        () => (difficultyOptions && difficultyOptions.length > 0 ? difficultyOptions : FALLBACK_DIFFICULTY_OPTIONS),
+        [difficultyOptions],
+    );
+    const [activeDifficulties, setActiveDifficulties] = useState<string[]>([]);
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
     const schoolAddress = typeof auth.user.address === 'string' ? auth.user.address : '';
@@ -890,6 +965,18 @@ export default function GeneratePaper({
     const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSavedRef = useRef<number | null>(null);
     const isRestoringRef = useRef(false);
+    const [pendingTemplate, setPendingTemplate] = useState<AppliedTemplate | null>(
+        appliedTemplate ?? null,
+    );
+    const templateStructureAppliedRef = useRef(false);
+    const templateSettingsAppliedRef = useRef(false);
+    const [isSaveAsTemplateOpen, setIsSaveAsTemplateOpen] = useState(false);
+    const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+    const [saveTemplateError, setSaveTemplateError] = useState<string | null>(null);
+    const [activeSetIndex, setActiveSetIndex] = useState(0);
+    const [numSets, setNumSets] = useState(1);
+    const [viewMode, setViewMode] = useState<'paper' | 'answer_key'>('paper');
+    const [printAllSets, setPrintAllSets] = useState(false);
     const [savedPaperId, setSavedPaperId] = useState<number | null>(null);
     const [savedPaperName, setSavedPaperName] = useState('');
     const [savedPaperIsDraft, setSavedPaperIsDraft] = useState(false);
@@ -1242,6 +1329,9 @@ export default function GeneratePaper({
         activeSourceValues.forEach((source) =>
             params.append('sources[]', source),
         );
+        activeDifficulties.forEach((difficulty) =>
+            params.append('difficulties[]', difficulty),
+        );
 
         queueMicrotask(() => {
             if (!abortController.signal.aborted) {
@@ -1287,7 +1377,81 @@ export default function GeneratePaper({
             .finally(() => setLoadingQuestionSections(false));
 
         return () => abortController.abort();
-    }, [activeSourceValues, selectedChapterIds, selectedTopicIds, step]);
+    }, [activeSourceValues, activeDifficulties, selectedChapterIds, selectedTopicIds, step]);
+
+    useEffect(() => {
+        if (
+            !pendingTemplate ||
+            templateStructureAppliedRef.current ||
+            questionSelection.sections.length === 0
+        ) {
+            return;
+        }
+
+        const structureByType = new Map<number, AppliedTemplate['structure']['sections'][number]>();
+        for (const section of pendingTemplate.structure.sections) {
+            if (typeof section.questionTypeId === 'number') {
+                structureByType.set(section.questionTypeId, section);
+            }
+        }
+
+        if (structureByType.size === 0) {
+            return;
+        }
+
+        setQuestionSelection((current) =>
+            withTotalMarks({
+                ...current,
+                sections: current.sections.map((section) => {
+                    const match = structureByType.get(section.questionTypeId);
+                    if (!match) return section;
+
+                    const rows = section.rows.length > 0 ? [...section.rows] : [createQuestionRow(String(questionRowSequence.current++))];
+                    const firstRow = rows[0];
+                    rows[0] = normalizeQuestionRow(
+                        {
+                            ...firstRow,
+                            requiredQuestions: String(match.requiredQuestions ?? ''),
+                            marksPerQuestion: String(match.marksEach ?? ''),
+                            choiceQuestions: String(match.totalQuestions ?? match.requiredQuestions ?? ''),
+                        },
+                        section.availableCount,
+                    );
+
+                    return {
+                        ...section,
+                        columnPerRow: match.columns ?? section.columnPerRow,
+                        rows,
+                    };
+                }),
+            }),
+        );
+
+        templateStructureAppliedRef.current = true;
+    }, [pendingTemplate, questionSelection.sections.length]);
+
+    useEffect(() => {
+        if (
+            !pendingTemplate ||
+            templateSettingsAppliedRef.current ||
+            !generatedPaper
+        ) {
+            return;
+        }
+
+        setGeneratedPaper((current) =>
+            current
+                ? {
+                      ...current,
+                      settings: normalizePaperSettings({
+                          ...current.settings,
+                          ...pendingTemplate.settings,
+                      }),
+                  }
+                : current,
+        );
+        templateSettingsAppliedRef.current = true;
+    }, [pendingTemplate, generatedPaper]);
 
     useEffect(() => {
         if (
@@ -1311,6 +1475,9 @@ export default function GeneratePaper({
         );
         activeSourceValues.forEach((source) =>
             params.append('sources[]', source),
+        );
+        activeDifficulties.forEach((difficulty) =>
+            params.append('difficulties[]', difficulty),
         );
 
         queueMicrotask(() => {
@@ -1351,6 +1518,7 @@ export default function GeneratePaper({
     }, [
         activeManualQuestionTypeId,
         activeSourceValues,
+        activeDifficulties,
         manualPickerTarget,
         selectedChapterIds,
         selectedTopicIds,
@@ -1762,10 +1930,14 @@ return;
         const chapterIds = filters?.chapterIds ?? selectedChapterIds;
         const topicIds = filters?.topicIds ?? selectedTopicIds;
         const sources = filters?.sources ?? activeSourceValues;
+        const difficulties = activeDifficulties;
 
         chapterIds.forEach((id) => params.append('chapter_ids[]', String(id)));
         topicIds.forEach((id) => params.append('topic_ids[]', String(id)));
         sources.forEach((source) => params.append('sources[]', source));
+        difficulties.forEach((difficulty) =>
+            params.append('difficulties[]', difficulty),
+        );
 
         return params;
     }
@@ -2256,6 +2428,61 @@ return '';
                 .filter(Boolean)
                 .join(' – ') || 'My Paper'
         );
+    }
+
+    async function saveAsTemplateToServer(values: SaveAsTemplateValues) {
+        if (!generatedPaper || isSavingTemplate) return;
+
+        setIsSavingTemplate(true);
+        setSaveTemplateError(null);
+
+        const csrfToken =
+            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+                ?.content ?? '';
+
+        const structure = {
+            sections: generatedPaper.sections.map((section) => ({
+                questionTypeId: section.questionTypeId,
+                category: section.category,
+                title: section.title,
+                requiredQuestions: section.requiredQuestions,
+                totalQuestions: section.totalQuestions,
+                marksEach: section.marksEach,
+                columns: section.columns ?? null,
+            })),
+        };
+
+        try {
+            const res = await fetch('/templates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    name: values.name,
+                    description: values.description || null,
+                    settings: generatedPaper.settings,
+                    structure,
+                }),
+                credentials: 'same-origin',
+            });
+
+            if (!res.ok) {
+                throw new Error(`Server returned ${res.status}`);
+            }
+
+            setIsSaveAsTemplateOpen(false);
+            toast.success('Template saved');
+        } catch (error) {
+            setSaveTemplateError(
+                error instanceof Error ? error.message : 'Failed to save template.',
+            );
+        } finally {
+            setIsSavingTemplate(false);
+        }
     }
 
     function updatePaperHeader(
@@ -3133,7 +3360,22 @@ return '';
                         </div>
                     )}
                     <GeneratedPaperView
-                        paper={generatedPaper}
+                        paper={variantForSet(generatedPaper, activeSetIndex)}
+                        rawPaper={generatedPaper}
+                        activeSetIndex={activeSetIndex}
+                        numSets={numSets}
+                        viewMode={viewMode}
+                        onActiveSetChange={setActiveSetIndex}
+                        onNumSetsChange={setNumSets}
+                        onViewModeChange={setViewMode}
+                        printAllSets={printAllSets}
+                        onPrintAllSets={() => {
+                            setPrintAllSets(true);
+                            setTimeout(() => {
+                                window.print();
+                                setPrintAllSets(false);
+                            }, 50);
+                        }}
                         totalMarks={paperTotalMarks(generatedPaper)}
                         defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                         schoolAddress={schoolAddress}
@@ -3150,6 +3392,10 @@ return '';
                         onOpenSavePaperModal={() =>
                             setIsSavePaperModalOpen(true)
                         }
+                        onOpenSaveAsTemplate={() => {
+                            setSaveTemplateError(null);
+                            setIsSaveAsTemplateOpen(true);
+                        }}
                         onSaveDraft={() => void saveAsDraft()}
                         onGoBack={returnToPaperSetup}
                         onSaveDraftAndBack={() => void saveDraftAndBack()}
@@ -3245,6 +3491,19 @@ return '';
                             onSearchQuestions={searchPaperQuestionPool}
                             onClose={closeAddPaperSectionModal}
                             onSubmit={addPaperSection}
+                        />
+                    )}
+
+                    {isSaveAsTemplateOpen && generatedPaper && (
+                        <SaveAsTemplateModal
+                            defaultName={savedPaperName || defaultPaperName() || 'My Template'}
+                            isSaving={isSavingTemplate}
+                            error={saveTemplateError}
+                            onSave={saveAsTemplateToServer}
+                            onCancel={() => {
+                                setIsSaveAsTemplateOpen(false);
+                                setSaveTemplateError(null);
+                            }}
                         />
                     )}
                 </>
@@ -3564,6 +3823,35 @@ return '';
                                                             />
                                                         ),
                                                     )}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-800">
+                                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                                        Difficulty
+                                                    </span>
+                                                    {difficultyFilters.map((item) => {
+                                                        const checked = activeDifficulties.includes(item.value);
+                                                        return (
+                                                            <button
+                                                                key={item.value}
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setActiveDifficulties((current) =>
+                                                                        current.includes(item.value)
+                                                                            ? current.filter((v) => v !== item.value)
+                                                                            : [...current, item.value],
+                                                                    )
+                                                                }
+                                                                className={cn(
+                                                                    'inline-flex cursor-pointer items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                                                                    checked
+                                                                        ? DIFFICULTY_STYLES[item.value] ?? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300'
+                                                                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800',
+                                                                )}
+                                                            >
+                                                                {item.label}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         </div>
@@ -3926,6 +4214,16 @@ function ManualQuestionPickerModal({
                                                     question.source ??
                                                     'No source'}
                                             </span>
+                                            {question.difficulty && (
+                                                <span
+                                                    className={cn(
+                                                        'rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase',
+                                                        DIFFICULTY_STYLES[question.difficulty] ?? '',
+                                                    )}
+                                                >
+                                                    {question.difficulty}
+                                                </span>
+                                            )}
                                             <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
                                                 {manualQuestionChapterLabel(
                                                     question,
@@ -4964,6 +5262,15 @@ function EmptyQuestionState({
 
 function GeneratedPaperView({
     paper,
+    rawPaper,
+    activeSetIndex,
+    numSets,
+    viewMode,
+    onActiveSetChange,
+    onNumSetsChange,
+    onViewModeChange,
+    printAllSets,
+    onPrintAllSets,
     totalMarks,
     defaultWatermarkLogoUrl,
     schoolAddress,
@@ -4978,6 +5285,7 @@ function GeneratedPaperView({
     isSavingPaper,
     isSavingDraft,
     onOpenSavePaperModal,
+    onOpenSaveAsTemplate,
     onSaveDraft,
     onGoBack,
     onSaveDraftAndBack,
@@ -5004,6 +5312,15 @@ function GeneratedPaperView({
     onPickerClose,
 }: {
     paper: GeneratedPaper;
+    rawPaper: GeneratedPaper;
+    activeSetIndex: number;
+    numSets: number;
+    viewMode: 'paper' | 'answer_key';
+    onActiveSetChange: (index: number) => void;
+    onNumSetsChange: (count: number) => void;
+    onViewModeChange: (mode: 'paper' | 'answer_key') => void;
+    printAllSets: boolean;
+    onPrintAllSets: () => void;
     totalMarks: number;
     defaultWatermarkLogoUrl: string;
     schoolAddress: string;
@@ -5021,6 +5338,7 @@ function GeneratedPaperView({
     isSavingPaper: boolean;
     isSavingDraft: boolean;
     onOpenSavePaperModal: () => void;
+    onOpenSaveAsTemplate: () => void;
     onSaveDraft: () => void;
     onGoBack: () => void;
     onSaveDraftAndBack: () => void;
@@ -5178,6 +5496,74 @@ return null;
                             <PlusIcon className="size-4" />
                             Add Section
                         </button>
+                        <div className="inline-flex rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                            <button
+                                type="button"
+                                onClick={() => onViewModeChange('paper')}
+                                className={cn(
+                                    'inline-flex cursor-pointer items-center gap-1.5 rounded-l-lg px-3 py-2 text-sm font-medium transition-colors',
+                                    viewMode === 'paper'
+                                        ? 'bg-brand-600 text-white'
+                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                )}
+                            >
+                                <FileTextIcon className="size-4" />
+                                Paper
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onViewModeChange('answer_key')}
+                                className={cn(
+                                    'inline-flex cursor-pointer items-center gap-1.5 rounded-r-lg px-3 py-2 text-sm font-medium transition-colors',
+                                    viewMode === 'answer_key'
+                                        ? 'bg-brand-600 text-white'
+                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                )}
+                            >
+                                <KeyRoundIcon className="size-4" />
+                                Answer Key
+                            </button>
+                        </div>
+                        <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+                            <ShuffleIcon className="size-4 text-slate-400" />
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                Sets
+                            </span>
+                            <select
+                                value={numSets}
+                                onChange={(e) => {
+                                    const next = Number(e.target.value);
+                                    onNumSetsChange(next);
+                                    if (activeSetIndex >= next) onActiveSetChange(next - 1);
+                                }}
+                                className="cursor-pointer border-none bg-transparent text-sm font-semibold text-slate-700 outline-none dark:text-slate-200"
+                            >
+                                {[1, 2, 3].map((n) => (
+                                    <option key={n} value={n}>
+                                        {n}
+                                    </option>
+                                ))}
+                            </select>
+                            {numSets > 1 && (
+                                <div className="flex items-center gap-0.5 border-l border-slate-200 pl-2 dark:border-slate-800">
+                                    {SET_LABELS.slice(0, numSets).map((label, index) => (
+                                        <button
+                                            key={label}
+                                            type="button"
+                                            onClick={() => onActiveSetChange(index)}
+                                            className={cn(
+                                                'inline-flex size-6 items-center justify-center rounded text-xs font-bold transition-colors',
+                                                activeSetIndex === index
+                                                    ? 'bg-brand-600 text-white'
+                                                    : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800',
+                                            )}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         {isDraft && savedPaperId !== null && (
                             <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                                 <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
@@ -5242,11 +5628,20 @@ return null;
                         </button>
                         <button
                             type="button"
-                            onClick={() => window.print()}
+                            onClick={onOpenSaveAsTemplate}
+                            title="Save as template"
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            <LayoutTemplateIcon className="size-4" />
+                            Save as Template
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => (numSets > 1 ? onPrintAllSets() : window.print())}
                             className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white"
                         >
                             <PrinterIcon className="size-4" />
-                            Print
+                            {numSets > 1 ? `Print ${numSets} Sets` : 'Print'}
                         </button>
                     </div>
                 </div>
@@ -5309,11 +5704,14 @@ return null;
                             header={{
                                 ...paper.header,
                                 marks: totalMarks,
+                                type: viewMode === 'answer_key'
+                                    ? `Answer Key${numSets > 1 ? ` — Set ${setLabelFor(activeSetIndex)}` : ''}`
+                                    : paper.header.type,
                             }}
                             logoUrl={defaultWatermarkLogoUrl}
                             address={schoolAddress}
                             showAddress={showSchoolAddress}
-                            onChange={onHeaderChange}
+                            onChange={viewMode === 'answer_key' ? () => {} : onHeaderChange}
                         />
                         <div
                             className="flex flex-col"
@@ -5322,59 +5720,151 @@ return null;
                                 gap: `${settings.sectionSpacing}mm`,
                             }}
                         >
-                            {paper.sections.map((section, sectionIndex) => {
-                                const Template = pickSectionTemplate(
-                                    settings.questionLayout,
-                                    section.category,
-                                );
+                            {viewMode === 'answer_key' ? (
+                                <AnswerKeySheet
+                                    paper={paper}
+                                    setIndex={activeSetIndex}
+                                    settings={settings}
+                                    style={{}}
+                                />
+                            ) : (
+                                paper.sections.map((section, sectionIndex) => {
+                                    const Template = pickSectionTemplate(
+                                        settings.questionLayout,
+                                        section.category,
+                                    );
 
-                                return (
-                                    <Template
-                                        key={section.id}
-                                        section={section}
-                                        index={sectionIndex}
-                                        numberingFormat={
-                                            settings.questionNumberingFormat
-                                        }
-                                        canMoveUp={sectionIndex > 0}
-                                        canMoveDown={
-                                            sectionIndex <
-                                            paper.sections.length - 1
-                                        }
-                                        onEditSection={onEditSection}
-                                        onDeleteSection={onDeleteSection}
-                                        onMoveUp={(sectionId) =>
-                                            onMoveSection(sectionId, -1)
-                                        }
-                                        onMoveDown={(sectionId) =>
-                                            onMoveSection(sectionId, 1)
-                                        }
-                                        onAddRandomQuestion={
-                                            onAddRandomQuestion
-                                        }
-                                        onAddCustomQuestion={
-                                            onAddCustomQuestion
-                                        }
-                                        onEditQuestion={onEditQuestion}
-                                        onRandomQuestion={onRandomQuestion}
-                                        onPickQuestion={onPickQuestion}
-                                        onRemoveQuestion={onRemoveQuestion}
-                                        onAnswerLinesChange={
-                                            onQuestionAnswerLinesChange
-                                        }
-                                        onAnswerLineSpacingChange={
-                                            onQuestionAnswerLineSpacingChange
-                                        }
-                                        onQuestionImageSizeChange={
-                                            onQuestionImageSizeChange
-                                        }
-                                        onColumnsChange={onColumnsChange}
-                                    />
-                                );
-                            })}
+                                    return (
+                                        <Template
+                                            key={section.id}
+                                            section={section}
+                                            index={sectionIndex}
+                                            numberingFormat={
+                                                settings.questionNumberingFormat
+                                            }
+                                            canMoveUp={sectionIndex > 0}
+                                            canMoveDown={
+                                                sectionIndex <
+                                                paper.sections.length - 1
+                                            }
+                                            onEditSection={onEditSection}
+                                            onDeleteSection={onDeleteSection}
+                                            onMoveUp={(sectionId) =>
+                                                onMoveSection(sectionId, -1)
+                                            }
+                                            onMoveDown={(sectionId) =>
+                                                onMoveSection(sectionId, 1)
+                                            }
+                                            onAddRandomQuestion={
+                                                onAddRandomQuestion
+                                            }
+                                            onAddCustomQuestion={
+                                                onAddCustomQuestion
+                                            }
+                                            onEditQuestion={onEditQuestion}
+                                            onRandomQuestion={onRandomQuestion}
+                                            onPickQuestion={onPickQuestion}
+                                            onRemoveQuestion={onRemoveQuestion}
+                                            onAnswerLinesChange={
+                                                onQuestionAnswerLinesChange
+                                            }
+                                            onAnswerLineSpacingChange={
+                                                onQuestionAnswerLineSpacingChange
+                                            }
+                                            onQuestionImageSizeChange={
+                                                onQuestionImageSizeChange
+                                            }
+                                            onColumnsChange={onColumnsChange}
+                                        />
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
                 </main>
+
+                {printAllSets && numSets > 1 && (
+                    <div className="hidden print:block">
+                        {Array.from({ length: numSets }).map((_, index) => {
+                            if (index === activeSetIndex) return null;
+                            const variantPaper = variantForSet(rawPaper, index);
+                            return (
+                                <main
+                                    key={`variant-${index}`}
+                                    data-print-paper
+                                    style={{ ...paperShellStyle, breakBefore: 'page' }}
+                                    className="relative mx-auto overflow-hidden bg-white print:overflow-visible print:shadow-none"
+                                >
+                                    <div className="relative z-10">
+                                        <PaperHeader
+                                            template={settings.headerTemplate}
+                                            header={{
+                                                ...variantPaper.header,
+                                                marks: totalMarks,
+                                                type: viewMode === 'answer_key'
+                                                    ? `Answer Key — Set ${setLabelFor(index)}`
+                                                    : variantPaper.header.type
+                                                        ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
+                                                        : `Set ${setLabelFor(index)}`,
+                                            }}
+                                            logoUrl={defaultWatermarkLogoUrl}
+                                            address={schoolAddress}
+                                            showAddress={showSchoolAddress}
+                                            onChange={() => {}}
+                                        />
+                                        <div
+                                            className="flex flex-col"
+                                            style={{
+                                                marginTop: `${settings.sectionSpacing}mm`,
+                                                gap: `${settings.sectionSpacing}mm`,
+                                            }}
+                                        >
+                                            {viewMode === 'answer_key' ? (
+                                                <AnswerKeySheet
+                                                    paper={variantPaper}
+                                                    setIndex={index}
+                                                    settings={settings}
+                                                    style={{}}
+                                                />
+                                            ) : (
+                                                variantPaper.sections.map((section, sectionIndex) => {
+                                                    const Template = pickSectionTemplate(
+                                                        settings.questionLayout,
+                                                        section.category,
+                                                    );
+                                                    return (
+                                                        <Template
+                                                            key={section.id}
+                                                            section={section}
+                                                            index={sectionIndex}
+                                                            numberingFormat={settings.questionNumberingFormat}
+                                                            canMoveUp={false}
+                                                            canMoveDown={false}
+                                                            onEditSection={() => {}}
+                                                            onDeleteSection={() => {}}
+                                                            onMoveUp={() => {}}
+                                                            onMoveDown={() => {}}
+                                                            onAddRandomQuestion={() => {}}
+                                                            onAddCustomQuestion={() => {}}
+                                                            onEditQuestion={() => {}}
+                                                            onRandomQuestion={() => {}}
+                                                            onPickQuestion={() => {}}
+                                                            onRemoveQuestion={() => {}}
+                                                            onAnswerLinesChange={() => {}}
+                                                            onAnswerLineSpacingChange={() => {}}
+                                                            onQuestionImageSizeChange={() => {}}
+                                                            onColumnsChange={() => {}}
+                                                        />
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                </main>
+                            );
+                        })}
+                    </div>
+                )}
 
                 <div className="flex justify-end gap-2 print:hidden">
                     <button
@@ -5751,6 +6241,19 @@ function DirectChapterRow({
                 <span className="truncate" title={chapter.name}>
                     {chapter.name}
                 </span>
+                {typeof chapter.question_count === 'number' && (
+                    <span
+                        className={cn(
+                            'ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums',
+                            chapter.question_count > 0
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+                        )}
+                        title={`${chapter.question_count} question${chapter.question_count === 1 ? '' : 's'}`}
+                    >
+                        {chapter.question_count}
+                    </span>
+                )}
             </button>
         </li>
     );
@@ -5811,6 +6314,19 @@ function ChapterCard({
                         >
                             {chapter.name}
                         </h3>
+                        {typeof chapter.question_count === 'number' && (
+                            <span
+                                className={cn(
+                                    'ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums',
+                                    chapter.question_count > 0
+                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                        : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+                                )}
+                                title={`${chapter.question_count} question${chapter.question_count === 1 ? '' : 's'} available`}
+                            >
+                                {chapter.question_count}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -5847,6 +6363,18 @@ function ChapterCard({
                                 >
                                     {topic.name}
                                 </button>
+                                {typeof topic.question_count === 'number' && (
+                                    <span
+                                        className={cn(
+                                            'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                                            topic.question_count > 0
+                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                                : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+                                        )}
+                                    >
+                                        {topic.question_count}
+                                    </span>
+                                )}
                             </li>
                         );
                     })}

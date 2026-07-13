@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Customer\GeneratePaperController;
 use App\Http\Controllers\Customer\PaperController;
+use App\Http\Controllers\Customer\PaperFolderController;
+use App\Http\Controllers\Customer\PaperTemplateController;
 use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Superadmin\ChapterController;
@@ -51,6 +53,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('papers/{paper}/edit', [PaperController::class, 'edit'])->name('customer.papers.edit');
             Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
             Route::delete('papers/{paper}', [PaperController::class, 'destroy'])->name('customer.papers.destroy');
+            Route::post('papers/{paper}/duplicate', [PaperController::class, 'duplicate'])->name('customer.papers.duplicate');
+            Route::patch('papers/{paper}/folder', [PaperController::class, 'move'])->name('customer.papers.move');
+
+            Route::post('paper-folders', [PaperFolderController::class, 'store'])->name('customer.paper-folders.store');
+            Route::put('paper-folders/{folder}', [PaperFolderController::class, 'update'])->name('customer.paper-folders.update');
+            Route::delete('paper-folders/{folder}', [PaperFolderController::class, 'destroy'])->name('customer.paper-folders.destroy');
+
+            Route::get('templates', [PaperTemplateController::class, 'index'])->name('customer.templates.index');
+            Route::post('templates', [PaperTemplateController::class, 'store'])->name('customer.templates.store');
+            Route::put('templates/{template}', [PaperTemplateController::class, 'update'])->name('customer.templates.update');
+            Route::delete('templates/{template}', [PaperTemplateController::class, 'destroy'])->name('customer.templates.destroy');
         });
 
         // ─── Teachers (school owner only) ─────────────────────────────────────

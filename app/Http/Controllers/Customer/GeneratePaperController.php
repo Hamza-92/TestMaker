@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
+use App\Models\PaperTemplate;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Support\AppUserAccess;
@@ -71,12 +72,33 @@ class GeneratePaperController extends Controller
                     'label' => $label,
                 ])
                 ->values(),
+            'difficultyOptions' => collect(Question::difficultyValues())
+                ->map(fn (string $value) => [
+                    'value' => $value,
+                    'label' => ucfirst($value),
+                ])
+                ->values(),
         ];
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        return Inertia::render('customer/papers/generate', self::pageData());
+        $props = self::pageData();
+
+        $templateId = (int) $request->query('template', 0);
+        if ($templateId > 0) {
+            $template = PaperTemplate::where('user_id', auth()->id())->find($templateId);
+            if ($template !== null) {
+                $props['appliedTemplate'] = [
+                    'id'        => $template->id,
+                    'name'      => $template->name,
+                    'settings'  => $template->settings,
+                    'structure' => $template->structure,
+                ];
+            }
+        }
+
+        return Inertia::render('customer/papers/generate', $props);
     }
 
     /**
@@ -107,11 +129,13 @@ class GeneratePaperController extends Controller
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
             ->where('status', 1)
+            ->withCount(['questions as question_count' => fn ($q) => $q->where('status', 1)])
             ->with(['topics' => function ($q) {
                 $q->where('status', 1)
                     ->orderBy('sort_id')
                     ->orderBy('id')
-                    ->select('id', 'chapter_id', 'name');
+                    ->select('id', 'chapter_id', 'name')
+                    ->withCount(['questions as question_count' => fn ($qq) => $qq->where('status', 1)]);
             }])
             ->orderBy('group_name')
             ->orderBy('group_heading')
@@ -125,9 +149,11 @@ class GeneratePaperController extends Controller
                 'chapter_number' => $c->chapter_number,
                 'group_name'     => $c->group_name,
                 'group_heading'  => $c->group_heading,
+                'question_count' => (int) ($c->question_count ?? 0),
                 'topics'         => $c->topics->map(fn ($t) => [
-                    'id'   => $t->id,
-                    'name' => $t->name,
+                    'id'             => $t->id,
+                    'name'           => $t->name,
+                    'question_count' => (int) ($t->question_count ?? 0),
                 ])->values(),
             ])
             ->values();
@@ -137,13 +163,13 @@ class GeneratePaperController extends Controller
 
     public function questionTypes(Request $request): JsonResponse
     {
-        [$chapterIds, $validTopicIds, $sources] = $this->questionScope($request);
+        [$chapterIds, $validTopicIds, $sources, $difficulties] = $this->questionScope($request);
 
         if ($sources->isEmpty()) {
             return response()->json(['sections' => []]);
         }
 
-        $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources)
+        $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
             ->where('question_types.status', 1)
             ->groupBy('question_types.id', 'question_types.name', 'question_types.is_objective', 'question_types.column_per_row')
@@ -173,7 +199,7 @@ class GeneratePaperController extends Controller
 
     public function questions(Request $request): JsonResponse
     {
-        [$chapterIds, $validTopicIds, $sources] = $this->questionScope($request);
+        [$chapterIds, $validTopicIds, $sources, $difficulties] = $this->questionScope($request);
         $data = $request->validate([
             'question_type_id' => ['required', 'integer', 'exists:question_types,id'],
         ]);
@@ -182,7 +208,7 @@ class GeneratePaperController extends Controller
             return response()->json(['questions' => []]);
         }
 
-        $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources)
+        $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->where('questions.question_type_id', $data['question_type_id'])
             ->with([
                 'questionType',
@@ -220,6 +246,7 @@ class GeneratePaperController extends Controller
                     'content' => $content,
                     'source' => $question->source,
                     'sourceLabel' => Question::sourceLabel($question->source),
+                    'difficulty' => $question->difficulty,
                     'chapter' => [
                         'id' => $question->chapter->id,
                         'name' => $question->chapter->name,
@@ -247,6 +274,8 @@ class GeneratePaperController extends Controller
             'topic_ids.*' => ['integer', 'exists:topics,id'],
             'sources' => ['array'],
             'sources.*' => ['string', Rule::in(Question::sourceValues())],
+            'difficulties' => ['array'],
+            'difficulties.*' => ['string', Rule::in(Question::difficultyValues())],
         ]);
 
         $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
@@ -273,6 +302,9 @@ class GeneratePaperController extends Controller
         $sources = collect($data['sources'] ?? [])
             ->filter(fn ($source) => in_array($source, Question::sourceValues(), true))
             ->values();
+        $difficulties = collect($data['difficulties'] ?? [])
+            ->filter(fn ($value) => in_array($value, Question::difficultyValues(), true))
+            ->values();
         $validTopicIds = $topicIds->isEmpty()
             ? collect()
             : DB::table('topics')
@@ -280,12 +312,12 @@ class GeneratePaperController extends Controller
                 ->whereIn('chapter_id', $chapterIds)
                 ->pluck('id');
 
-        return [$chapterIds, $validTopicIds, $sources];
+        return [$chapterIds, $validTopicIds, $sources, $difficulties];
     }
 
-    private function scopedQuestionsQuery($chapterIds, $validTopicIds, $sources)
+    private function scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties = null)
     {
-        return Question::query()
+        $query = Question::query()
             ->whereIn('questions.chapter_id', $chapterIds)
             ->where('questions.status', 1)
             ->whereIn('questions.source', $sources)
@@ -295,5 +327,11 @@ class GeneratePaperController extends Controller
                         ->orWhereNull('questions.topic_id');
                 });
             });
+
+        if ($difficulties !== null && $difficulties->isNotEmpty()) {
+            $query->whereIn('questions.difficulty', $difficulties);
+        }
+
+        return $query;
     }
 }

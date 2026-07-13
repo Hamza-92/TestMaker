@@ -9,6 +9,7 @@ class Paper extends Model
 {
     protected $fillable = [
         'user_id',
+        'folder_id',
         'name',
         'subject',
         'class_name',
@@ -26,5 +27,10 @@ class Paper extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(PaperFolder::class, 'folder_id');
     }
 }

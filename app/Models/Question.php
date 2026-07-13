@@ -15,6 +15,12 @@ class Question extends Model
 
     public const SOURCE_PAST_PAPER = 'past paper';
 
+    public const DIFFICULTY_EASY = 'easy';
+
+    public const DIFFICULTY_MEDIUM = 'medium';
+
+    public const DIFFICULTY_HARD = 'hard';
+
     protected $fillable = [
         'question_type_id',
         'topic_id',
@@ -27,6 +33,7 @@ class Question extends Model
         'answer_ur',
         'content',
         'source',
+        'difficulty',
         'status',
         'created_by',
     ];
@@ -115,5 +122,10 @@ class Question extends Model
         }
 
         return self::sourceOptions()[$normalized] ?? null;
+    }
+
+    public static function difficultyValues(): array
+    {
+        return [self::DIFFICULTY_EASY, self::DIFFICULTY_MEDIUM, self::DIFFICULTY_HARD];
     }
 }

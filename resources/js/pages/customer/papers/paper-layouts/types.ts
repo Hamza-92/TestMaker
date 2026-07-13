@@ -6,6 +6,7 @@ export type PaperSectionCategory =
 export interface PaperQuestionOption {
     id: string;
     text: string;
+    isCorrect?: boolean;
 }
 
 export interface GeneratedPaperQuestion {
@@ -20,8 +21,8 @@ export interface GeneratedPaperQuestion {
     imageSize: PaperImageSize;
     options: PaperQuestionOption[];
     answerLines: number;
-    /** Vertical gap (px) between answer lines. Optional — falls back to 4px. */
     answerLineSpacing?: number;
+    answerText?: string | null;
 }
 
 export interface GeneratedPaperSection {

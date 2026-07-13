@@ -74,6 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
                 label: 'My Templates',
                 href: '/templates',
                 icon: LayoutTemplateIcon,
+                requires: 'manage_own_papers',
             },
         ],
     },
