@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ArrowRightIcon,
     BookmarkIcon,
@@ -8,6 +8,7 @@ import {
     FilePlusIcon,
     FileTextIcon,
     PlusIcon,
+    SparklesIcon,
 } from 'lucide-react';
 
 interface Stats {
@@ -31,6 +32,17 @@ interface RecentPaper {
 interface Props {
     stats: Stats;
     recentPapers: RecentPaper[];
+}
+
+interface CustomerDashboardPageProps {
+    [key: string]: unknown;
+    auth: {
+        teacher_permissions?: string[];
+        school_context?: {
+            allow_online_mcq_tests: boolean;
+            is_owner: boolean;
+        } | null;
+    };
 }
 
 const STAT_CARDS: {
@@ -65,27 +77,6 @@ const STAT_CARDS: {
     },
 ];
 
-const QUICK_ACTIONS = [
-    {
-        href: '/papers/generate',
-        icon: FilePlusIcon,
-        title: 'Generate Paper',
-        description: 'Build a new exam paper from the question bank.',
-    },
-    {
-        href: '/questions',
-        icon: DatabaseIcon,
-        title: 'Question Bank',
-        description: 'Browse and manage available questions.',
-    },
-    {
-        href: '/papers',
-        icon: BookmarkIcon,
-        title: 'Saved Papers',
-        description: 'Reopen, print, or edit your saved papers.',
-    },
-];
-
 function formatDate(isoString: string) {
     return new Date(isoString).toLocaleDateString(undefined, {
         year: 'numeric',
@@ -95,6 +86,48 @@ function formatDate(isoString: string) {
 }
 
 export default function CustomerDashboard({ stats, recentPapers }: Props) {
+    const page = usePage<CustomerDashboardPageProps>();
+    const schoolContext = page.props.auth.school_context;
+    const canManageOnlineTests = Boolean(
+        schoolContext?.allow_online_mcq_tests &&
+        (schoolContext.is_owner ||
+            (page.props.auth.teacher_permissions ?? []).includes(
+                'manage_online_tests',
+            )),
+    );
+
+    const quickActions = [
+        {
+            href: '/papers/generate',
+            icon: FilePlusIcon,
+            title: 'Generate Paper',
+            description: 'Build a new exam paper from the question bank.',
+        },
+        {
+            href: '/questions',
+            icon: DatabaseIcon,
+            title: 'Question Bank',
+            description: 'Browse and manage available questions.',
+        },
+        {
+            href: '/papers',
+            icon: BookmarkIcon,
+            title: 'Saved Papers',
+            description: 'Reopen, print, or edit your saved papers.',
+        },
+        ...(canManageOnlineTests
+            ? [
+                  {
+                      href: '/online-tests',
+                      icon: SparklesIcon,
+                      title: 'Online Tests',
+                      description:
+                          'Create timed MCQ tests and share them with students.',
+                  },
+              ]
+            : []),
+    ];
+
     return (
         <>
             <Head title="Dashboard" />
@@ -144,8 +177,8 @@ export default function CustomerDashboard({ stats, recentPapers }: Props) {
                 </div>
 
                 {/* ── Quick actions ─────────────────────────────────────── */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                    {QUICK_ACTIONS.map(
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {quickActions.map(
                         ({ href, icon: Icon, title, description }) => (
                             <Link
                                 key={href}

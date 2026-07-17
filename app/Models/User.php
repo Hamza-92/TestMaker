@@ -167,4 +167,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Paper::class);
     }
+
+    public function onlineTests(): HasMany
+    {
+        return $this->hasMany(OnlineTest::class, 'school_id');
+    }
 }

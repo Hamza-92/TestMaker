@@ -82,6 +82,7 @@ class CustomerSubscriptionController extends Controller
                 'duration'          => $subscription->duration,
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
+                'allow_online_mcq_tests' => $subscription->allow_online_mcq_tests,
                 'max_teachers'      => $subscription->max_teachers,
                 'is_question_based' => $subscription->is_question_based,
                 'pattern_access'    => $summaryIds['pattern_access'],
@@ -267,6 +268,7 @@ class CustomerSubscriptionController extends Controller
                 'expired_at'        => $subscription->expired_at?->toDateString(),
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
+                'allow_online_mcq_tests' => $subscription->allow_online_mcq_tests,
                 'max_teachers'      => $subscription->max_teachers,
                 'is_question_based' => $subscription->is_question_based,
                 'access_scope'      => SubscriptionAccess::resolveScope($subscription, $resources),
@@ -294,16 +296,22 @@ class CustomerSubscriptionController extends Controller
                 'nullable', 'integer', 'min:0',
             ],
             'started_at'         => ['required', 'date'],
-            'expired_at'         => ['required', 'date', 'after:started_at'],
+            'duration'           => ['nullable', 'integer', 'min:1'],
+            'expired_at'         => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
             'status'             => ['required', 'in:active,expired,cancelled'],
             'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
+            'allow_online_mcq_tests' => ['boolean'],
             'max_teachers'       => ['nullable', 'integer', 'min:1'],
         ]);
 
         $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
-        $expiredAt = Carbon::parse($validated['expired_at'])->startOfDay();
-        $duration  = max(1, $startedAt->diffInDays($expiredAt));
+        $duration  = filled($validated['duration'] ?? null)
+            ? max(1, (int) $validated['duration'])
+            : max(1, $startedAt->diffInDays(Carbon::parse($validated['expired_at'])->startOfDay()));
+        $expiredAt = filled($validated['expired_at'] ?? null)
+            ? Carbon::parse($validated['expired_at'])->startOfDay()
+            : $startedAt->copy()->addDays($duration);
         $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
         $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
         $oldAccessScope = SubscriptionAccess::resolveScope($subscription, $resources);
@@ -328,6 +336,7 @@ class CustomerSubscriptionController extends Controller
                 'subject_access'     => $summaryIds['subject_access'],
                 'access_scope'       => $accessScope,
                 'allow_teachers'     => $validated['allow_teachers'] ?? false,
+                'allow_online_mcq_tests' => $validated['allow_online_mcq_tests'] ?? false,
                 'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'is_question_based'  => $isQuestionBased,
                 'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
@@ -400,10 +409,12 @@ class CustomerSubscriptionController extends Controller
                 'nullable', 'integer', 'min:0',
             ],
             'started_at'         => ['required', 'date'],
-            'expired_at'         => ['required', 'date', 'after:started_at'],
+            'duration'           => ['nullable', 'integer', 'min:1'],
+            'expired_at'         => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
             'status'             => ['required', 'in:active,expired,cancelled'],
             'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
+            'allow_online_mcq_tests' => ['boolean'],
             'max_teachers'       => ['nullable', 'integer', 'min:1'],
             // Payment (optional)
             'has_payment'        => ['boolean'],
@@ -428,8 +439,12 @@ class CustomerSubscriptionController extends Controller
         ]);
 
         $startedAt  = Carbon::parse($validated['started_at'])->startOfDay();
-        $expiredAt  = Carbon::parse($validated['expired_at'])->startOfDay();
-        $duration   = max(1, $startedAt->diffInDays($expiredAt));
+        $duration   = filled($validated['duration'] ?? null)
+            ? max(1, (int) $validated['duration'])
+            : max(1, $startedAt->diffInDays(Carbon::parse($validated['expired_at'])->startOfDay()));
+        $expiredAt  = filled($validated['expired_at'] ?? null)
+            ? Carbon::parse($validated['expired_at'])->startOfDay()
+            : $startedAt->copy()->addDays($duration);
         $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
         $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
         $createdSubscription = null;
@@ -449,6 +464,7 @@ class CustomerSubscriptionController extends Controller
                 'subject_access'     => $summaryIds['subject_access'],
                 'access_scope'       => $accessScope,
                 'allow_teachers'     => $validated['allow_teachers'] ?? false,
+                'allow_online_mcq_tests' => $validated['allow_online_mcq_tests'] ?? false,
                 'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'is_question_based'  => $isQuestionBased,
                 'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
@@ -529,7 +545,7 @@ class CustomerSubscriptionController extends Controller
             'account_number' => ['nullable', 'string', 'max:100'],
             'notes'          => ['nullable', 'string', 'max:1000'],
             'receipt'        => [
-                $requireReceipt ? 'required' : 'nullable',
+                'nullable',
                 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120',
             ],
         ]);

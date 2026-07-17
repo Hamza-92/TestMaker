@@ -41,6 +41,7 @@ interface SubscriptionData {
     expired_at: string | null;
     status: string;
     allow_teachers: boolean;
+    allow_online_mcq_tests: boolean;
     max_teachers: number | null;
     is_question_based: boolean;
     access_scope: SubscriptionAccessScope | null;
@@ -66,6 +67,7 @@ interface FormData {
     status: string;
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
+    allow_online_mcq_tests: boolean;
     max_teachers: string;
 }
 
@@ -196,6 +198,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
         status: subscription.status,
         access_scope: subscription.access_scope,
         allow_teachers: subscription.allow_teachers,
+        allow_online_mcq_tests: subscription.allow_online_mcq_tests,
         max_teachers: subscription.max_teachers != null ? String(subscription.max_teachers) : '',
     });
 
@@ -361,6 +364,13 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                     />
                                 </Field>
                             )}
+
+                            <ToggleField
+                                icon={<ClipboardListIcon />}
+                                label="Online MCQ Tests"
+                                checked={data.allow_online_mcq_tests}
+                                onCheckedChange={(checked) => setData('allow_online_mcq_tests', checked)}
+                            />
                         </div>
                     </div>
 

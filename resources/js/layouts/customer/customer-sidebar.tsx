@@ -34,6 +34,7 @@ interface SchoolContext {
     school_name: string | null;
     is_owner: boolean;
     allow_teachers: boolean;
+    allow_online_mcq_tests: boolean;
     max_teachers: number | null;
     teachers_used: number;
     has_subscription: boolean;
@@ -75,6 +76,12 @@ const NAV_GROUPS: NavGroup[] = [
                 href: '/templates',
                 icon: LayoutTemplateIcon,
                 requires: 'manage_own_papers',
+            },
+            {
+                label: 'Online Tests',
+                href: '/online-tests',
+                icon: SparklesIcon,
+                requires: 'manage_online_tests',
             },
         ],
     },
@@ -182,6 +189,9 @@ function SidebarContent({
     const visibleGroups = NAV_GROUPS.map((group) => {
         if (group.ownerOnly && !isOwner) return null;
         const items = group.items.filter((item) => {
+            if (item.href === '/online-tests' && !schoolContext?.allow_online_mcq_tests) {
+                return false;
+            }
             if (isOwner) return true;
             if (!item.requires) return false;
             return teacherPermissions.includes(item.requires);

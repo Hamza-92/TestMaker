@@ -75,6 +75,7 @@ interface Subscription {
     duration: number;
     status: SubscriptionStatus;
     allow_teachers: boolean;
+    allow_online_mcq_tests: boolean;
     max_teachers: number | null;
     access_scope: SubscriptionAccessScope | null;
     access_overview: AccessOverviewPattern[];
@@ -610,6 +611,19 @@ export default function ShowSubscription({
                                     </span>
                                 ) : (
                                     <span className="text-muted-foreground italic">Not allowed</span>
+                                )
+                            }
+                        />
+                        <InfoCell
+                            label="Online MCQ Tests"
+                            value={
+                                subscription.allow_online_mcq_tests ? (
+                                    <span className="flex items-center gap-1.5 font-medium text-emerald-600">
+                                        <BadgeCheckIcon className="size-4" />
+                                        Enabled
+                                    </span>
+                                ) : (
+                                    <span className="text-muted-foreground italic">Disabled</span>
                                 )
                             }
                         />

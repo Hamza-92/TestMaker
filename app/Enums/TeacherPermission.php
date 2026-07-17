@@ -8,6 +8,7 @@ enum TeacherPermission: string
     case ViewQuestionBank  = 'view_question_bank';
     case ManageOwnPapers   = 'manage_own_papers';
     case ViewSchoolPapers  = 'view_school_papers';
+    case ManageOnlineTests = 'manage_online_tests';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum TeacherPermission: string
             self::ViewQuestionBank  => 'View Question Bank',
             self::ManageOwnPapers   => 'Manage Own Papers',
             self::ViewSchoolPapers  => 'View School Papers',
+            self::ManageOnlineTests => 'Manage Online Tests',
         };
     }
 
@@ -26,6 +28,7 @@ enum TeacherPermission: string
             self::ViewQuestionBank  => 'Browse questions across allowed subjects and chapters.',
             self::ManageOwnPapers   => 'Save, edit, and delete papers they created.',
             self::ViewSchoolPapers  => 'See papers created by other teachers of the school.',
+            self::ManageOnlineTests => 'Create, publish, and review online MCQ tests.',
         };
     }
 

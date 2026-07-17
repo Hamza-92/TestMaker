@@ -22,6 +22,7 @@ function makeCustomer(): User
 {
     return User::factory()->create([
         'user_type' => UserType::Customer->value,
+        'account_type' => 'paid',
     ]);
 }
 

@@ -56,6 +56,7 @@ interface FormData {
     status: string;
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
+    allow_online_mcq_tests: boolean;
     max_teachers: string;
     // Payment
     has_payment: boolean;
@@ -198,6 +199,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
         status: 'active',
         access_scope: null,
         allow_teachers: false,
+        allow_online_mcq_tests: false,
         max_teachers: '',
         has_payment: false,
         payment_paid: '',
@@ -381,6 +383,13 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                     />
                                 </Field>
                             )}
+
+                            <ToggleField
+                                icon={<ClipboardListIcon />}
+                                label="Online MCQ Tests"
+                                checked={data.allow_online_mcq_tests}
+                                onCheckedChange={(checked) => setData('allow_online_mcq_tests', checked)}
+                            />
                         </div>
 
                         {/* ── Initial Payment sub-section ────────────────────── */}
