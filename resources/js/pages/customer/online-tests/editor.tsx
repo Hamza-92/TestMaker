@@ -72,11 +72,19 @@ interface QuestionOption {
     prompt: string;
     chapter_name: string | null;
     topic_name: string | null;
+    question_type_id: number | null;
     question_type: string | null;
+    question_type_key: string | null;
     option_count: number;
     source: string | null;
     source_label: string | null;
     difficulty: string | null;
+}
+interface QuestionTypeGroup {
+    key: string;
+    id: number | null;
+    label: string;
+    questions: QuestionOption[];
 }
 
 type TimingMode = 'whole_test' | 'per_question' | 'none';
@@ -601,7 +609,9 @@ export default function OnlineTestEditor({
     const [questionLoading, setQuestionLoading] = useState(false);
     const [catalogError, setCatalogError] = useState<string | null>(null);
     const [questionSearch, setQuestionSearch] = useState('');
-    const [automaticCount, setAutomaticCount] = useState('20');
+    const [objectiveCounts, setObjectiveCounts] = useState<
+        Record<string, string>
+    >({});
     const [activeSources, setActiveSources] = useState(() =>
         sourceOptions.map((option) => option.value),
     );
@@ -670,6 +680,36 @@ export default function OnlineTestEditor({
     const selectedQuestions = questions.filter((question) =>
         data.question_ids.includes(question.id),
     );
+    const questionTypeGroups = useMemo<QuestionTypeGroup[]>(() => {
+        const groups = new Map<string, QuestionTypeGroup>();
+
+        for (const question of questions) {
+            const key =
+                question.question_type_id !== null
+                    ? `type-${question.question_type_id}`
+                    : `schema-${question.question_type_key ?? question.question_type ?? 'unknown'}`;
+            const label = question.question_type ?? 'Objective Questions';
+            const existing = groups.get(key);
+
+            if (existing) {
+                existing.questions.push(question);
+            } else {
+                groups.set(key, {
+                    key,
+                    id: question.question_type_id,
+                    label,
+                    questions: [question],
+                });
+            }
+        }
+
+        return Array.from(groups.values()).sort((a, b) =>
+            a.label.localeCompare(b.label),
+        );
+    }, [questions]);
+    const questionTypeGroupKey = questionTypeGroups
+        .map((group) => `${group.key}:${group.questions.length}`)
+        .join('|');
     const stepIndex = STEPS.findIndex((item) => item.id === step);
     const chapterIdsKey = data.chapter_ids.join(',');
     const topicIdsKey = data.topic_ids.join(',');
@@ -693,6 +733,30 @@ export default function OnlineTestEditor({
               )
             : questions;
     }, [questions, questionSearch]);
+    const filteredQuestionTypeGroups = useMemo(
+        () =>
+            questionTypeGroups
+                .map((group) => ({
+                    ...group,
+                    questions: filteredQuestions.filter((question) =>
+                        group.questions.some((item) => item.id === question.id),
+                    ),
+                }))
+                .filter((group) => group.questions.length > 0),
+        [filteredQuestions, questionTypeGroups],
+    );
+
+    useEffect(() => {
+        setObjectiveCounts((current) => {
+            const next: Record<string, string> = {};
+
+            for (const group of questionTypeGroups) {
+                next[group.key] = current[group.key] ?? '';
+            }
+
+            return next;
+        });
+    }, [questionTypeGroupKey, questionTypeGroups]);
     const chapterGroups = useMemo(() => {
         if (!chapters) {
             return [] as ChapterGroup[];
@@ -1070,18 +1134,47 @@ export default function OnlineTestEditor({
                 : [...values, value],
         );
     }
-    function buildAutomaticSelection() {
-        const count = Math.max(
-            1,
-            Math.min(Number(automaticCount) || 1, questions.length),
+    function objectiveCountFor(group: QuestionTypeGroup) {
+        return Math.max(
+            0,
+            Math.min(
+                Number(objectiveCounts[group.key]) || 0,
+                group.questions.length,
+            ),
         );
-        setData(
-            'question_ids',
-            [...questions]
+    }
+    function objectiveCountTotal() {
+        return questionTypeGroups.reduce(
+            (sum, group) => sum + objectiveCountFor(group),
+            0,
+        );
+    }
+    function updateObjectiveCount(group: QuestionTypeGroup, value: string) {
+        const normalized = Math.max(
+            0,
+            Math.min(Number(value) || 0, group.questions.length),
+        );
+
+        setObjectiveCounts((current) => ({
+            ...current,
+            [group.key]: value === '' ? '' : String(normalized),
+        }));
+    }
+    function buildAutomaticSelection() {
+        const selectedIds = questionTypeGroups.flatMap((group) => {
+            const count = objectiveCountFor(group);
+
+            if (count === 0) {
+                return [];
+            }
+
+            return [...group.questions]
                 .sort(() => Math.random() - 0.5)
                 .slice(0, count)
-                .map((question) => question.id),
-        );
+                .map((question) => question.id);
+        });
+
+        setData('question_ids', selectedIds);
     }
     function toggleQuestion(id: number) {
         setData(
@@ -1089,6 +1182,29 @@ export default function OnlineTestEditor({
             data.question_ids.includes(id)
                 ? data.question_ids.filter((item) => item !== id)
                 : [...data.question_ids, id],
+        );
+    }
+    function selectedCountInGroup(group: QuestionTypeGroup) {
+        return group.questions.filter((question) =>
+            data.question_ids.includes(question.id),
+        ).length;
+    }
+    function toggleQuestionGroup(group: QuestionTypeGroup) {
+        const groupIds = new Set(
+            group.questions.map((question) => question.id),
+        );
+        const selectedCount = selectedCountInGroup(group);
+
+        setData(
+            'question_ids',
+            selectedCount === group.questions.length
+                ? data.question_ids.filter((id) => !groupIds.has(id))
+                : Array.from(
+                      new Set([
+                          ...data.question_ids,
+                          ...group.questions.map((question) => question.id),
+                      ]),
+                  ),
         );
     }
     function chooseTiming(value: TimingMode) {
@@ -1376,52 +1492,114 @@ export default function OnlineTestEditor({
                     </div>
                 ) : selectionMode === 'automatic' ? (
                     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                            <div className="max-w-md">
-                                <Label htmlFor="automatic_count">
-                                    Number of questions
-                                </Label>
-                                <div className="mt-1.5 flex gap-2">
-                                    <Input
-                                        id="automatic_count"
-                                        type="number"
-                                        min="1"
-                                        max={questions.length}
-                                        value={automaticCount}
-                                        onChange={(event) =>
-                                            setAutomaticCount(
-                                                event.target.value,
-                                            )
-                                        }
-                                        className="max-w-32"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={buildAutomaticSelection}
-                                        className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-                                    >
-                                        {selectedQuestions.length ? (
-                                            <RefreshCwIcon className="size-4" />
-                                        ) : (
-                                            <SparklesIcon className="size-4" />
-                                        )}
-                                        {selectedQuestions.length
-                                            ? 'Create another set'
-                                            : 'Create question set'}
-                                    </button>
-                                </div>
-                                <p className="mt-2 text-xs text-slate-500">
-                                    {questions.length} questions are available
-                                    in the current pool.
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    Objective mix
+                                </h3>
+                                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                    Choose how many questions to include from
+                                    each objective type.
                                 </p>
                             </div>
-                            {selectedQuestions.length > 0 && (
-                                <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                    <CheckIcon className="mr-2 inline size-4" />
-                                    A set of {selectedQuestions.length}{' '}
-                                    questions is ready
+                            <button
+                                type="button"
+                                onClick={buildAutomaticSelection}
+                                disabled={objectiveCountTotal() === 0}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {selectedQuestions.length ? (
+                                    <RefreshCwIcon className="size-4" />
+                                ) : (
+                                    <SparklesIcon className="size-4" />
+                                )}
+                                {selectedQuestions.length
+                                    ? 'Create another set'
+                                    : 'Create question set'}
+                            </button>
+                        </div>
+
+                        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {questionTypeGroups.map((group) => (
+                                <div
+                                    key={group.key}
+                                    className={cn(
+                                        'rounded-xl border p-4 transition-colors',
+                                        objectiveCountFor(group) > 0
+                                            ? 'border-brand-300 bg-brand-50/40 dark:border-brand-500/40 dark:bg-brand-500/[0.06]'
+                                            : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900',
+                                    )}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <h4 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                {group.label}
+                                            </h4>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {group.questions.length}{' '}
+                                                available
+                                            </p>
+                                        </div>
+                                        <div className="w-24">
+                                            <Label
+                                                htmlFor={`objective-count-${group.key}`}
+                                                className="sr-only"
+                                            >
+                                                {group.label} count
+                                            </Label>
+                                            <Input
+                                                id={`objective-count-${group.key}`}
+                                                type="number"
+                                                min="0"
+                                                max={group.questions.length}
+                                                value={
+                                                    objectiveCounts[
+                                                        group.key
+                                                    ] ?? ''
+                                                }
+                                                onChange={(event) =>
+                                                    updateObjectiveCount(
+                                                        group,
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="text-center font-semibold tabular-nums"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                updateObjectiveCount(
+                                                    group,
+                                                    String(
+                                                        group.questions.length,
+                                                    ),
+                                                )
+                                            }
+                                            className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50 dark:bg-slate-950 dark:text-brand-300 dark:ring-brand-500/30"
+                                        >
+                                            All
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                updateObjectiveCount(group, '')
+                                            }
+                                            className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-400 dark:ring-slate-700"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
+                            ))}
+                        </div>
+
+                        <div className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                            Requested total: {objectiveCountTotal()} of{' '}
+                            {questions.length} available questions
                         </div>
                         {selectedQuestions.length > 0 && (
                             <div className="mt-5 grid gap-2 border-t border-slate-100 pt-5 md:grid-cols-2 dark:border-slate-800">
@@ -1483,45 +1661,95 @@ export default function OnlineTestEditor({
                                     : 'Select all'}
                             </button>
                         </div>
-                        <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
-                            {filteredQuestions.map((question) => {
-                                const checked = data.question_ids.includes(
-                                    question.id,
-                                );
+                        <div className="max-h-[560px] overflow-y-auto">
+                            {filteredQuestionTypeGroups.map((group) => {
+                                const selectedCount =
+                                    selectedCountInGroup(group);
+                                const allSelected =
+                                    selectedCount === group.questions.length;
 
                                 return (
-                                    <button
-                                        key={question.id}
-                                        type="button"
-                                        onClick={() =>
-                                            toggleQuestion(question.id)
-                                        }
-                                        className={cn(
-                                            'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors',
-                                            checked
-                                                ? 'bg-brand-50/50 dark:bg-brand-500/[0.05]'
-                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/50',
-                                        )}
+                                    <div
+                                        key={group.key}
+                                        className="border-b border-slate-100 last:border-b-0 dark:border-slate-800"
                                     >
-                                        <CheckControl checked={checked} />
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block text-sm leading-6 font-medium text-slate-900 dark:text-slate-100">
-                                                {question.prompt}
-                                            </span>
-                                            <span className="mt-1 block text-xs text-slate-500">
-                                                {[
-                                                    question.chapter_name,
-                                                    question.topic_name,
-                                                    question.source_label,
-                                                    question.difficulty &&
-                                                        `${question.difficulty} difficulty`,
-                                                    `${question.option_count} options`,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(' · ')}
-                                            </span>
-                                        </span>
-                                    </button>
+                                        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-slate-50 px-4 py-3 dark:bg-slate-900">
+                                            <div className="min-w-0">
+                                                <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                    {group.label}
+                                                </h3>
+                                                <p className="mt-0.5 text-xs text-slate-500">
+                                                    {selectedCount}/
+                                                    {group.questions.length}{' '}
+                                                    selected
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    toggleQuestionGroup(group)
+                                                }
+                                                className="shrink-0 text-xs font-semibold text-brand-700 dark:text-brand-300"
+                                            >
+                                                {allSelected
+                                                    ? 'Clear type'
+                                                    : 'Select type'}
+                                            </button>
+                                        </div>
+                                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                            {group.questions.map((question) => {
+                                                const checked =
+                                                    data.question_ids.includes(
+                                                        question.id,
+                                                    );
+
+                                                return (
+                                                    <button
+                                                        key={question.id}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            toggleQuestion(
+                                                                question.id,
+                                                            )
+                                                        }
+                                                        className={cn(
+                                                            'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors',
+                                                            checked
+                                                                ? 'bg-brand-50/50 dark:bg-brand-500/[0.05]'
+                                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/50',
+                                                        )}
+                                                    >
+                                                        <CheckControl
+                                                            checked={checked}
+                                                        />
+                                                        <span className="min-w-0 flex-1">
+                                                            <span className="block text-sm leading-6 font-medium text-slate-900 dark:text-slate-100">
+                                                                {
+                                                                    question.prompt
+                                                                }
+                                                            </span>
+                                                            <span className="mt-1 block text-xs text-slate-500">
+                                                                {[
+                                                                    question.chapter_name,
+                                                                    question.topic_name,
+                                                                    question.source_label,
+                                                                    question.difficulty &&
+                                                                        `${question.difficulty} difficulty`,
+                                                                    `${question.option_count} options`,
+                                                                ]
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    )
+                                                                    .join(
+                                                                        ' · ',
+                                                                    )}
+                                                            </span>
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 );
                             })}
                         </div>
