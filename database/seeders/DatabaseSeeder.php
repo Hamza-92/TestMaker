@@ -26,8 +26,9 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Super Admin',
                 'password' => bcrypt('11111111'),
-                'user_type' => UserType::SuperAdmin,
-                'status' => UserStatus::Active,
+                'user_type' => UserType::SuperAdmin->value,
+                'status' => UserStatus::Active->value,
+                'email_verified_at' => now(),
                 'created_by' => null,
             ]
         );
