@@ -14,6 +14,7 @@ use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
+use App\Http\Controllers\Superadmin\DataTransferController;
 use App\Http\Controllers\Superadmin\PatternController;
 use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
@@ -109,6 +110,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('superadmin/customers/{customer}', [CustomerController::class, 'update'])->name('superadmin.customers.update')->middleware('permission:customers.edit');
         Route::get('superadmin/customers/{customer}/logs/{log}', [CustomerController::class, 'showLog'])->name('superadmin.customers.logs.show')->middleware('permission:customers.view');
         Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view');
+
+        // Data Transfer
+        Route::get('superadmin/data-transfer', [DataTransferController::class, 'index'])->name('superadmin.data-transfer')->middleware('permission:subjects.create');
+        Route::get('superadmin/data-transfer/catalog', [DataTransferController::class, 'catalog'])->name('superadmin.data-transfer.catalog')->middleware('permission:subjects.create');
+        Route::post('superadmin/data-transfer', [DataTransferController::class, 'store'])->name('superadmin.data-transfer.store')->middleware('permission:subjects.create');
 
         // ─── Subscriptions ───────────────────────────────────────────────────────
         Route::get('superadmin/customers/{customer}/subscriptions/add', [CustomerSubscriptionController::class, 'create'])->name('superadmin.customers.subscriptions.add')->middleware('permission:subscriptions.create');

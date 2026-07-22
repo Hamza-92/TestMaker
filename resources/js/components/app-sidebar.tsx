@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
     BookOpenIcon,
+    DatabaseIcon,
     HelpCircleIcon,
     LayoutGrid,
     SchoolIcon,
@@ -35,6 +36,7 @@ export function AppSidebar() {
         ...(can('patterns.view')       ? [{ title: 'Patterns',       href: '/superadmin/patterns',       icon: TagIcon }] : []),
         ...(can('classes.view')        ? [{ title: 'Classes',        href: '/superadmin/classes',        icon: SchoolIcon }] : []),
         ...(can('subjects.view')       ? [{ title: 'Subjects',       href: '/superadmin/subjects',       icon: BookOpenIcon }] : []),
+        ...(can('subjects.create')     ? [{ title: 'Data Transfer',  href: '/superadmin/data-transfer',  icon: DatabaseIcon }] : []),
         ...(can('questions.view')      ? [{ title: 'Questions',      href: '/superadmin/questions',      icon: HelpCircleIcon }] : []),
         ...(can('question_types.view') ? [{
             title: 'Question Types',
