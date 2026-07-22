@@ -1,515 +1,454 @@
-import { Head, router, useForm } from '@inertiajs/react';
-import {
-    AlertTriangleIcon,
-    ArrowRightIcon,
-    DatabaseIcon,
-    RefreshCwIcon,
-    SearchIcon,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { Head } from '@inertiajs/react';
+import { ArrowRightIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    FloatingCombobox,
+    type ComboboxOptionItem,
+} from '@/components/ui/floating-combobox';
 
-interface SourcePattern {
-    key: string;
-    label: string;
-    afaq: number;
+const tabs = [
+    { key: 'legacy', label: 'Legacy Data Transfer' },
+    { key: 'creative', label: 'Creative Data Transfer' },
+] as const;
+
+const sourcePatterns = [
+    {
+        id: 'short_syllabus',
+        name: 'short_syllabus',
+        classes: [
+            {
+                id: '31',
+                name: '9th',
+                subjects: [
+                    {
+                        id: '120',
+                        name: 'English 2025',
+                        chapters: [
+                            { id: '120-1', name: 'Unit 1', topics: [] },
+                            { id: '120-2', name: 'Unit 2', topics: [] },
+                            { id: '120-3', name: 'Unit 3', topics: [] },
+                        ],
+                    },
+                    {
+                        id: '122',
+                        name: 'Mathematics 2025',
+                        chapters: [
+                            { id: '122-1', name: 'Real Numbers', topics: [] },
+                            { id: '122-2', name: 'Logarithms', topics: [] },
+                            { id: '122-3', name: 'Sets and Functions', topics: [] },
+                        ],
+                    },
+                    {
+                        id: '116',
+                        name: 'Physics 2025',
+                        chapters: [
+                            {
+                                id: '116-1',
+                                name: 'Physical Quantities',
+                                topics: [
+                                    { id: '116-1-1', name: 'Measurements' },
+                                    { id: '116-1-2', name: 'Prefixes' },
+                                    { id: '116-1-3', name: 'Errors' },
+                                ],
+                            },
+                            {
+                                id: '116-2',
+                                name: 'Kinematics',
+                                topics: [
+                                    { id: '116-2-1', name: 'Speed and Velocity' },
+                                    { id: '116-2-2', name: 'Acceleration' },
+                                    { id: '116-2-3', name: 'Graphs' },
+                                ],
+                            },
+                        ],
+                    },
+                    {
+                        id: '123',
+                        name: 'Urdu 2025',
+                        chapters: [
+                            { id: '123-1', name: 'سبق 1', topics: [] },
+                            { id: '123-2', name: 'سبق 2', topics: [] },
+                            { id: '123-3', name: 'سبق 3', topics: [] },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+];
+
+const targetPatterns = [
+    {
+        id: 'pecta',
+        name: 'PECTA',
+        classes: [
+            {
+                id: '9th',
+                name: '9th',
+                subjects: [
+                    { id: 'english', name: 'English 2025' },
+                    { id: 'mathematics', name: 'Mathematics 2025' },
+                    { id: 'physics', name: 'Physics 2025' },
+                    { id: 'urdu', name: 'Urdu 2025' },
+                ],
+            },
+        ],
+    },
+];
+
+type TransferTab = (typeof tabs)[number]['key'];
+type SourceSubject = (typeof sourcePatterns)[number]['classes'][number]['subjects'][number];
+
+function comboboxOptions<T extends { id: string; name: string }>(
+    items: T[],
+): ComboboxOptionItem[] {
+    return items.map((item) => ({
+        id: item.id,
+        label: item.name,
+    }));
 }
 
-interface SourceClass {
-    id: number;
-    name: string;
-    subjects_count: number;
-    chapters_count: number;
+function selectedOption(
+    options: ComboboxOptionItem[],
+    id: string,
+): ComboboxOptionItem | null {
+    return options.find((option) => String(option.id) === id) ?? null;
 }
 
-interface SourceSubject {
-    id: number;
-    name: string;
-    subject_type: 'chapter-wise' | 'topic-wise';
-    chapters_count: number;
-    topics_count: number;
-    questions_count: number;
-}
+function SubjectTransferPanel() {
+    const [sourcePatternId, setSourcePatternId] = useState('');
+    const [sourceClassId, setSourceClassId] = useState('');
+    const [sourceSubjectId, setSourceSubjectId] = useState('');
+    const [targetPatternId, setTargetPatternId] = useState('');
+    const [targetClassId, setTargetClassId] = useState('');
+    const [targetSubjectId, setTargetSubjectId] = useState('');
+    const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
+    const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
+    const [isTransferring, setIsTransferring] = useState(false);
 
-interface TargetPattern {
-    id: number;
-    name: string;
-    short_name: string | null;
-}
+    const selectedSourcePattern = sourcePatterns.find(
+        (pattern) => pattern.id === sourcePatternId,
+    );
+    const sourceClasses = selectedSourcePattern?.classes ?? [];
+    const selectedSourceClass = sourceClasses.find(
+        (schoolClass) => schoolClass.id === sourceClassId,
+    );
+    const sourceSubjects = selectedSourceClass?.subjects ?? [];
+    const selectedSourceSubject = sourceSubjects.find(
+        (subject) => subject.id === sourceSubjectId,
+    );
 
-interface TargetClass {
-    id: number;
-    name: string;
-}
+    const selectedTargetPattern = targetPatterns.find(
+        (pattern) => pattern.id === targetPatternId,
+    );
+    const targetClasses = selectedTargetPattern?.classes ?? [];
+    const selectedTargetClass = targetClasses.find(
+        (schoolClass) => schoolClass.id === targetClassId,
+    );
+    const targetSubjects = selectedTargetClass?.subjects ?? [];
+    const sourcePatternOptions = comboboxOptions(sourcePatterns);
+    const sourceClassOptions = comboboxOptions(sourceClasses);
+    const sourceSubjectOptions = comboboxOptions(sourceSubjects);
+    const targetPatternOptions = comboboxOptions(targetPatterns);
+    const targetClassOptions = comboboxOptions(targetClasses);
+    const targetSubjectOptions = comboboxOptions(targetSubjects);
 
-interface TargetCatalog {
-    patterns: TargetPattern[];
-    classes: TargetClass[];
-    subjects: Array<{
-        id: number;
-        name_eng: string;
-        subject_type: string;
-    }>;
-}
+    const canTransfer = useMemo(
+        () =>
+            sourcePatternId &&
+            sourceClassId &&
+            sourceSubjectId &&
+            (selectedChapterIds.length > 0 || selectedTopicIds.length > 0) &&
+            targetPatternId &&
+            targetClassId &&
+            targetSubjectId,
+        [
+            sourcePatternId,
+            sourceClassId,
+            sourceSubjectId,
+            selectedChapterIds.length,
+            selectedTopicIds.length,
+            targetPatternId,
+            targetClassId,
+            targetSubjectId,
+        ],
+    );
 
-interface TransferReport {
-    pattern: { id: number; name: string; short_name: string | null };
-    class: { id: number; name: string };
-    subjects: Array<{
-        id: number;
-        name: string;
-        chapters: number;
-        topics: number;
-        questions: number;
-        options: number;
-        question_types: number;
-    }>;
-    totals: {
-        subjects: number;
-        chapters: number;
-        topics: number;
-        questions: number;
-        options: number;
-        question_types: number;
-    };
-}
-
-interface TransferForm {
-    source_pattern: string;
-    source_class_id: string;
-    source_subject_ids: string[];
-    target_pattern_id: string;
-    target_pattern_name: string;
-    target_pattern_short_name: string;
-    target_class_id: string;
-    target_class_name: string;
-    replace_existing: boolean;
-    [key: string]: boolean | string | string[];
-}
-
-function numberFormat(value: number) {
-    return new Intl.NumberFormat('en-US').format(value);
-}
-
-function Stat({
-    label,
-    value,
-}: {
-    label: string;
-    value: number | string;
-}) {
     return (
-        <div className="rounded-lg border px-3 py-2">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-1 text-sm font-semibold">{value}</p>
+        <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)]">
+                <section className="space-y-4 rounded-lg border p-4">
+                    <h2 className="text-sm font-semibold">Source</h2>
+
+                    <FloatingCombobox
+                        label="Pattern"
+                        options={sourcePatternOptions}
+                        value={selectedOption(sourcePatternOptions, sourcePatternId)}
+                        onChange={(option) => {
+                            setSourcePatternId(String(option?.id ?? ''));
+                            setSourceClassId('');
+                            setSourceSubjectId('');
+                            setSelectedChapterIds([]);
+                            setSelectedTopicIds([]);
+                            setIsTransferring(false);
+                        }}
+                    />
+
+                    <FloatingCombobox
+                        label="Class"
+                        options={sourceClassOptions}
+                        value={selectedOption(sourceClassOptions, sourceClassId)}
+                        disabled={!sourcePatternId}
+                        onChange={(option) => {
+                            setSourceClassId(String(option?.id ?? ''));
+                            setSourceSubjectId('');
+                            setSelectedChapterIds([]);
+                            setSelectedTopicIds([]);
+                            setIsTransferring(false);
+                        }}
+                    />
+
+                    <FloatingCombobox
+                        label="Subject"
+                        options={sourceSubjectOptions}
+                        value={selectedOption(sourceSubjectOptions, sourceSubjectId)}
+                        disabled={!sourceClassId}
+                        onChange={(option) => {
+                            setSourceSubjectId(String(option?.id ?? ''));
+                            setSelectedChapterIds([]);
+                            setSelectedTopicIds([]);
+                            setIsTransferring(false);
+                        }}
+                    />
+                </section>
+
+                <div className="flex items-center justify-center">
+                    <span className="flex size-10 items-center justify-center rounded-full border">
+                        <ArrowRightIcon className="size-5" />
+                    </span>
+                </div>
+
+                <section className="space-y-4 rounded-lg border p-4">
+                    <h2 className="text-sm font-semibold">Target</h2>
+
+                    <FloatingCombobox
+                        label="Pattern"
+                        options={targetPatternOptions}
+                        value={selectedOption(targetPatternOptions, targetPatternId)}
+                        onChange={(option) => {
+                            setTargetPatternId(String(option?.id ?? ''));
+                            setTargetClassId('');
+                            setTargetSubjectId('');
+                            setIsTransferring(false);
+                        }}
+                    />
+
+                    <FloatingCombobox
+                        label="Class"
+                        options={targetClassOptions}
+                        value={selectedOption(targetClassOptions, targetClassId)}
+                        disabled={!targetPatternId}
+                        onChange={(option) => {
+                            setTargetClassId(String(option?.id ?? ''));
+                            setTargetSubjectId('');
+                            setIsTransferring(false);
+                        }}
+                    />
+
+                    <FloatingCombobox
+                        label="Subject"
+                        options={targetSubjectOptions}
+                        value={selectedOption(targetSubjectOptions, targetSubjectId)}
+                        disabled={!targetClassId}
+                        onChange={(option) => {
+                            setTargetSubjectId(String(option?.id ?? ''));
+                            setIsTransferring(false);
+                        }}
+                    />
+                </section>
+            </div>
+
+            {selectedSourceSubject ? (
+                <ChapterSelector
+                    selectedChapterIds={selectedChapterIds}
+                    selectedSubject={selectedSourceSubject}
+                    selectedTopicIds={selectedTopicIds}
+                    onChapterIdsChange={setSelectedChapterIds}
+                    onTopicIdsChange={setSelectedTopicIds}
+                />
+            ) : null}
+
+            <div className="space-y-3">
+                {isTransferring ? (
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full w-1/3 rounded-full bg-primary" />
+                    </div>
+                ) : null}
+
+                <div className="flex justify-end">
+                    <Button
+                        type="button"
+                        disabled={!canTransfer}
+                        onClick={() => setIsTransferring(true)}
+                    >
+                        Transfer Data
+                    </Button>
+                </div>
+            </div>
         </div>
     );
 }
 
-export default function DataTransfer({
-    sourcePatterns,
-    sourceClasses: initialSourceClasses,
-    targetCatalog: initialTargetCatalog,
-    defaults,
-    report,
-    transferError,
+function ChapterSelector({
+    onChapterIdsChange,
+    onTopicIdsChange,
+    selectedChapterIds,
+    selectedSubject,
+    selectedTopicIds,
 }: {
-    sourcePatterns: SourcePattern[];
-    sourceClasses: SourceClass[];
-    targetCatalog: TargetCatalog;
-    defaults: {
-        source_pattern: string;
-        source_class_id: string;
-        source_subject_ids: string[];
-        target_pattern_name: string;
-        target_pattern_short_name: string;
-        target_class_name: string;
-        replace_existing: boolean;
-    };
-    report: TransferReport | null;
-    transferError: string | null;
+    onChapterIdsChange: (value: string[]) => void;
+    onTopicIdsChange: (value: string[]) => void;
+    selectedChapterIds: string[];
+    selectedSubject: SourceSubject;
+    selectedTopicIds: string[];
 }) {
-    const form = useForm<TransferForm>({
-        source_pattern: defaults.source_pattern,
-        source_class_id: defaults.source_class_id,
-        source_subject_ids: defaults.source_subject_ids,
-        target_pattern_id: '',
-        target_pattern_name: defaults.target_pattern_name,
-        target_pattern_short_name: defaults.target_pattern_short_name,
-        target_class_id: '',
-        target_class_name: defaults.target_class_name,
-        replace_existing: defaults.replace_existing,
-    });
-    const [sourceClasses, setSourceClasses] = useState(initialSourceClasses);
-    const [sourceSubjects, setSourceSubjects] = useState<SourceSubject[]>([]);
-    const [targetCatalog, setTargetCatalog] = useState(initialTargetCatalog);
-    const [loadingCatalog, setLoadingCatalog] = useState(false);
-    const [subjectSearch, setSubjectSearch] = useState('');
-    const selectedSubjects = useMemo(
-        () =>
-            sourceSubjects.filter((subject) =>
-                form.data.source_subject_ids.includes(String(subject.id)),
-            ),
-        [form.data.source_subject_ids, sourceSubjects],
+    const allChapterIds = selectedSubject.chapters.map((chapter) => chapter.id);
+    const allTopicIds = selectedSubject.chapters.flatMap((chapter) =>
+        chapter.topics.map((topic) => topic.id),
     );
-    const filteredSubjects = useMemo(() => {
-        const q = subjectSearch.toLowerCase().trim();
+    const isAllSelected =
+        allChapterIds.length > 0 &&
+        allChapterIds.every((id) => selectedChapterIds.includes(id)) &&
+        allTopicIds.every((id) => selectedTopicIds.includes(id));
 
-        return sourceSubjects.filter(
-            (subject) =>
-                !q ||
-                subject.name.toLowerCase().includes(q) ||
-                String(subject.id).includes(q),
+    const toggleChapter = (chapterId: string, checked: boolean) => {
+        const chapter = selectedSubject.chapters.find((item) => item.id === chapterId);
+        const chapterTopicIds = chapter?.topics.map((topic) => topic.id) ?? [];
+
+        onChapterIdsChange(
+            checked
+                ? Array.from(new Set([...selectedChapterIds, chapterId]))
+                : selectedChapterIds.filter((id) => id !== chapterId),
         );
-    }, [sourceSubjects, subjectSearch]);
-    const selectedTotals = useMemo(
-        () =>
-            selectedSubjects.reduce(
-                (totals, subject) => ({
-                    chapters: totals.chapters + subject.chapters_count,
-                    topics: totals.topics + subject.topics_count,
-                    questions: totals.questions + subject.questions_count,
-                }),
-                { chapters: 0, topics: 0, questions: 0 },
-            ),
-        [selectedSubjects],
+
+        if (chapterTopicIds.length > 0) {
+            onTopicIdsChange(
+                checked
+                    ? Array.from(new Set([...selectedTopicIds, ...chapterTopicIds]))
+                    : selectedTopicIds.filter((id) => !chapterTopicIds.includes(id)),
+            );
+        }
+    };
+
+    const toggleTopic = (topicId: string, checked: boolean) => {
+        onTopicIdsChange(
+            checked
+                ? Array.from(new Set([...selectedTopicIds, topicId]))
+                : selectedTopicIds.filter((id) => id !== topicId),
+        );
+    };
+
+    const toggleAll = (checked: boolean) => {
+        onChapterIdsChange(checked ? allChapterIds : []);
+        onTopicIdsChange(checked ? allTopicIds : []);
+    };
+
+    return (
+        <section className="space-y-3 rounded-lg border p-4">
+            <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold">Chapters</h2>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={(value) => toggleAll(value === true)}
+                    />
+                    <span>Select All</span>
+                </label>
+            </div>
+
+            <div className="divide-y rounded-lg border">
+                {selectedSubject.chapters.map((chapter) => {
+                    const isChapterChecked = selectedChapterIds.includes(chapter.id);
+
+                    return (
+                        <div key={chapter.id} className="p-3">
+                            <label className="flex cursor-pointer items-center gap-3">
+                                <Checkbox
+                                    checked={isChapterChecked}
+                                    onCheckedChange={(value) =>
+                                        toggleChapter(chapter.id, value === true)
+                                    }
+                                />
+                                <span className="min-w-0 truncate text-sm font-medium">
+                                    {chapter.name}
+                                </span>
+                            </label>
+
+                            {chapter.topics.length > 0 ? (
+                                <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                    {chapter.topics.map((topic) => (
+                                        <label
+                                            key={topic.id}
+                                            className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                                        >
+                                            <Checkbox
+                                                checked={selectedTopicIds.includes(topic.id)}
+                                                onCheckedChange={(value) =>
+                                                    toggleTopic(topic.id, value === true)
+                                                }
+                                            />
+                                            <span className="truncate">{topic.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
     );
+}
 
-    useEffect(() => {
-        const controller = new AbortController();
-        const params = new URLSearchParams({
-            source_pattern: form.data.source_pattern,
-            source_class_id: form.data.source_class_id,
-        });
-
-        setLoadingCatalog(true);
-        fetch(`/superadmin/data-transfer/catalog?${params.toString()}`, {
-            signal: controller.signal,
-            headers: { Accept: 'application/json' },
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                setSourceClasses(data.source_classes ?? []);
-                setSourceSubjects(data.source_subjects ?? []);
-                setTargetCatalog(data.target_catalog ?? initialTargetCatalog);
-            })
-            .catch((error) => {
-                if (error.name !== 'AbortError') {
-                    setSourceSubjects([]);
-                }
-            })
-            .finally(() => setLoadingCatalog(false));
-
-        return () => controller.abort();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.data.source_pattern, form.data.source_class_id]);
-
-    const toggleSubject = (subjectId: number, checked: boolean) => {
-        const value = String(subjectId);
-        const next = checked
-            ? Array.from(new Set([...form.data.source_subject_ids, value]))
-            : form.data.source_subject_ids.filter((id) => id !== value);
-
-        form.setData('source_subject_ids', next);
-    };
-
-    const selectInitialFour = () => {
-        form.setData('source_subject_ids', ['120', '122', '116', '123']);
-    };
-
-    const submit = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        form.post('/superadmin/data-transfer', {
-            preserveScroll: true,
-        });
-    };
+export default function DataTransfer() {
+    const [activeTab, setActiveTab] = useState<TransferTab>('legacy');
 
     return (
         <>
             <Head title="Data Transfer" />
             <div className="space-y-5 p-4 md:p-6">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="h1-semibold">Data Transfer</h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Copy legacy class and subject content into the new schema.
-                        </p>
+                <h1 className="h1-semibold">Data Transfer</h1>
+
+                <div className="border-b">
+                    <div className="flex gap-1 overflow-x-auto">
+                        {tabs.map((tab) => {
+                            const isActive = activeTab === tab.key;
+
+                            return (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.key)}
+                                    className={`cursor-pointer border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                                        isActive
+                                            ? 'border-primary text-foreground'
+                                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
                     </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={loadingCatalog}
-                        onClick={() => router.reload({ only: ['targetCatalog'] })}
-                    >
-                        <RefreshCwIcon className="size-4" />
-                        Refresh
-                    </Button>
                 </div>
 
-                {transferError ? (
-                    <Alert variant="destructive">
-                        <AlertTriangleIcon className="size-4" />
-                        <AlertTitle>Transfer failed</AlertTitle>
-                        <AlertDescription>{transferError}</AlertDescription>
-                    </Alert>
-                ) : null}
-
-                {report ? (
-                    <div className="space-y-3 rounded-lg border p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">Completed</Badge>
-                            <span className="text-sm font-medium">
-                                {report.pattern.name} / {report.class.name}
-                            </span>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                            <Stat label="Subjects" value={report.totals.subjects} />
-                            <Stat label="Chapters" value={report.totals.chapters} />
-                            <Stat label="Topics" value={report.totals.topics} />
-                            <Stat label="Questions" value={numberFormat(report.totals.questions)} />
-                            <Stat label="Options" value={numberFormat(report.totals.options)} />
-                            <Stat label="Question Types" value={report.totals.question_types} />
-                        </div>
-                    </div>
-                ) : null}
-
-                <form onSubmit={submit} className="space-y-5">
-                    <div className="grid gap-5 xl:grid-cols-[1fr_auto_1fr]">
-                        <section className="space-y-4 rounded-lg border p-4">
-                            <div className="flex items-center gap-2">
-                                <DatabaseIcon className="size-4 text-muted-foreground" />
-                                <h2 className="text-sm font-semibold">Copy From</h2>
-                            </div>
-
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-1.5">
-                                    <Label>Pattern</Label>
-                                    <Select
-                                        value={form.data.source_pattern}
-                                        onValueChange={(value) => {
-                                            form.setData('source_pattern', value);
-                                            form.setData('source_subject_ids', []);
-                                        }}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {sourcePatterns.map((pattern) => (
-                                                <SelectItem key={pattern.key} value={pattern.key}>
-                                                    {pattern.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <Label>Class</Label>
-                                    <Select
-                                        value={form.data.source_class_id}
-                                        onValueChange={(value) => {
-                                            form.setData('source_class_id', value);
-                                            form.setData('source_subject_ids', []);
-                                        }}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select class" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {sourceClasses.map((schoolClass) => (
-                                                <SelectItem key={schoolClass.id} value={String(schoolClass.id)}>
-                                                    {schoolClass.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                    <Label>Subjects</Label>
-                                    <Button type="button" size="sm" variant="outline" onClick={selectInitialFour}>
-                                        Select initial 4
-                                    </Button>
-                                </div>
-                                <div className="relative">
-                                    <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        value={subjectSearch}
-                                        onChange={(event) => setSubjectSearch(event.target.value)}
-                                        placeholder="Search source subjects"
-                                        className="pl-9"
-                                    />
-                                </div>
-                                <div className="max-h-[380px] divide-y overflow-y-auto rounded-lg border">
-                                    {loadingCatalog ? (
-                                        <div className="p-4 text-sm text-muted-foreground">Loading subjects...</div>
-                                    ) : filteredSubjects.length === 0 ? (
-                                        <div className="p-4 text-sm text-muted-foreground">No source subjects found.</div>
-                                    ) : (
-                                        filteredSubjects.map((subject) => {
-                                            const checked = form.data.source_subject_ids.includes(String(subject.id));
-
-                                            return (
-                                                <label
-                                                    key={subject.id}
-                                                    className="flex cursor-pointer items-start gap-3 px-3 py-3 hover:bg-accent/50"
-                                                >
-                                                    <Checkbox
-                                                        checked={checked}
-                                                        onCheckedChange={(value) => toggleSubject(subject.id, value === true)}
-                                                    />
-                                                    <span className="min-w-0 flex-1">
-                                                        <span className="block truncate text-sm font-medium">
-                                                            {subject.name}
-                                                        </span>
-                                                        <span className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                                            <span>ID {subject.id}</span>
-                                                            <span>{subject.subject_type}</span>
-                                                            <span>{subject.chapters_count} chapters</span>
-                                                            <span>{subject.topics_count} topics</span>
-                                                            <span>{numberFormat(subject.questions_count)} questions</span>
-                                                        </span>
-                                                    </span>
-                                                </label>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            </div>
-                        </section>
-
-                        <div className="hidden items-center justify-center xl:flex">
-                            <span className="flex size-10 items-center justify-center rounded-full border bg-background">
-                                <ArrowRightIcon className="size-5 text-muted-foreground" />
-                            </span>
-                        </div>
-
-                        <section className="space-y-4 rounded-lg border p-4">
-                            <div className="flex items-center gap-2">
-                                <DatabaseIcon className="size-4 text-muted-foreground" />
-                                <h2 className="text-sm font-semibold">Copy To</h2>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label>Target Pattern</Label>
-                                <Select
-                                    value={form.data.target_pattern_id || 'new'}
-                                    onValueChange={(value) => form.setData('target_pattern_id', value === 'new' ? '' : value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="new">Create or use by name</SelectItem>
-                                        {targetCatalog.patterns.map((pattern) => (
-                                            <SelectItem key={pattern.id} value={String(pattern.id)}>
-                                                {pattern.short_name ? `${pattern.short_name} / ${pattern.name}` : pattern.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {!form.data.target_pattern_id ? (
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-1.5">
-                                        <Label>Pattern Name</Label>
-                                        <Input
-                                            value={form.data.target_pattern_name}
-                                            onChange={(event) => form.setData('target_pattern_name', event.target.value)}
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label>Short Name</Label>
-                                        <Input
-                                            value={form.data.target_pattern_short_name}
-                                            onChange={(event) => form.setData('target_pattern_short_name', event.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            <div className="space-y-1.5">
-                                <Label>Target Class</Label>
-                                <Select
-                                    value={form.data.target_class_id || 'new'}
-                                    onValueChange={(value) => form.setData('target_class_id', value === 'new' ? '' : value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="new">Create or use by name</SelectItem>
-                                        {targetCatalog.classes.map((schoolClass) => (
-                                            <SelectItem key={schoolClass.id} value={String(schoolClass.id)}>
-                                                {schoolClass.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {!form.data.target_class_id ? (
-                                <div className="space-y-1.5">
-                                    <Label>Class Name</Label>
-                                    <Input
-                                        value={form.data.target_class_name}
-                                        onChange={(event) => form.setData('target_class_name', event.target.value)}
-                                    />
-                                </div>
-                            ) : null}
-
-                            <label className="flex items-start gap-3 rounded-lg border p-3">
-                                <Checkbox
-                                    checked={form.data.replace_existing}
-                                    onCheckedChange={(value) => form.setData('replace_existing', value === true)}
-                                />
-                                <span>
-                                    <span className="block text-sm font-medium">Replace existing scoped content</span>
-                                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                                        Deletes chapters, topics, and questions already under the selected target pattern, class, and copied subjects before importing.
-                                    </span>
-                                </span>
-                            </label>
-
-                            <div className="grid gap-3 sm:grid-cols-3">
-                                <Stat label="Selected Subjects" value={selectedSubjects.length} />
-                                <Stat label="Chapters" value={selectedTotals.chapters} />
-                                <Stat label="Questions" value={numberFormat(selectedTotals.questions)} />
-                            </div>
-                        </section>
-                    </div>
-
-                    <div className="flex justify-end gap-3">
-                        <Button
-                            type="submit"
-                            disabled={
-                                form.processing ||
-                                form.data.source_subject_ids.length === 0 ||
-                                (!form.data.target_pattern_id && !form.data.target_pattern_name.trim()) ||
-                                (!form.data.target_class_id && !form.data.target_class_name.trim())
-                            }
-                        >
-                            <ArrowRightIcon className="size-4" />
-                            {form.processing ? 'Transferring...' : 'Transfer Data'}
-                        </Button>
-                    </div>
-                </form>
+                {activeTab === 'legacy' ? (
+                    <SubjectTransferPanel />
+                ) : (
+                    <section className="min-h-[320px] rounded-lg border p-4" />
+                )}
             </div>
         </>
     );
