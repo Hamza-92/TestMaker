@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { ArrowRightIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -13,142 +13,200 @@ const tabs = [
     { key: 'creative', label: 'Creative Data Transfer' },
 ] as const;
 
-const sourcePatterns = [
-    {
-        id: 'short_syllabus',
-        name: 'short_syllabus',
-        classes: [
-            {
-                id: '31',
-                name: '9th',
-                subjects: [
-                    {
-                        id: '120',
-                        name: 'English 2025',
-                        chapters: [
-                            { id: '120-1', name: 'Unit 1', topics: [] },
-                            { id: '120-2', name: 'Unit 2', topics: [] },
-                            { id: '120-3', name: 'Unit 3', topics: [] },
-                        ],
-                    },
-                    {
-                        id: '122',
-                        name: 'Mathematics 2025',
-                        chapters: [
-                            { id: '122-1', name: 'Real Numbers', topics: [] },
-                            { id: '122-2', name: 'Logarithms', topics: [] },
-                            { id: '122-3', name: 'Sets and Functions', topics: [] },
-                        ],
-                    },
-                    {
-                        id: '116',
-                        name: 'Physics 2025',
-                        chapters: [
-                            {
-                                id: '116-1',
-                                name: 'Physical Quantities',
-                                topics: [
-                                    { id: '116-1-1', name: 'Measurements' },
-                                    { id: '116-1-2', name: 'Prefixes' },
-                                    { id: '116-1-3', name: 'Errors' },
-                                ],
-                            },
-                            {
-                                id: '116-2',
-                                name: 'Kinematics',
-                                topics: [
-                                    { id: '116-2-1', name: 'Speed and Velocity' },
-                                    { id: '116-2-2', name: 'Acceleration' },
-                                    { id: '116-2-3', name: 'Graphs' },
-                                ],
-                            },
-                        ],
-                    },
-                    {
-                        id: '123',
-                        name: 'Urdu 2025',
-                        chapters: [
-                            { id: '123-1', name: 'سبق 1', topics: [] },
-                            { id: '123-2', name: 'سبق 2', topics: [] },
-                            { id: '123-3', name: 'سبق 3', topics: [] },
-                        ],
-                    },
-                ],
-            },
-        ],
-    },
-];
-
-const targetPatterns = [
-    {
-        id: 'pecta',
-        name: 'PECTA',
-        classes: [
-            {
-                id: '9th',
-                name: '9th',
-                subjects: [
-                    { id: 'english', name: 'English 2025' },
-                    { id: 'mathematics', name: 'Mathematics 2025' },
-                    { id: 'physics', name: 'Physics 2025' },
-                    { id: 'urdu', name: 'Urdu 2025' },
-                ],
-            },
-        ],
-    },
-];
-
 type TransferTab = (typeof tabs)[number]['key'];
-type SourceSubject = (typeof sourcePatterns)[number]['classes'][number]['subjects'][number];
 
-function comboboxOptions<T extends { id: string; name: string }>(
+interface SourcePattern {
+    key: string;
+    label: string;
+    afaq: number;
+}
+
+interface CatalogClass {
+    id: number;
+    name: string;
+    status?: number;
+}
+
+interface SourceSubject {
+    id: number;
+    name: string;
+    subject_type?: string;
+    chapters_count?: number;
+    topics_count?: number;
+    questions_count?: number;
+}
+
+interface SourceTopic {
+    id: number;
+    chapter_id: number;
+    name: string;
+    questions_count?: number;
+}
+
+interface SourceChapter {
+    id: number;
+    name: string;
+    chapter_number?: number | null;
+    questions_count?: number;
+    topics: SourceTopic[];
+}
+
+interface TargetPattern {
+    id: number;
+    name: string;
+    short_name?: string | null;
+    status?: number;
+}
+
+interface TargetSubject {
+    id: number;
+    name: string;
+    name_eng?: string | null;
+    name_ur?: string | null;
+    subject_type?: string | null;
+    status?: number;
+}
+
+interface CatalogResponse {
+    source_patterns: SourcePattern[];
+    source_classes: CatalogClass[];
+    source_subjects: SourceSubject[];
+    source_chapters: SourceChapter[];
+    target_patterns: TargetPattern[];
+    target_classes: CatalogClass[];
+    target_subjects: TargetSubject[];
+}
+
+interface DataTransferProps {
+    sourcePatterns: SourcePattern[];
+    targetPatterns: TargetPattern[];
+    defaults?: {
+        source_pattern?: string;
+    };
+}
+
+function csrfToken() {
+    return (
+        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)
+            ?.content ?? ''
+    );
+}
+
+function comboboxOptions<T extends { id: number | string; name?: string; label?: string }>(
     items: T[],
 ): ComboboxOptionItem[] {
     return items.map((item) => ({
         id: item.id,
-        label: item.name,
+        label: item.label ?? item.name ?? String(item.id),
     }));
 }
 
 function selectedOption(
     options: ComboboxOptionItem[],
-    id: string,
+    id: number | string | null,
 ): ComboboxOptionItem | null {
-    return options.find((option) => String(option.id) === id) ?? null;
+    if (id === null || id === '') {
+        return null;
+    }
+
+    return options.find((option) => String(option.id) === String(id)) ?? null;
 }
 
-function SubjectTransferPanel() {
-    const [sourcePatternId, setSourcePatternId] = useState('');
-    const [sourceClassId, setSourceClassId] = useState('');
-    const [sourceSubjectId, setSourceSubjectId] = useState('');
-    const [targetPatternId, setTargetPatternId] = useState('');
-    const [targetClassId, setTargetClassId] = useState('');
-    const [targetSubjectId, setTargetSubjectId] = useState('');
-    const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
-    const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
+function SubjectTransferPanel({
+    defaults,
+    initialSourcePatterns,
+    initialTargetPatterns,
+}: {
+    defaults?: DataTransferProps['defaults'];
+    initialSourcePatterns: SourcePattern[];
+    initialTargetPatterns: TargetPattern[];
+}) {
+    const [sourcePatterns, setSourcePatterns] = useState(initialSourcePatterns);
+    const [sourceClasses, setSourceClasses] = useState<CatalogClass[]>([]);
+    const [sourceSubjects, setSourceSubjects] = useState<SourceSubject[]>([]);
+    const [sourceChapters, setSourceChapters] = useState<SourceChapter[]>([]);
+    const [targetPatterns, setTargetPatterns] = useState(initialTargetPatterns);
+    const [targetClasses, setTargetClasses] = useState<CatalogClass[]>([]);
+    const [targetSubjects, setTargetSubjects] = useState<TargetSubject[]>([]);
+
+    const [sourcePatternId, setSourcePatternId] = useState(
+        defaults?.source_pattern ?? initialSourcePatterns[0]?.key ?? '',
+    );
+    const [sourceClassId, setSourceClassId] = useState<number | null>(null);
+    const [sourceSubjectId, setSourceSubjectId] = useState<number | null>(null);
+    const [targetPatternId, setTargetPatternId] = useState<number | null>(null);
+    const [targetClassId, setTargetClassId] = useState<number | null>(null);
+    const [targetSubjectId, setTargetSubjectId] = useState<number | null>(null);
+    const [selectedChapterIds, setSelectedChapterIds] = useState<number[]>([]);
+    const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
     const [isTransferring, setIsTransferring] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
 
-    const selectedSourcePattern = sourcePatterns.find(
-        (pattern) => pattern.id === sourcePatternId,
-    );
-    const sourceClasses = selectedSourcePattern?.classes ?? [];
-    const selectedSourceClass = sourceClasses.find(
-        (schoolClass) => schoolClass.id === sourceClassId,
-    );
-    const sourceSubjects = selectedSourceClass?.subjects ?? [];
-    const selectedSourceSubject = sourceSubjects.find(
-        (subject) => subject.id === sourceSubjectId,
-    );
+    useEffect(() => {
+        const params = new URLSearchParams();
 
-    const selectedTargetPattern = targetPatterns.find(
-        (pattern) => pattern.id === targetPatternId,
-    );
-    const targetClasses = selectedTargetPattern?.classes ?? [];
-    const selectedTargetClass = targetClasses.find(
-        (schoolClass) => schoolClass.id === targetClassId,
-    );
-    const targetSubjects = selectedTargetClass?.subjects ?? [];
-    const sourcePatternOptions = comboboxOptions(sourcePatterns);
+        if (sourcePatternId) {
+            params.set('source_pattern', sourcePatternId);
+        }
+
+        if (sourceClassId) {
+            params.set('source_class_id', String(sourceClassId));
+        }
+
+        if (sourceSubjectId) {
+            params.set('source_subject_id', String(sourceSubjectId));
+        }
+
+        if (targetPatternId) {
+            params.set('target_pattern_id', String(targetPatternId));
+        }
+
+        if (targetClassId) {
+            params.set('target_class_id', String(targetClassId));
+        }
+
+        let cancelled = false;
+
+        fetch(`/superadmin/data-transfer/catalog?${params.toString()}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((response) => response.json() as Promise<CatalogResponse>)
+            .then((catalog) => {
+                if (cancelled) {
+                    return;
+                }
+
+                setSourcePatterns(catalog.source_patterns);
+                setSourceClasses(catalog.source_classes);
+                setSourceSubjects(catalog.source_subjects);
+                setSourceChapters(catalog.source_chapters);
+                setTargetPatterns(catalog.target_patterns);
+                setTargetClasses(catalog.target_classes);
+                setTargetSubjects(catalog.target_subjects);
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setError('Catalog could not be loaded.');
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        sourcePatternId,
+        sourceClassId,
+        sourceSubjectId,
+        targetPatternId,
+        targetClassId,
+    ]);
+
+    const sourcePatternOptions = sourcePatterns.map((pattern) => ({
+        id: pattern.key,
+        label: pattern.label,
+    }));
     const sourceClassOptions = comboboxOptions(sourceClasses);
     const sourceSubjectOptions = comboboxOptions(sourceSubjects);
     const targetPatternOptions = comboboxOptions(targetPatterns);
@@ -157,13 +215,16 @@ function SubjectTransferPanel() {
 
     const canTransfer = useMemo(
         () =>
-            sourcePatternId &&
-            sourceClassId &&
-            sourceSubjectId &&
-            (selectedChapterIds.length > 0 || selectedTopicIds.length > 0) &&
-            targetPatternId &&
-            targetClassId &&
-            targetSubjectId,
+            Boolean(
+                sourcePatternId &&
+                    sourceClassId &&
+                    sourceSubjectId &&
+                    (selectedChapterIds.length > 0 || selectedTopicIds.length > 0) &&
+                    targetPatternId &&
+                    targetClassId &&
+                    targetSubjectId &&
+                    !isTransferring,
+            ),
         [
             sourcePatternId,
             sourceClassId,
@@ -173,8 +234,59 @@ function SubjectTransferPanel() {
             targetPatternId,
             targetClassId,
             targetSubjectId,
+            isTransferring,
         ],
     );
+
+    const runTransfer = async () => {
+        if (!canTransfer) {
+            return;
+        }
+
+        setIsTransferring(true);
+        setProgress(8);
+        setMessage('');
+        setError('');
+
+        const timer = window.setInterval(() => {
+            setProgress((value) => (value < 90 ? value + 6 : value));
+        }, 700);
+
+        try {
+            const response = await fetch('/superadmin/data-transfer', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+                body: JSON.stringify({
+                    source_pattern: sourcePatternId,
+                    source_class_id: sourceClassId,
+                    source_subject_id: sourceSubjectId,
+                    source_chapter_ids: selectedChapterIds,
+                    source_topic_ids: selectedTopicIds,
+                    target_pattern_id: targetPatternId,
+                    target_class_id: targetClassId,
+                    target_subject_id: targetSubjectId,
+                }),
+            });
+            const payload = await response.json();
+
+            if (!response.ok) {
+                throw new Error(payload.message ?? 'Transfer failed.');
+            }
+
+            setProgress(100);
+            setMessage(payload.message ?? 'Completed.');
+        } catch (exception) {
+            setProgress(0);
+            setError(exception instanceof Error ? exception.message : 'Transfer failed.');
+        } finally {
+            window.clearInterval(timer);
+            setIsTransferring(false);
+        }
+    };
 
     return (
         <div className="space-y-4">
@@ -188,11 +300,15 @@ function SubjectTransferPanel() {
                         value={selectedOption(sourcePatternOptions, sourcePatternId)}
                         onChange={(option) => {
                             setSourcePatternId(String(option?.id ?? ''));
-                            setSourceClassId('');
-                            setSourceSubjectId('');
+                            setSourceClassId(null);
+                            setSourceSubjectId(null);
+                            setSourceClasses([]);
+                            setSourceSubjects([]);
+                            setSourceChapters([]);
                             setSelectedChapterIds([]);
                             setSelectedTopicIds([]);
-                            setIsTransferring(false);
+                            setMessage('');
+                            setError('');
                         }}
                     />
 
@@ -202,11 +318,14 @@ function SubjectTransferPanel() {
                         value={selectedOption(sourceClassOptions, sourceClassId)}
                         disabled={!sourcePatternId}
                         onChange={(option) => {
-                            setSourceClassId(String(option?.id ?? ''));
-                            setSourceSubjectId('');
+                            setSourceClassId(option ? Number(option.id) : null);
+                            setSourceSubjectId(null);
+                            setSourceSubjects([]);
+                            setSourceChapters([]);
                             setSelectedChapterIds([]);
                             setSelectedTopicIds([]);
-                            setIsTransferring(false);
+                            setMessage('');
+                            setError('');
                         }}
                     />
 
@@ -216,10 +335,12 @@ function SubjectTransferPanel() {
                         value={selectedOption(sourceSubjectOptions, sourceSubjectId)}
                         disabled={!sourceClassId}
                         onChange={(option) => {
-                            setSourceSubjectId(String(option?.id ?? ''));
+                            setSourceSubjectId(option ? Number(option.id) : null);
+                            setSourceChapters([]);
                             setSelectedChapterIds([]);
                             setSelectedTopicIds([]);
-                            setIsTransferring(false);
+                            setMessage('');
+                            setError('');
                         }}
                     />
                 </section>
@@ -238,10 +359,13 @@ function SubjectTransferPanel() {
                         options={targetPatternOptions}
                         value={selectedOption(targetPatternOptions, targetPatternId)}
                         onChange={(option) => {
-                            setTargetPatternId(String(option?.id ?? ''));
-                            setTargetClassId('');
-                            setTargetSubjectId('');
-                            setIsTransferring(false);
+                            setTargetPatternId(option ? Number(option.id) : null);
+                            setTargetClassId(null);
+                            setTargetSubjectId(null);
+                            setTargetClasses([]);
+                            setTargetSubjects([]);
+                            setMessage('');
+                            setError('');
                         }}
                     />
 
@@ -251,9 +375,11 @@ function SubjectTransferPanel() {
                         value={selectedOption(targetClassOptions, targetClassId)}
                         disabled={!targetPatternId}
                         onChange={(option) => {
-                            setTargetClassId(String(option?.id ?? ''));
-                            setTargetSubjectId('');
-                            setIsTransferring(false);
+                            setTargetClassId(option ? Number(option.id) : null);
+                            setTargetSubjectId(null);
+                            setTargetSubjects([]);
+                            setMessage('');
+                            setError('');
                         }}
                     />
 
@@ -263,17 +389,18 @@ function SubjectTransferPanel() {
                         value={selectedOption(targetSubjectOptions, targetSubjectId)}
                         disabled={!targetClassId}
                         onChange={(option) => {
-                            setTargetSubjectId(String(option?.id ?? ''));
-                            setIsTransferring(false);
+                            setTargetSubjectId(option ? Number(option.id) : null);
+                            setMessage('');
+                            setError('');
                         }}
                     />
                 </section>
             </div>
 
-            {selectedSourceSubject ? (
+            {sourceSubjectId ? (
                 <ChapterSelector
+                    chapters={sourceChapters}
                     selectedChapterIds={selectedChapterIds}
-                    selectedSubject={selectedSourceSubject}
                     selectedTopicIds={selectedTopicIds}
                     onChapterIdsChange={setSelectedChapterIds}
                     onTopicIdsChange={setSelectedTopicIds}
@@ -283,16 +410,25 @@ function SubjectTransferPanel() {
             <div className="space-y-3">
                 {isTransferring ? (
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full w-1/3 rounded-full bg-primary" />
+                        <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${progress}%` }}
+                        />
                     </div>
                 ) : null}
 
-                <div className="flex justify-end">
-                    <Button
-                        type="button"
-                        disabled={!canTransfer}
-                        onClick={() => setIsTransferring(true)}
+                {(message || error) && (
+                    <p
+                        className={`text-right text-sm ${
+                            error ? 'text-destructive' : 'text-muted-foreground'
+                        }`}
                     >
+                        {error || message}
+                    </p>
+                )}
+
+                <div className="flex justify-end">
+                    <Button type="button" disabled={!canTransfer} onClick={runTransfer}>
                         Transfer Data
                     </Button>
                 </div>
@@ -302,20 +438,20 @@ function SubjectTransferPanel() {
 }
 
 function ChapterSelector({
+    chapters,
     onChapterIdsChange,
     onTopicIdsChange,
     selectedChapterIds,
-    selectedSubject,
     selectedTopicIds,
 }: {
-    onChapterIdsChange: (value: string[]) => void;
-    onTopicIdsChange: (value: string[]) => void;
-    selectedChapterIds: string[];
-    selectedSubject: SourceSubject;
-    selectedTopicIds: string[];
+    chapters: SourceChapter[];
+    onChapterIdsChange: (value: number[]) => void;
+    onTopicIdsChange: (value: number[]) => void;
+    selectedChapterIds: number[];
+    selectedTopicIds: number[];
 }) {
-    const allChapterIds = selectedSubject.chapters.map((chapter) => chapter.id);
-    const allTopicIds = selectedSubject.chapters.flatMap((chapter) =>
+    const allChapterIds = chapters.map((chapter) => chapter.id);
+    const allTopicIds = chapters.flatMap((chapter) =>
         chapter.topics.map((topic) => topic.id),
     );
     const isAllSelected =
@@ -323,8 +459,8 @@ function ChapterSelector({
         allChapterIds.every((id) => selectedChapterIds.includes(id)) &&
         allTopicIds.every((id) => selectedTopicIds.includes(id));
 
-    const toggleChapter = (chapterId: string, checked: boolean) => {
-        const chapter = selectedSubject.chapters.find((item) => item.id === chapterId);
+    const toggleChapter = (chapterId: number, checked: boolean) => {
+        const chapter = chapters.find((item) => item.id === chapterId);
         const chapterTopicIds = chapter?.topics.map((topic) => topic.id) ?? [];
 
         onChapterIdsChange(
@@ -342,11 +478,21 @@ function ChapterSelector({
         }
     };
 
-    const toggleTopic = (topicId: string, checked: boolean) => {
-        onTopicIdsChange(
-            checked
-                ? Array.from(new Set([...selectedTopicIds, topicId]))
-                : selectedTopicIds.filter((id) => id !== topicId),
+    const toggleTopic = (chapterId: number, topicId: number, checked: boolean) => {
+        const chapter = chapters.find((item) => item.id === chapterId);
+        const chapterTopicIds = chapter?.topics.map((topic) => topic.id) ?? [];
+        const nextTopicIds = checked
+            ? Array.from(new Set([...selectedTopicIds, topicId]))
+            : selectedTopicIds.filter((id) => id !== topicId);
+        const hasChapterTopicSelected = chapterTopicIds.some((id) =>
+            nextTopicIds.includes(id),
+        );
+
+        onTopicIdsChange(nextTopicIds);
+        onChapterIdsChange(
+            hasChapterTopicSelected
+                ? Array.from(new Set([...selectedChapterIds, chapterId]))
+                : selectedChapterIds.filter((id) => id !== chapterId),
         );
     };
 
@@ -369,7 +515,7 @@ function ChapterSelector({
             </div>
 
             <div className="divide-y rounded-lg border">
-                {selectedSubject.chapters.map((chapter) => {
+                {chapters.map((chapter) => {
                     const isChapterChecked = selectedChapterIds.includes(chapter.id);
 
                     return (
@@ -387,7 +533,7 @@ function ChapterSelector({
                             </label>
 
                             {chapter.topics.length > 0 ? (
-                                <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                <div className="mt-3 grid gap-2 pl-8 md:grid-cols-2 xl:grid-cols-3">
                                     {chapter.topics.map((topic) => (
                                         <label
                                             key={topic.id}
@@ -396,7 +542,11 @@ function ChapterSelector({
                                             <Checkbox
                                                 checked={selectedTopicIds.includes(topic.id)}
                                                 onCheckedChange={(value) =>
-                                                    toggleTopic(topic.id, value === true)
+                                                    toggleTopic(
+                                                        chapter.id,
+                                                        topic.id,
+                                                        value === true,
+                                                    )
                                                 }
                                             />
                                             <span className="truncate">{topic.name}</span>
@@ -412,7 +562,11 @@ function ChapterSelector({
     );
 }
 
-export default function DataTransfer() {
+export default function DataTransfer({
+    defaults,
+    sourcePatterns,
+    targetPatterns,
+}: DataTransferProps) {
     const [activeTab, setActiveTab] = useState<TransferTab>('legacy');
 
     return (
@@ -445,7 +599,11 @@ export default function DataTransfer() {
                 </div>
 
                 {activeTab === 'legacy' ? (
-                    <SubjectTransferPanel />
+                    <SubjectTransferPanel
+                        defaults={defaults}
+                        initialSourcePatterns={sourcePatterns}
+                        initialTargetPatterns={targetPatterns}
+                    />
                 ) : (
                     <section className="min-h-[320px] rounded-lg border p-4" />
                 )}

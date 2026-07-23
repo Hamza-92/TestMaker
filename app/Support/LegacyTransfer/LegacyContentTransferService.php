@@ -90,47 +90,150 @@ class LegacyContentTransferService
             ->all();
     }
 
+    public function sourceChapters(string $sourcePattern, int $sourceClassId, int $sourceSubjectId): array
+    {
+        $afaq = $this->sourceAfaq($sourcePattern);
+
+        $chapters = $this->source()
+            ->table('pk_chapter as chapter')
+            ->leftJoin('pk_question as question', function ($join) use ($afaq): void {
+                $join->on('question.chapter_id', '=', 'chapter.id')
+                    ->where('question.afaq', '=', $afaq);
+            })
+            ->where('chapter.class_id', $sourceClassId)
+            ->where('chapter.subject_id', $sourceSubjectId)
+            ->where('chapter.afaq', $afaq)
+            ->selectRaw('chapter.id, chapter.name, chapter.u_name, chapter.chapter_number, chapter.chapter_type, chapter.sort_int, count(distinct question.id) as questions_count')
+            ->groupBy('chapter.id', 'chapter.name', 'chapter.u_name', 'chapter.chapter_number', 'chapter.chapter_type', 'chapter.sort_int')
+            ->orderBy('chapter.chapter_number')
+            ->orderBy('chapter.sort_int')
+            ->orderBy('chapter.id')
+            ->get();
+
+        if ($chapters->isEmpty()) {
+            return [];
+        }
+
+        $chapterIds = $chapters->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $topics = $this->source()
+            ->table('pk_topics as topic')
+            ->leftJoin('pk_question as question', function ($join) use ($afaq): void {
+                $join->on('question.topic_id', '=', 'topic.id')
+                    ->where('question.afaq', '=', $afaq);
+            })
+            ->whereIn('topic.chapter_id', $chapterIds)
+            ->selectRaw('topic.id, topic.chapter_id, topic.name, topic.u_name, topic.sort_int, count(distinct question.id) as questions_count')
+            ->groupBy('topic.id', 'topic.chapter_id', 'topic.name', 'topic.u_name', 'topic.sort_int')
+            ->orderBy('topic.sort_int')
+            ->orderBy('topic.id')
+            ->get()
+            ->groupBy('chapter_id');
+
+        return $chapters
+            ->map(fn (object $chapter) => [
+                'id' => (int) $chapter->id,
+                'name' => $this->displayName($chapter->name, $chapter->u_name, "Chapter {$chapter->id}"),
+                'name_eng' => $this->nullableString($chapter->name),
+                'name_ur' => $this->nullableString($chapter->u_name),
+                'chapter_number' => $this->nullableInt($chapter->chapter_number),
+                'chapter_type' => $this->nullableString($chapter->chapter_type),
+                'questions_count' => (int) $chapter->questions_count,
+                'topics' => ($topics->get($chapter->id) ?? collect())
+                    ->map(fn (object $topic) => [
+                        'id' => (int) $topic->id,
+                        'chapter_id' => (int) $topic->chapter_id,
+                        'name' => $this->displayName($topic->name, $topic->u_name, "Topic {$topic->id}"),
+                        'name_eng' => $this->nullableString($topic->name),
+                        'name_ur' => $this->nullableString($topic->u_name),
+                        'questions_count' => (int) $topic->questions_count,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     public function targetCatalog(): array
     {
         return [
-            'patterns' => Pattern::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'short_name', 'status'])
-                ->map(fn (Pattern $pattern) => [
-                    'id' => $pattern->id,
-                    'name' => $pattern->name,
-                    'short_name' => $pattern->short_name,
-                    'status' => $pattern->status,
-                ])
-                ->values(),
+            'patterns' => $this->targetPatterns(),
             'classes' => SchoolClass::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'status'])
-                ->map(fn (SchoolClass $class) => [
-                    'id' => $class->id,
-                    'name' => $class->name,
-                    'status' => $class->status,
-                ])
-                ->values(),
+                ->map(fn (SchoolClass $class) => $this->targetClassPayload($class))
+                ->values()
+                ->all(),
             'subjects' => Subject::query()
                 ->orderBy('name_eng')
                 ->get(['id', 'name_eng', 'name_ur', 'subject_type', 'status'])
-                ->map(fn (Subject $subject) => [
-                    'id' => $subject->id,
-                    'name_eng' => $subject->name_eng,
-                    'name_ur' => $subject->name_ur,
-                    'subject_type' => $subject->subject_type,
-                    'status' => $subject->status,
-                ])
-                ->values(),
+                ->map(fn (Subject $subject) => $this->targetSubjectPayload($subject))
+                ->values()
+                ->all(),
         ];
+    }
+
+    public function targetPatterns(): array
+    {
+        return Pattern::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'short_name', 'status'])
+            ->map(fn (Pattern $pattern) => [
+                'id' => $pattern->id,
+                'name' => $pattern->name,
+                'short_name' => $pattern->short_name,
+                'status' => $pattern->status,
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function targetClasses(?int $targetPatternId): array
+    {
+        if (! $targetPatternId) {
+            return [];
+        }
+
+        $pattern = Pattern::query()->find($targetPatternId);
+
+        if (! $pattern) {
+            return [];
+        }
+
+        return $pattern->classes()
+            ->orderBy('classes.name')
+            ->get(['classes.id', 'classes.name', 'classes.status'])
+            ->map(fn (SchoolClass $class) => $this->targetClassPayload($class))
+            ->values()
+            ->all();
+    }
+
+    public function targetSubjects(?int $targetPatternId, ?int $targetClassId): array
+    {
+        if (! $targetPatternId || ! $targetClassId) {
+            return [];
+        }
+
+        return Subject::query()
+            ->join('class_subjects', 'class_subjects.subject_id', '=', 'subjects.id')
+            ->where('class_subjects.pattern_id', $targetPatternId)
+            ->where('class_subjects.class_id', $targetClassId)
+            ->orderBy('subjects.name_eng')
+            ->get(['subjects.id', 'subjects.name_eng', 'subjects.name_ur', 'subjects.subject_type', 'subjects.status'])
+            ->map(fn (Subject $subject) => $this->targetSubjectPayload($subject))
+            ->values()
+            ->all();
     }
 
     public function transfer(array $options, ?int $creatorId): array
     {
         $sourcePattern = (string) $options['source_pattern'];
         $sourceClassId = (int) $options['source_class_id'];
-        $sourceSubjectIds = array_values(array_unique(array_map('intval', $options['source_subject_ids'])));
+        $sourceSubjectIds = isset($options['source_subject_id'])
+            ? [(int) $options['source_subject_id']]
+            : array_values(array_unique(array_map('intval', $options['source_subject_ids'] ?? [])));
+        $sourceChapterIds = array_values(array_unique(array_map('intval', $options['source_chapter_ids'] ?? [])));
+        $sourceTopicIds = array_values(array_unique(array_map('intval', $options['source_topic_ids'] ?? [])));
         $replaceExisting = (bool) ($options['replace_existing'] ?? false);
         $afaq = $this->sourceAfaq($sourcePattern);
         $sourceClass = $this->source()->table('pk_class')->where('id', $sourceClassId)->first();
@@ -141,6 +244,10 @@ class LegacyContentTransferService
 
         if ($sourceSubjectIds === []) {
             throw new RuntimeException('Select at least one source subject.');
+        }
+
+        if (isset($options['source_subject_id']) && $sourceChapterIds === [] && $sourceTopicIds === []) {
+            throw new RuntimeException('Select at least one source chapter or topic.');
         }
 
         $sourceSubjects = $this->source()
@@ -164,8 +271,10 @@ class LegacyContentTransferService
             $replaceExisting,
             $sourceClass,
             $sourceClassId,
+            $sourceChapterIds,
             $sourceSubjectIds,
-            $sourceSubjects
+            $sourceSubjects,
+            $sourceTopicIds
         ): array {
             $pattern = $this->resolveTargetPattern($options, $creatorId);
             $class = $this->resolveTargetClass($options, $sourceClass, $creatorId);
@@ -188,7 +297,7 @@ class LegacyContentTransferService
             foreach ($sourceSubjectIds as $sourceSubjectId) {
                 $sourceSubject = $sourceSubjects->get($sourceSubjectId);
                 $subjectType = $this->sourceSubjectType($sourceClassId, $sourceSubjectId);
-                $subject = $this->resolveTargetSubject($sourceSubject, $subjectType, $creatorId);
+                $subject = $this->resolveTargetSubject($sourceSubject, $subjectType, $options, $creatorId);
 
                 ClassSubject::query()->firstOrCreate([
                     'class_id' => $class->id,
@@ -209,6 +318,8 @@ class LegacyContentTransferService
                     creatorId: $creatorId,
                     sourceClassId: $sourceClassId,
                     sourceSubjectId: $sourceSubjectId,
+                    sourceChapterIds: $sourceChapterIds,
+                    sourceTopicIds: $sourceTopicIds,
                     targetClass: $class,
                     targetPattern: $pattern,
                     targetSubject: $subject,
@@ -235,11 +346,12 @@ class LegacyContentTransferService
         ?int $creatorId,
         int $sourceClassId,
         int $sourceSubjectId,
+        array $sourceChapterIds,
+        array $sourceTopicIds,
         SchoolClass $targetClass,
         Pattern $targetPattern,
         Subject $targetSubject,
     ): array {
-        $chapterMap = [];
         $topicMap = [];
         $usedChapterNumbers = [];
         $counts = [
@@ -255,10 +367,15 @@ class LegacyContentTransferService
             ->where('class_id', $sourceClassId)
             ->where('subject_id', $sourceSubjectId)
             ->where('afaq', $afaq)
+            ->when($sourceChapterIds !== [], fn ($query) => $query->whereIn('id', $sourceChapterIds))
             ->orderBy('chapter_number')
             ->orderBy('sort_int')
             ->orderBy('id')
             ->get();
+
+        if ($sourceChapters->isEmpty()) {
+            throw new RuntimeException('No source chapters matched the selected filters.');
+        }
 
         foreach ($sourceChapters as $sourceChapter) {
             $chapterNumber = $this->nullableInt($sourceChapter->chapter_number);
@@ -271,10 +388,7 @@ class LegacyContentTransferService
                 }
             }
 
-            $chapter = Chapter::query()->create([
-                'subject_id' => $targetSubject->id,
-                'class_id' => $targetClass->id,
-                'pattern_id' => $targetPattern->id,
+            $chapterAttributes = [
                 'name' => $this->limitedString($sourceChapter->name, 150) ?? "Chapter {$sourceChapter->chapter_number}",
                 'name_ur' => $this->limitedString($sourceChapter->u_name, 150),
                 'chapter_number' => $chapterNumber,
@@ -283,22 +397,31 @@ class LegacyContentTransferService
                 'sort_id' => (int) ($sourceChapter->sort_int ?? 0),
                 'status' => (int) ($sourceChapter->status ?? 1),
                 'created_by' => $creatorId,
-            ]);
+            ];
 
-            $chapterMap[(int) $sourceChapter->id] = $chapter->id;
+            $chapter = $this->resolveTargetChapter(
+                targetClass: $targetClass,
+                targetPattern: $targetPattern,
+                targetSubject: $targetSubject,
+                attributes: $chapterAttributes,
+            );
+
             $counts['chapters']++;
 
             $sourceTopics = $this->source()
                 ->table('pk_topics')
                 ->where('chapter_id', $sourceChapter->id)
+                ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('id', $sourceTopicIds))
                 ->orderBy('sort_int')
                 ->orderBy('id')
                 ->get();
 
+            $chapterTopicIds = [];
             foreach ($sourceTopics as $sourceTopic) {
-                $topic = Topic::query()->create([
+                $topic = Topic::query()->updateOrCreate([
                     'chapter_id' => $chapter->id,
                     'name' => $this->limitedString($sourceTopic->name, 150) ?? "Topic {$sourceTopic->id}",
+                ], [
                     'name_ur' => $this->limitedString($sourceTopic->u_name, 150),
                     'sort_id' => (int) ($sourceTopic->sort_int ?? 0),
                     'status' => (int) ($sourceTopic->status ?? 1),
@@ -306,13 +429,27 @@ class LegacyContentTransferService
                 ]);
 
                 $topicMap[(int) $sourceTopic->id] = $topic->id;
+                $chapterTopicIds[] = $topic->id;
                 $counts['topics']++;
+            }
+
+            if ($chapterTopicIds !== []) {
+                Question::query()
+                    ->whereIn('topic_id', $chapterTopicIds)
+                    ->delete();
+            } else {
+                Question::query()
+                    ->where('chapter_id', $chapter->id)
+                    ->whereNull('topic_id')
+                    ->delete();
             }
 
             $sourceQuestions = $this->source()
                 ->table('pk_question')
                 ->where('chapter_id', $sourceChapter->id)
                 ->where('afaq', $afaq)
+                ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('topic_id', $sourceTopicIds))
+                ->when($sourceTopicIds === [] && $sourceTopics->isNotEmpty(), fn ($query) => $query->whereIn('topic_id', $sourceTopics->pluck('id')->all()))
                 ->orderBy('id')
                 ->get();
 
@@ -633,8 +770,12 @@ class LegacyContentTransferService
         );
     }
 
-    private function resolveTargetSubject(object $sourceSubject, string $subjectType, ?int $creatorId): Subject
+    private function resolveTargetSubject(object $sourceSubject, string $subjectType, array $options, ?int $creatorId): Subject
     {
+        if (! empty($options['target_subject_id'])) {
+            return Subject::query()->findOrFail((int) $options['target_subject_id']);
+        }
+
         $name = $this->limitedString($sourceSubject->name, 100) ?? "Subject {$sourceSubject->id}";
 
         return Subject::query()->firstOrCreate(
@@ -646,6 +787,69 @@ class LegacyContentTransferService
                 'created_by' => $creatorId,
             ],
         );
+    }
+
+    private function resolveTargetChapter(
+        SchoolClass $targetClass,
+        Pattern $targetPattern,
+        Subject $targetSubject,
+        array $attributes,
+    ): Chapter {
+        $baseQuery = Chapter::query()
+            ->where('subject_id', $targetSubject->id)
+            ->where('class_id', $targetClass->id)
+            ->where('pattern_id', $targetPattern->id);
+
+        if ($attributes['chapter_number'] !== null) {
+            $chapter = (clone $baseQuery)
+                ->where('chapter_number', $attributes['chapter_number'])
+                ->first();
+
+            if ($chapter) {
+                $chapter->update($attributes);
+
+                return $chapter;
+            }
+        }
+
+        $chapter = (clone $baseQuery)
+            ->where('name', $attributes['name'])
+            ->where('sort_id', $attributes['sort_id'])
+            ->first();
+
+        if ($chapter) {
+            $chapter->update($attributes);
+
+            return $chapter;
+        }
+
+        return Chapter::query()->create([
+            'subject_id' => $targetSubject->id,
+            'class_id' => $targetClass->id,
+            'pattern_id' => $targetPattern->id,
+            ...$attributes,
+        ]);
+    }
+
+    private function targetClassPayload(SchoolClass $class): array
+    {
+        return [
+            'id' => $class->id,
+            'name' => $class->name,
+            'status' => $class->status,
+        ];
+    }
+
+    private function targetSubjectPayload(Subject $subject): array
+    {
+        return [
+            'id' => $subject->id,
+            'name' => $this->displayName($subject->name_eng, $subject->name_ur, "Subject {$subject->id}"),
+            'name_eng' => $subject->name_eng,
+            'name_ur' => $subject->name_ur,
+            'subject_type' => $subject->subject_type,
+            'status' => $subject->status,
+        ];
     }
 
     private function sourceSubjectType(int $sourceClassId, int $sourceSubjectId): string
@@ -701,6 +905,13 @@ class LegacyContentTransferService
         $normalized = $this->nullableString($value);
 
         return $normalized === null ? null : Str::limit($normalized, $limit, '');
+    }
+
+    private function displayName(mixed $english, mixed $urdu, string $fallback): string
+    {
+        return $this->nullableString($english)
+            ?? $this->nullableString($urdu)
+            ?? $fallback;
     }
 
     private function nullableInt(mixed $value): ?int
