@@ -217,13 +217,13 @@ function SubjectTransferPanel({
         () =>
             Boolean(
                 sourcePatternId &&
-                    sourceClassId &&
-                    sourceSubjectId &&
-                    (selectedChapterIds.length > 0 || selectedTopicIds.length > 0) &&
-                    targetPatternId &&
-                    targetClassId &&
-                    targetSubjectId &&
-                    !isTransferring,
+                sourceClassId &&
+                sourceSubjectId &&
+                (selectedChapterIds.length > 0 || selectedTopicIds.length > 0) &&
+                targetPatternId &&
+                targetClassId &&
+                targetSubjectId &&
+                !isTransferring,
             ),
         [
             sourcePatternId,
@@ -407,7 +407,7 @@ function SubjectTransferPanel({
                 />
             ) : null}
 
-            <div className="space-y-3">
+            <div className="sticky bottom-0 z-20 -mx-4 space-y-3 border-t bg-background/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
                 {isTransferring ? (
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                         <div
@@ -419,9 +419,8 @@ function SubjectTransferPanel({
 
                 {(message || error) && (
                     <p
-                        className={`text-right text-sm ${
-                            error ? 'text-destructive' : 'text-muted-foreground'
-                        }`}
+                        className={`text-right text-sm ${error ? 'text-destructive' : 'text-muted-foreground'
+                            }`}
                     >
                         {error || message}
                     </p>
@@ -585,11 +584,10 @@ export default function DataTransfer({
                                     key={tab.key}
                                     type="button"
                                     onClick={() => setActiveTab(tab.key)}
-                                    className={`cursor-pointer border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                                        isActive
+                                    className={`cursor-pointer border-b-2 px-4 py-2 text-sm font-medium transition-colors ${isActive
                                             ? 'border-primary text-foreground'
                                             : 'border-transparent text-muted-foreground hover:text-foreground'
-                                    }`}
+                                        }`}
                                 >
                                     {tab.label}
                                 </button>

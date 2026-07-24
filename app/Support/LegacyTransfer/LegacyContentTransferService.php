@@ -21,10 +21,60 @@ class LegacyContentTransferService
     private const SOURCE_CONNECTION = 'legacy_mysql';
 
     private const SOURCE_PATTERNS = [
+        'punjab' => [
+            'key' => 'punjab',
+            'label' => 'Punjab',
+            'afaq' => 0,
+        ],
+        'afaq' => [
+            'key' => 'afaq',
+            'label' => 'AFAQ',
+            'afaq' => 1,
+        ],
+        'oxford' => [
+            'key' => 'oxford',
+            'label' => 'Oxford',
+            'afaq' => 2,
+        ],
         'short_syllabus' => [
             'key' => 'short_syllabus',
-            'label' => 'AFAQ / short_syllabus',
+            'label' => 'Short Syllabus',
             'afaq' => 3,
+        ],
+        'pef' => [
+            'key' => 'pef',
+            'label' => 'PEF',
+            'afaq' => 3,
+        ],
+        'fedral' => [
+            'key' => 'fedral',
+            'label' => 'Federal',
+            'afaq' => 4,
+        ],
+        'afaq_sons' => [
+            'key' => 'afaq_sons',
+            'label' => 'AFAQ Sons',
+            'afaq' => 5,
+        ],
+        'ajk' => [
+            'key' => 'ajk',
+            'label' => 'AJK',
+            'afaq' => 6,
+        ],
+        'kpk' => [
+            'key' => 'kpk',
+            'label' => 'KPK',
+            'afaq' => 7,
+        ],
+        'ss' => [
+            'key' => 'ss',
+            'label' => 'SS',
+            'afaq' => 8,
+        ],
+        'sindh' => [
+            'key' => 'sindh',
+            'label' => 'Sindh',
+            'afaq' => 9,
         ],
     ];
 
@@ -38,11 +88,13 @@ class LegacyContentTransferService
     public function sourceClasses(string $sourcePattern): array
     {
         $afaq = $this->sourceAfaq($sourcePattern);
+        $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
 
         return $this->source()
             ->table('pk_class as class')
             ->join('pk_chapter as chapter', 'chapter.class_id', '=', 'class.id')
             ->where('chapter.afaq', $afaq)
+            ->where("chapter.{$statusColumn}", 1)
             ->selectRaw('class.id, class.name, count(distinct chapter.subject_id) as subjects_count, count(distinct chapter.id) as chapters_count')
             ->groupBy('class.id', 'class.name')
             ->orderBy('class.id_order')
@@ -60,13 +112,15 @@ class LegacyContentTransferService
     public function sourceSubjects(string $sourcePattern, int $sourceClassId): array
     {
         $afaq = $this->sourceAfaq($sourcePattern);
+        $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
 
         return $this->source()
             ->table('pk_subject as subject')
-            ->join('pk_chapter as chapter', function ($join) use ($sourceClassId, $afaq): void {
+            ->join('pk_chapter as chapter', function ($join) use ($sourceClassId, $afaq, $statusColumn): void {
                 $join->on('chapter.subject_id', '=', 'subject.id')
                     ->where('chapter.class_id', '=', $sourceClassId)
-                    ->where('chapter.afaq', '=', $afaq);
+                    ->where('chapter.afaq', '=', $afaq)
+                    ->where("chapter.{$statusColumn}", '=', 1);
             })
             ->leftJoin('pk_topics as topic', 'topic.chapter_id', '=', 'chapter.id')
             ->leftJoin('pk_question as question', function ($join) use ($afaq): void {
@@ -93,6 +147,7 @@ class LegacyContentTransferService
     public function sourceChapters(string $sourcePattern, int $sourceClassId, int $sourceSubjectId): array
     {
         $afaq = $this->sourceAfaq($sourcePattern);
+        $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
 
         $chapters = $this->source()
             ->table('pk_chapter as chapter')
@@ -103,6 +158,7 @@ class LegacyContentTransferService
             ->where('chapter.class_id', $sourceClassId)
             ->where('chapter.subject_id', $sourceSubjectId)
             ->where('chapter.afaq', $afaq)
+            ->where("chapter.{$statusColumn}", 1)
             ->selectRaw('chapter.id, chapter.name, chapter.u_name, chapter.chapter_number, chapter.chapter_type, chapter.sort_int, count(distinct question.id) as questions_count')
             ->groupBy('chapter.id', 'chapter.name', 'chapter.u_name', 'chapter.chapter_number', 'chapter.chapter_type', 'chapter.sort_int')
             ->orderBy('chapter.chapter_number')
@@ -236,6 +292,7 @@ class LegacyContentTransferService
         $sourceTopicIds = array_values(array_unique(array_map('intval', $options['source_topic_ids'] ?? [])));
         $replaceExisting = (bool) ($options['replace_existing'] ?? false);
         $afaq = $this->sourceAfaq($sourcePattern);
+        $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
         $sourceClass = $this->source()->table('pk_class')->where('id', $sourceClassId)->first();
 
         if (! $sourceClass) {
@@ -274,6 +331,7 @@ class LegacyContentTransferService
             $sourceChapterIds,
             $sourceSubjectIds,
             $sourceSubjects,
+            $statusColumn,
             $sourceTopicIds
         ): array {
             $pattern = $this->resolveTargetPattern($options, $creatorId);
@@ -320,6 +378,7 @@ class LegacyContentTransferService
                     sourceSubjectId: $sourceSubjectId,
                     sourceChapterIds: $sourceChapterIds,
                     sourceTopicIds: $sourceTopicIds,
+                    statusColumn: $statusColumn,
                     targetClass: $class,
                     targetPattern: $pattern,
                     targetSubject: $subject,
@@ -348,6 +407,7 @@ class LegacyContentTransferService
         int $sourceSubjectId,
         array $sourceChapterIds,
         array $sourceTopicIds,
+        string $statusColumn,
         SchoolClass $targetClass,
         Pattern $targetPattern,
         Subject $targetSubject,
@@ -367,6 +427,7 @@ class LegacyContentTransferService
             ->where('class_id', $sourceClassId)
             ->where('subject_id', $sourceSubjectId)
             ->where('afaq', $afaq)
+            ->where($statusColumn, 1)
             ->when($sourceChapterIds !== [], fn ($query) => $query->whereIn('id', $sourceChapterIds))
             ->orderBy('chapter_number')
             ->orderBy('sort_int')
@@ -886,6 +947,11 @@ class LegacyContentTransferService
         }
 
         return $pattern['afaq'];
+    }
+
+    private function sourceChapterStatusColumn(string $sourcePattern): string
+    {
+        return $sourcePattern === 'pef' ? 'status_pef' : 'status';
     }
 
     private function source(): ConnectionInterface
