@@ -21,6 +21,12 @@ interface SourcePattern {
     afaq: number;
 }
 
+function isVisibleSourcePattern(pattern: SourcePattern): boolean {
+    return !(
+        pattern.label.trim().toLowerCase() === 'punjab'
+    );
+}
+
 interface CatalogClass {
     id: number;
     name: string;
@@ -121,7 +127,13 @@ function SubjectTransferPanel({
     initialSourcePatterns: SourcePattern[];
     initialTargetPatterns: TargetPattern[];
 }) {
-    const [sourcePatterns, setSourcePatterns] = useState(initialSourcePatterns);
+    const visibleInitialSourcePatterns = initialSourcePatterns.filter(
+        isVisibleSourcePattern,
+    );
+
+    const [sourcePatterns, setSourcePatterns] = useState(
+        visibleInitialSourcePatterns,
+    );
     const [sourceClasses, setSourceClasses] = useState<CatalogClass[]>([]);
     const [sourceSubjects, setSourceSubjects] = useState<SourceSubject[]>([]);
     const [sourceChapters, setSourceChapters] = useState<SourceChapter[]>([]);
@@ -129,8 +141,14 @@ function SubjectTransferPanel({
     const [targetClasses, setTargetClasses] = useState<CatalogClass[]>([]);
     const [targetSubjects, setTargetSubjects] = useState<TargetSubject[]>([]);
 
+    const defaultSourcePattern = visibleInitialSourcePatterns.some(
+        (pattern) => String(pattern.key) === String(defaults?.source_pattern),
+    )
+        ? defaults?.source_pattern
+        : visibleInitialSourcePatterns[0]?.key;
+
     const [sourcePatternId, setSourcePatternId] = useState(
-        defaults?.source_pattern ?? initialSourcePatterns[0]?.key ?? '',
+        defaultSourcePattern ?? '',
     );
     const [sourceClassId, setSourceClassId] = useState<number | null>(null);
     const [sourceSubjectId, setSourceSubjectId] = useState<number | null>(null);
@@ -178,7 +196,9 @@ function SubjectTransferPanel({
                     return;
                 }
 
-                setSourcePatterns(catalog.source_patterns);
+                setSourcePatterns(
+                    catalog.source_patterns.filter(isVisibleSourcePattern),
+                );
                 setSourceClasses(catalog.source_classes);
                 setSourceSubjects(catalog.source_subjects);
                 setSourceChapters(catalog.source_chapters);
@@ -585,8 +605,8 @@ export default function DataTransfer({
                                     type="button"
                                     onClick={() => setActiveTab(tab.key)}
                                     className={`cursor-pointer border-b-2 px-4 py-2 text-sm font-medium transition-colors ${isActive
-                                            ? 'border-primary text-foreground'
-                                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                                        ? 'border-primary text-foreground'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground'
                                         }`}
                                 >
                                     {tab.label}
