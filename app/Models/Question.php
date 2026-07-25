@@ -15,6 +15,10 @@ class Question extends Model
 
     public const SOURCE_PAST_PAPER = 'past paper';
 
+    public const SOURCE_EXERCISE_EXAMPLES = 'exercise examples';
+
+    public const SOURCE_CONCEPTUAL_QUESTIONS = 'conceptual questions';
+
     public const DIFFICULTY_EASY = 'easy';
 
     public const DIFFICULTY_MEDIUM = 'medium';
@@ -87,6 +91,8 @@ class Question extends Model
             self::SOURCE_EXERCISE => 'Exercise',
             self::SOURCE_ADDITIONAL => 'Additional',
             self::SOURCE_PAST_PAPER => 'Past Paper',
+            self::SOURCE_EXERCISE_EXAMPLES => 'Exercise Examples',
+            self::SOURCE_CONCEPTUAL_QUESTIONS => 'Conceptual Questions',
         ];
     }
 

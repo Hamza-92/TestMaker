@@ -334,6 +334,8 @@ const fallbackSourceOptions: SourceOption[] = [
     { value: 'exercise', label: 'Exercise' },
     { value: 'additional', label: 'Additional' },
     { value: 'past paper', label: 'Past Paper' },
+    { value: 'exercise examples', label: 'Exercise Examples' },
+    { value: 'conceptual questions', label: 'Conceptual Questions' },
 ];
 
 function normalizeSourceOptions(sourceOptions: SourceOption[]): SourceOption[] {
