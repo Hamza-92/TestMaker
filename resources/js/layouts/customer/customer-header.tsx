@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     BellIcon,
     ChevronDownIcon,
@@ -191,8 +191,9 @@ function UserMenu() {
 }
 
 export function CustomerHeader() {
-    const page = usePage<{ auth: { user: Record<string, unknown> } }>();
+    const page = usePage<{ auth: { user: Record<string, unknown>; is_impersonating?: boolean } }>();
     const user = page.props.auth.user;
+    const isImpersonating = Boolean(page.props.auth.is_impersonating);
     const schoolName =
         (user.school_name as string | null) ?? (user.name as string);
 
@@ -223,6 +224,15 @@ export function CustomerHeader() {
 
             {/* ── Actions ───────────────────────────────────────────────── */}
             <div className="flex items-center gap-0.5">
+                {isImpersonating && (
+                    <button
+                        type="button"
+                        onClick={() => router.post('/impersonation/stop')}
+                        className="mr-1 rounded-md px-2 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
+                    >
+                        Return to Superadmin
+                    </button>
+                )}
                 <NotificationBell />
                 <AppearanceToggle />
                 <div className="mx-1.5 h-5 w-px bg-slate-200 dark:bg-slate-700" />

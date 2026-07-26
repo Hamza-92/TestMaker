@@ -9,6 +9,7 @@ import {
     CreditCardIcon,
     HashIcon,
     KeyRoundIcon,
+    LogInIcon,
     LogsIcon,
     MailIcon,
     MapPinIcon,
@@ -379,6 +380,7 @@ export default function ShowCustomer({
     });
     const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
     const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false);
+    const loginForm = useForm({});
     const logoUrl = customer.logo ? `/storage/${customer.logo}` : null;
     const location = [customer.city, customer.province].filter(Boolean).join(', ');
     const address = customer.is_show_address ? customer.address : null;
@@ -436,6 +438,10 @@ export default function ShowCustomer({
         }
     }
 
+    function loginAsCustomer() {
+        loginForm.post(`/superadmin/customers/${customer.id}/login`);
+    }
+
     return (
         <>
             <Head title={customer.name} />
@@ -476,6 +482,12 @@ export default function ShowCustomer({
                             >
                                 <KeyRoundIcon className="size-4" />
                                 Reset Password
+                            </Button>
+                        )}
+                        {can('customers.edit') && (
+                            <Button type="button" variant="outline" size="sm" onClick={loginAsCustomer} disabled={loginForm.processing}>
+                                <LogInIcon className="size-4" />
+                                Login
                             </Button>
                         )}
                         {can('subscriptions.create') && customer.account_type !== 'trial' && (

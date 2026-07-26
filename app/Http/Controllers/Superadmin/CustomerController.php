@@ -10,6 +10,7 @@ use App\Models\PaymentLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -355,6 +356,42 @@ class CustomerController extends Controller
         );
 
         return redirect()->route('superadmin.customers.show', $customer);
+    }
+
+    public function loginAsCustomer(Request $request, User $customer)
+    {
+        abort_unless($customer->isCustomer(), 404);
+
+        $request->session()->put('impersonator_id', $request->user()->id);
+        Auth::login($customer);
+        $request->session()->regenerate();
+
+        return redirect()->route('dashboard');
+    }
+
+    public function stopImpersonation(Request $request)
+    {
+        $impersonatorId = $request->session()->pull('impersonator_id');
+
+        abort_unless($request->user()?->isCustomer() && $impersonatorId, 403);
+
+        $admin = User::query()
+            ->whereKey($impersonatorId)
+            ->whereIn('user_type', [UserType::SuperAdmin->value, UserType::Staff->value])
+            ->first();
+
+        if (! $admin) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login');
+        }
+
+        Auth::login($admin);
+        $request->session()->regenerate();
+
+        return redirect()->route('superadmin.customers');
     }
 
     private function transformCustomerLog(User $customer, AuditLog $log): array
