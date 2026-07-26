@@ -440,7 +440,21 @@ function availableForQuestionRow(
 }
 
 function shuffledQuestions(questions: ManualQuestion[]): ManualQuestion[] {
-    return [...questions].sort(() => Math.random() - 0.5);
+    return shuffleItems(questions);
+}
+
+function shuffleItems<T>(items: readonly T[]): T[] {
+    const shuffled = [...items];
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [
+            shuffled[swapIndex],
+            shuffled[index],
+        ];
+    }
+
+    return shuffled;
 }
 
 function paperQuestionFromManual(
@@ -2952,6 +2966,33 @@ return '';
         );
     }
 
+    function shufflePaperSection(sectionId: string) {
+        setGeneratedPaper((current) =>
+            current
+                ? {
+                      ...current,
+                      sections: current.sections.map((section) =>
+                          section.id === sectionId
+                              ? {
+                                    ...section,
+                                    questions: shuffleItems(
+                                        section.questions,
+                                    ).map((question) => ({
+                                        ...question,
+                                        options:
+                                            section.category ===
+                                            'Objective Questions'
+                                                ? shuffleItems(question.options)
+                                                : question.options,
+                                    })),
+                                }
+                              : section,
+                      ),
+                  }
+                : current,
+        );
+    }
+
     function openAddPaperSectionModal() {
         setIsAddSectionModalOpen(true);
     }
@@ -3419,6 +3460,7 @@ return '';
                         onEditSection={openPaperSectionEditor}
                         onDeleteSection={deletePaperSection}
                         onMoveSection={movePaperSection}
+                        onShuffleQuestions={shufflePaperSection}
                         onEditQuestion={openPaperQuestionEditor}
                         onRandomQuestion={replacePaperQuestionRandom}
                         onPickQuestion={openPaperQuestionPicker}
@@ -5299,6 +5341,7 @@ function GeneratedPaperView({
     onEditSection,
     onDeleteSection,
     onMoveSection,
+    onShuffleQuestions,
     onEditQuestion,
     onQuestionImageSizeChange,
     onQuestionAnswerLinesChange,
@@ -5352,6 +5395,7 @@ function GeneratedPaperView({
     onEditSection: (sectionId: string) => void;
     onDeleteSection: (sectionId: string) => void;
     onMoveSection: (sectionId: string, direction: -1 | 1) => void;
+    onShuffleQuestions: (sectionId: string) => void;
     onEditQuestion: (sectionId: string, questionId: string) => void;
     onQuestionImageSizeChange: (
         sectionId: string,
@@ -5757,6 +5801,9 @@ return null;
                                             onMoveDown={(sectionId) =>
                                                 onMoveSection(sectionId, 1)
                                             }
+                                            onShuffleQuestions={
+                                                onShuffleQuestions
+                                            }
                                             onAddRandomQuestion={
                                                 onAddRandomQuestion
                                             }
@@ -5846,6 +5893,7 @@ return null;
                                                             onDeleteSection={() => {}}
                                                             onMoveUp={() => {}}
                                                             onMoveDown={() => {}}
+                                                            onShuffleQuestions={() => {}}
                                                             onAddRandomQuestion={() => {}}
                                                             onAddCustomQuestion={() => {}}
                                                             onEditQuestion={() => {}}

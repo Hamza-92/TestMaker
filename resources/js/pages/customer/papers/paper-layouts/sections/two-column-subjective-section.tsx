@@ -18,6 +18,7 @@ interface TwoColumnSubjectiveSectionProps {
     onDeleteSection: (sectionId: string) => void;
     onMoveUp: (sectionId: string) => void;
     onMoveDown: (sectionId: string) => void;
+    onShuffleQuestions: (sectionId: string) => void;
     onAddRandomQuestion: (sectionId: string) => void;
     onAddCustomQuestion: (sectionId: string) => void;
     onEditQuestion: (sectionId: string, questionId: string) => void;
@@ -52,6 +53,7 @@ export function TwoColumnSubjectiveSection({
     onDeleteSection,
     onMoveUp,
     onMoveDown,
+    onShuffleQuestions,
     onAddRandomQuestion,
     onAddCustomQuestion,
     onEditQuestion,
@@ -123,6 +125,7 @@ export function TwoColumnSubjectiveSection({
                 columns={columns}
                 onMoveUp={() => onMoveUp(section.id)}
                 onMoveDown={() => onMoveDown(section.id)}
+                onShuffleQuestions={() => onShuffleQuestions(section.id)}
                 onAddRandom={() => onAddRandomQuestion(section.id)}
                 onAddCustom={() => onAddCustomQuestion(section.id)}
                 onEdit={() => onEditSection(section.id)}

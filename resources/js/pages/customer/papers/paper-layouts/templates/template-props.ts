@@ -20,6 +20,7 @@ export interface SectionTemplateProps {
     onDeleteSection: (sectionId: string) => void;
     onMoveUp: (sectionId: string) => void;
     onMoveDown: (sectionId: string) => void;
+    onShuffleQuestions: (sectionId: string) => void;
     onAddRandomQuestion: (sectionId: string) => void;
     onAddCustomQuestion: (sectionId: string) => void;
     onEditQuestion: (sectionId: string, questionId: string) => void;

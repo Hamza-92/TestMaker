@@ -192,6 +192,7 @@ export function SectionControls({
     columns,
     onMoveUp,
     onMoveDown,
+    onShuffleQuestions,
     onAddRandom,
     onAddCustom,
     onEdit,
@@ -204,6 +205,7 @@ export function SectionControls({
     columns: number;
     onMoveUp: () => void;
     onMoveDown: () => void;
+    onShuffleQuestions: () => void;
     onAddRandom: () => void;
     onAddCustom: () => void;
     onEdit: () => void;
@@ -212,6 +214,7 @@ export function SectionControls({
 }) {
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
 
     return (
         <>
@@ -231,17 +234,34 @@ export function SectionControls({
                     />
                     <ToolbarDivider />
                     <SectionButton
-                        label="Add random question"
-                        disabled={!canAddRandom}
+                        label="Shuffle questions"
                         icon={<ShuffleIcon className="size-4" />}
-                        onClick={onAddRandom}
+                        onClick={onShuffleQuestions}
                     />
-                    <SectionButton
-                        label="Add custom question"
-                        variant="accent"
-                        icon={<PlusIcon className="size-4" />}
-                        onClick={onAddCustom}
-                    />
+                    <div className="relative">
+                        <SectionButton
+                            label="Add question"
+                            variant={isAddQuestionOpen ? 'accent' : 'default'}
+                            icon={<PlusIcon className="size-4" />}
+                            onClick={() =>
+                                setIsAddQuestionOpen((open) => !open)
+                            }
+                        />
+                        {isAddQuestionOpen && (
+                            <AddQuestionPopover
+                                canAddRandom={canAddRandom}
+                                onAddCustom={() => {
+                                    setIsAddQuestionOpen(false);
+                                    onAddCustom();
+                                }}
+                                onAddRandom={() => {
+                                    setIsAddQuestionOpen(false);
+                                    onAddRandom();
+                                }}
+                                onClose={() => setIsAddQuestionOpen(false)}
+                            />
+                        )}
+                    </div>
                     <ToolbarDivider />
                     <SectionButton
                         label="Edit section"
@@ -295,6 +315,73 @@ export function SectionControls({
  * panel (not a centered modal) so it reads as a direct extension of the
  * button that opened it. Closes on outside click or Escape.
  */
+function AddQuestionPopover({
+    canAddRandom,
+    onAddCustom,
+    onAddRandom,
+    onClose,
+}: {
+    canAddRandom: boolean;
+    onAddCustom: () => void;
+    onAddRandom: () => void;
+    onClose: () => void;
+}) {
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function onPointerDown(event: PointerEvent) {
+            if (
+                panelRef.current &&
+                !panelRef.current.contains(event.target as Node)
+            ) {
+                onClose();
+            }
+        }
+
+        function onKey(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        }
+
+        window.addEventListener('pointerdown', onPointerDown);
+        window.addEventListener('keydown', onKey);
+
+        return () => {
+            window.removeEventListener('pointerdown', onPointerDown);
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [onClose]);
+
+    return (
+        <div
+            ref={panelRef}
+            className="absolute bottom-full left-1/2 z-30 mb-2.5 w-52 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-2 text-left shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40 print:hidden"
+        >
+            <span className="absolute -bottom-[5px] left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-r border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" />
+            <div className="relative flex flex-col gap-1">
+                <button
+                    type="button"
+                    onClick={onAddCustom}
+                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-brand-50 hover:text-brand-700 dark:text-slate-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-200"
+                >
+                    <PlusIcon className="size-4" />
+                    Add custom question
+                </button>
+                <button
+                    type="button"
+                    disabled={!canAddRandom}
+                    onClick={onAddRandom}
+                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-200"
+                >
+                    <ShuffleIcon className="size-4" />
+                    Add random question
+                </button>
+            </div>
+        </div>
+    );
+}
+
 function BlockSettingsPopover({
     columns,
     onChange,

@@ -21,6 +21,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     onDeleteSection,
     onMoveUp,
     onMoveDown,
+    onShuffleQuestions,
     onAddRandomQuestion,
     onAddCustomQuestion,
     onColumnsChange,
@@ -120,6 +121,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                 columns={columns}
                 onMoveUp={() => onMoveUp(section.id)}
                 onMoveDown={() => onMoveDown(section.id)}
+                onShuffleQuestions={() => onShuffleQuestions(section.id)}
                 onAddRandom={() => onAddRandomQuestion(section.id)}
                 onAddCustom={() => onAddCustomQuestion(section.id)}
                 onEdit={() => onEditSection(section.id)}
