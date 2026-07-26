@@ -1,4 +1,5 @@
 import { QuestionContent } from '../questions/question-content';
+import { PassageQuestionContent } from '../questions/passage-question-content';
 import { SectionControls } from '../sections/section-actions';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type { SectionTemplate } from './template-props';
@@ -108,6 +109,12 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                         </span>
                                     ))}
                                 </span>
+                            )}
+                            {question.passageQuestions && (
+                                <PassageQuestionContent
+                                    questions={question.passageQuestions}
+                                    inline
+                                />
                             )}
                         </span>
                     );

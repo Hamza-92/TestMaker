@@ -127,8 +127,9 @@ class LegacyContentTransferService
                 $join->on('question.chapter_id', '=', 'chapter.id')
                     ->where('question.afaq', '=', $afaq);
             })
+            ->leftJoin('pk_question2 as question2', 'question2.chapter_id', '=', 'chapter.id')
             ->where('subject.afaq', $afaq)
-            ->selectRaw('subject.id, subject.name, subject.status_punjab, subject.status_smart, count(distinct chapter.id) as chapters_count, count(distinct topic.id) as topics_count, count(distinct question.id) as questions_count')
+            ->selectRaw('subject.id, subject.name, subject.status_punjab, subject.status_smart, count(distinct chapter.id) as chapters_count, count(distinct topic.id) as topics_count, (count(distinct question.id) + count(distinct question2.id)) as questions_count')
             ->groupBy('subject.id', 'subject.name', 'subject.status_punjab', 'subject.status_smart')
             ->orderBy('subject.name')
             ->get()
@@ -155,11 +156,12 @@ class LegacyContentTransferService
                 $join->on('question.chapter_id', '=', 'chapter.id')
                     ->where('question.afaq', '=', $afaq);
             })
+            ->leftJoin('pk_question2 as question2', 'question2.chapter_id', '=', 'chapter.id')
             ->where('chapter.class_id', $sourceClassId)
             ->where('chapter.subject_id', $sourceSubjectId)
             ->where('chapter.afaq', $afaq)
             ->where("chapter.{$statusColumn}", 1)
-            ->selectRaw('chapter.id, chapter.name, chapter.u_name, chapter.chapter_number, chapter.chapter_type, chapter.sort_int, count(distinct question.id) as questions_count')
+            ->selectRaw('chapter.id, chapter.name, chapter.u_name, chapter.chapter_number, chapter.chapter_type, chapter.sort_int, (count(distinct question.id) + count(distinct question2.id)) as questions_count')
             ->groupBy('chapter.id', 'chapter.name', 'chapter.u_name', 'chapter.chapter_number', 'chapter.chapter_type', 'chapter.sort_int')
             ->orderBy('chapter.chapter_number')
             ->orderBy('chapter.sort_int')
@@ -514,15 +516,44 @@ class LegacyContentTransferService
                 ->orderBy('id')
                 ->get();
 
+            $sourceQuestions->each(
+                fn (object $question) => $question->legacy_source_table = 'pk_question',
+            );
+
+            $sourceQuestion2 = $this->source()
+                ->table('pk_question2')
+                ->where('chapter_id', $sourceChapter->id)
+                ->when($sourceTopicIds !== [], fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderBy('id')
+                ->get();
+
+            $sourceQuestion2->each(
+                fn (object $question) => $question->legacy_source_table = 'pk_question2',
+            );
+
+            $sourceQuestions = $sourceQuestions
+                ->concat($sourceQuestion2)
+                ->sortBy('id')
+                ->values();
+
             foreach ($sourceQuestions as $sourceQuestion) {
-                $sourceOptions = $this->source()
-                    ->table('pk_options')
-                    ->where('question_id', $sourceQuestion->id)
-                    ->orderBy('id')
-                    ->get();
-                $sourceTypeKey = (string) $sourceQuestion->type_id;
+                $sourceOptions = ($sourceQuestion->legacy_source_table ?? 'pk_question') === 'pk_question2'
+                    ? collect()
+                    : $this->source()
+                        ->table('pk_options')
+                        ->where('question_id', $sourceQuestion->id)
+                        ->orderBy('id')
+                        ->get();
+                $hasEmbeddedPassageItems = $this->legacyPassageItems(
+                    $sourceQuestion->paragraph_questions ?? null,
+                ) !== [];
                 $knownTypeCount = count($this->questionTypeMap);
-                $questionType = $this->resolveQuestionType($sourceQuestion, $sourceOptions->isNotEmpty(), $creatorId);
+                $questionType = $this->resolveQuestionType(
+                    $sourceQuestion,
+                    $sourceOptions->isNotEmpty() || $hasEmbeddedPassageItems,
+                    $hasEmbeddedPassageItems,
+                    $creatorId,
+                );
                 if (count($this->questionTypeMap) > $knownTypeCount) {
                     $counts['question_types']++;
                 }
@@ -532,7 +563,7 @@ class LegacyContentTransferService
                     sourceOptions: $sourceOptions->all(),
                     questionType: $questionType,
                     targetChapterId: $chapter->id,
-                    targetTopicId: $topicMap[(int) $sourceQuestion->topic_id] ?? null,
+                    targetTopicId: $topicMap[(int) ($sourceQuestion->topic_id ?? 0)] ?? null,
                     creatorId: $creatorId,
                 );
 
@@ -543,7 +574,8 @@ class LegacyContentTransferService
                 }
 
                 $counts['questions']++;
-                $counts['options'] += count($options);
+                $counts['options'] += count($options)
+                    + $this->questionPayloadOptionCount($payload['content'] ?? []);
             }
         }
 
@@ -598,6 +630,9 @@ class LegacyContentTransferService
         $answerUr = $this->nullableString($question->answer_ur);
         $paragraph = $this->nullableString($question->paragraph_questions);
         $options = $this->legacyOptions($sourceOptions);
+        $passageItems = $this->legacyPassageItems(
+            $question->paragraph_questions ?? null,
+        );
 
         return match ($schemaKey) {
             QuestionTypeSchemaRegistry::OBJECTIVE_MCQ,
@@ -618,13 +653,19 @@ class LegacyContentTransferService
                 'answer_ur' => $answerUr ?? '',
             ],
             QuestionTypeSchemaRegistry::OBJECTIVE_PASSAGE_MCQ => [
-                'passage_en' => $paragraph ?? $descriptionEn ?? $statementEn ?? '',
-                'passage_ur' => $descriptionUr ?? $statementUr ?? '',
-                'items' => [[
-                    'prompt_en' => $statementEn ?? '',
-                    'prompt_ur' => $statementUr ?? '',
-                    'options' => $options,
-                ]],
+                'passage_en' => $passageItems !== []
+                    ? ($statementEn ?? $descriptionEn ?? '')
+                    : ($paragraph ?? $descriptionEn ?? $statementEn ?? ''),
+                'passage_ur' => $passageItems !== []
+                    ? ($statementUr ?? $descriptionUr ?? '')
+                    : ($descriptionUr ?? $statementUr ?? ''),
+                'items' => $passageItems !== []
+                    ? $passageItems
+                    : [[
+                        'prompt_en' => $statementEn ?? '',
+                        'prompt_ur' => $statementUr ?? '',
+                        'options' => $options,
+                    ]],
             ],
             QuestionTypeSchemaRegistry::SUBJECTIVE_GROUPED => [
                 'intro_en' => $descriptionEn ?? '',
@@ -655,6 +696,104 @@ class LegacyContentTransferService
                 'answer_ur' => $answerUr ?? '',
             ],
         };
+    }
+
+    private function legacyPassageItems(mixed $raw): array
+    {
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $items = array_is_list($decoded) ? $decoded : [$decoded];
+
+        return collect($items)
+            ->filter(fn (mixed $item) => is_array($item))
+            ->map(function (array $item): array {
+                $promptEn = $this->nullableString(
+                    $item['prompt_en'] ?? $item['statement_en'] ?? null,
+                ) ?? '';
+                $promptUr = $this->nullableString(
+                    $item['prompt_ur'] ?? $item['statement_ur'] ?? null,
+                ) ?? '';
+                $options = collect(is_array($item['options'] ?? null)
+                    ? $item['options']
+                    : [])
+                    ->filter(fn (mixed $option) => is_array($option))
+                    ->map(function (array $option): array {
+                        return [
+                            'text_en' => $this->nullableString(
+                                $option['text_en']
+                                    ?? $option['option_en']
+                                    ?? $option['name_en']
+                                    ?? $option['name']
+                                    ?? null,
+                            ) ?? '',
+                            'text_ur' => $this->nullableString(
+                                $option['text_ur']
+                                    ?? $option['option_ur']
+                                    ?? $option['name_ur']
+                                    ?? null,
+                            ) ?? '',
+                            'is_correct' => $this->legacyBoolean(
+                                $option['is_correct']
+                                    ?? $option['is_true']
+                                    ?? false,
+                            ),
+                        ];
+                    })
+                    ->filter(
+                        fn (array $option) => $option['text_en'] !== ''
+                            || $option['text_ur'] !== '',
+                    )
+                    ->values()
+                    ->all();
+
+                return [
+                    'prompt_en' => $promptEn,
+                    'prompt_ur' => $promptUr,
+                    'options' => $options,
+                ];
+            })
+            ->filter(
+                fn (array $item) => $item['prompt_en'] !== ''
+                    || $item['prompt_ur'] !== ''
+                    || $item['options'] !== [],
+            )
+            ->values()
+            ->all();
+    }
+
+    private function questionPayloadOptionCount(array $content): int
+    {
+        $rootOptions = is_array($content['options'] ?? null)
+            ? count($content['options'])
+            : 0;
+        $nestedOptions = collect(is_array($content['items'] ?? null)
+            ? $content['items']
+            : [])
+            ->sum(
+                fn (mixed $item) => is_array($item)
+                    && is_array($item['options'] ?? null)
+                    ? count($item['options'])
+                    : 0,
+            );
+
+        return $rootOptions + $nestedOptions;
+    }
+
+    private function legacyBoolean(mixed $value): bool
+    {
+        return in_array(
+            strtolower(trim((string) $value)),
+            ['1', 'true', 'yes', 'on'],
+            true,
+        );
     }
 
     private function legacyOptions(array $sourceOptions): array
@@ -698,16 +837,22 @@ class LegacyContentTransferService
         };
     }
 
-    private function resolveQuestionType(object $sourceQuestion, bool $hasOptions, ?int $creatorId): QuestionType
+    private function resolveQuestionType(
+        object $sourceQuestion,
+        bool $hasOptions,
+        bool $hasEmbeddedPassageItems,
+        ?int $creatorId,
+    ): QuestionType
     {
         $sourceTypeId = (int) $sourceQuestion->type_id;
-        $mapKey = "{$sourceTypeId}:".($hasOptions ? 'objective' : 'subjective');
-
-        if (isset($this->questionTypeMap[$mapKey])) {
-            return QuestionType::query()->findOrFail($this->questionTypeMap[$mapKey]);
-        }
-
-        $sourceType = $this->source()->table('pk_question_types')->where('id', $sourceTypeId)->first()
+        $sourceType = $hasEmbeddedPassageItems
+            ? $this->source()
+                ->table('pk_question_types')
+                ->where('objective_type_id', 5)
+                ->where('is_objective', 1)
+                ->first()
+            : null;
+        $sourceType ??= $this->source()->table('pk_question_types')->where('id', $sourceTypeId)->first()
             ?? $this->resolveQuestionTypeByOrder($sourceTypeId, $hasOptions);
 
         if (! $sourceType) {
@@ -732,6 +877,12 @@ class LegacyContentTransferService
         }
 
         $isObjective = (bool) ($sourceType->is_objective ?? $hasOptions);
+        $mapKey = "{$sourceTypeId}:".($isObjective ? 'objective' : 'subjective');
+
+        if (isset($this->questionTypeMap[$mapKey])) {
+            return QuestionType::query()->findOrFail($this->questionTypeMap[$mapKey]);
+        }
+
         $schemaKey = QuestionTypeSchemaRegistry::infer($isObjective, [
             'objective_type_id' => (int) ($sourceType->objective_type_id ?? 0),
             'have_description' => (bool) ($sourceType->have_description ?? false),

@@ -1,4 +1,5 @@
 import { QuestionContent } from '../questions/question-content';
+import { PassageQuestionContent } from '../questions/passage-question-content';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type {
     GeneratedPaperQuestion,
@@ -225,6 +226,14 @@ function ObjectiveQuestionRow({
                             </button>
                         ))}
                     </div>
+                </div>
+            )}
+
+            {question.passageQuestions && (
+                <div data-paper-question-divider="t" className="px-2 py-1">
+                    <PassageQuestionContent
+                        questions={question.passageQuestions}
+                    />
                 </div>
             )}
 

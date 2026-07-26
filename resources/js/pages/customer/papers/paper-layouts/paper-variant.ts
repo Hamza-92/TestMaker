@@ -50,6 +50,19 @@ export function variantForSet(paper: GeneratedPaper, setIndex: number): Generate
                 options: question.options.length > 0
                     ? shuffleWith(question.options, random)
                     : question.options,
+                passageQuestions: question.passageQuestions
+                    ? shuffleWith(question.passageQuestions, random).map(
+                          (passageQuestion) => ({
+                              ...passageQuestion,
+                              options: passageQuestion.options.length > 0
+                                  ? shuffleWith(
+                                        passageQuestion.options,
+                                        random,
+                                    )
+                                  : passageQuestion.options,
+                          }),
+                      )
+                    : question.passageQuestions,
             }),
         );
 

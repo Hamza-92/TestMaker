@@ -185,3 +185,65 @@ it('updates an objective question and replaces its options', function () {
         ->and($question->options->firstWhere('is_correct', true)?->text_en)->toBe('New B')
         ->and(QuestionOption::query()->where('question_id', $question->id)->count())->toBe(4);
 });
+
+it('creates a passage based MCQ with nested sub-questions and options', function () {
+    $admin = makeQuestionAdmin();
+    $questionType = makeObjectiveQuestionTypeForManagement($admin, [
+        'name' => 'Passage MCQ',
+        'heading_en' => 'Passage MCQ',
+        'schema_key' => 'objective_passage_mcq',
+    ]);
+    $context = makeQuestionContextForManagement($admin);
+
+    $response = $this
+        ->actingAs($admin)
+        ->post(route('superadmin.questions.store'), [
+            'question_type_id' => $questionType->id,
+            'chapter_id' => $context['chapter']->id,
+            'topic_id' => null,
+            'source' => 'exercise',
+            'status' => true,
+            'content' => [
+                'passage_en' => 'Water changes into vapour when heated.',
+                'passage_ur' => null,
+                'items' => [
+                    [
+                        'prompt_en' => 'What happens to water when heated?',
+                        'prompt_ur' => null,
+                        'options' => [
+                            ['text_en' => 'It evaporates', 'text_ur' => null, 'is_correct' => true],
+                            ['text_en' => 'It freezes', 'text_ur' => null, 'is_correct' => false],
+                        ],
+                    ],
+                    [
+                        'prompt_en' => 'What is the passage about?',
+                        'prompt_ur' => null,
+                        'options' => [
+                            ['text_en' => 'Water', 'text_ur' => null, 'is_correct' => true],
+                            ['text_en' => 'Metal', 'text_ur' => null, 'is_correct' => false],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+    $question = Question::query()->with('options')->sole();
+    $content = $question->content;
+
+    $response->assertRedirect(
+        route('superadmin.questions.chapter', $context['chapter']),
+    );
+
+    expect($question->statement_en)
+        ->toBe('Water changes into vapour when heated.')
+        ->and($question->options)->toHaveCount(0)
+        ->and($content['passage_en'])->toBe(
+            'Water changes into vapour when heated.',
+        )
+        ->and($content['items'])->toHaveCount(2)
+        ->and($content['items'][0]['options'])->toHaveCount(4)
+        ->and($content['items'][0]['options'][0]['text_en'])->toBe(
+            'It evaporates',
+        )
+        ->and($content['items'][1]['options'][0]['is_correct'])->toBeTrue();
+});

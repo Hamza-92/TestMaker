@@ -1,4 +1,5 @@
 import { QuestionContent } from '../questions/question-content';
+import { PassageQuestionContent } from '../questions/passage-question-content';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type {
     GeneratedPaperQuestion,
@@ -215,6 +216,11 @@ function SubjectiveQuestionItem({
                             ))}
                         </div>
                     </div>
+                )}
+                {question.passageQuestions && (
+                    <PassageQuestionContent
+                        questions={question.passageQuestions}
+                    />
                 )}
                 {question.answerLines > 0 && (
                     <div className="mt-2 flex flex-col">

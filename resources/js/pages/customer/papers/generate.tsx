@@ -461,20 +461,107 @@ function paperQuestionFromManual(
     question: ManualQuestion,
     id: string,
 ): GeneratedPaperQuestion {
+    const passageQuestions = passageQuestionsFromManual(question, id);
+    const passageText = passageTextFromManual(question);
+
     return {
         id,
         sourceQuestionId: question.id,
-        text: question.summaryText,
+        text: passageQuestions ? passageText : question.summaryText,
         source: question.source,
         sourceLabel: question.sourceLabel,
         chapterLabel: manualQuestionChapterLabel(question),
         topicLabel: question.topic?.name ?? null,
         imageUrl: null,
         imageSize: 'md',
-        options: paperOptionsFromManual(question),
+        options: passageQuestions ? [] : paperOptionsFromManual(question),
+        passageQuestions,
         answerLines: question.isObjective ? 0 : 0,
         answerText: answerTextFromManual(question),
     };
+}
+
+function passageTextFromManual(question: ManualQuestion): string {
+    const content = question.content as Record<string, unknown> | null;
+
+    if (!content) {
+        return question.summaryText;
+    }
+
+    const passageEn =
+        typeof content.passage_en === 'string'
+            ? content.passage_en.trim()
+            : '';
+    const passageUr =
+        typeof content.passage_ur === 'string'
+            ? content.passage_ur.trim()
+            : '';
+
+    return passageEn || passageUr || question.summaryText;
+}
+
+function manualQuestionDisplayText(question: ManualQuestion): string {
+    return question.schemaKey === 'objective_passage_mcq'
+        ? passageTextFromManual(question)
+        : question.summaryText;
+}
+
+function passageQuestionsFromManual(
+    question: ManualQuestion,
+    id: string,
+): GeneratedPaperQuestion['passageQuestions'] {
+    if (question.schemaKey !== 'objective_passage_mcq') {
+        return undefined;
+    }
+
+    const content = question.content as Record<string, unknown> | null;
+    const items = content?.items;
+
+    if (!Array.isArray(items)) {
+        return undefined;
+    }
+
+    const passageQuestions = items
+        .map((item, index) => {
+            if (!item || typeof item !== 'object') {
+                return null;
+            }
+
+            const itemData = item as Record<string, unknown>;
+            const textEn =
+                typeof itemData.prompt_en === 'string'
+                    ? itemData.prompt_en.trim()
+                    : '';
+            const textUr =
+                typeof itemData.prompt_ur === 'string'
+                    ? itemData.prompt_ur.trim()
+                    : '';
+            const text = textEn || textUr;
+            const passageId = id + '_passage_' + index;
+            const options = paperOptionsFromContent(
+                itemData.options,
+                passageId,
+            );
+
+            if (text === '' && options.length === 0) {
+                return null;
+            }
+
+            return {
+                id: passageId,
+                text: text || 'Passage question',
+                options,
+            };
+        })
+        .filter(
+            (
+                item,
+            ): item is NonNullable<
+                GeneratedPaperQuestion['passageQuestions']
+            >[number] => item !== null,
+        );
+
+    return passageQuestions.length > 0 ? passageQuestions : undefined;
 }
 
 function answerTextFromManual(question: ManualQuestion): string | null {
@@ -522,7 +609,16 @@ function paperOptionsFromManual(
         ];
     }
 
-    const options = question.content.options;
+    return paperOptionsFromContent(
+        question.content.options,
+        question.id + '_option',
+    );
+}
+
+function paperOptionsFromContent(
+    options: unknown,
+    idPrefix: string,
+): PaperQuestionOption[] {
 
     if (!Array.isArray(options)) {
         return [];
@@ -542,7 +638,7 @@ function paperOptionsFromManual(
             }
 
             return {
-                id: `${question.id}_option_${index}`,
+                id: idPrefix + '_' + index,
                 text,
                 isCorrect: Boolean(value.is_correct),
             };
@@ -2984,6 +3080,21 @@ return '';
                                             'Objective Questions'
                                                 ? shuffleItems(question.options)
                                                 : question.options,
+                                        passageQuestions:
+                                            section.category ===
+                                                'Objective Questions' &&
+                                            question.passageQuestions
+                                                ? shuffleItems(
+                                                      question.passageQuestions,
+                                                  ).map(
+                                                      (passageQuestion) => ({
+                                                          ...passageQuestion,
+                                                          options: shuffleItems(
+                                                              passageQuestion.options,
+                                                          ),
+                                                      }),
+                                                  )
+                                                : question.passageQuestions,
                                     })),
                                 }
                               : section,
@@ -4250,7 +4361,7 @@ function ManualQuestionPickerModal({
                                     </span>
                                     <span className="min-w-0 flex-1">
                                         <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
-                                            {question.summaryText}
+                                            {manualQuestionDisplayText(question)}
                                         </span>
                                         <span className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                             <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
@@ -5141,7 +5252,7 @@ function QuestionSearchRow({
                 </span>
                 <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {question.summaryText}
+                        {manualQuestionDisplayText(question)}
                     </span>
                     {options.length > 0 && (
                         <span className="mt-2 grid gap-2 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-4 dark:text-slate-300">
@@ -6126,7 +6237,7 @@ function PaperQuestionPickerModal({
                                 </span>
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
-                                        {question.summaryText}
+                                        {manualQuestionDisplayText(question)}
                                     </span>
                                     <span className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                         <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">

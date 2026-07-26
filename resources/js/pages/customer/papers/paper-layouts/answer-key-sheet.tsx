@@ -11,6 +11,26 @@ interface Props {
 }
 
 function answerForQuestion(question: GeneratedPaperQuestion): string {
+    if (question.passageQuestions?.length) {
+        return question.passageQuestions
+            .map((passageQuestion, index) => {
+                const correctLetters = passageQuestion.options
+                    .map((option, optionIndex) =>
+                        option.isCorrect ? optionLetter(optionIndex) : null,
+                    )
+                    .filter(
+                        (letter): letter is string => letter !== null,
+                    );
+
+                return (
+                    String(index + 1) +
+                    '. ' +
+                    (correctLetters.join(', ') || '-')
+                );
+            })
+            .join('; ');
+    }
+
     if (question.options.length > 0) {
         const correctLetters = question.options
             .map((option, index) => (option.isCorrect ? optionLetter(index) : null))

@@ -9,6 +9,12 @@ export interface PaperQuestionOption {
     isCorrect?: boolean;
 }
 
+export interface GeneratedPaperPassageQuestion {
+    id: string;
+    text: string;
+    options: PaperQuestionOption[];
+}
+
 export interface GeneratedPaperQuestion {
     id: string;
     sourceQuestionId: number | null;
@@ -20,6 +26,7 @@ export interface GeneratedPaperQuestion {
     imageUrl: string | null;
     imageSize: PaperImageSize;
     options: PaperQuestionOption[];
+    passageQuestions?: GeneratedPaperPassageQuestion[];
     answerLines: number;
     answerLineSpacing?: number;
     answerText?: string | null;
