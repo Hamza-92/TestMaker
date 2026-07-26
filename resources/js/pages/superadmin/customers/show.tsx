@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -8,6 +8,7 @@ import {
     ClockIcon,
     CreditCardIcon,
     HashIcon,
+    KeyRoundIcon,
     LogsIcon,
     MailIcon,
     MapPinIcon,
@@ -19,10 +20,13 @@ import {
     WalletIcon,
     XCircleIcon,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 type CustomerStatus = 'active' | 'inactive' | 'suspended';
@@ -369,6 +373,12 @@ export default function ShowCustomer({
     customerLogs: CustomerLog[];
 }) {
     const { can } = usePermission();
+    const resetPasswordForm = useForm({
+        password: '',
+        password_confirmation: '',
+    });
+    const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+    const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false);
     const logoUrl = customer.logo ? `/storage/${customer.logo}` : null;
     const location = [customer.city, customer.province].filter(Boolean).join(', ');
     const address = customer.is_show_address ? customer.address : null;
@@ -403,6 +413,29 @@ export default function ShowCustomer({
 
     const expiredCount = customer.subscriptions.filter((subscription) => subscription.status === 'expired').length;
 
+    function submitPasswordReset(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setResetPasswordSuccess(false);
+
+        resetPasswordForm.post(`/superadmin/customers/${customer.id}/reset-password`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setResetPasswordSuccess(true);
+                resetPasswordForm.reset();
+            },
+        });
+    }
+
+    function closeResetPassword(open: boolean) {
+        setResetPasswordOpen(open);
+
+        if (!open) {
+            resetPasswordForm.reset();
+            resetPasswordForm.clearErrors();
+            setResetPasswordSuccess(false);
+        }
+    }
+
     return (
         <>
             <Head title={customer.name} />
@@ -429,6 +462,20 @@ export default function ShowCustomer({
                                     <PencilIcon className="size-4" />
                                     Edit
                                 </Link>
+                            </Button>
+                        )}
+                        {can('customers.edit') && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setResetPasswordSuccess(false);
+                                    setResetPasswordOpen(true);
+                                }}
+                            >
+                                <KeyRoundIcon className="size-4" />
+                                Reset Password
                             </Button>
                         )}
                         {can('subscriptions.create') && customer.account_type !== 'trial' && (
@@ -773,6 +820,50 @@ export default function ShowCustomer({
                     </SectionShell>
                 </div>
             </div>
+        <Dialog open={resetPasswordOpen} onOpenChange={closeResetPassword}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Reset Password</DialogTitle>
+                </DialogHeader>
+                {resetPasswordSuccess ? (
+                    <p className="text-sm text-emerald-700">Password reset successfully.</p>
+                ) : (
+                    <form onSubmit={submitPasswordReset} className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="reset-password">New Password</Label>
+                            <Input
+                                id="reset-password"
+                                type="password"
+                                value={resetPasswordForm.data.password}
+                                onChange={(event) => resetPasswordForm.setData('password', event.target.value)}
+                                autoComplete="new-password"
+                                aria-invalid={Boolean(resetPasswordForm.errors.password)}
+                            />
+                            {resetPasswordForm.errors.password && (
+                                <p className="text-destructive text-xs">{resetPasswordForm.errors.password}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="reset-password-confirmation">Confirm Password</Label>
+                            <Input
+                                id="reset-password-confirmation"
+                                type="password"
+                                value={resetPasswordForm.data.password_confirmation}
+                                onChange={(event) => resetPasswordForm.setData('password_confirmation', event.target.value)}
+                                autoComplete="new-password"
+                                aria-invalid={Boolean(resetPasswordForm.errors.password_confirmation)}
+                            />
+                            {resetPasswordForm.errors.password_confirmation && (
+                                <p className="text-destructive text-xs">{resetPasswordForm.errors.password_confirmation}</p>
+                            )}
+                        </div>
+                        <Button type="submit" className="w-full" disabled={resetPasswordForm.processing}>
+                            {resetPasswordForm.processing ? 'Resetting...' : 'Reset Password'}
+                        </Button>
+                    </form>
+                )}
+            </DialogContent>
+        </Dialog>
         </>
     );
 }

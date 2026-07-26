@@ -335,6 +335,28 @@ class CustomerController extends Controller
             ->with('success', 'Customer updated successfully.');
     }
 
+    public function resetPassword(Request $request, User $customer)
+    {
+        abort_unless($customer->isCustomer(), 404);
+
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:3', 'confirmed'],
+        ]);
+
+        $customer->password = Hash::make($validated['password']);
+        $customer->save();
+
+        AuditLog::record(
+            model: $customer,
+            event: AuditEvent::Updated,
+            newValues: ['password' => '[reset by superadmin]'],
+            actor: auth()->user(),
+            notes: 'Customer password reset by superadmin.',
+        );
+
+        return redirect()->route('superadmin.customers.show', $customer);
+    }
+
     private function transformCustomerLog(User $customer, AuditLog $log): array
     {
         return [

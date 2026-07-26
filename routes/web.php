@@ -108,6 +108,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('superadmin/customers', [CustomerController::class, 'store'])->name('superadmin.customers.store')->middleware('permission:customers.create');
         Route::get('superadmin/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('superadmin.customers.edit')->middleware('permission:customers.edit');
         Route::put('superadmin/customers/{customer}', [CustomerController::class, 'update'])->name('superadmin.customers.update')->middleware('permission:customers.edit');
+        Route::post('superadmin/customers/{customer}/reset-password', [CustomerController::class, 'resetPassword'])->name('superadmin.customers.reset-password')->middleware('permission:customers.edit');
         Route::get('superadmin/customers/{customer}/logs/{log}', [CustomerController::class, 'showLog'])->name('superadmin.customers.logs.show')->middleware('permission:customers.view');
         Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view');
 
