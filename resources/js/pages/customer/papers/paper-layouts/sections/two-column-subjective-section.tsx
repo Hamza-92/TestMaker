@@ -97,7 +97,7 @@ export function TwoColumnSubjectiveSection({
                 only applies to the "stacked" group variant). */}
             <div
                 data-paper-question-group="grid"
-                className="grid gap-x-8 gap-y-2 px-4 py-3"
+                className="grid gap-2 px-4 py-3"
                 style={{
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
                 }}
@@ -177,7 +177,7 @@ function SubjectiveQuestionItem({
     return (
         <div
             data-paper-question
-            className="group/question relative flex gap-3 pr-28 text-sm leading-6"
+            className="group/question relative flex gap-1 text-sm leading-6"
         >
             <span className="w-8 shrink-0 font-bold">
                 ({formatQuestionLabel(index, numberingFormat, 'roman')})

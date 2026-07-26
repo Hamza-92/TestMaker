@@ -182,7 +182,7 @@ function ObjectiveQuestionRow({
 
     return (
         <div data-paper-question className="group/question relative">
-            <div className="grid grid-cols-[3rem_1fr] text-sm">
+            <div className="grid grid-cols-[2rem_1fr] text-sm">
                 <div
                     data-paper-question-divider="r"
                     className="px-2 py-1 text-center font-bold"
@@ -240,7 +240,7 @@ function ObjectiveQuestionRow({
             {options.length > 0 && (
                 <div
                     data-paper-question-divider="t"
-                    className="grid grid-cols-4 text-sm"
+                    className="grid grid-cols-4 pl-8 text-sm"
                 >
                     {options.map((option, optionIndex) => (
                         <div
