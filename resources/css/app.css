@@ -389,6 +389,8 @@ input[type='date']::-webkit-calendar-picker-indicator {
     border-width: var(--paper-question-border-width, 1px);
     border-style: var(--paper-question-border-style, solid);
     border-color: currentColor;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
 }
 [data-print-paper] [data-paper-question-group] > [data-paper-question] {
     border-width: 0;
