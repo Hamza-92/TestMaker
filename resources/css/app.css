@@ -286,6 +286,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
     margin: 0;
 }
 
+.paper-rich-text :where(img) {
+    max-width: 100%;
+    height: auto;
+}
+
 .tm-equation {
     display: inline-block;
     max-width: 100%;
