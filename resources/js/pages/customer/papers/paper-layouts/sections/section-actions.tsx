@@ -33,6 +33,7 @@ interface QuestionHoverActionsProps {
 
 const SPACING_MIN = 0;
 const SPACING_MAX = 40;
+const SPACING_STEP = 2;
 
 export function QuestionHoverActions({
     canSwap,
@@ -111,7 +112,7 @@ export function QuestionHoverActions({
                     answerLines > 0 &&
                     onAnswerLineSpacingChange && (
                         <div
-                            className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-700 dark:bg-slate-950/60"
+                            className="flex h-8 select-none items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-700 dark:bg-slate-950/60"
                             title="Spacing between answer lines (px)"
                         >
                             <button
@@ -120,7 +121,7 @@ export function QuestionHoverActions({
                                     onAnswerLineSpacingChange(
                                         Math.max(
                                             SPACING_MIN,
-                                            (answerLineSpacing ?? 20) - 1,
+                                            (answerLineSpacing ?? 20) - SPACING_STEP,
                                         ),
                                     )
                                 }
@@ -129,7 +130,7 @@ export function QuestionHoverActions({
                             >
                                 <MinusIcon className="size-3.5" />
                             </button>
-                            <span className="min-w-10 text-center text-xs font-bold text-slate-700 tabular-nums dark:text-slate-200">
+                            <span className="min-w-10 select-none text-center text-xs font-bold text-slate-700 tabular-nums dark:text-slate-200">
                                 {answerLineSpacing ?? 20}
                                 <span className="ml-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
                                     px
@@ -141,7 +142,7 @@ export function QuestionHoverActions({
                                     onAnswerLineSpacingChange(
                                         Math.min(
                                             SPACING_MAX,
-                                            (answerLineSpacing ?? 20) + 1,
+                                            (answerLineSpacing ?? 20) + SPACING_STEP,
                                         ),
                                     )
                                 }
