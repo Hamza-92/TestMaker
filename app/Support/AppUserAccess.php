@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\AccountType;
+use App\Models\TrialSetting;
 use App\Models\User;
 
 class AppUserAccess
@@ -10,22 +12,17 @@ class AppUserAccess
     {
         $maps = SubscriptionAccess::buildMaps();
         $subscription = $user->activeSchoolSubscription();
+        $schoolOwner = $user->schoolOwner();
 
-        if ($subscription === null) {
-            return [
-                'scope' => [],
-                'ids'   => [
-                    'pattern_access' => [],
-                    'class_access'   => [],
-                    'subject_access' => [],
-                ],
-                'maps' => $maps,
-            ];
+        if ($subscription !== null) {
+            $scope = $user->isTeacher()
+                ? TeacherAccess::effectiveScope($user, $subscription, $maps)
+                : SubscriptionAccess::resolveScope($subscription, $maps);
+        } elseif ($schoolOwner?->account_type === AccountType::Trial) {
+            $scope = SubscriptionAccess::normalizeScope(TrialSetting::current()->access_scope, $maps);
+        } else {
+            $scope = [];
         }
-
-        $scope = $user->isTeacher()
-            ? TeacherAccess::effectiveScope($user, $subscription, $maps)
-            : SubscriptionAccess::resolveScope($subscription, $maps);
 
         $ids = SubscriptionAccess::summaryIds($scope, $maps);
 
