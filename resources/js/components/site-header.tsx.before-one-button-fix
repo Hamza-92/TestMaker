@@ -31,6 +31,8 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
     }, [isMenuOpen]);
 
     const closeMenu = () => setIsMenuOpen(false);
+    const primaryHref = isAuthenticated ? dashboard() : login();
+    const secondaryHref = isAuthenticated ? dashboard() : register();
 
     return (
         <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
@@ -50,8 +52,10 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                 </nav>
 
                 <div className="hidden items-center gap-5 sm:flex">
-                    {!isAuthenticated && <Link href={login()} className="min-h-11 rounded-lg px-1.5 py-3 text-sm font-medium text-slate-700 transition hover:text-brand-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/20">Login</Link>}
-                    <Link href={isAuthenticated ? dashboard() : register()} className="inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/25 active:bg-brand-800">
+                    <Link href={primaryHref} className="min-h-11 rounded-lg px-1.5 py-3 text-sm font-medium text-slate-700 transition hover:text-brand-600 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/20">
+                        {isAuthenticated ? 'Open app' : 'Login'}
+                    </Link>
+                    <Link href={secondaryHref} className="inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/25 active:bg-brand-800">
                         {isAuthenticated ? 'Go to Dashboard' : 'Sign Up Free'}
                         <ArrowUpRight size={15} aria-hidden="true" />
                     </Link>
@@ -74,8 +78,8 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                             {primaryNavigation.map((item) => <a key={item.label} href={item.href} onClick={closeMenu} className="flex min-h-12 items-center justify-between rounded-[10px] px-3 text-base font-medium text-slate-800 transition hover:bg-brand-50 hover:text-brand-700">{item.label}{item.hasMenu ? <ChevronDown size={16} /> : <ArrowUpRight size={16} />}</a>)}
                         </nav>
                         <div className="mt-auto grid gap-3 border-t border-slate-200 pt-6">
-                            {!isAuthenticated && <Link href={login()} onClick={closeMenu} className="min-h-12 rounded-[10px] px-4 py-3 text-center text-sm font-semibold text-slate-800 hover:bg-slate-50">Login</Link>}
-                            <Link href={isAuthenticated ? dashboard() : register()} onClick={closeMenu} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">{isAuthenticated ? 'Go to Dashboard' : 'Sign Up Free'} <ArrowUpRight size={15} /></Link>
+                            <Link href={primaryHref} onClick={closeMenu} className="min-h-12 rounded-[10px] px-4 py-3 text-center text-sm font-semibold text-slate-800 hover:bg-slate-50">{isAuthenticated ? 'Open app' : 'Login'}</Link>
+                            <Link href={secondaryHref} onClick={closeMenu} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">{isAuthenticated ? 'Go to Dashboard' : 'Sign Up Free'} <ArrowUpRight size={15} /></Link>
                         </div>
                     </aside>
                 </>
