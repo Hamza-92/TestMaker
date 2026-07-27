@@ -10,6 +10,7 @@ use App\Models\AuditLog;
 use App\Models\Chapter;
 use App\Models\Question;
 use App\Models\QuestionOption;
+use App\Models\Medium;
 use App\Models\QuestionType;
 use App\Models\Subject;
 use App\Models\Topic;
@@ -134,6 +135,7 @@ class QuestionController extends Controller
             'chapters'         => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions'    => $this->sourceOptions(),
             'defaultChapterId' => $chapterId,
+            'mediumOptions'    => $this->mediumOptions(),
             'defaultTopicId'   => $topicId,
             'lockedChapterId'  => $chapterId,
             'lockedTopicId'    => $topicId,
@@ -150,6 +152,7 @@ class QuestionController extends Controller
             'chapters' => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
+            'mediumOptions' => $this->mediumOptions(),
             'defaultTopicId' => $request->integer('topic_id') ?: null,
             'lockedChapterId' => $chapter->id,
             'backHref' => route('superadmin.subjects.chapters.questions', [$subject, $chapter], false),
@@ -223,6 +226,7 @@ class QuestionController extends Controller
             'chapters' => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
+            'mediumOptions' => $this->mediumOptions(),
             'defaultTopicId' => $topic->id,
             'lockedChapterId' => $chapter->id,
             'lockedTopicId' => $topic->id,
@@ -436,6 +440,7 @@ class QuestionController extends Controller
                 'id' => $question->id,
                 'question_type_id' => $question->question_type_id,
                 'chapter_id' => $question->chapter_id,
+                'medium_id' => $question->medium_id,
                 'topic_id' => $question->topic_id,
                 'source' => $question->source,
                 'status' => $question->status,
@@ -447,6 +452,7 @@ class QuestionController extends Controller
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
             'chapters'      => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
+            'mediumOptions' => $this->mediumOptions(),
             'backHref'      => $backHref,
         ]);
     }
@@ -541,6 +547,7 @@ class QuestionController extends Controller
 
         return [[
             'question_type_id' => $questionType->id,
+            'medium_id' => $validated['medium_id'] ?? Medium::query()->where('name', 'Both')->value('id'),
             'chapter_id' => $validated['chapter_id'],
             'topic_id' => $chapter->subject?->subject_type === 'topic-wise'
                 ? ($validated['topic_id'] ?? null)
@@ -713,6 +720,15 @@ class QuestionController extends Controller
             ])
             ->values();
     }
+    private function mediumOptions(): Collection
+    {
+        return Medium::query()
+            ->orderBy('id')
+            ->get(['id', 'name'])
+            ->map(fn (Medium $medium) => ['id' => $medium->id, 'name' => $medium->name])
+            ->values();
+    }
+
 
     private function ensureChapterBelongsToSubject(Subject $subject, Chapter $chapter): void
     {

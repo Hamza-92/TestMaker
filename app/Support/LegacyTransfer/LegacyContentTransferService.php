@@ -5,6 +5,7 @@ namespace App\Support\LegacyTransfer;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
+use App\Models\Medium;
 use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\SchoolClass;
@@ -603,6 +604,7 @@ class LegacyContentTransferService
         $questionPayload = QuestionTypeSchemaRegistry::buildQuestionPayload($questionType, $content);
 
         return [[
+            'medium_id' => $this->resolveLegacyMediumId($sourceQuestion->medium ?? null),
             'question_type_id' => $questionType->id,
             'chapter_id' => $targetChapterId,
             'topic_id' => $targetTopicId,
@@ -618,6 +620,19 @@ class LegacyContentTransferService
             'status' => (int) ($sourceQuestion->status ?? 1),
             'created_by' => $creatorId,
         ], $questionPayload['options']];
+    }
+
+
+    private function resolveLegacyMediumId(mixed $sourceMedium): ?int
+    {
+        $mediumName = match ((int) $sourceMedium) {
+            1 => 'English',
+            2 => 'Urdu',
+            3 => 'Both',
+            default => 'Both',
+        };
+
+        return Medium::query()->where('name', $mediumName)->value('id');
     }
 
     private function legacyQuestionContent(string $schemaKey, object $question, array $sourceOptions): array

@@ -6,6 +6,7 @@ use App\Enums\AuditEvent;
 use App\Models\AuditLog;
 use App\Models\Chapter;
 use App\Models\Question;
+use App\Models\Medium;
 use App\Models\QuestionType;
 use App\Models\Topic;
 use Illuminate\Http\UploadedFile;
@@ -20,6 +21,10 @@ class QuestionBulkImporter
     private const MAX_ERROR_MESSAGES = 60;
 
     private const PREVIEW_ROW_LIMIT = 25;
+    private ?int $bothMediumId = null;
+
+    private bool $mediumResolved = false;
+
 
     public function preview(
         UploadedFile $file,
@@ -447,6 +452,7 @@ class QuestionBulkImporter
             'record' => [
                 'payload' => [
                     'question_type_id' => $questionType->id,
+                    'medium_id' => $this->defaultMediumId(),
                     'chapter_id' => $chapter->id,
                     'topic_id' => $chapter->subject?->subject_type === 'topic-wise'
                         ? $topic?->id
@@ -466,7 +472,18 @@ class QuestionBulkImporter
         ];
     }
 
+
+    private function defaultMediumId(): ?int
+    {
+        if (! $this->mediumResolved) {
+            $this->bothMediumId = Medium::query()->where('name', 'Both')->value('id');
+            $this->mediumResolved = true;
+        }
+
+        return $this->bothMediumId;
+    }
     private function buildImportContent(
+
         QuestionType $questionType,
         string $schemaKey,
         ?string $statementEn,

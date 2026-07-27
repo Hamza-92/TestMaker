@@ -5,12 +5,14 @@ import type {
     QuestionFormData,
     QuestionTypeOption,
     SourceOption,
+    MediumOption,
 } from './form';
 
 interface QuestionPayload {
     id: number;
     question_type_id: number;
     chapter_id: number;
+    medium_id: number | null;
     topic_id: number | null;
     source: string | null;
     status: number;
@@ -22,12 +24,14 @@ export default function EditQuestion({
     questionTypes,
     chapters,
     sourceOptions,
+    mediumOptions,
     backHref,
 }: {
     question: QuestionPayload;
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
     sourceOptions: SourceOption[];
+    mediumOptions: MediumOption[];
     backHref: string;
 }) {
     const form = useForm<QuestionFormData>({
@@ -35,6 +39,7 @@ export default function EditQuestion({
         chapter_id: String(question.chapter_id),
         topic_id: question.topic_id ? String(question.topic_id) : '',
         source: question.source ?? '',
+        medium_id: question.medium_id ? String(question.medium_id) : String(mediumOptions.find((medium) => medium.name === 'Both')?.id ?? mediumOptions[0]?.id ?? ''),
         status: String(question.status),
         content: question.content,
     });
@@ -55,6 +60,7 @@ export default function EditQuestion({
                 questionTypes={questionTypes}
                 chapters={chapters}
                 sourceOptions={sourceOptions}
+                mediumOptions={mediumOptions}
                 onSubmit={handleSubmit}
             />
         </>

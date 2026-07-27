@@ -27,6 +27,7 @@ class Question extends Model
 
     protected $fillable = [
         'question_type_id',
+        'medium_id',
         'topic_id',
         'chapter_id',
         'statement_en',
@@ -53,6 +54,11 @@ class Question extends Model
     public function questionType(): BelongsTo
     {
         return $this->belongsTo(QuestionType::class);
+    }
+
+    public function medium(): BelongsTo
+    {
+        return $this->belongsTo(Medium::class);
     }
 
     public function topic(): BelongsTo

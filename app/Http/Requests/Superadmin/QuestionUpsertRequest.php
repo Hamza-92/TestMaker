@@ -4,6 +4,7 @@ namespace App\Http\Requests\Superadmin;
 
 use App\Models\Chapter;
 use App\Models\Question;
+use App\Models\Medium;
 use App\Models\QuestionType;
 use App\Models\Topic;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
@@ -23,6 +24,7 @@ class QuestionUpsertRequest extends FormRequest
         return [
             'question_type_id' => ['required', 'integer', Rule::exists('question_types', 'id')],
             'chapter_id' => ['required', 'integer', Rule::exists('chapters', 'id')],
+            'medium_id' => ['nullable', 'integer', Rule::exists('mediums', 'id')],
             'topic_id' => ['nullable', 'integer', Rule::exists('topics', 'id')],
             'content' => ['required', 'array'],
             'source' => ['nullable', 'string', 'max:100', Rule::in(Question::sourceValues())],
@@ -85,6 +87,9 @@ class QuestionUpsertRequest extends FormRequest
                 : null,
             'topic_id' => filled($this->input('topic_id')) ? (int) $this->input('topic_id') : null,
             'content' => $this->normalizeContent($this->input('content', [])),
+            'medium_id' => filled($this->input('medium_id'))
+                ? (int) $this->input('medium_id')
+                : Medium::query()->where('name', 'Both')->value('id'),
             'source' => Question::normalizeSource($this->input('source')),
             'status' => $this->boolean('status'),
         ]);

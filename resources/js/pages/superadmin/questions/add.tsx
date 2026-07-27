@@ -5,6 +5,7 @@ import type {
     QuestionFormData,
     QuestionTypeOption,
     SourceOption,
+    MediumOption,
 } from './form';
 
 const STICKY_KEY = 'question_add_sticky';
@@ -13,12 +14,14 @@ interface StickyDefaults {
     question_type_id: string;
     chapter_id: string;
     topic_id: string;
+    medium_id: string;
     source: string;
     status: string;
 }
 
 function loadSticky(
     questionTypes: QuestionTypeOption[],
+    mediumOptions: MediumOption[],
     chapters: ChapterOption[],
     sourceOptions: SourceOption[],
 ): Partial<StickyDefaults> {
@@ -58,6 +61,13 @@ function loadSticky(
             valid.source = raw.source;
         }
 
+
+        if (
+            raw.medium_id &&
+            mediumOptions.some((medium) => medium.id.toString() === raw.medium_id)
+        ) {
+            valid.medium_id = raw.medium_id;
+        }
         if (raw.status === '0' || raw.status === '1') {
             valid.status = raw.status;
         }
@@ -75,6 +85,7 @@ function saveSticky(data: StickyDefaults) {
 }
 
 export default function AddQuestion({
+    mediumOptions,
     questionTypes,
     chapters,
     sourceOptions,
@@ -88,12 +99,18 @@ export default function AddQuestion({
     chapters: ChapterOption[];
     sourceOptions: SourceOption[];
     defaultChapterId?: number | null;
+    mediumOptions: MediumOption[];
     defaultTopicId?: number | null;
     lockedChapterId?: number | null;
     lockedTopicId?: number | null;
     backHref?: string;
 }) {
-    const sticky = loadSticky(questionTypes, chapters, sourceOptions);
+    const sticky = loadSticky(
+        questionTypes,
+        mediumOptions,
+        chapters,
+        sourceOptions,
+    );
 
     const scopedChapterId = lockedChapterId ?? defaultChapterId ?? null;
     const initialChapterId = scopedChapterId
@@ -109,6 +126,7 @@ export default function AddQuestion({
         topic_id: initialTopicId,
         source: sticky.source ?? '',
         status: sticky.status ?? '1',
+        medium_id: sticky.medium_id ?? String(mediumOptions.find((medium) => medium.name === 'Both')?.id ?? mediumOptions[0]?.id ?? ''),
         content: createEmptyQuestionContent(),
     });
 
@@ -119,10 +137,10 @@ export default function AddQuestion({
             .submitter as HTMLButtonElement | null;
         const saveAndAddNew = submitter?.value === 'save-and-add-new';
 
-        const { question_type_id, chapter_id, topic_id, source, status } =
+        const { question_type_id, chapter_id, topic_id, source, status, medium_id } =
             form.data;
 
-        saveSticky({ question_type_id, chapter_id, topic_id, source, status });
+        saveSticky({ question_type_id, chapter_id, topic_id, source, status, medium_id });
 
         const query = new URLSearchParams();
 
@@ -151,6 +169,7 @@ export default function AddQuestion({
                     source,
                     status,
                     content: createEmptyQuestionContent(),
+                    medium_id,
                 });
             },
         });
@@ -168,6 +187,7 @@ export default function AddQuestion({
                 chapters={chapters}
                 sourceOptions={sourceOptions}
                 onSubmit={handleSubmit}
+                mediumOptions={mediumOptions}
                 secondarySubmitLabel="Save & Add New"
                 lockedChapterId={lockedChapterId}
                 lockedTopicId={lockedTopicId}

@@ -122,8 +122,14 @@ export interface SourceOption {
     label: string;
 }
 
+export interface MediumOption {
+    id: number;
+    name: string;
+}
+
 export interface QuestionFormData {
     question_type_id: string;
+    medium_id: string;
     chapter_id: string;
     topic_id: string;
     source: string;
@@ -140,6 +146,7 @@ interface QuestionFormProps {
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
     sourceOptions: SourceOption[];
+    mediumOptions: MediumOption[];
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     secondarySubmitLabel?: string;
     lockedChapterId?: number | null;
@@ -278,6 +285,7 @@ export function QuestionForm({
     questionTypes,
     chapters,
     sourceOptions,
+    mediumOptions,
     onSubmit,
     secondarySubmitLabel,
     lockedChapterId,
@@ -1230,9 +1238,43 @@ export function QuestionForm({
                             </Select>
                         </Field>
 
+
                         <Field
-                            label="Status"
+                            label="Medium"
                             required
+                            error={form.errors.medium_id}
+                        >
+                            <Select
+                                value={form.data.medium_id || 'none'}
+                                onValueChange={(value) =>
+                                    form.setData(
+                                        'medium_id',
+                                        value === 'none' ? '' : value,
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select medium" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">
+                                        Select medium
+                                    </SelectItem>
+                                    {mediumOptions.map((medium) => (
+                                        <SelectItem
+                                            key={medium.id}
+                                            value={String(medium.id)}
+                                        >
+                                            {medium.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </Field>
+
+                        <Field
+                            required
+                            label="Status"
                             error={form.errors.status}
                         >
                             <Select
