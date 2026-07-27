@@ -1,0 +1,91 @@
+import { Head, Link, usePage } from '@inertiajs/react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+    ArrowRight,
+    BarChart3,
+    BookOpen,
+    Check,
+    CheckCircle2,
+    ClipboardCheck,
+    FileCheck2,
+    FileDown,
+    Files,
+    Layers3,
+    ListChecks,
+    PenLine,
+    Printer,
+    Settings2,
+    Share2,
+    ShieldCheck,
+    SlidersHorizontal,
+    Smartphone,
+    UsersRound,
+    WandSparkles,
+    type LucideIcon,
+} from 'lucide-react';
+import '@/css/homepage.css';
+import SiteHeader from '@/components/site-header';
+import { dashboard, register } from '@/routes';
+import type { Auth } from '@/types/auth';
+
+const featureCards: Array<{ icon: LucideIcon; title: string; description: string; iconColor: string; hoverBorder: string; hoverFill: string }> = [
+    { icon: PenLine, title: 'Easy Paper Creation', description: 'Create tests and papers with the question types, marks, and structure your class needs.', iconColor: 'bg-blue-50 text-blue-600', hoverBorder: 'hover:border-blue-300', hoverFill: 'bg-blue-100' },
+    { icon: ListChecks, title: 'Multiple Question Types', description: 'Use MCQs, true or false, short answer, essay, matching, and more.', iconColor: 'bg-violet-50 text-violet-600', hoverBorder: 'hover:border-violet-300', hoverFill: 'bg-violet-100' },
+    { icon: BarChart3, title: 'Smart Reporting', description: 'Get clear reports and useful insights to track performance and progress.', iconColor: 'bg-amber-50 text-amber-600', hoverBorder: 'hover:border-amber-300', hoverFill: 'bg-amber-100' },
+    { icon: ShieldCheck, title: 'Secure & Reliable', description: 'Keep your data, papers, and tests protected with dependable access controls.', iconColor: 'bg-cyan-50 text-cyan-600', hoverBorder: 'hover:border-cyan-300', hoverFill: 'bg-cyan-100' },
+    { icon: Share2, title: 'Share & Collaborate', description: 'Share tests with students or colleagues and work together with confidence.', iconColor: 'bg-emerald-50 text-emerald-600', hoverBorder: 'hover:border-emerald-300', hoverFill: 'bg-emerald-100' },
+    { icon: Smartphone, title: 'Mobile Friendly', description: 'Create and take tests on any device, whenever your teaching day needs it.', iconColor: 'bg-rose-50 text-rose-600', hoverBorder: 'hover:border-rose-300', hoverFill: 'bg-rose-100' },
+];
+
+const workflowSteps: Array<{ icon: LucideIcon; title: string; description: string; iconColor: string; hoverBorder: string }> = [
+    { icon: SlidersHorizontal, title: 'Select Scope', description: 'Select the pattern, class, and subject for your paper.', iconColor: 'bg-blue-50 text-blue-600', hoverBorder: 'hover:border-blue-300' },
+    { icon: BookOpen, title: 'Chapters', description: 'Pick the chapters and topics you want students to focus on.', iconColor: 'bg-violet-50 text-violet-600', hoverBorder: 'hover:border-violet-300' },
+    { icon: ListChecks, title: 'Questions', description: 'Choose question types, set marks, and build the right mix.', iconColor: 'bg-amber-50 text-amber-600', hoverBorder: 'hover:border-amber-300' },
+    { icon: FileCheck2, title: 'Paper Is Ready', description: 'Review, save, print, download, or share your finished paper.', iconColor: 'bg-emerald-50 text-emerald-600', hoverBorder: 'hover:border-emerald-300' },
+];
+
+function BuilderField({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
+    return <div className="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5"><div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500"><Icon size={13} className="text-brand-600" />{label}</div><p className="mt-1 text-xs font-semibold text-slate-900">{value}</p></div>;
+}
+
+function PaperBuilderMockup() {
+    return (
+        <div className="relative mx-auto w-full max-w-[640px]">
+            <div className="absolute -inset-8 -z-10 rounded-[42%] bg-brand-100/80 blur-2xl sm:-inset-12" />
+            <div className="absolute -right-2 -top-8 -z-10 h-28 w-28 opacity-60 [background-image:radial-gradient(#93c5fd_1.5px,transparent_1.5px)] [background-size:13px_13px]" />
+            <div className="relative overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.12)]"><div className="flex">
+                <aside className="hidden w-14 shrink-0 flex-col items-center gap-5 border-r border-slate-200 bg-white py-5 sm:flex"><ClipboardCheck size={22} className="text-brand-600" /><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><PenLine size={15} /></div><Files size={17} className="text-slate-400" /><UsersRound size={17} className="text-slate-400" /><Settings2 size={17} className="text-slate-400" /></aside>
+                <div className="min-w-0 flex-1 bg-slate-50 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">Create a new paper</p><p className="mt-1 text-[10px] text-slate-500">Build an assessment for your next lesson.</p></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Draft</span></div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-3"><BuilderField label="Class" value="Grade 8" icon={UsersRound} /><BuilderField label="Subject" value="General Science" icon={BookOpen} /><BuilderField label="Pattern" value="Mixed paper" icon={Layers3} /></div>
+                    <div className="mt-3 grid gap-3 lg:grid-cols-[1.04fr_0.96fr]"><div className="rounded-[10px] border border-slate-200 bg-white p-3.5"><div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-900">Choose question types</p><span className="text-[10px] font-medium text-brand-600">12 selected</span></div><div className="mt-3 grid grid-cols-2 gap-2">{['Multiple choice', 'Short answer', 'True / False', 'Long answer'].map((label, index) => <div key={label} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-[10px] font-medium ${index < 2 ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}`}><span className={`flex h-4 w-4 items-center justify-center rounded border ${index < 2 ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300'}`}>{index < 2 && <Check size={10} />}</span>{label}</div>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-lg bg-slate-50 p-2.5"><p className="text-[10px] text-slate-500">Total marks</p><p className="mt-1 text-sm font-bold text-slate-900">50</p></div><div className="rounded-lg bg-slate-50 p-2.5"><p className="text-[10px] text-slate-500">Duration</p><p className="mt-1 text-sm font-bold text-slate-900">60 min</p></div></div></div>
+                        <div className="rounded-[10px] border border-brand-200 bg-white p-3.5"><div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-900">Paper preview</p><span className="text-[10px] font-medium text-emerald-700">Ready</span></div><div className="mt-3 rounded-lg border border-slate-200 p-3"><div className="h-1.5 w-2/3 rounded-full bg-slate-200" /><div className="mt-2 h-1.5 w-1/2 rounded-full bg-slate-100" /><div className="mt-4 grid gap-2">{[1, 2, 3].map((item) => <div key={item} className="flex items-center gap-2"><span className="h-5 w-5 rounded bg-brand-50" /><span className="h-1.5 flex-1 rounded-full bg-slate-100" /></div>)}</div></div><button type="button" className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-3 text-[11px] font-semibold text-white transition hover:bg-brand-700"><WandSparkles size={14} /> Generate paper</button></div></div>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><Printer size={13} className="text-brand-600" /> Print ready</span><span className="inline-flex items-center gap-1.5"><FileDown size={13} className="text-brand-600" /> PDF download</span><span className="inline-flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-600" /> Answer sheet included</span></div>
+                </div>
+            </div></div>
+        </div>
+    );
+}
+
+function TestCreationProcessSection() {
+    const sectionRef = useRef<HTMLElement | null>(null);
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const section = sectionRef.current;
+        if (!section || typeof IntersectionObserver === 'undefined') { setIsVisible(true); return undefined; }
+        const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setIsVisible(true); observer.disconnect(); } }, { threshold: 0.16 });
+        observer.observe(section);
+        return () => observer.disconnect();
+    }, []);
+
+    return <section id="how-it-works" ref={sectionRef} className="relative overflow-hidden bg-[linear-gradient(180deg,#F8FAFC_0%,#EFF6FF_50%,#F8FAFC_100%)] px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20"><div aria-hidden="true" className="pointer-events-none absolute left-[12%] top-16 h-28 w-28 opacity-25 [background-image:radial-gradient(#93c5fd_1.5px,transparent_1.5px)] [background-size:13px_13px]" /><div aria-hidden="true" className="pointer-events-none absolute bottom-10 right-[10%] h-24 w-24 opacity-25 [background-image:radial-gradient(#93c5fd_1.5px,transparent_1.5px)] [background-size:13px_13px]" /><div className="relative mx-auto max-w-[1240px] rounded-[20px] border border-slate-200 bg-white/90 px-4 py-8 shadow-[0_12px_32px_rgba(15,23,42,0.05)] sm:px-8 sm:py-10 lg:px-10 lg:py-12"><header className="mx-auto max-w-[700px] text-center"><p className="text-[13px] font-bold uppercase tracking-[0.12em] text-brand-600">How it works</p><h2 className="mt-4 font-display text-[30px] font-bold leading-[1.2] tracking-[-0.025em] text-slate-900 sm:text-[40px]">Create a Test Paper in Four Simple Steps</h2><p className="mx-auto mt-4 max-w-[620px] text-[17px] leading-[1.7] text-slate-500">From selecting your syllabus to downloading the finished paper, TestMaker guides you through every step.</p></header><div className="relative mt-10 sm:mt-12"><ol className="grid items-stretch gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">{workflowSteps.map(({ icon: Icon, title, description, iconColor, hoverBorder }, index) => { const style = { '--process-delay': `${index * 90}ms` } as CSSProperties; return <li key={title}><article style={style} className={`process-step-card relative flex h-full min-h-[220px] flex-col items-center justify-center rounded-[18px] border border-slate-200 bg-white p-7 text-center shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition duration-180 hover:-translate-y-1 ${hoverBorder} hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)] ${isVisible ? 'is-visible' : ''}`}><span className={`flex h-[56px] w-[56px] items-center justify-center rounded-[16px] ${iconColor}`}><Icon size={25} strokeWidth={2} aria-hidden="true" /></span><h3 className="mt-5 font-display text-[20px] font-bold leading-[1.35] text-slate-900">{title}</h3><p className="mt-3 max-w-[245px] text-[15px] leading-[1.65] text-slate-500">{description}</p></article></li>; })}</ol></div></div></section>;
+}
+
+type WelcomePageProps = { auth: Auth; canRegister?: boolean };
+
+export default function Welcome({ canRegister = true }: { canRegister?: boolean }) {
+    const { auth } = usePage<WelcomePageProps>().props;
+    const isAuthenticated = Boolean(auth?.user);
+
+    return <><Head title="Smarter tests. Better assessments." /><div className="min-h-screen overflow-x-hidden bg-white text-slate-900"><SiteHeader auth={auth} /><main className="pt-[74px]"><section className="relative overflow-hidden border-b border-slate-200 bg-[linear-gradient(180deg,#EFF6FF_0%,#FFFFFF_75%)]"><div className="pointer-events-none absolute -right-32 top-10 h-[28rem] w-[28rem] rounded-full bg-brand-100/75 blur-3xl" /><div className="pointer-events-none absolute left-1/2 top-0 h-28 w-28 -translate-x-1/2 opacity-50 [background-image:radial-gradient(#93c5fd_1.5px,transparent_1.5px)] [background-size:13px_13px]" /><div className="relative mx-auto grid min-h-[610px] w-full max-w-[1360px] items-center gap-12 px-4 py-16 sm:px-6 md:py-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14 lg:px-8 lg:py-14"><div className="max-w-[580px]"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Assessment tools for better teaching</p><h1 className="mt-5 font-display text-[38px] font-extrabold leading-[1.1] tracking-[-0.06em] text-slate-900 sm:text-[48px] lg:text-[56px]">Create smarter tests.<br />Assess <span className="text-brand-600">better.</span></h1><p className="mt-6 max-w-[560px] text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">TestMaker helps teachers, trainers, and institutions create exams, quizzes, and assessments in minutes—then customize, print, share, and understand them with confidence.</p><div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href={isAuthenticated ? dashboard() : register()} className="inline-flex min-h-[52px] items-center justify-center gap-3 rounded-[10px] bg-brand-600 px-6 text-base font-semibold text-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/25 active:bg-brand-800">Get Started Free <ArrowRight size={17} /></Link><a href="#features" className="inline-flex min-h-[52px] items-center justify-center gap-3 rounded-[10px] border border-brand-200 bg-white px-6 text-base font-semibold text-brand-700 transition hover:bg-brand-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/20">Explore Features</a></div><div className="mt-9 grid max-w-lg grid-cols-3 gap-4"><div className="flex items-start gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Check size={15} /></span><span className="pt-1 text-xs font-medium leading-4 text-slate-600">No credit card<br />required</span></div><div className="flex items-start gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><UsersRound size={15} /></span><span className="pt-1 text-xs font-medium leading-4 text-slate-600">Trusted by<br />educators</span></div><div className="flex items-start gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><ShieldCheck size={15} /></span><span className="pt-1 text-xs font-medium leading-4 text-slate-600">Secure &<br />reliable</span></div></div></div><div className="relative z-10"><PaperBuilderMockup /></div></div></section><section id="features" className="bg-white px-4 py-16 sm:px-6 lg:px-8 lg:py-24"><div className="mx-auto max-w-[1240px] text-center"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Everything you need</p><h2 className="mt-3 font-display text-[30px] font-bold leading-tight tracking-[-0.05em] text-slate-900 sm:text-[38px]">Powerful features for better assessments</h2><p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">Create, customize, and analyze tests effortlessly with one dependable assessment platform.</p><div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">{featureCards.map(({ icon: Icon, title, description, iconColor, hoverBorder, hoverFill }) => <article key={title} className={`group relative flex min-h-[146px] items-start gap-4 overflow-hidden rounded-[14px] border border-slate-200 bg-white p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition duration-180 hover:-translate-y-0.5 ${hoverBorder} hover:shadow-[0_12px_32px_rgba(15,23,42,0.1)]`}><span aria-hidden="true" className={`pointer-events-none absolute -bottom-20 -right-20 h-40 w-40 origin-center scale-0 rounded-full opacity-0 transition duration-700 ease-out group-hover:scale-[6] group-hover:opacity-60 ${hoverFill}`} /><span className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] ${iconColor}`}><Icon size={24} strokeWidth={2} /></span><div className="relative z-10"><h3 className="font-display text-[19px] font-semibold leading-7 text-slate-900">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{description}</p></div></article>)}</div></div></section><TestCreationProcessSection /></main></div></>;
+}

@@ -46,25 +46,6 @@ main > section:first-of-type > div:nth-child(3) > div:nth-child(2) > div:first-c
     background-size: cover;
 }
 
-#how-it-works .process-step-card {
-    min-height: 190px;
-    padding: 1.25rem;
-}
-
-#how-it-works .process-step-card > span {
-    width: 3.25rem;
-    height: 3.25rem;
-}
-
-#how-it-works .process-step-card h3 {
-    margin-top: 0.75rem;
-}
-
-#how-it-works .process-step-card p {
-    margin-top: 0.5rem;
-    line-height: 1.5;
-}
-
 .process-step-card {
     opacity: 0;
     transform: translateY(18px);
