@@ -1,0 +1,622 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../js';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-sans:
+        'Montserrat', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    /* ── Customer brand scale ──────────────────────────────────────────
+       The single source of truth for the customer app's color. Swap this
+       block to rebrand the whole customer side (Tailwind blue today).
+       Usage: bg-brand-600, text-brand-700, border-brand-200, … */
+    --color-brand-50: oklch(0.97 0.014 254.604);
+    --color-brand-100: oklch(0.932 0.032 255.585);
+    --color-brand-200: oklch(0.882 0.059 254.128);
+    --color-brand-300: oklch(0.809 0.105 251.813);
+    --color-brand-400: oklch(0.707 0.165 254.624);
+    --color-brand-500: oklch(0.623 0.214 259.815);
+    --color-brand-600: oklch(0.546 0.245 262.881);
+    --color-brand-700: oklch(0.488 0.243 264.376);
+    --color-brand-800: oklch(0.424 0.199 265.638);
+    --color-brand-900: oklch(0.379 0.146 265.522);
+    --color-brand-950: oklch(0.282 0.091 267.935);
+}
+
+:root {
+    --background: oklch(1 0 0);
+
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.344 0.087 247);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.94 0.02 247);
+    --secondary-foreground: oklch(0.344 0.087 247);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.94 0.02 247);
+    --accent-foreground: oklch(0.344 0.087 247);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(1 0 0);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.344 0.087 247);
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+    --radius: 0.625rem;
+    --sidebar: #0c3c60;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: oklch(0.985 0 0);
+    --sidebar-primary-foreground: oklch(0.344 0.087 247);
+    --sidebar-accent: oklch(0.28 0.07 247);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(0.28 0.06 247);
+    --sidebar-ring: oklch(0.5 0.09 247);
+    --progress: rgba(75, 85, 99, 0.15);
+}
+
+.dark {
+    --background: oklch(0.145 0 0);
+    --progress: rgba(255, 255, 255);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.145 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.145 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.65 0.1 247);
+    --primary-foreground: oklch(0.145 0 0);
+    --secondary: oklch(0.22 0.05 247);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.22 0.05 247);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.396 0.141 25.723);
+    --destructive-foreground: oklch(1 0 0);
+    --border: oklch(0.269 0 0);
+    --input: oklch(0.269 0 0);
+    --ring: oklch(0.65 0.1 247);
+    --chart-1: oklch(0.488 0.243 264.376);
+    --chart-2: oklch(0.696 0.17 162.48);
+    --chart-3: oklch(0.769 0.188 70.08);
+    --chart-4: oklch(0.627 0.265 303.9);
+    --chart-5: oklch(0.645 0.246 16.439);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.985 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(0.269 0 0);
+    --sidebar-ring: oklch(0.439 0 0);
+}
+
+/* ── Customer app theme ────────────────────────────────────────────────
+   Applied to <body> by CustomerLayout so Radix portals (dialogs, menus,
+   selects) inherit it too. Re-points the semantic shadcn tokens at the
+   brand scale — customer pages and ui/* components pick it up with zero
+   changes, while the superadmin side keeps the :root values above. */
+.theme-customer {
+    --primary: var(--color-brand-600);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: var(--color-brand-50);
+    --secondary-foreground: var(--color-brand-700);
+    --accent: var(--color-brand-50);
+    --accent-foreground: var(--color-brand-700);
+    --ring: var(--color-brand-500);
+    --radius: 0.5rem;
+    --progress: var(--color-brand-600);
+}
+
+.dark .theme-customer {
+    --primary: var(--color-brand-500);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.28 0.06 262);
+    --secondary-foreground: var(--color-brand-100);
+    --accent: oklch(0.28 0.06 262);
+    --accent-foreground: var(--color-brand-100);
+    --ring: var(--color-brand-400);
+    --progress: var(--color-brand-400);
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+
+.home-nav-link {
+    display: inline-flex;
+    align-items: center;
+    color: #5b7289;
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: color 180ms ease, transform 180ms ease;
+}
+
+.home-nav-link:hover {
+    color: #155eef;
+    transform: translateY(-1px);
+}
+
+.home-login-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.65rem 1rem;
+    color: #45627d;
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.home-login-link:hover {
+    background: #edf3fb;
+    color: #155eef;
+    transform: translateY(-1px);
+}
+
+.home-button-primary,
+.home-button-secondary,
+.home-button-ghost {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.65rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 800;
+    line-height: 1.25;
+    white-space: nowrap;
+    transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.home-button-primary {
+    background: #155eef;
+    color: #fff;
+    box-shadow: 0 10px 24px -10px rgba(21, 94, 239, 0.75);
+}
+
+.home-button-primary:hover {
+    background: #0f4dcc;
+    box-shadow: 0 16px 30px -12px rgba(21, 94, 239, 0.75);
+    transform: translateY(-2px);
+}
+
+.home-button-primary:active,
+.home-button-secondary:active,
+.home-button-ghost:active {
+    transform: translateY(0);
+}
+
+.home-button-secondary {
+    border: 1px solid #cbdcf2;
+    background: #fff;
+    color: #155eef;
+}
+
+.home-button-secondary:hover {
+    border-color: #9ebde8;
+    background: #f5f9ff;
+    box-shadow: 0 10px 25px -16px rgba(16, 43, 70, 0.5);
+    transform: translateY(-2px);
+}
+
+.home-button-ghost {
+    border: 1px solid #d7e3f0;
+    background: rgba(255, 255, 255, 0.72);
+    color: #45627d;
+}
+
+.home-button-ghost:hover {
+    border-color: #9ebde8;
+    background: #fff;
+    color: #155eef;
+    box-shadow: 0 10px 25px -16px rgba(16, 43, 70, 0.35);
+    transform: translateY(-2px);
+}
+
+.home-feature-card {
+    transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.home-feature-card:hover {
+    border-color: #9ebde8;
+    box-shadow: 0 24px 60px -30px rgba(16, 43, 70, 0.38);
+    transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-feature-card {
+        transition: none;
+.home-kicker {
+    }
+}
+    color: #155eef;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.home-heading {
+    color: #102b46;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.055em;
+    line-height: 1.06;
+}
+
+.home-reveal {
+    animation: home-reveal 700ms ease-out both;
+}
+
+.home-reveal-delay-1 {
+    animation-delay: 100ms;
+}
+
+.home-reveal-delay-2 {
+    animation-delay: 180ms;
+}
+
+.home-reveal-delay-3 {
+    animation-delay: 260ms;
+}
+
+.home-float {
+    animation: home-float 5s ease-in-out infinite;
+}
+
+.home-float-delay-1 {
+    animation-delay: -2.2s;
+}
+
+@keyframes home-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+@keyframes home-reveal {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-float,
+    .home-reveal {
+        animation: none;
+    }
+}
+.h1-semibold {
+    @apply text-2xl font-semibold;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+    display: none;
+}
+
+.scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255 255 255 / 0.12) transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+    width: 4px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+    background: rgba(255 255 255 / 0.12);
+    border-radius: 9999px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background: rgba(255 255 255 / 0.25);
+}
+
+.rich-question-editor :where(p, div) {
+    margin: 0 0 0.5rem;
+}
+
+.rich-question-editor :where(h3, h4) {
+    margin: 0.35rem 0 0.2rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.rich-question-editor :where(ul, ol) {
+    margin: 0.25rem 0 0.5rem 1.25rem;
+    padding-left: 1rem;
+}
+
+.rich-question-editor :where(ul) {
+    list-style: disc;
+}
+
+.rich-question-editor :where(ol) {
+    list-style: decimal;
+}
+
+.rich-question-editor :where(a) {
+    color: #0f766e;
+    text-decoration: underline;
+}
+
+.paper-rich-text :where(p, div) {
+    margin: 0;
+}
+
+.paper-rich-text :where(ul, ol) {
+    margin: 0.1rem 0 0.1rem 1.15rem;
+    padding-left: 0.9rem;
+}
+
+.paper-rich-text :where(ul) {
+    list-style: disc;
+}
+
+.paper-rich-text :where(ol) {
+    list-style: decimal;
+}
+
+.paper-rich-text :where(h3, h4) {
+    margin: 0;
+    font-weight: 700;
+}
+
+.paper-rich-text.inline,
+.paper-rich-text.inline :where(p, div) {
+    display: inline;
+}
+
+.paper-rich-text :where(a) {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.paper-rich-text :where(u) {
+    text-underline-offset: 2px;
+}
+
+.paper-rich-text :where(.katex-display) {
+    margin: 0;
+}
+
+.paper-rich-text :where(img) {
+    max-width: 100%;
+    height: auto;
+}
+
+.tm-equation {
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: middle;
+}
+
+.tm-equation-block {
+    display: block;
+    margin: 0.35rem 0;
+    text-align: center;
+}
+
+.paper-rich-text.inline .tm-equation-block {
+    display: inline-block;
+    margin: 0;
+}
+
+.paper-formula {
+    display: inline-block;
+    border-radius: 0.25rem;
+    background: rgba(15, 118, 110, 0.08);
+    padding: 0 0.25rem;
+    font-family:
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        'Liberation Mono', 'Courier New', monospace;
+}
+
+/* ── Paper Settings: font sizing ───────────────────────────────────────── */
+/* CSS variables on [data-print-paper] are written by the React component.
+   The `*` selector forces nested Tailwind text-utility classes to inherit
+   instead of overriding our user-chosen size. */
+/* ── HEADER ────────────────────────────────────────────────────────────── */
+/* Font sizing (already in place from the typography work). */
+[data-print-paper] [data-paper-header] {
+    font-size: var(--paper-header-size, 0.875rem);
+    line-height: var(--paper-header-line-height, 1.5);
+}
+[data-print-paper] [data-paper-header] * {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+/* Outer frame of the exam header block (school + fields). The configured
+   width/style applies to all four sides; width=0 removes the frame entirely. */
+[data-print-paper] [data-paper-header-frame] {
+    border-width: var(--paper-header-border-width, 2px);
+    border-style: var(--paper-header-border-style, solid);
+    border-color: currentColor;
+}
+
+/* All internal dividers (logo separator, between field columns, between field
+   rows, between label/value cells) follow the same header border setting, so
+   setting width=0 wipes the entire header out — not just the outer frame. */
+[data-print-paper]
+    [data-paper-header-frame]
+    [data-paper-header-divider~='r']:not(:last-child) {
+    border-right-width: var(--paper-header-border-width, 2px);
+    border-right-style: var(--paper-header-border-style, solid);
+    border-right-color: currentColor;
+}
+[data-print-paper]
+    [data-paper-header-frame]
+    [data-paper-header-divider~='b']:not(:last-child) {
+    border-bottom-width: var(--paper-header-border-width, 2px);
+    border-bottom-style: var(--paper-header-border-style, solid);
+    border-bottom-color: currentColor;
+}
+
+/* ── HEADING (section "Q.1 Title (5×1=5)" row) ─────────────────────────── */
+/* Standalone bordered block — all 4 sides controlled by --paper-heading-border-*. */
+[data-print-paper] [data-paper-heading] {
+    font-size: var(--paper-heading-size, 0.875rem);
+    line-height: var(--paper-heading-line-height, 1.5);
+    border-width: var(--paper-heading-border-width, 1px);
+    border-style: var(--paper-heading-border-style, solid);
+    border-color: currentColor;
+}
+[data-print-paper] [data-paper-heading] * {
+    font-size: inherit;
+    line-height: inherit;
+}
+/* Internal column dividers inside the heading row use the same heading border. */
+[data-print-paper]
+    [data-paper-heading]
+    [data-paper-heading-divider]:not(:last-child) {
+    border-right-width: var(--paper-heading-border-width, 1px);
+    border-right-style: var(--paper-heading-border-style, solid);
+    border-right-color: currentColor;
+}
+
+/* ── QUESTIONS ─────────────────────────────────────────────────────────── */
+/* Both layouts wrap their questions in one outer border — the user setting
+   controls a single rectangle around the whole question block. Individual
+   questions inside the block carry no borders. */
+[data-print-paper] [data-paper-question-group] {
+    border-width: var(--paper-question-border-width, 1px);
+    border-style: var(--paper-question-border-style, solid);
+    border-color: currentColor;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+[data-print-paper] [data-paper-question-group] > [data-paper-question] {
+    border-width: 0;
+}
+
+/* Internal dividers (Q# right, between options, between text → options →
+   answer-lines) are intentionally NOT styled in stacked layout — the
+   question list reads as a clean column of text inside the single outer
+   border, with the question number simply offset by the column's column
+   gap rather than a visible rule. */
+
+[data-print-paper] [data-paper-question] {
+    font-size: var(--paper-question-size, 0.875rem);
+    line-height: var(--paper-question-line-height, 1.5);
+}
+[data-print-paper] [data-paper-question] * {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+@media print {
+    /* The @page size/margin rule is injected per-paper by the React component
+       so it can react to the user's paper-size + margin settings. */
+
+    body:has([data-print-paper]),
+    body:has([data-print-paper]) #app {
+        width: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    body:has([data-print-paper]) [data-customer-sidebar],
+    body:has([data-print-paper]) [data-customer-header] {
+        display: none !important;
+    }
+
+    body:has([data-print-paper]) [data-customer-layout],
+    body:has([data-print-paper]) [data-customer-main],
+    body:has([data-print-paper]) [data-customer-content],
+    body:has([data-print-paper]) [data-paper-shell] {
+        display: block !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    body:has([data-print-paper]) [data-print-paper] {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+    }
+}

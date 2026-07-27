@@ -1,0 +1,147 @@
+import { Head, Link, usePage } from '@inertiajs/react';
+import { dashboard, login, register } from '@/routes';
+import {
+    ArrowRight,
+    BarChart3,
+    Check,
+    ChevronRight,
+    ClipboardCheck,
+    FileText,
+    LayoutTemplate,
+    Menu,
+    MonitorPlay,
+    Sparkles,
+    Users,
+    X,
+    Zap,
+} from 'lucide-react';
+
+import { useState, type ReactNode } from 'react';
+function Logo({ light = false }: { light?: boolean }) {
+    return (
+        <div className="flex items-center gap-2.5">
+            <span className={light ? 'flex size-10 items-center justify-center rounded-[13px] bg-white text-[#102b46] shadow-lg shadow-black/10' : 'flex size-10 items-center justify-center rounded-[13px] bg-[#155eef] text-white shadow-lg shadow-blue-900/20'}>
+                <ClipboardCheck className="size-5.5" strokeWidth={2.4} />
+            </span>
+            <span className={light ? 'text-[19px] font-extrabold tracking-[-0.04em] text-white' : 'text-[19px] font-extrabold tracking-[-0.04em] text-[#102b46]'}>
+                Test<span className={light ? 'text-[#8db8ff]' : 'text-[#155eef]'}>Maker</span>
+            </span>
+        </div>
+    );
+}
+
+function FeatureCard({ icon, eyebrow, title, children, tone }: { icon: ReactNode; eyebrow: string; title: string; children: ReactNode; tone: string }) {
+    return (
+        <article className="home-feature-card group rounded-[26px] border border-[#dbe5f2] bg-white p-6 shadow-[0_18px_50px_-35px_rgba(16,43,70,0.5)] transition duration-300 hover:-translate-y-1 hover:border-[#a9c6ee] sm:p-7">
+            <div className={"mb-6 flex size-12 items-center justify-center rounded-2xl " + tone}>{icon}</div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#67809b]">{eyebrow}</p>
+            <h3 className="mb-3 text-xl font-bold tracking-[-0.03em] text-[#102b46]">{title}</h3>
+            <p className="text-sm leading-7 text-[#647a91]">{children}</p>
+            <div className="mt-6 flex items-center gap-1 text-sm font-bold text-[#155eef] transition group-hover:gap-2">See how it works <ArrowRight className="size-4" /></div>
+        </article>
+    );
+}
+
+function Step({ number, title, children }: { number: string; title: string; children: ReactNode }) {
+    return (
+        <div className="flex gap-4 sm:gap-5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#e9f1ff] text-sm font-extrabold text-[#155eef] ring-8 ring-[#f6f9fd]">{number}</span>
+            <div className="pb-8">
+                <h3 className="mb-1.5 text-base font-bold text-[#102b46]">{title}</h3>
+                <p className="max-w-sm text-sm leading-6 text-[#6b8197]">{children}</p>
+            </div>
+        </div>
+    );
+}
+
+export default function Welcome({ canRegister = true }: { canRegister?: boolean }) {
+    const { auth } = usePage().props;
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const isLoggedIn = Boolean(auth.user);
+    const heroImage = 'https://images.unsplash.com/photo-1523240795612-9a054b0db644-auto=format&fit=crop&w=1400&q=88';
+    const collaborationImage = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f-auto=format&fit=crop&w=1200&q=85';
+    const libraryImage = 'https://images.unsplash.com/photo-1498243691581-b145c3f54a5a-auto=format&fit=crop&w=1200&q=85';
+
+    return (
+        <>
+            <Head title="Online Question Paper Generator for Schools & Teachers">
+                <meta head-key="description" name="description" content="TestMaker helps schools and teachers in Pakistan create professional question papers, manage question banks, and run online MCQ tests in minutes." />
+                <meta head-key="keywords" name="keywords" content="question paper generator Pakistan, online test maker, school assessment software, MCQ test maker, teacher question bank" />
+                <meta name="theme-color" content="#102b46" />
+                <link rel="preconnect" href="https://images.unsplash.com" />
+                <script type="application/ld+json">
+                    {JSON.stringify({ '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'TestMaker', applicationCategory: 'EducationalApplication', operatingSystem: 'Web', description: 'A question paper generator and online assessment platform for schools and teachers.' })}
+                </script>
+            </Head>
+
+            <div className="min-h-screen overflow-hidden bg-[#f6f9fd] text-[#102b46] selection:bg-[#cfe0ff] selection:text-[#102b46]">
+                <header className="absolute inset-x-0 top-0 z-50">
+                    <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
+                        <a href="#top" aria-label="TestMaker home"><Logo /></a>
+                        <nav className="hidden items-center gap-8 lg:flex" aria-label="Primary navigation">
+                            <a className="home-nav-link" href="#platform">Platform</a>
+                            <a className="home-nav-link" href="#how-it-works">How it works</a>
+                            <a className="home-nav-link" href="#for-schools">For schools</a>
+                            <a className="home-nav-link" href="#resources">Resources</a>
+                        </nav>
+                        <div className="hidden items-center gap-3 sm:flex">
+                            {isLoggedIn ? <Link href={dashboard()} className="home-button-secondary">Open workspace <ArrowRight className="size-4" /></Link> : <>
+                                <Link href={login()} className="home-login-link">Sign in</Link>
+                                {canRegister && <Link href={register()} className="home-button-primary">Get started <ArrowRight className="size-4" /></Link>}
+                            </>}
+                        </div>
+                        <button type="button" aria-label={mobileOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileOpen} className="flex size-10 items-center justify-center rounded-xl border border-[#dbe5f2] bg-white text-[#102b46] sm:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
+                            {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+                        </button>
+                    </div>
+                    {mobileOpen && <div className="mx-4 rounded-2xl border border-[#dbe5f2] bg-white p-3 shadow-xl sm:hidden">
+                        {[
+                            ['Platform', '#platform'],
+                            ['How it works', '#how-it-works'],
+                            ['For schools', '#for-schools'],
+                            ['Resources', '#resources'],
+                        ].map(([label, href]) => <a key={href} href={href} className="block rounded-xl px-4 py-3 text-sm font-bold text-[#45627d] hover:bg-[#f1f6fc]" onClick={() => setMobileOpen(false)}>{label}</a>)}
+                        <div className="mt-2 flex gap-2 border-t border-[#e7eef7] pt-3"><Link href={login()} className="home-login-link flex-1 justify-center">Sign in</Link>{canRegister && <Link href={register()} className="home-button-primary flex-1 justify-center">Get started</Link>}</div>
+                    </div>}
+                </header>
+
+                <main id="top">
+                    <section className="relative isolate overflow-hidden bg-[#f6f9fd] pt-28 sm:pt-32 lg:pt-40">
+                        <div className="pointer-events-none absolute -top-48 -right-32 -z-10 size-[620px] rounded-full bg-[#dceaff] opacity-70 blur-3xl" />
+                        <div className="pointer-events-none absolute top-64 -left-48 -z-10 size-[480px] rounded-full bg-[#e5f4f4] opacity-75 blur-3xl" />
+                        <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 pb-20 sm:px-8 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12 lg:px-10 lg:pb-32">
+                            <div className="relative z-10 max-w-2xl">
+                                <div className="home-reveal mb-6 inline-flex items-center gap-2 rounded-full border border-[#c8dbf6] bg-white/80 px-3.5 py-2 text-xs font-bold text-[#155eef] shadow-sm backdrop-blur"><Sparkles className="size-3.5" /> Built for better learning outcomes</div>
+                                <h1 className="home-reveal home-reveal-delay-1 max-w-2xl text-[clamp(2.7rem,6vw,5.35rem)] font-extrabold leading-[0.98] tracking-[-0.075em] text-[#102b46]">Make every paper count.</h1>
+                                <p className="home-reveal home-reveal-delay-2 mt-6 max-w-xl text-base leading-8 text-[#5f7891] sm:text-lg">Create polished question papers, build a smarter question bank, and run online assessments - all from one calm, focused workspace.</p>
+                                <div className="home-reveal home-reveal-delay-3 mt-8 flex flex-col gap-3 sm:flex-row">
+                                    {isLoggedIn ? <Link href={dashboard()} className="home-button-primary h-13 px-6 text-sm">Open your workspace <ArrowRight className="size-4" /></Link> : canRegister && <Link href={register()} className="home-button-primary h-13 px-6 text-sm">Start creating for free <ArrowRight className="size-4" /></Link>}
+                                    <a href="#platform" className="home-button-ghost h-13 px-6 text-sm">Explore TestMaker <ChevronRight className="size-4" /></a>
+                                </div>
+                                <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs font-semibold text-[#71879b]"><span className="inline-flex items-center gap-1.5"><Check className="size-4 text-[#16a37b]" /> Made for teachers</span><span className="inline-flex items-center gap-1.5"><Check className="size-4 text-[#16a37b]" /> Print-ready papers</span><span className="inline-flex items-center gap-1.5"><Check className="size-4 text-[#16a37b]" /> Easy to start</span></div>
+                            </div>
+                            <div className="relative mx-auto w-full max-w-[620px] lg:mr-0">
+                                <div className="absolute -top-7 right-5 z-20 hidden rounded-2xl border border-white/80 bg-white px-4 py-3 shadow-[0_20px_45px_-18px_rgba(16,43,70,0.35)] sm:block home-float home-float-delay-1"><div className="flex items-center gap-3"><span className="flex size-9 items-center justify-center rounded-xl bg-[#e5f8f0] text-[#16936e]"><Check className="size-4.5" /></span><div><p className="text-[11px] font-semibold text-[#7a8ea1]">Paper status</p><p className="text-sm font-extrabold text-[#102b46]">Ready to print</p></div></div></div>
+                                <div className="relative overflow-hidden rounded-[32px] border-[10px] border-white bg-[#102b46] shadow-[0_32px_70px_-22px_rgba(16,43,70,0.42)]"><img src={heroImage} alt="Teachers and students collaborating with digital learning tools" className="aspect-[1.08/1] w-full object-cover opacity-90" /><div className="absolute inset-0 bg-gradient-to-tr from-[#102b46]/85 via-[#102b46]/10 to-transparent" /><div className="absolute right-4 bottom-4 left-4 rounded-2xl border border-white/20 bg-[#102b46]/80 p-4 text-white shadow-xl backdrop-blur-md sm:right-6 sm:bottom-6 sm:left-6 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.17em] text-[#a9c6ee]">Your assessment workspace</p><p className="mt-1 text-base font-bold">Grade 9 - Physics</p></div><span className="rounded-lg bg-white/10 px-2.5 py-1 text-[10px] font-bold text-[#cce0ff]">LIVE PREVIEW</span></div><div className="grid grid-cols-3 gap-2"><div className="rounded-xl bg-white/10 p-3"><FileText className="mb-2 size-4 text-[#8db8ff]" /><p className="text-lg font-extrabold">24</p><p className="text-[10px] text-white/60">Questions</p></div><div className="rounded-xl bg-white/10 p-3"><LayoutTemplate className="mb-2 size-4 text-[#71dfb7]" /><p className="text-lg font-extrabold">3</p><p className="text-[10px] text-white/60">Sections</p></div><div className="rounded-xl bg-white/10 p-3"><Zap className="mb-2 size-4 text-[#ffd37c]" /><p className="text-lg font-extrabold">4m</p><p className="text-[10px] text-white/60">To build</p></div></div></div></div>
+                                <div className="absolute -bottom-8 -left-4 z-20 rounded-2xl border border-[#d9e6f7] bg-white p-4 shadow-[0_20px_45px_-18px_rgba(16,43,70,0.3)] home-float sm:-left-8"><div className="flex items-center gap-3"><div className="flex -space-x-2"><span className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-[#ffd7c2] text-[10px] font-bold text-[#6d4234]">A</span><span className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-[#cfe0ff] text-[10px] font-bold text-[#245195]">M</span><span className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-[#d9f1e6] text-[10px] font-bold text-[#236b51]">+</span></div><div><p className="text-sm font-extrabold text-[#102b46]">Team-ready</p><p className="text-[10px] font-semibold text-[#7a8ea1]">Built for busy schools</p></div></div></div>
+                            </div>
+                        </div>
+                        <div className="border-y border-[#dce7f3] bg-white/65"><div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-[#e2eaf3] px-5 sm:px-8 md:grid-cols-4 lg:px-10">{[['01', 'Choose your content'], ['02', 'Shape your paper'], ['03', 'Review with confidence'], ['04', 'Print or publish online']].map(([number, label]) => <div key={number} className="flex items-center gap-3 py-5 pr-3 sm:gap-4 sm:py-6 sm:pr-6"><span className="text-xs font-extrabold text-[#155eef]">{number}</span><span className="text-xs font-bold leading-5 text-[#526d86] sm:text-sm">{label}</span></div>)}</div></div>
+                    </section>
+
+                    <section id="platform" className="bg-white py-24 sm:py-28 lg:py-32"><div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10"><div className="mx-auto mb-14 max-w-2xl text-center sm:mb-16"><p className="home-kicker">One platform. Less busywork.</p><h2 className="home-heading mt-4">Everything you need to make assessment feel simple.</h2><p className="mt-5 text-base leading-7 text-[#6b8197]">From the first question to the final printed page, TestMaker keeps your teaching workflow organized, flexible, and beautifully clear.</p></div><div className="grid gap-5 md:grid-cols-3"><FeatureCard icon={<LayoutTemplate className="size-5.5" />} eyebrow="Paper builder" title="Papers that look as good as they teach." tone="bg-[#eaf2ff] text-[#155eef]">Mix question types, arrange sections, shuffle questions, and fine-tune spacing before you print. Your paper, your standards.</FeatureCard><FeatureCard icon={<FileText className="size-5.5" />} eyebrow="Question bank" title="Your best questions, always within reach." tone="bg-[#e7f8f1] text-[#168568]">Organize questions by class, subject, chapter, topic, medium, and source so the right practice is never buried in a file.</FeatureCard><FeatureCard icon={<MonitorPlay className="size-5.5" />} eyebrow="Online assessment" title="Turn practice into progress." tone="bg-[#fff3df] text-[#c77a12]">Build engaging MCQ tests, share them with students, and see how learning is moving - without stitching together five different tools.</FeatureCard></div></div></section>
+
+                    <section id="how-it-works" className="relative overflow-hidden bg-[#f6f9fd] py-24 sm:py-28 lg:py-32"><div className="pointer-events-none absolute top-0 right-0 size-[520px] rounded-full bg-[#dceaff] opacity-40 blur-3xl" /><div className="relative mx-auto grid max-w-7xl gap-14 px-5 sm:px-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-center lg:gap-24 lg:px-10"><div className="relative overflow-hidden rounded-[30px] bg-[#102b46] p-3 shadow-[0_28px_70px_-30px_rgba(16,43,70,0.45)] sm:p-4"><img src={collaborationImage} alt="Students learning together around a laptop" className="aspect-[0.92/1] w-full rounded-[22px] object-cover opacity-85" loading="lazy" /><div className="absolute inset-x-7 bottom-7 rounded-2xl border border-white/20 bg-[#102b46]/80 p-5 text-white backdrop-blur-md"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#8db8ff]">A better rhythm for teachers</p><p className="mt-2 max-w-xs text-lg font-bold leading-7">Spend less time formatting. Spend more time teaching.</p></div></div><div><p className="home-kicker">How it works</p><h2 className="home-heading mt-4 max-w-xl">From a blank page to a confident classroom.</h2><p className="mt-5 max-w-xl text-base leading-7 text-[#6b8197]">TestMaker brings the structure of a great assessment into one intuitive flow. No design degree, no spreadsheet gymnastics, no last-minute panic.</p><div className="mt-10"><Step number="1" title="Build your library">Add and organize the questions your students actually need to practice.</Step><Step number="2" title="Compose your paper">Select chapters, set marks, and let the paper builder handle the layout.</Step><Step number="3" title="Share the outcome">Print a polished paper or publish an online test in a few clicks.</Step></div><a href="#resources" className="mt-1 inline-flex items-center gap-2 text-sm font-extrabold text-[#155eef]">See the full workflow <ArrowRight className="size-4" /></a></div></div></section>
+
+                    <section id="for-schools" className="bg-[#102b46] py-24 text-white sm:py-28 lg:py-32"><div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-20 lg:px-10"><div><p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#8db8ff]">For schools that move together</p><h2 className="max-w-2xl text-4xl font-extrabold leading-[1.04] tracking-[-0.06em] sm:text-5xl">A shared standard for every classroom.</h2><p className="mt-6 max-w-xl text-base leading-8 text-[#b8cbe0]">Give coordinators a clear view, teachers a faster workflow, and students a more consistent learning experience. TestMaker scales from one classroom to an entire school.</p><div className="mt-9 grid max-w-xl gap-4 sm:grid-cols-2">{['Centralized question bank', 'Flexible teacher access', 'Print and online formats', 'Clear assessment workflow'].map((item) => <div key={item} className="flex items-center gap-3 text-sm font-semibold text-[#e5eef9]"><span className="flex size-6 items-center justify-center rounded-full bg-[#1d5791]"><Check className="size-3.5 text-[#91d9bc]" /></span>{item}</div>)}</div></div><div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-3 sm:p-4"><img src={libraryImage} alt="Bright school library prepared for collaborative learning" className="aspect-[1.1/0.85] w-full rounded-[20px] object-cover opacity-75" loading="lazy" /><div className="absolute top-8 right-8 rounded-2xl border border-white/20 bg-[#102b46]/85 p-4 shadow-xl backdrop-blur-md"><div className="mb-3 flex items-center gap-2"><BarChart3 className="size-4 text-[#8db8ff]" /><span className="text-xs font-bold text-white/70">School overview</span></div><div className="flex items-end gap-1.5"><span className="h-7 w-2 rounded-full bg-[#71dfb7]" /><span className="h-11 w-2 rounded-full bg-[#8db8ff]" /><span className="h-9 w-2 rounded-full bg-[#ffd37c]" /><span className="h-14 w-2 rounded-full bg-[#71dfb7]" /><span className="h-12 w-2 rounded-full bg-[#8db8ff]" /></div></div></div></div></section>
+
+                    <section id="resources" className="bg-white py-24 sm:py-28 lg:py-32"><div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10"><div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-end"><div><p className="home-kicker">Made for real classrooms</p><h2 className="home-heading mt-4">Thoughtful tools for the work behind the lesson.</h2></div><p className="max-w-xl text-base leading-7 text-[#6b8197] lg:justify-self-end">Great teaching is full of invisible work. TestMaker gives that work a better home - one that feels reliable on Monday morning and still gets out of your way on exam day.</p></div><div className="mt-12 grid gap-5 md:grid-cols-3"><div className="rounded-[24px] bg-[#f6f9fd] p-6 sm:p-7"><Users className="mb-10 size-6 text-[#155eef]" /><h3 className="text-lg font-bold text-[#102b46]">For teachers</h3><p className="mt-3 text-sm leading-7 text-[#6b8197]">Save your time for the decisions only a teacher can make.</p></div><div className="rounded-[24px] bg-[#f6f9fd] p-6 sm:p-7"><Sparkles className="mb-10 size-6 text-[#c77a12]" /><h3 className="text-lg font-bold text-[#102b46]">For coordinators</h3><p className="mt-3 text-sm leading-7 text-[#6b8197]">Bring consistency to assessment without slowing anyone down.</p></div><div className="rounded-[24px] bg-[#f6f9fd] p-6 sm:p-7"><BarChart3 className="mb-10 size-6 text-[#168568]" /><h3 className="text-lg font-bold text-[#102b46]">For students</h3><p className="mt-3 text-sm leading-7 text-[#6b8197]">Make practice clearer, more focused, and easier to keep up with.</p></div></div></div></section>
+
+                    <section className="bg-[#eaf2ff] px-5 py-20 sm:px-8 sm:py-24 lg:px-10"><div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-8 rounded-[30px] bg-[#155eef] px-7 py-9 text-white shadow-[0_25px_60px_-25px_rgba(21,94,239,0.55)] sm:px-12 sm:py-12 md:flex-row md:items-center"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#bcd4ff]">Your next paper can be easier</p><h2 className="mt-3 max-w-xl text-3xl font-extrabold leading-tight tracking-[-0.05em] sm:text-4xl">Build a better assessment workflow today.</h2></div>{!isLoggedIn && canRegister && <Link href={register()} className="inline-flex h-12 shrink-0 items-center gap-2 rounded-xl bg-white px-5 text-sm font-extrabold text-[#155eef] transition hover:bg-[#f0f5ff]">Start for free <ArrowRight className="size-4" /></Link>}</div></section>
+                </main>
+
+                <footer className="bg-[#102b46] text-white"><div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-12 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10"><div><Logo light /><p className="mt-4 max-w-xs text-sm leading-6 text-[#9eb5cb]">A calmer way to create, manage, and deliver assessments.</p></div><div className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-[#b8cbe0]"><a className="transition hover:text-white" href="#platform">Platform</a><a className="transition hover:text-white" href="#how-it-works">How it works</a><a className="transition hover:text-white" href="#for-schools">For schools</a><a className="transition hover:text-white" href="#resources">Resources</a></div></div><div className="border-t border-white/10"><div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-xs text-[#839bb2] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10"><span>&copy; {new Date().getFullYear()} TestMaker. Built for better learning.</span><span>Professional assessment tools for modern schools.</span></div></div></footer>
+            </div>
+        </>
+    );
+}
