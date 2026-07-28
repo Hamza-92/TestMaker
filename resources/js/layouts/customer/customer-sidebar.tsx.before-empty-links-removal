@@ -1,12 +1,17 @@
-﻿import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     ActivityIcon,
+    BarChart3Icon,
     BookmarkIcon,
+    BookOpenIcon,
+    DatabaseIcon,
     FilePlusIcon,
     LayoutDashboardIcon,
     LayoutTemplateIcon,
+    SchoolIcon,
     SettingsIcon,
     SparklesIcon,
+    TrendingUpIcon,
     UsersIcon,
     XIcon,
 } from 'lucide-react';
@@ -54,7 +59,12 @@ const NAV_GROUPS: NavGroup[] = [
                 icon: FilePlusIcon,
                 requires: 'generate_papers',
             },
-
+            {
+                label: 'Question Bank',
+                href: '/questions',
+                icon: DatabaseIcon,
+                requires: 'view_question_bank',
+            },
             {
                 label: 'Saved Papers',
                 href: '/papers',
@@ -80,18 +90,18 @@ const NAV_GROUPS: NavGroup[] = [
         ownerOnly: true,
         items: [
             { label: 'Teachers', href: '/teachers', icon: UsersIcon },
-
-
-            { label: 'Settings', href: '/customer/settings', icon: SettingsIcon },
+            { label: 'Classes', href: '/classes', icon: SchoolIcon },
+            { label: 'Subjects', href: '/subjects', icon: BookOpenIcon },
+            { label: 'Settings', href: '/settings', icon: SettingsIcon },
         ],
     },
     {
         title: 'Analytics',
         ownerOnly: true,
         items: [
-
-            { label: 'Activity Log', href: '/customer/activity', icon: ActivityIcon },
-
+            { label: 'Reports', href: '/reports', icon: BarChart3Icon },
+            { label: 'Activity Log', href: '/activity', icon: ActivityIcon },
+            { label: 'Most Used', href: '/most-used', icon: TrendingUpIcon },
         ],
     },
 ];
@@ -197,7 +207,7 @@ function SidebarContent({
 
     return (
         <>
-            {/* â”€â”€ Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Brand ─────────────────────────────────────────────────── */}
             <div
                 className={[
                     'flex h-14 shrink-0 items-center gap-2.5 overflow-hidden border-b border-white/10',
@@ -219,7 +229,7 @@ function SidebarContent({
                 )}
             </div>
 
-            {/* â”€â”€ Nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Nav ───────────────────────────────────────────────────── */}
             <nav
                 className={[
                     'scrollbar-slim flex-1 space-y-4 overflow-x-hidden overflow-y-auto pt-3 pb-3',
@@ -263,7 +273,7 @@ function SidebarContent({
                 ))}
             </nav>
 
-            {/* â”€â”€ Upgrade card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Upgrade card ──────────────────────────────────────────── */}
             {!collapsed && (
                 <div className="mx-3 mb-3 rounded-lg border border-white/10 bg-white/[0.06] p-3">
                     <div className="mb-1.5 flex items-center gap-2">
@@ -291,7 +301,7 @@ export function CustomerSidebar() {
 
     return (
         <>
-            {/* â”€â”€ Desktop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Desktop ───────────────────────────────────────────────── */}
             <aside
                 data-customer-sidebar
                 className={[
@@ -302,7 +312,7 @@ export function CustomerSidebar() {
                 <SidebarContent collapsed={collapsed} />
             </aside>
 
-            {/* â”€â”€ Mobile drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Mobile drawer ─────────────────────────────────────────── */}
             {mobileOpen && (
                 <div className="fixed inset-0 z-50 md:hidden">
                     <div
@@ -330,6 +340,3 @@ export function CustomerSidebar() {
         </>
     );
 }
-
-
-

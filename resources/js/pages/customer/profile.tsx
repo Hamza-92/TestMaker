@@ -1,0 +1,156 @@
+import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowLeft, Building2, ImagePlus, Mail, MapPin, Phone, Save, Trash2, Upload, UserRound } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { useRef, useState } from 'react';
+import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+type ProfileUser = {
+    name: string;
+    email: string;
+    phone: string | null;
+    school_name: string | null;
+    address: string | null;
+    city: string | null;
+    province: string | null;
+    logo: string | null;
+    account_type: string | null;
+};
+
+type FormData = {
+    name: string;
+    email: string;
+    phone: string;
+    school_name: string;
+    address: string;
+    city: string;
+    province: string;
+    logo: File | null;
+    remove_logo: boolean;
+};
+
+function FieldIcon({ icon: Icon }: { icon: LucideIcon }) {
+    return <Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />;
+}
+
+export default function Profile({ user, status }: { user: ProfileUser; status?: string }) {
+    const logoRef = useRef<HTMLInputElement>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(user.logo ? `/storage/${user.logo}` : null);
+    const { data, setData, patch, processing, errors } = useForm<FormData>({
+        name: user.name ?? '',
+        email: user.email ?? '',
+        phone: user.phone ?? '',
+        school_name: user.school_name ?? '',
+        address: user.address ?? '',
+        city: user.city ?? '',
+        province: user.province ?? '',
+        logo: null,
+        remove_logo: false,
+    });
+
+    function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0] ?? null;
+        if (!file) return;
+        setData('logo', file);
+        setData('remove_logo', false);
+        setLogoPreview(URL.createObjectURL(file));
+    }
+
+    function removeLogo() {
+        setData('logo', null);
+        setData('remove_logo', Boolean(user.logo));
+        setLogoPreview(null);
+        if (logoRef.current) logoRef.current.value = '';
+    }
+
+    function submit(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        patch('/customer/profile', { preserveScroll: true, forceFormData: true });
+    }
+
+    const initials = data.name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('');
+
+    return (
+        <>
+            <Head title="Profile" />
+
+            <div className="mx-auto max-w-5xl space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Link href="/dashboard" className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100" aria-label="Back to dashboard">
+                            <ArrowLeft className="size-4" />
+                        </Link>
+                        <div>
+                            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Profile</h1>
+                            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Manage your account and school information.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+                        <div className="flex size-9 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white">{initials || 'U'}</div>
+                        <div className="hidden min-w-0 sm:block">
+                            <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{data.name}</p>
+                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{data.email}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {status && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">{status}</div>}
+
+                <form onSubmit={submit} encType="multipart/form-data" className="space-y-6">
+                    <div className="grid gap-6 lg:grid-cols-2">
+                        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                            <div className="flex items-center gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                                <div className="flex size-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"><UserRound className="size-4" /></div>
+                                <div><h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Account owner</h2><p className="text-xs text-slate-500 dark:text-slate-400">Your personal login details.</p></div>
+                            </div>
+                            <div className="mt-5 grid gap-4">
+                                <div className="space-y-1.5"><Label htmlFor="name">Full name</Label><div className="relative"><FieldIcon icon={UserRound} /><Input id="name" value={data.name} onChange={(event) => setData('name', event.target.value)} className="h-10 pl-9" required /></div><InputError message={errors.name} /></div>
+                                <div className="space-y-1.5"><Label htmlFor="email">Email address</Label><div className="relative"><FieldIcon icon={Mail} /><Input id="email" type="email" value={data.email} onChange={(event) => setData('email', event.target.value)} className="h-10 pl-9" required /></div><InputError message={errors.email} /></div>
+                                <div className="space-y-1.5"><Label htmlFor="phone">Contact number</Label><div className="relative"><FieldIcon icon={Phone} /><Input id="phone" type="tel" value={data.phone} onChange={(event) => setData('phone', event.target.value)} className="h-10 pl-9" placeholder="03xx xxxxxxx" /></div><InputError message={errors.phone} /></div>
+                            </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                            <div className="flex items-center gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                                <div className="flex size-9 items-center justify-center rounded-lg bg-blue-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"><Building2 className="size-4" /></div>
+                                <div><h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">School information</h2><p className="text-xs text-slate-500 dark:text-slate-400">Details connected to your school account.</p></div>
+                            </div>
+                            <div className="mt-5 grid gap-4">
+                                <div className="flex items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-950/30">
+                                    <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-300 dark:border-slate-700 dark:bg-slate-900">
+                                        {logoPreview ? <img src={logoPreview} alt="School logo preview" className="size-full object-cover" /> : <ImagePlus className="size-7" />}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">School logo</p>
+                                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">PNG or JPG, up to 2MB.</p>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            <button type="button" onClick={() => logoRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"><Upload className="size-3.5" />{logoPreview ? 'Change logo' : 'Upload logo'}</button>
+                                            {logoPreview && <button type="button" onClick={removeLogo} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"><Trash2 className="size-3.5" />Remove</button>}
+                                        </div>
+                                    </div>
+                                    <input ref={logoRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleLogoChange} />
+                                </div>
+                                <InputError message={errors.logo as string | undefined} />
+                                <div className="space-y-1.5"><Label htmlFor="school_name">School name</Label><div className="relative"><FieldIcon icon={Building2} /><Input id="school_name" value={data.school_name} onChange={(event) => setData('school_name', event.target.value)} className="h-10 pl-9" required /></div><InputError message={errors.school_name} /></div>
+                                <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="city">City</Label><div className="relative"><FieldIcon icon={MapPin} /><Input id="city" value={data.city} onChange={(event) => setData('city', event.target.value)} className="h-10 pl-9" required /></div><InputError message={errors.city} /></div><div className="space-y-1.5"><Label htmlFor="province">Province</Label><Input id="province" value={data.province} onChange={(event) => setData('province', event.target.value)} className="h-10" required /><InputError message={errors.province} /></div></div>
+                                <div className="space-y-1.5"><Label htmlFor="address">School address <span className="font-normal text-slate-400">(optional)</span></Label><Input id="address" value={data.address} onChange={(event) => setData('address', event.target.value)} className="h-10" placeholder="Street address" /><InputError message={errors.address} /></div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div className="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-slate-200 pt-5 dark:border-slate-800 sm:flex-row sm:items-center">
+                        <Link href="/dashboard" className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Cancel</Link>
+                        <Button type="submit" disabled={processing} className="h-10 rounded-lg bg-brand-600 px-5 text-sm font-semibold text-white hover:bg-brand-700"><Save className="size-4" />{processing ? 'Saving…' : 'Save changes'}</Button>
+                    </div>
+                </form>
+            </div>
+        </>
+    );
+}

@@ -7,7 +7,6 @@ use App\Http\Controllers\Customer\OnlineTestController;
 use App\Http\Controllers\Customer\PaperController;
 use App\Http\Controllers\Customer\PaperFolderController;
 use App\Http\Controllers\Customer\PaperTemplateController;
-use App\Http\Controllers\Customer\ProfileController;
 use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
@@ -43,22 +42,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('impersonation/stop', [CustomerController::class, 'stopImpersonation'])->name('impersonation.stop');
 
-    // â”€â”€â”€ Shared smart dashboard (renders based on user type) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Shared smart dashboard (renders based on user type) ─────────────────
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::inertia('customer/settings', 'customer/coming-soon', [
-        'title' => 'Settings',
-        'description' => 'Customer settings are being prepared and will be available soon.',
-    ])->middleware('app.user')->name('customer.settings');
-
-    Route::inertia('customer/activity', 'customer/coming-soon', [
-        'title' => 'Activity Log',
-        'description' => 'Your school activity history will be available here soon.',
-    ])->middleware('app.user')->name('customer.activity');
-    Route::get('customer/profile', [ProfileController::class, 'edit'])->middleware('app.user')->name('customer.profile');
-    Route::patch('customer/profile', [ProfileController::class, 'update'])->middleware('app.user')->name('customer.profile.update');
-
-    // â”€â”€â”€ Customer / Teacher app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Customer / Teacher app ───────────────────────────────────────────────
     Route::middleware('app.user')->group(function () {
         Route::middleware('teacher.feature:generate_papers')->group(function () {
             Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
@@ -105,7 +92,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('online-tests/{onlineTest}', [OnlineTestController::class, 'show'])->name('customer.online-tests.show');
         });
 
-        // â”€â”€â”€ Teachers (school owner only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Teachers (school owner only) ─────────────────────────────────────
         Route::middleware('school.owner')->group(function () {
             Route::get('teachers', [TeacherController::class, 'index'])->name('customer.teachers.index');
             Route::get('teachers/add', [TeacherController::class, 'create'])->name('customer.teachers.add');
@@ -118,10 +105,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
     });
 
-    // â”€â”€â”€ Superadmin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Superadmin ───────────────────────────────────────────────────────────
     Route::middleware('superadmin')->group(function () {
 
-        // â”€â”€â”€ Customers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Customers ───────────────────────────────────────────────────────────
         Route::get('superadmin/customers', [CustomerController::class, 'index'])->name('superadmin.customers')->middleware('permission:customers.view');
         Route::get('superadmin/customers/add', [CustomerController::class, 'create'])->name('superadmin.customers.add')->middleware('permission:customers.create');
         Route::post('superadmin/customers', [CustomerController::class, 'store'])->name('superadmin.customers.store')->middleware('permission:customers.create');
@@ -137,7 +124,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/data-transfer/catalog', [DataTransferController::class, 'catalog'])->name('superadmin.data-transfer.catalog')->middleware('permission:subjects.create');
         Route::post('superadmin/data-transfer', [DataTransferController::class, 'store'])->name('superadmin.data-transfer.store')->middleware('permission:subjects.create');
 
-        // â”€â”€â”€ Subscriptions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Subscriptions ───────────────────────────────────────────────────────
         Route::get('superadmin/customers/{customer}/subscriptions/add', [CustomerSubscriptionController::class, 'create'])->name('superadmin.customers.subscriptions.add')->middleware('permission:subscriptions.create');
         Route::post('superadmin/customers/{customer}/subscriptions', [CustomerSubscriptionController::class, 'store'])->name('superadmin.customers.subscriptions.store')->middleware('permission:subscriptions.create');
         Route::get('superadmin/customers/{customer}/subscriptions/{subscription}', [CustomerSubscriptionController::class, 'show'])->name('superadmin.customers.subscriptions.show')->middleware('permission:subscriptions.view');
@@ -147,7 +134,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('superadmin/customers/{customer}/subscriptions/{subscription}/payment-logs/{paymentLog}', [CustomerSubscriptionController::class, 'updatePaymentLog'])->name('superadmin.customers.subscriptions.payment-logs.update')->middleware('permission:subscriptions.manage_payments');
         Route::patch('superadmin/customers/{customer}/subscriptions/{subscription}/payment-logs/{paymentLog}/review', [CustomerSubscriptionController::class, 'reviewPaymentLog'])->name('superadmin.customers.subscriptions.payment-logs.review')->middleware('permission:subscriptions.manage_payments');
 
-        // â”€â”€â”€ Patterns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Patterns ────────────────────────────────────────────────────────────
         Route::get('superadmin/patterns', [PatternController::class, 'index'])->name('superadmin.patterns')->middleware('permission:patterns.view');
         Route::get('superadmin/patterns/add', [PatternController::class, 'create'])->name('superadmin.patterns.add')->middleware('permission:patterns.create');
         Route::post('superadmin/patterns', [PatternController::class, 'store'])->name('superadmin.patterns.store')->middleware('permission:patterns.create');
@@ -157,7 +144,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/patterns/{pattern}/classes/{class}', [PatternController::class, 'showClass'])->name('superadmin.patterns.classes.show')->middleware('permission:patterns.view');
         Route::get('superadmin/patterns/{pattern}', [PatternController::class, 'show'])->name('superadmin.patterns.show')->middleware('permission:patterns.view');
 
-        // â”€â”€â”€ Classes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Classes ─────────────────────────────────────────────────────────────
         Route::get('superadmin/classes', [ClassController::class, 'index'])->name('superadmin.classes')->middleware('permission:classes.view');
         Route::get('superadmin/classes/add', [ClassController::class, 'create'])->name('superadmin.classes.add')->middleware('permission:classes.create');
         Route::post('superadmin/classes', [ClassController::class, 'store'])->name('superadmin.classes.store')->middleware('permission:classes.create');
@@ -166,7 +153,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('superadmin/classes/{class}', [ClassController::class, 'destroy'])->name('superadmin.classes.destroy')->middleware('permission:classes.delete');
         Route::get('superadmin/classes/{class}', [ClassController::class, 'show'])->name('superadmin.classes.show')->middleware('permission:classes.view');
 
-        // â”€â”€â”€ Subjects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Subjects ────────────────────────────────────────────────────────────
         Route::get('superadmin/subjects', [SubjectController::class, 'index'])->name('superadmin.subjects')->middleware('permission:subjects.view');
         Route::get('superadmin/subjects/add', [SubjectController::class, 'create'])->name('superadmin.subjects.add')->middleware('permission:subjects.create');
         Route::post('superadmin/subjects', [SubjectController::class, 'store'])->name('superadmin.subjects.store')->middleware('permission:subjects.create');
@@ -175,24 +162,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('superadmin/subjects/{subject}', [SubjectController::class, 'destroy'])->name('superadmin.subjects.destroy')->middleware('permission:subjects.delete');
         Route::get('superadmin/subjects/{subject}', [SubjectController::class, 'show'])->name('superadmin.subjects.show')->middleware('permission:subjects.view');
 
-        // â”€â”€â”€ Chapters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Chapters ────────────────────────────────────────────────────────────
         Route::post('superadmin/subjects/{subject}/chapters', [ChapterController::class, 'store'])->name('superadmin.subjects.chapters.store')->middleware('permission:subjects.create');
         Route::put('superadmin/subjects/{subject}/chapters/{chapter}', [ChapterController::class, 'update'])->name('superadmin.subjects.chapters.update')->middleware('permission:subjects.edit');
         Route::delete('superadmin/subjects/{subject}/chapters/{chapter}', [ChapterController::class, 'destroy'])->name('superadmin.subjects.chapters.destroy')->middleware('permission:subjects.delete');
 
-        // â”€â”€â”€ Topics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Topics ──────────────────────────────────────────────────────────────
         Route::post('superadmin/subjects/{subject}/chapters/{chapter}/topics', [TopicController::class, 'store'])->name('superadmin.subjects.chapters.topics.store')->middleware('permission:subjects.create');
         Route::put('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}', [TopicController::class, 'update'])->name('superadmin.subjects.chapters.topics.update')->middleware('permission:subjects.edit');
         Route::delete('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}', [TopicController::class, 'destroy'])->name('superadmin.subjects.chapters.topics.destroy')->middleware('permission:subjects.delete');
 
-        // â”€â”€â”€ Questions (subject-scoped) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Questions (subject-scoped) ───────────────────────────────────────────
         Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions', [QuestionController::class, 'chapterIndex'])->name('superadmin.subjects.chapters.questions')->middleware('permission:questions.view');
         Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions/add', [QuestionController::class, 'createForChapter'])->name('superadmin.subjects.chapters.questions.add')->middleware('permission:questions.create');
         Route::get('superadmin/subjects/{subject}/chapters/{chapter}/questions/import', [QuestionController::class, 'importForChapter'])->name('superadmin.subjects.chapters.questions.import')->middleware('permission:questions.import');
         Route::get('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}/questions', [QuestionController::class, 'topicIndex'])->name('superadmin.subjects.chapters.topics.questions')->middleware('permission:questions.view');
         Route::get('superadmin/subjects/{subject}/chapters/{chapter}/topics/{topic}/questions/add', [QuestionController::class, 'createForTopic'])->name('superadmin.subjects.chapters.topics.questions.add')->middleware('permission:questions.create');
 
-        // â”€â”€â”€ Question Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Question Types ───────────────────────────────────────────────────────
         Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types')->middleware('permission:question_types.view');
         Route::get('superadmin/question-types/add', [QuestionTypeController::class, 'create'])->name('superadmin.question-types.add')->middleware('permission:question_types.create');
         Route::get('superadmin/question-types/objective', [QuestionTypeController::class, 'objectiveIndex'])->name('superadmin.question-types.objective')->middleware('permission:question_types.view');
@@ -209,7 +196,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('superadmin/question-types/{questionType}', [QuestionTypeController::class, 'destroy'])->name('superadmin.question-types.destroy')->middleware('permission:question_types.delete');
         Route::get('superadmin/question-types/{questionType}', [QuestionTypeController::class, 'show'])->name('superadmin.question-types.show')->middleware('permission:question_types.view');
 
-        // â”€â”€â”€ Questions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Questions ────────────────────────────────────────────────────────────
         Route::get('superadmin/questions', [QuestionController::class, 'index'])->name('superadmin.questions')->middleware('permission:questions.view');
         Route::get('superadmin/questions/add', [QuestionController::class, 'create'])->name('superadmin.questions.add')->middleware('permission:questions.create');
         Route::get('superadmin/questions/import', [QuestionController::class, 'import'])->name('superadmin.questions.import')->middleware('permission:questions.import');
@@ -226,11 +213,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('superadmin/questions/{question}', [QuestionController::class, 'destroy'])->name('superadmin.questions.destroy')->middleware('permission:questions.delete');
         Route::get('superadmin/questions/{question}', [QuestionController::class, 'show'])->name('superadmin.questions.show')->middleware('permission:questions.view');
 
-        // â”€â”€â”€ Trial Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Trial Settings ───────────────────────────────────────────────────────
         Route::get('superadmin/trial-settings', [TrialSettingController::class, 'index'])->name('superadmin.trial-settings')->middleware('permission:trial_settings.edit');
         Route::put('superadmin/trial-settings', [TrialSettingController::class, 'update'])->name('superadmin.trial-settings.update')->middleware('permission:trial_settings.edit');
 
-        // â”€â”€â”€ Superadmin Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── Superadmin Users ─────────────────────────────────────────────────────
         Route::get('superadmin/users', [SuperadminUserController::class, 'index'])->name('superadmin.users')->middleware('permission:users.view');
         Route::get('superadmin/users/add', [SuperadminUserController::class, 'create'])->name('superadmin.users.add')->middleware('permission:users.create');
         Route::post('superadmin/users', [SuperadminUserController::class, 'store'])->name('superadmin.users.store')->middleware('permission:users.create');
@@ -263,7 +250,7 @@ Route::get('/run-optimize', function () {
 });
 
 Route::get('/run-seed', function () {
-    // Only seeds safe, idempotent seeders â€” never recreates users
+    // Only seeds safe, idempotent seeders — never recreates users
     Artisan::call('db:seed', ['--class' => 'PermissionSeeder', '--force' => true]);
     $out = trim(Artisan::output()) ?: '(no output)';
 
@@ -277,7 +264,7 @@ Route::get('/run-assign-permissions', function () {
     $allIds = Permission::pluck('id');
 
     if ($allIds->isEmpty()) {
-        return response('No permissions found â€” run /run-seed first.', 200)
+        return response('No permissions found — run /run-seed first.', 200)
             ->header('Content-Type', 'text/plain');
     }
 
@@ -294,7 +281,7 @@ Route::get('/run-assign-permissions', function () {
     foreach ($users as $user) {
         $user->permissions()->syncWithoutDetaching($allIds);
         Cache::forget("user_permissions_{$user->id}");
-        $output .= "âœ“ Assigned all {$allIds->count()} permissions to: {$user->name} ({$user->email})\n";
+        $output .= "✓ Assigned all {$allIds->count()} permissions to: {$user->name} ({$user->email})\n";
     }
 
     return response($output, 200)->header('Content-Type', 'text/plain');
@@ -322,7 +309,7 @@ Route::get('/run-all', function () {
         Artisan::call($command, $args);
         $result = trim(Artisan::output());
         $label = $command.(isset($args['--class']) ? " ({$args['--class']})" : '');
-        $output .= "â–¶ {$label}\n".($result ?: '(no output)')."\n\n";
+        $output .= "▶ {$label}\n".($result ?: '(no output)')."\n\n";
     }
 
     // Step 6: assign all permissions to non-master superadmins
@@ -332,7 +319,7 @@ Route::get('/run-all', function () {
     foreach ($users as $user) {
         $user->permissions()->syncWithoutDetaching($allIds);
         Cache::forget("user_permissions_{$user->id}");
-        $output .= "âœ“ Permissions assigned to: {$user->name} ({$user->email})\n";
+        $output .= "✓ Permissions assigned to: {$user->name} ({$user->email})\n";
     }
 
     return response($output, 200)->header('Content-Type', 'text/plain');
@@ -349,7 +336,3 @@ Route::post('take-test/attempt/{attemptToken}/submit', [PublicOnlineTestControll
 Route::get('take-test/attempt/{attemptToken}/complete', [PublicOnlineTestController::class, 'complete'])->name('online-tests.public.complete');
 
 require __DIR__.'/settings.php';
-
-
-
-

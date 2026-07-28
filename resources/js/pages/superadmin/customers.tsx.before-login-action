@@ -1,4 +1,4 @@
-﻿import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     BanknoteIcon,
     CalendarIcon,
@@ -11,7 +11,6 @@ import {
     CoinsIcon,
     EyeIcon,
     MailIcon,
-    LogInIcon,
     MapPinIcon,
     PencilIcon,
     SchoolIcon,
@@ -263,7 +262,6 @@ function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 
 
 export default function Customers({ customers }: { customers: Customer[] }) {
     const { can } = usePermission();
-    const loginForm = useForm({});
     const [tab, setTab] = useState<'all' | 'mine'>('all');
     const [search, setSearch] = useState('');
     const [accountTypeFilter, setAccountTypeFilter] = useState<string>('all');
@@ -274,10 +272,6 @@ export default function Customers({ customers }: { customers: Customer[] }) {
     const [pageSize, setPageSize] = useState(10);
     const [page, setPage] = useState(1);
     const [visibleCols, setVisibleCols] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE_COLUMNS);
-
-    const loginAsCustomer = (customerId: number) => {
-        loginForm.post('/superadmin/customers/' + customerId + '/login');
-    };
 
     const myCount = useMemo(() => customers.filter((c) => c.is_my_customer).length, [customers]);
 
@@ -442,7 +436,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="relative min-w-40 flex-1">
                             <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                            <Input placeholder="Searchâ€¦" value={search}
+                            <Input placeholder="Search…" value={search}
                                 onChange={(e) => handleSearch(e.target.value)} className="w-full pl-9" />
                         </div>
 
@@ -808,18 +802,6 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                                 <ActionIconLink href={`/superadmin/customers/${customer.id}/edit`}
                                                                     icon={<PencilIcon className="size-4" />} label="Edit customer" />
                                                             )}
-                                                            {can('customers.edit') && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => loginAsCustomer(customer.id)}
-                                                                    disabled={loginForm.processing}
-                                                                    className={cn(ACTION_BUTTON_CLASS, 'disabled:cursor-not-allowed disabled:opacity-50')}
-                                                                    aria-label="Login as customer"
-                                                                    title="Login as customer"
-                                                                >
-                                                                    <LogInIcon className="size-4" />
-                                                                </button>
-                                                            )}
                                                         </div>
                                                     </td>
                                                 )}
@@ -836,7 +818,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                         <p className="text-muted-foreground text-xs">
                             {filtered.length === 0
                                 ? 'No results'
-                                : `${(safePage - 1) * pageSize + 1}â€“${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
+                                : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
                         </p>
                         <div className="flex items-center gap-1">
                             <button onClick={() => goTo(1)} disabled={safePage === 1}
@@ -857,7 +839,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                     }, [])
                                     .map((item, i) =>
                                         item === 'ellipsis' ? (
-                                            <span key={`e-${i}`} className="text-muted-foreground px-1 text-xs">â€¦</span>
+                                            <span key={`e-${i}`} className="text-muted-foreground px-1 text-xs">…</span>
                                         ) : (
                                             <button key={item} onClick={() => goTo(item as number)}
                                                 className={cn('min-w-7 rounded px-2 py-1 text-xs font-medium transition-colors',
@@ -889,5 +871,3 @@ Customers.layout = {
         { title: 'Customers', href: '/superadmin/customers' },
     ],
 };
-
-

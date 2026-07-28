@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Enums\UserType;
 use App\Http\Controllers\Customer\GeneratePaperController;
@@ -7,7 +7,6 @@ use App\Http\Controllers\Customer\OnlineTestController;
 use App\Http\Controllers\Customer\PaperController;
 use App\Http\Controllers\Customer\PaperFolderController;
 use App\Http\Controllers\Customer\PaperTemplateController;
-use App\Http\Controllers\Customer\ProfileController;
 use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
@@ -55,8 +54,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'title' => 'Activity Log',
         'description' => 'Your school activity history will be available here soon.',
     ])->middleware('app.user')->name('customer.activity');
-    Route::get('customer/profile', [ProfileController::class, 'edit'])->middleware('app.user')->name('customer.profile');
-    Route::patch('customer/profile', [ProfileController::class, 'update'])->middleware('app.user')->name('customer.profile.update');
 
     // â”€â”€â”€ Customer / Teacher app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::middleware('app.user')->group(function () {
@@ -349,7 +346,6 @@ Route::post('take-test/attempt/{attemptToken}/submit', [PublicOnlineTestControll
 Route::get('take-test/attempt/{attemptToken}/complete', [PublicOnlineTestController::class, 'complete'])->name('online-tests.public.complete');
 
 require __DIR__.'/settings.php';
-
 
 
 

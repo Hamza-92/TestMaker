@@ -82,7 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
             { label: 'Teachers', href: '/teachers', icon: UsersIcon },
 
 
-            { label: 'Settings', href: '/customer/settings', icon: SettingsIcon },
+            { label: 'Settings', href: '/settings', icon: SettingsIcon },
         ],
     },
     {
@@ -90,7 +90,7 @@ const NAV_GROUPS: NavGroup[] = [
         ownerOnly: true,
         items: [
 
-            { label: 'Activity Log', href: '/customer/activity', icon: ActivityIcon },
+            { label: 'Activity Log', href: '/activity', icon: ActivityIcon },
 
         ],
     },
@@ -330,6 +330,5 @@ export function CustomerSidebar() {
         </>
     );
 }
-
 
 

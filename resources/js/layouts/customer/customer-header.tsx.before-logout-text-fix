@@ -124,8 +124,8 @@ function LogoutMenuItem() {
                 }
             />
             <DropdownMenuItem asChild variant="destructive">
-                <button type="submit" className="w-full cursor-pointer !text-rose-700 hover:!text-rose-800">
-                    <LogOutIcon className="!text-rose-700" />
+                <button type="submit" className="w-full cursor-pointer">
+                    <LogOutIcon />
                     Log out
                 </button>
             </DropdownMenuItem>
@@ -241,5 +241,4 @@ export function CustomerHeader() {
         </header>
     );
 }
-
 
