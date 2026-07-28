@@ -6,7 +6,7 @@ import type { Auth } from '@/types/auth';
 
 const primaryNavigation = [
     { label: 'Features', href: '#features' },
-    { label: 'Pricing', href: '/pricing' },
+    { label: 'Pricing', href: '/testmaker/pricing.php' },
     { label: 'How it Works', href: '#how-it-works' },
     { label: 'Resources', href: '#resources', hasMenu: true },
     { label: 'About Us', href: '#about' },
