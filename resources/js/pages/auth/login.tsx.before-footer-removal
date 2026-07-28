@@ -1,0 +1,80 @@
+﻿import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { ArrowRight, CheckCircle2, ClipboardCheck } from 'lucide-react';
+import InputError from '@/components/input-error';
+import PasswordInput from '@/components/password-input';
+import SiteHeader from '@/components/site-header';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { register } from '@/routes';
+import { store } from '@/routes/login';
+import type { Auth } from '@/types/auth';
+
+type Props = {
+    status?: string;
+    canRegister: boolean;
+};
+
+export default function Login({ status, canRegister }: Props) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+
+    return (
+        <>
+            <Head title="Log in to TestMaker" />
+            <div className="min-h-screen overflow-x-hidden bg-[#f8fafc] text-slate-900">
+                <SiteHeader auth={auth} />
+                <main className="flex min-h-[calc(100vh-74px)] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+                    <section className="w-full max-w-[460px]">
+                        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.08)] sm:p-9">
+                            <div className="mb-7 text-center">
+                                <h1 className="font-display text-3xl font-extrabold tracking-[-0.05em] text-slate-900">Welcome back</h1>
+                                <p className="mt-2 text-sm text-slate-500">Log in to continue to TestMaker.</p>
+                            </div>
+
+                            {status && <div className="mb-5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">{status}</div>}
+
+                            <Form {...store.form()} resetOnSuccess={['password']} disableWhileProcessing autoComplete="off" className="grid gap-5">
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="email">Email address</Label>
+                                            <Input id="email" type="email" name="email" required autoFocus tabIndex={1} autoComplete="off" placeholder="you@school.com" className="h-12 rounded-[10px] border-slate-300 bg-white" />
+                                            <InputError message={errors.email} />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="password">Password</Label>
+                                            <PasswordInput id="password" name="password" required tabIndex={2} autoComplete="current-password" placeholder="Enter your password" className="h-12 rounded-[10px] border-slate-300 bg-white" />
+                                            <InputError message={errors.password} />
+                                        </div>
+
+                                        <label className="flex items-center gap-3 text-sm text-slate-600">
+                                            <input id="remember" type="checkbox" name="remember" tabIndex={3} style={{ accentColor: '#2563eb' }} className="h-4 w-4 rounded border border-slate-300 bg-white" />
+                                            <span>Remember me</span>
+                                        </label>
+
+                                        <Button type="submit" className="mt-1 h-12 w-full rounded-[10px] bg-brand-600 text-sm font-bold text-white hover:bg-brand-700" tabIndex={4} disabled={processing} data-test="login-button">
+                                            {processing && <Spinner />}
+                                            Log in <ArrowRight size={16} />
+                                        </Button>
+                                    </>
+                                )}
+                            </Form>
+
+                            {canRegister && <p className="mt-6 text-center text-sm text-slate-500">Don&apos;t have an account? <Link href={register()} className="font-bold text-brand-700 transition hover:text-brand-900" tabIndex={5}>Create one</Link></p>}
+                        </div>
+                    </section>
+                </main>
+                <footer className="bg-[#0b2035] px-5 py-8 text-white sm:px-8">
+                    <div className="mx-auto flex max-w-[1240px] flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                        <Link href="/" className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#102b46]"><ClipboardCheck size={19} /></span><span className="font-display text-xl font-extrabold tracking-[-0.04em]">TestMaker</span></Link>
+                        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-blue-200"><Link href="/" className="transition hover:text-white">Home</Link><Link href="/pricing" className="transition hover:text-white">Pricing</Link><span className="flex items-center gap-1"><CheckCircle2 size={15} className="text-emerald-300" /> Secure school workspace</span></div>
+                    </div>
+                </footer>
+            </div>
+        </>
+    );
+}
+
+Login.layout = null;
