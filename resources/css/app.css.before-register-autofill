@@ -452,15 +452,3 @@ input[type='date']::-webkit-calendar-picker-indicator {
         box-shadow: none !important;
     }
 }
-
-/* Keep browser autofill from changing the appearance of public forms. */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-textarea:-webkit-autofill,
-select:-webkit-autofill {
-    -webkit-text-fill-color: #0f172a;
-    -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
-    box-shadow: 0 0 0 1000px #ffffff inset;
-    transition: background-color 9999s ease-out 0s;
-}

@@ -11,7 +11,6 @@ use App\Models\TrialSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -25,37 +24,16 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
-        $validator = Validator::make($input, [
+        $validated = Validator::make($input, [
             ...$this->profileRules(),
             'school_name' => ['required', 'string', 'max:255'],
-            'phone'       => ['required', 'string', 'max:30', 'regex:/^[0-9+()\-\s]{7,30}$/'],
+            'phone'       => ['required', 'string', 'max:30'],
             'address'     => ['nullable', 'string', 'max:255'],
-            'city'        => ['required', 'string', 'max:100'],
-            'province'    => ['required', 'string', 'max:100'],
+            'city'        => ['nullable', 'string', 'max:100'],
+            'province'    => ['nullable', 'string', 'max:100'],
             'terms'       => ['accepted'],
             'password'    => $this->passwordRules(),
-        ]);
-
-        $validator->after(function ($validator) use ($input): void {
-            $email = Str::lower(trim((string) ($input['email'] ?? '')));
-            $schoolName = Str::lower(trim((string) ($input['school_name'] ?? '')));
-
-            if ($email !== '' && User::query()
-                ->where('user_type', UserType::Customer->value)
-                ->whereRaw('LOWER(email) = ?', [$email])
-                ->exists()) {
-                $validator->errors()->add('email', 'This customer already has a TestMaker account.');
-            }
-
-            if ($schoolName !== '' && User::query()
-                ->where('user_type', UserType::Customer->value)
-                ->whereRaw('LOWER(school_name) = ?', [$schoolName])
-                ->exists()) {
-                $validator->errors()->add('school_name', 'This school already has a customer account.');
-            }
-        });
-
-        $validated = $validator->validate();
+        ])->validate();
 
         return DB::transaction(function () use ($validated): User {
             // Ensure the configured trial access is ready for this new school.
@@ -68,8 +46,8 @@ class CreateNewUser implements CreatesNewUsers
                 'phone'        => $validated['phone'],
                 'school_name'  => $validated['school_name'],
                 'address'      => $validated['address'] ?? null,
-                'city'         => $validated['city'],
-                'province'     => $validated['province'],
+                'city'         => $validated['city'] ?? null,
+                'province'     => $validated['province'] ?? null,
                 'user_type'    => UserType::Customer->value,
                 'status'       => UserStatus::Active->value,
                 'account_type' => AccountType::Trial->value,
