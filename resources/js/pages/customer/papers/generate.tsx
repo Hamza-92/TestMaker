@@ -1,4 +1,4 @@
-﻿import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -346,7 +346,10 @@ function createGlobalFilters(
     sourceOptions: SourceOption[],
 ): Record<SourceFilterKey, boolean> {
     return Object.fromEntries(
-        sourceOptions.map((source) => [source.value, true]),
+        sourceOptions.map((source) => [
+            source.value,
+            source.value === 'exercise',
+        ]),
     );
 }
 
@@ -1148,7 +1151,8 @@ export default function GeneratePaper({
             sourceFilters
                 .filter(
                     (item) =>
-                        questionSelection.globalFilters[item.value] ?? true,
+                        questionSelection.globalFilters[item.value] ??
+                            item.value === 'exercise',
                 )
                 .map((item) => item.value),
         [questionSelection.globalFilters, sourceFilters],
@@ -3228,7 +3232,9 @@ return '';
             ...current,
             globalFilters: {
                 ...current.globalFilters,
-                [key]: !(current.globalFilters[key] ?? true),
+                [key]: !(
+                    current.globalFilters[key] ?? key === 'exercise'
+                ),
             },
             sections: current.sections.map((section) => ({
                 ...section,
@@ -3254,7 +3260,9 @@ return '';
     }
 
     function sourceChecked(value: string) {
-        return questionSelection.globalFilters[value] ?? true;
+        return (
+            questionSelection.globalFilters[value] ?? value === 'exercise'
+        );
     }
 
     function updateSectionValue(

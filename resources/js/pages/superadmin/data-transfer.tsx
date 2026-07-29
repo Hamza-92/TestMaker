@@ -1,8 +1,16 @@
 import { Head } from '@inertiajs/react';
-import { ArrowRightIcon } from 'lucide-react';
+import { ArrowRightIcon, CheckCircle2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     FloatingCombobox,
     type ComboboxOptionItem,
@@ -161,6 +169,7 @@ function SubjectTransferPanel({
     const [progress, setProgress] = useState(0);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
 
     useEffect(() => {
         const params = new URLSearchParams();
@@ -267,6 +276,7 @@ function SubjectTransferPanel({
         setProgress(8);
         setMessage('');
         setError('');
+        setIsCompletionModalOpen(false);
 
         const timer = window.setInterval(() => {
             setProgress((value) => (value < 90 ? value + 6 : value));
@@ -298,7 +308,17 @@ function SubjectTransferPanel({
             }
 
             setProgress(100);
-            setMessage(payload.message ?? 'Completed.');
+            const totals = payload.report?.totals;
+            const assets = payload.report?.assets;
+            const missingAssetWarning = assets?.missing
+                ? ` ${assets.missing} referenced legacy image${assets.missing === 1 ? '' : 's'} could not be found and ${assets.missing === 1 ? 'was' : 'were'} left unchanged.`
+                : '';
+            const completionMessage = totals
+                ? `Transferred ${totals.chapters} chapters, ${totals.topics} topics, ${totals.questions} questions, and ${totals.options} legacy options. ${assets ? `${assets.copied} images copied; ${assets.reused} reused.` : ''}${missingAssetWarning}`
+                : (payload.message ?? 'Completed.');
+
+            setMessage(completionMessage);
+            setIsCompletionModalOpen(true);
         } catch (exception) {
             setProgress(0);
             setError(exception instanceof Error ? exception.message : 'Transfer failed.');
@@ -437,14 +457,7 @@ function SubjectTransferPanel({
                     </div>
                 ) : null}
 
-                {(message || error) && (
-                    <p
-                        className={`text-right text-sm ${error ? 'text-destructive' : 'text-muted-foreground'
-                            }`}
-                    >
-                        {error || message}
-                    </p>
-                )}
+                {error && <p className="text-right text-sm text-destructive">{error}</p>}
 
                 <div className="flex justify-end">
                     <Button type="button" disabled={!canTransfer} onClick={runTransfer}>
@@ -452,6 +465,25 @@ function SubjectTransferPanel({
                     </Button>
                 </div>
             </div>
+
+            <Dialog open={isCompletionModalOpen} onOpenChange={setIsCompletionModalOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader className="items-center text-center sm:text-center">
+                        <div className="mb-1 flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
+                            <CheckCircle2Icon className="size-6" />
+                        </div>
+                        <DialogTitle>Transfer completed</DialogTitle>
+                        <DialogDescription className="text-center leading-6">
+                            {message}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="sm:justify-center">
+                        <Button type="button" onClick={() => setIsCompletionModalOpen(false)}>
+                            Done
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
