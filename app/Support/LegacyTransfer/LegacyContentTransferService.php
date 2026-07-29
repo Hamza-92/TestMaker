@@ -81,6 +81,8 @@ class LegacyContentTransferService
 
     private array $questionTypeMap = [];
 
+    private array $mediumIdMap = [];
+
     public function __construct(private readonly LegacyAssetMigrator $assets) {}
 
     public function sourcePatterns(): array
@@ -355,6 +357,7 @@ class LegacyContentTransferService
         }
 
         $this->questionTypeMap = [];
+        $this->mediumIdMap = [];
         $this->assets->reset();
 
         return DB::transaction(function () use (
@@ -394,7 +397,7 @@ class LegacyContentTransferService
                 $subjectType = $this->sourceSubjectType($sourcePattern, $sourceClassId, $sourceSubjectId);
                 $subject = $this->resolveTargetSubject($sourceSubject, $subjectType, $options, $creatorId);
 
-                ClassSubject::query()->firstOrCreate([
+                $classSubject = ClassSubject::query()->firstOrCreate([
                     'class_id' => $class->id,
                     'pattern_id' => $pattern->id,
                     'subject_id' => $subject->id,
@@ -421,6 +424,18 @@ class LegacyContentTransferService
                     targetPattern: $pattern,
                     targetSubject: $subject,
                 );
+
+                $detectedMedium = (string) ($subjectReport['medium'] ?? 'Both');
+                if (! $replaceExisting) {
+                    $classSubject->loadMissing('medium');
+                    $detectedMedium = $this->mergeMediumNames(
+                        $classSubject->medium?->name,
+                        $detectedMedium,
+                    );
+                }
+                $classSubject->update([
+                    'medium_id' => $this->mediumId($detectedMedium),
+                ]);
 
                 $report['subjects'][] = [
                     'id' => $subject->id,
@@ -463,6 +478,7 @@ class LegacyContentTransferService
             'options' => 0,
             'question_types' => 0,
         ];
+        $languagePresence = ['english' => false, 'urdu' => false];
 
         $sourceChapters = $this->source()
             ->table('pk_chapter')
@@ -481,6 +497,10 @@ class LegacyContentTransferService
         }
 
         foreach ($sourceChapters as $sourceChapter) {
+            $this->recordLocalizedPayload($languagePresence, [
+                'name_en' => $sourceChapter->name,
+                'name_ur' => $sourceChapter->u_name,
+            ]);
             $chapterNumber = $this->nullableInt($sourceChapter->chapter_number);
 
             if ($chapterNumber !== null) {
@@ -522,6 +542,10 @@ class LegacyContentTransferService
 
             $chapterTopicIds = [];
             foreach ($sourceTopics as $sourceTopic) {
+                $this->recordLocalizedPayload($languagePresence, [
+                    'name_en' => $sourceTopic->name,
+                    'name_ur' => $sourceTopic->u_name,
+                ]);
                 $topic = Topic::query()->updateOrCreate([
                     'chapter_id' => $chapter->id,
                     'name' => $this->limitedString($sourceTopic->name, 150) ?? "Topic {$sourceTopic->id}",
@@ -593,6 +617,11 @@ class LegacyContentTransferService
                     creatorId: $creatorId,
                 );
 
+                $this->recordLocalizedPayload($languagePresence, [
+                    ...$payload,
+                    'options' => $options,
+                ]);
+
                 $question = Question::query()->create($payload);
 
                 if ($options !== []) {
@@ -603,6 +632,8 @@ class LegacyContentTransferService
                 $counts['options'] += $legacyOptionCount;
             }
         }
+
+        $counts['medium'] = $this->mediumNameFromPresence($languagePresence);
 
         return $counts;
     }
@@ -628,7 +659,9 @@ class LegacyContentTransferService
         $questionPayload = QuestionTypeSchemaRegistry::buildQuestionPayload($questionType, $content);
 
         return [[
-            'medium_id' => $this->resolveLegacyMediumId($sourceQuestion->medium ?? null),
+            'medium_id' => $this->mediumId(
+                $this->mediumNameFromPayload($questionPayload),
+            ),
             'question_type_id' => $questionType->id,
             'chapter_id' => $targetChapterId,
             'topic_id' => $targetTopicId,
@@ -646,16 +679,76 @@ class LegacyContentTransferService
         ], $questionPayload['options']];
     }
 
-    private function resolveLegacyMediumId(mixed $sourceMedium): ?int
+    private function mediumId(string $mediumName): ?int
     {
-        $mediumName = match ((int) $sourceMedium) {
-            1 => 'English',
-            2 => 'Urdu',
-            3 => 'Both',
-            default => 'Both',
-        };
+        if (! array_key_exists($mediumName, $this->mediumIdMap)) {
+            $this->mediumIdMap[$mediumName] = Medium::query()
+                ->where('name', $mediumName)
+                ->value('id');
+        }
 
-        return Medium::query()->where('name', $mediumName)->value('id');
+        return $this->mediumIdMap[$mediumName];
+    }
+
+    private function mediumNameFromPayload(array $payload): string
+    {
+        $presence = ['english' => false, 'urdu' => false];
+        $this->recordLocalizedPayload($presence, $payload);
+
+        return $this->mediumNameFromPresence($presence);
+    }
+
+    private function recordLocalizedPayload(array &$presence, mixed $value): void
+    {
+        if (! is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $key => $item) {
+            if ($key === 'options') {
+                continue;
+            }
+
+            if (
+                is_string($key)
+                && ! is_array($item)
+                && ! is_object($item)
+                && $this->nullableString($item) !== null
+            ) {
+                if (str_ends_with($key, '_en')) {
+                    $presence['english'] = true;
+                }
+                if (str_ends_with($key, '_ur')) {
+                    $presence['urdu'] = true;
+                }
+            }
+
+            if (is_array($item)) {
+                $this->recordLocalizedPayload($presence, $item);
+            }
+        }
+    }
+
+    private function mediumNameFromPresence(array $presence): string
+    {
+        if ($presence['english'] && $presence['urdu']) {
+            return 'Both';
+        }
+
+        if ($presence['urdu']) {
+            return 'Urdu';
+        }
+
+        return 'English';
+    }
+
+    private function mergeMediumNames(?string $existing, string $detected): string
+    {
+        if ($existing === null || $existing === '') {
+            return $detected;
+        }
+
+        return $existing === $detected ? $detected : 'Both';
     }
 
     private function legacyQuestionContent(string $schemaKey, object $question, array $sourceOptions): array

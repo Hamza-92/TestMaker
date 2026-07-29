@@ -246,9 +246,14 @@ interface QuestionTypeCount {
     columnPerRow: number;
 }
 
+type ContentMedium = 'English' | 'Urdu' | 'Both';
+
 interface ManualQuestion {
     id: number;
     summaryText: string;
+    summaryTextEn?: string | null;
+    summaryTextUr?: string | null;
+    medium?: ContentMedium | null;
     schemaKey: string;
     isObjective: boolean;
     content: Record<string, unknown>;
@@ -460,6 +465,50 @@ function shuffleItems<T>(items: readonly T[]): T[] {
     return shuffled;
 }
 
+function localizedPaperHtml(
+    english: unknown,
+    urdu: unknown,
+    medium: ContentMedium | null | undefined,
+    fallback = '',
+): string {
+    const englishText = typeof english === 'string' ? english.trim() : '';
+    const urduText = typeof urdu === 'string' ? urdu.trim() : '';
+    const resolvedMedium =
+        medium ??
+        (englishText !== '' && urduText !== ''
+            ? 'Both'
+            : urduText !== ''
+              ? 'Urdu'
+              : 'English');
+
+    if (resolvedMedium === 'English') {
+        return englishText || urduText || fallback;
+    }
+
+    if (resolvedMedium === 'Urdu') {
+        return urduText || englishText || fallback;
+    }
+
+    if (englishText !== '' && urduText !== '' && englishText !== urduText) {
+        return (
+            '<div>' +
+            englishText +
+            '</div><div dir="rtl">' +
+            urduText +
+            '</div>'
+        );
+    }
+
+    return englishText || urduText || fallback;
+}
+
+function plainQuestionText(value: string): string {
+    return value
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function paperQuestionFromManual(
     question: ManualQuestion,
     id: string,
@@ -470,7 +519,14 @@ function paperQuestionFromManual(
     return {
         id,
         sourceQuestionId: question.id,
-        text: passageQuestions ? passageText : question.summaryText,
+        text: passageQuestions
+            ? passageText
+            : localizedPaperHtml(
+                  question.summaryTextEn,
+                  question.summaryTextUr,
+                  question.medium,
+                  question.summaryText,
+              ),
         source: question.source,
         sourceLabel: question.sourceLabel,
         chapterLabel: manualQuestionChapterLabel(question),
@@ -500,13 +556,21 @@ function passageTextFromManual(question: ManualQuestion): string {
             ? content.passage_ur.trim()
             : '';
 
-    return passageEn || passageUr || question.summaryText;
+    return localizedPaperHtml(
+        passageEn,
+        passageUr,
+        question.medium,
+        question.summaryText,
+    );
 }
 
 function manualQuestionDisplayText(question: ManualQuestion): string {
-    return question.schemaKey === 'objective_passage_mcq'
-        ? passageTextFromManual(question)
-        : question.summaryText;
+    const value =
+        question.schemaKey === 'objective_passage_mcq'
+            ? passageTextFromManual(question)
+            : question.summaryText;
+
+    return plainQuestionText(value);
 }
 
 function passageQuestionsFromManual(
@@ -539,11 +603,16 @@ function passageQuestionsFromManual(
                 typeof itemData.prompt_ur === 'string'
                     ? itemData.prompt_ur.trim()
                     : '';
-            const text = textEn || textUr;
+            const text = localizedPaperHtml(
+                textEn,
+                textUr,
+                question.medium,
+            );
             const passageId = id + '_passage_' + index;
             const options = paperOptionsFromContent(
                 itemData.options,
                 passageId,
+                question.medium,
             );
 
             if (text === '' && options.length === 0) {
@@ -579,10 +648,10 @@ function answerTextFromManual(question: ManualQuestion): string | null {
     }
 
     const en = typeof content.answer_en === 'string' ? content.answer_en.trim() : '';
-    if (en !== '') return en;
     const ur = typeof content.answer_ur === 'string' ? content.answer_ur.trim() : '';
-    if (ur !== '') return ur;
-    return null;
+    const answer = localizedPaperHtml(en, ur, question.medium);
+
+    return answer !== '' ? answer : null;
 }
 
 function createCustomPaperQuestion(id: string): GeneratedPaperQuestion {
@@ -615,12 +684,14 @@ function paperOptionsFromManual(
     return paperOptionsFromContent(
         question.content.options,
         question.id + '_option',
+        question.medium,
     );
 }
 
 function paperOptionsFromContent(
     options: unknown,
     idPrefix: string,
+    medium?: ContentMedium | null,
 ): PaperQuestionOption[] {
 
     if (!Array.isArray(options)) {
@@ -634,7 +705,11 @@ function paperOptionsFromContent(
             }
 
             const value = option as Record<string, unknown>;
-            const text = String(value.text_en || value.text_ur || '').trim();
+            const text = localizedPaperHtml(
+                value.text_en,
+                value.text_ur,
+                medium,
+            );
 
             if (text === '') {
                 return null;
@@ -5265,7 +5340,9 @@ function QuestionSearchRow({
                     {options.length > 0 && (
                         <span className="mt-2 grid gap-2 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-4 dark:text-slate-300">
                             {options.map((option) => (
-                                <span key={option.id}>{option.text}</span>
+                                <span key={option.id}>
+                                    {plainQuestionText(option.text)}
+                                </span>
                             ))}
                         </span>
                     )}

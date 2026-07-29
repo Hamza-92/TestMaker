@@ -22,7 +22,7 @@ class GeneratePaperController extends Controller
     {
         $access = AppUserAccess::resolve(auth()->user());
         $patternIds = $access['ids']['pattern_access'];
-        $classIds   = $access['ids']['class_access'];
+        $classIds = $access['ids']['class_access'];
         $subjectIds = $access['ids']['subject_access'];
 
         $patterns = Pattern::where('status', 1)
@@ -42,6 +42,7 @@ class GeneratePaperController extends Controller
             ->values();
 
         $classSubjects = ClassSubject::join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
+            ->leftJoin('mediums', 'mediums.id', '=', 'class_subjects.medium_id')
             ->where('subjects.status', 1)
             ->when($patternIds !== null, fn ($q) => $q->whereIn('class_subjects.pattern_id', $patternIds))
             ->when($classIds !== null, fn ($q) => $q->whereIn('class_subjects.class_id', $classIds))
@@ -51,7 +52,9 @@ class GeneratePaperController extends Controller
                 'class_subjects.class_id',
                 'class_subjects.pattern_id',
                 'class_subjects.subject_id',
-                'subjects.name_eng as name'
+                'subjects.name_eng as name',
+                'subjects.name_ur',
+                'mediums.name as medium',
             )
             ->get()
             ->filter(fn ($row) => AppUserAccess::allowsSubject(
@@ -63,10 +66,10 @@ class GeneratePaperController extends Controller
             ->values();
 
         return [
-            'patterns'       => $patterns,
+            'patterns' => $patterns,
             'patternClasses' => $patternClasses,
-            'classSubjects'  => $classSubjects,
-            'sourceOptions'  => collect(Question::sourceOptions())
+            'classSubjects' => $classSubjects,
+            'sourceOptions' => collect(Question::sourceOptions())
                 ->map(fn (string $label, string $value) => [
                     'value' => $value,
                     'label' => $label,
@@ -90,9 +93,9 @@ class GeneratePaperController extends Controller
             $template = PaperTemplate::where('user_id', auth()->id())->find($templateId);
             if ($template !== null) {
                 $props['appliedTemplate'] = [
-                    'id'        => $template->id,
-                    'name'      => $template->name,
-                    'settings'  => $template->settings,
+                    'id' => $template->id,
+                    'name' => $template->name,
+                    'settings' => $template->settings,
                     'structure' => $template->structure,
                 ];
             }
@@ -109,7 +112,7 @@ class GeneratePaperController extends Controller
     {
         $data = $request->validate([
             'pattern_id' => 'required|integer|exists:patterns,id',
-            'class_id'   => 'required|integer|exists:classes,id',
+            'class_id' => 'required|integer|exists:classes,id',
             'subject_id' => 'required|integer|exists:subjects,id',
         ]);
 
@@ -124,6 +127,12 @@ class GeneratePaperController extends Controller
             403,
         );
 
+        $displayMedium = $this->subjectMedium(
+            (int) $data['pattern_id'],
+            (int) $data['class_id'],
+            (int) $data['subject_id'],
+        );
+
         $chapters = Chapter::query()
             ->where('pattern_id', $data['pattern_id'])
             ->where('class_id', $data['class_id'])
@@ -134,7 +143,7 @@ class GeneratePaperController extends Controller
                 $q->where('status', 1)
                     ->orderBy('sort_id')
                     ->orderBy('id')
-                    ->select('id', 'chapter_id', 'name')
+                    ->select('id', 'chapter_id', 'name', 'name_ur')
                     ->withCount(['questions as question_count' => fn ($qq) => $qq->where('status', 1)]);
             }])
             ->orderBy('group_name')
@@ -142,28 +151,36 @@ class GeneratePaperController extends Controller
             ->orderBy('chapter_number')
             ->orderBy('sort_id')
             ->orderBy('id')
-            ->get(['id', 'name', 'chapter_number', 'group_name', 'group_heading'])
+            ->get(['id', 'name', 'name_ur', 'chapter_number', 'group_name', 'group_heading'])
             ->map(fn (Chapter $c) => [
-                'id'             => $c->id,
-                'name'           => $c->name,
+                'id' => $c->id,
+                'name' => $this->localizedLabel($c->name, $c->name_ur, $displayMedium),
+                'name_eng' => $c->name,
+                'name_ur' => $c->name_ur,
                 'chapter_number' => $c->chapter_number,
-                'group_name'     => $c->group_name,
-                'group_heading'  => $c->group_heading,
+                'group_name' => $c->group_name,
+                'group_heading' => $c->group_heading,
                 'question_count' => (int) ($c->question_count ?? 0),
-                'topics'         => $c->topics->map(fn ($t) => [
-                    'id'             => $t->id,
-                    'name'           => $t->name,
+                'topics' => $c->topics->map(fn ($t) => [
+                    'id' => $t->id,
+                    'name' => $this->localizedLabel($t->name, $t->name_ur, $displayMedium),
+                    'name_eng' => $t->name,
+                    'name_ur' => $t->name_ur,
                     'question_count' => (int) ($t->question_count ?? 0),
                 ])->values(),
             ])
             ->values();
 
-        return response()->json(['chapters' => $chapters]);
+        return response()->json([
+            'chapters' => $chapters,
+            'medium' => $displayMedium,
+        ]);
     }
 
     public function questionTypes(Request $request): JsonResponse
     {
         [$chapterIds, $validTopicIds, $sources, $difficulties] = $this->questionScope($request);
+        $displayMedium = $this->subjectMediumForChapters($chapterIds);
 
         if ($sources->isEmpty()) {
             return response()->json(['sections' => []]);
@@ -172,12 +189,13 @@ class GeneratePaperController extends Controller
         $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.is_objective', 'question_types.column_per_row')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.is_objective', 'question_types.column_per_row')
             ->orderByDesc('question_types.is_objective')
             ->orderBy('question_types.name')
             ->select([
                 'question_types.id',
                 'question_types.name',
+                'question_types.name_ur',
                 'question_types.is_objective',
                 'question_types.column_per_row',
                 DB::raw('COUNT(questions.id) as available_count'),
@@ -189,7 +207,7 @@ class GeneratePaperController extends Controller
             'id' => 'sec_'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
             'questionTypeId' => (int) $row->id,
             'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
-            'title' => $row->name,
+            'title' => $this->localizedLabel($row->name, $row->name_ur, $displayMedium),
             'availableCount' => (int) $row->available_count,
             'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
         ]);
@@ -208,19 +226,20 @@ class GeneratePaperController extends Controller
             return response()->json(['questions' => []]);
         }
 
+        $displayMedium = $this->subjectMediumForChapters($chapterIds);
         $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->where('questions.question_type_id', $data['question_type_id'])
             ->with([
                 'questionType',
-                'chapter:id,name,chapter_number',
-                'topic:id,name',
+                'chapter:id,name,name_ur,chapter_number',
+                'topic:id,name,name_ur',
                 'options',
             ])
             ->orderBy('questions.chapter_id')
             ->orderBy('questions.topic_id')
             ->orderBy('questions.id')
             ->get()
-            ->map(function (Question $question) {
+            ->map(function (Question $question) use ($displayMedium) {
                 $content = QuestionTypeSchemaRegistry::contentFromQuestion(
                     $question,
                     $question->questionType,
@@ -235,12 +254,23 @@ class GeneratePaperController extends Controller
                     ],
                 );
 
+                $summaryEn = $this->localizedQuestionSummary($question, $content, 'en');
+                $summaryUr = $this->localizedQuestionSummary($question, $content, 'ur');
+
                 return [
                     'id' => $question->id,
-                    'summaryText' => QuestionTypeSchemaRegistry::summarize(
-                        $question->questionType,
-                        $content,
+                    'summaryText' => $this->localizedLabel(
+                        $summaryEn,
+                        $summaryUr,
+                        $displayMedium,
+                        QuestionTypeSchemaRegistry::summarize(
+                            $question->questionType,
+                            $content,
+                        ),
                     ),
+                    'summaryTextEn' => $summaryEn,
+                    'summaryTextUr' => $summaryUr,
+                    'medium' => $displayMedium,
                     'schemaKey' => $schema['key'],
                     'isObjective' => (bool) $question->questionType->is_objective,
                     'content' => $content,
@@ -249,13 +279,25 @@ class GeneratePaperController extends Controller
                     'difficulty' => $question->difficulty,
                     'chapter' => [
                         'id' => $question->chapter->id,
-                        'name' => $question->chapter->name,
+                        'name' => $this->localizedLabel(
+                            $question->chapter->name,
+                            $question->chapter->name_ur,
+                            $displayMedium,
+                        ),
+                        'nameEng' => $question->chapter->name,
+                        'nameUr' => $question->chapter->name_ur,
                         'chapterNumber' => $question->chapter->chapter_number,
                     ],
                     'topic' => $question->topic
                         ? [
                             'id' => $question->topic->id,
-                            'name' => $question->topic->name,
+                            'name' => $this->localizedLabel(
+                                $question->topic->name,
+                                $question->topic->name_ur,
+                                $displayMedium,
+                            ),
+                            'nameEng' => $question->topic->name,
+                            'nameUr' => $question->topic->name_ur,
                         ]
                         : null,
                 ];
@@ -313,6 +355,137 @@ class GeneratePaperController extends Controller
                 ->pluck('id');
 
         return [$chapterIds, $validTopicIds, $sources, $difficulties];
+    }
+
+    private function subjectMedium(int $patternId, int $classId, int $subjectId): string
+    {
+        $assigned = ClassSubject::query()
+            ->leftJoin('mediums', 'mediums.id', '=', 'class_subjects.medium_id')
+            ->where('class_subjects.pattern_id', $patternId)
+            ->where('class_subjects.class_id', $classId)
+            ->where('class_subjects.subject_id', $subjectId)
+            ->value('mediums.name');
+
+        if (in_array($assigned, ['English', 'Urdu', 'Both'], true)) {
+            return $assigned;
+        }
+
+        $questionScope = Question::query()
+            ->whereHas('chapter', fn ($query) => $query
+                ->where('pattern_id', $patternId)
+                ->where('class_id', $classId)
+                ->where('subject_id', $subjectId));
+
+        $hasEnglish = (clone $questionScope)
+            ->where(function ($query): void {
+                $query->whereNotNull('statement_en')
+                    ->orWhereNotNull('description_en')
+                    ->orWhereNotNull('answer_en')
+                    ->orWhereHas('options', fn ($optionQuery) => $optionQuery->whereNotNull('text_en'));
+            })
+            ->exists();
+        $hasUrdu = (clone $questionScope)
+            ->where(function ($query): void {
+                $query->whereNotNull('statement_ur')
+                    ->orWhereNotNull('description_ur')
+                    ->orWhereNotNull('answer_ur')
+                    ->orWhereHas('options', fn ($optionQuery) => $optionQuery->whereNotNull('text_ur'));
+            })
+            ->exists();
+
+        if (! $hasEnglish && ! $hasUrdu) {
+            $chapterScope = Chapter::query()
+                ->where('pattern_id', $patternId)
+                ->where('class_id', $classId)
+                ->where('subject_id', $subjectId);
+            $hasEnglish = (clone $chapterScope)->whereNotNull('name')->exists();
+            $hasUrdu = (clone $chapterScope)->whereNotNull('name_ur')->exists();
+        }
+
+        return $hasEnglish && $hasUrdu
+            ? 'Both'
+            : ($hasUrdu ? 'Urdu' : 'English');
+    }
+
+    private function subjectMediumForChapters($chapterIds): string
+    {
+        $scope = Chapter::query()
+            ->whereIn('id', $chapterIds)
+            ->first(['pattern_id', 'class_id', 'subject_id']);
+
+        return $scope
+            ? $this->subjectMedium(
+                (int) $scope->pattern_id,
+                (int) $scope->class_id,
+                (int) $scope->subject_id,
+            )
+            : 'Both';
+    }
+
+    private function localizedQuestionSummary(
+        Question $question,
+        array $content,
+        string $locale,
+    ): ?string {
+        foreach ([
+            "statement_{$locale}",
+            "description_{$locale}",
+            "answer_{$locale}",
+        ] as $attribute) {
+            $value = trim((string) $question->{$attribute});
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return $this->firstLocalizedContentValue($content, "_{$locale}");
+    }
+
+    private function firstLocalizedContentValue(array $content, string $suffix): ?string
+    {
+        foreach ($content as $key => $value) {
+            if (is_string($key) && str_ends_with($key, $suffix) && ! is_array($value)) {
+                $normalized = trim((string) $value);
+                if ($normalized !== '') {
+                    return $normalized;
+                }
+            }
+        }
+
+        foreach ($content as $value) {
+            if (is_array($value)) {
+                $localized = $this->firstLocalizedContentValue($value, $suffix);
+                if ($localized !== null) {
+                    return $localized;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function localizedLabel(
+        mixed $english,
+        mixed $urdu,
+        string $medium,
+        string $fallback = '',
+    ): string {
+        $english = trim((string) $english);
+        $urdu = trim((string) $urdu);
+
+        if ($medium === 'English') {
+            return $english !== '' ? $english : ($urdu !== '' ? $urdu : $fallback);
+        }
+
+        if ($medium === 'Urdu') {
+            return $urdu !== '' ? $urdu : ($english !== '' ? $english : $fallback);
+        }
+
+        if ($english !== '' && $urdu !== '' && $english !== $urdu) {
+            return "{$english} / {$urdu}";
+        }
+
+        return $english !== '' ? $english : ($urdu !== '' ? $urdu : $fallback);
     }
 
     private function scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties = null)
