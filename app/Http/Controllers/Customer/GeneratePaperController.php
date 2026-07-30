@@ -189,13 +189,15 @@ class GeneratePaperController extends Controller
         $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.is_objective', 'question_types.column_per_row')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.column_per_row')
             ->orderByDesc('question_types.is_objective')
             ->orderBy('question_types.name')
             ->select([
                 'question_types.id',
                 'question_types.name',
                 'question_types.name_ur',
+                'question_types.heading_en',
+                'question_types.heading_ur',
                 'question_types.is_objective',
                 'question_types.column_per_row',
                 DB::raw('COUNT(questions.id) as available_count'),
@@ -208,6 +210,11 @@ class GeneratePaperController extends Controller
             'questionTypeId' => (int) $row->id,
             'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
             'title' => $this->localizedLabel($row->name, $row->name_ur, $displayMedium),
+            'heading' => $this->localizedLabel(
+                $row->heading_en,
+                $row->heading_ur,
+                $displayMedium,
+            ) ?: $this->localizedLabel($row->name, $row->name_ur, $displayMedium),
             'availableCount' => (int) $row->available_count,
             'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
         ]);

@@ -166,6 +166,7 @@ function SubjectTransferPanel({
     const [selectedChapterIds, setSelectedChapterIds] = useState<number[]>([]);
     const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
     const [isTransferring, setIsTransferring] = useState(false);
+    const [replaceExisting, setReplaceExisting] = useState(false);
     const [progress, setProgress] = useState(0);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
@@ -296,9 +297,11 @@ function SubjectTransferPanel({
                     source_subject_id: sourceSubjectId,
                     source_chapter_ids: selectedChapterIds,
                     source_topic_ids: selectedTopicIds,
+
                     target_pattern_id: targetPatternId,
                     target_class_id: targetClassId,
                     target_subject_id: targetSubjectId,
+                    replace_existing: replaceExisting,
                 }),
             });
             const payload = await response.json();
@@ -402,6 +405,7 @@ function SubjectTransferPanel({
                             setTargetPatternId(option ? Number(option.id) : null);
                             setTargetClassId(null);
                             setTargetSubjectId(null);
+                            setReplaceExisting(false);
                             setTargetClasses([]);
                             setTargetSubjects([]);
                             setMessage('');
@@ -417,6 +421,7 @@ function SubjectTransferPanel({
                         onChange={(option) => {
                             setTargetClassId(option ? Number(option.id) : null);
                             setTargetSubjectId(null);
+                            setReplaceExisting(false);
                             setTargetSubjects([]);
                             setMessage('');
                             setError('');
@@ -430,6 +435,7 @@ function SubjectTransferPanel({
                         disabled={!targetClassId}
                         onChange={(option) => {
                             setTargetSubjectId(option ? Number(option.id) : null);
+                            setReplaceExisting(false);
                             setMessage('');
                             setError('');
                         }}
@@ -459,7 +465,16 @@ function SubjectTransferPanel({
 
                 {error && <p className="text-right text-sm text-destructive">{error}</p>}
 
-                <div className="flex justify-end">
+                <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+                    <label className="flex cursor-pointer items-start gap-2 text-sm text-muted-foreground">
+                        <Checkbox
+                            checked={replaceExisting}
+                            onCheckedChange={(value) => setReplaceExisting(value === true)}
+                        />
+                        <span>
+                            Replace existing content in this exact target scope.
+                        </span>
+                    </label>
                     <Button type="button" disabled={!canTransfer} onClick={runTransfer}>
                         Transfer Data
                     </Button>

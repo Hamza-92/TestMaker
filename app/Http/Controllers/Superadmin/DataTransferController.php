@@ -51,6 +51,9 @@ class DataTransferController extends Controller
 
     public function store(Request $request, LegacyContentTransferService $transfer): JsonResponse|RedirectResponse
     {
+        // Keep the HTTP entry point alive while the service imports large subjects.
+        set_time_limit(0);
+
         $validated = $request->validate([
             'source_pattern' => ['required', 'string'],
             'source_class_id' => ['required', 'integer'],
@@ -61,6 +64,7 @@ class DataTransferController extends Controller
             'source_chapter_ids.*' => ['integer'],
             'source_topic_ids' => ['nullable', 'array'],
             'source_topic_ids.*' => ['integer'],
+            'exercise_question' => ['nullable', 'integer', 'in:0,1,2,3,4'],
             'target_pattern_id' => ['nullable', 'integer', 'exists:patterns,id'],
             'target_pattern_name' => ['nullable', 'string', 'max:100', 'required_without:target_pattern_id'],
             'target_pattern_short_name' => ['nullable', 'string', 'max:50'],

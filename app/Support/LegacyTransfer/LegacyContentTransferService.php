@@ -317,6 +317,10 @@ class LegacyContentTransferService
 
     public function transfer(array $options, ?int $creatorId): array
     {
+        // Legacy imports can process thousands of questions and migrated assets.
+        // Do not let PHP's default 30-second request timer abort a valid transfer.
+        set_time_limit(0);
+
         $sourcePattern = (string) $options['source_pattern'];
         $sourceClassId = (int) $options['source_class_id'];
         $sourceSubjectIds = isset($options['source_subject_id'])
@@ -324,6 +328,11 @@ class LegacyContentTransferService
             : array_values(array_unique(array_map('intval', $options['source_subject_ids'] ?? [])));
         $sourceChapterIds = array_values(array_unique(array_map('intval', $options['source_chapter_ids'] ?? [])));
         $sourceTopicIds = array_values(array_unique(array_map('intval', $options['source_topic_ids'] ?? [])));
+        // A migration imports every legacy source category unless an explicit
+        // source filter is supplied by an API caller.
+        $exerciseQuestion = isset($options['exercise_question'])
+            ? (int) $options['exercise_question']
+            : null;
         $replaceExisting = (bool) ($options['replace_existing'] ?? false);
         $afaq = $this->sourceAfaq($sourcePattern);
         $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
@@ -356,6 +365,8 @@ class LegacyContentTransferService
             throw new RuntimeException('Missing source subjects: '.implode(', ', $missingSubjects));
         }
 
+        $this->validateTargetScope($options);
+
         $this->questionTypeMap = [];
         $this->mediumIdMap = [];
         $this->assets->reset();
@@ -372,7 +383,8 @@ class LegacyContentTransferService
             $sourceSubjects,
             $sourcePattern,
             $statusColumn,
-            $sourceTopicIds
+            $sourceTopicIds,
+            $exerciseQuestion
         ): array {
             $pattern = $this->resolveTargetPattern($options, $creatorId);
             $class = $this->resolveTargetClass($options, $sourceClass, $creatorId);
@@ -394,6 +406,13 @@ class LegacyContentTransferService
 
             foreach ($sourceSubjectIds as $sourceSubjectId) {
                 $sourceSubject = $sourceSubjects->get($sourceSubjectId);
+                $this->validateSourceSelection(
+                    sourcePattern: $sourcePattern,
+                    sourceClassId: $sourceClassId,
+                    sourceSubjectId: $sourceSubjectId,
+                    sourceChapterIds: $sourceChapterIds,
+                    sourceTopicIds: $sourceTopicIds,
+                );
                 $subjectType = $this->sourceSubjectType($sourcePattern, $sourceClassId, $sourceSubjectId);
                 $subject = $this->resolveTargetSubject($sourceSubject, $subjectType, $options, $creatorId);
 
@@ -419,6 +438,7 @@ class LegacyContentTransferService
                     sourceSubjectId: $sourceSubjectId,
                     sourceChapterIds: $sourceChapterIds,
                     sourceTopicIds: $sourceTopicIds,
+                    exerciseQuestion: $exerciseQuestion,
                     statusColumn: $statusColumn,
                     targetClass: $class,
                     targetPattern: $pattern,
@@ -464,6 +484,7 @@ class LegacyContentTransferService
         int $sourceSubjectId,
         array $sourceChapterIds,
         array $sourceTopicIds,
+        ?int $exerciseQuestion,
         string $statusColumn,
         SchoolClass $targetClass,
         Pattern $targetPattern,
@@ -577,6 +598,8 @@ class LegacyContentTransferService
                 ->where('chapter_id', $sourceChapter->id)
                 ->where('afaq', $afaq)
                 ->where('status', 1)
+                ->when($exerciseQuestion !== null, fn ($query) => $query->where('exercise_question', $exerciseQuestion))
+                ->where('type_id', '!=', 332)
                 ->when($sourcePattern === 'pef', fn ($query) => $query->where('status_pef', 1))
                 ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('topic_id', $sourceTopicIds))
                 ->when($sourceTopicIds === [] && $sourceTopics->isNotEmpty(), fn ($query) => $query->whereIn('topic_id', $sourceTopics->pluck('id')->all()))
@@ -961,15 +984,11 @@ class LegacyContentTransferService
         ?int $creatorId,
     ): QuestionType {
         $sourceTypeId = (int) $sourceQuestion->type_id;
-        $sourceType = $hasEmbeddedPassageItems
-            ? $this->source()
-                ->table('pk_question_types')
-                ->where('objective_type_id', 5)
-                ->where('is_objective', 1)
-                ->first()
-            : null;
-        $sourceType ??= $this->source()->table('pk_question_types')->where('id', $sourceTypeId)->first()
-            ?? $this->resolveQuestionTypeByOrder($sourceTypeId, $hasOptions);
+        $sourceType = $this->resolveLegacyQuestionType(
+            sourceTypeId: $sourceTypeId,
+            hasOptions: $hasOptions,
+            hasEmbeddedPassageItems: $hasEmbeddedPassageItems,
+        );
 
         if (! $sourceType) {
             $sourceType = (object) [
@@ -993,7 +1012,11 @@ class LegacyContentTransferService
         }
 
         $isObjective = (bool) ($sourceType->is_objective ?? $hasOptions);
-        $mapKey = "{$sourceTypeId}:".($isObjective ? 'objective' : 'subjective');
+        // Group objective rows by their legacy parent objective type.
+        $objectiveGroupId = (int) ($sourceType->objective_type_id ?? 0);
+        $mapKey = $isObjective
+            ? 'objective:'.($objectiveGroupId > 0 ? $objectiveGroupId : $sourceTypeId)
+            : "subjective:{$sourceTypeId}";
 
         if (isset($this->questionTypeMap[$mapKey])) {
             return QuestionType::query()->findOrFail($this->questionTypeMap[$mapKey]);
@@ -1006,33 +1029,68 @@ class LegacyContentTransferService
         ]);
         $baseName = $this->limitedString($sourceType->type_name, 100) ?? "Legacy Type {$sourceTypeId}";
         $name = $this->uniqueQuestionTypeName($baseName, $schemaKey);
-        $questionType = QuestionType::query()->firstOrCreate(
-            ['name' => $name],
-            [
-                'name_ur' => $this->limitedString($sourceType->type_name_ur ?? null, 100),
-                'heading_en' => $this->limitedString($sourceType->heading_en ?? null, 150) ?? $baseName,
-                'heading_ur' => $this->limitedString($sourceType->heading_ur ?? null, 150),
-                'description_en' => $this->nullableString($sourceType->description_en ?? null),
-                'description_ur' => $this->nullableString($sourceType->description_ur ?? null),
-                'have_exercise' => (int) ($sourceType->have_exercise ?? 0),
-                'have_statement' => (int) ($sourceType->have_statment ?? 1),
-                'statement_label' => $this->limitedString($sourceType->statement_label ?? null, 100),
-                'have_description' => (int) ($sourceType->have_description ?? 0),
-                'description_label' => $this->limitedString($sourceType->description_label ?? null, 100),
-                'have_answer' => (int) ($sourceType->have_answer ?? ($hasOptions ? 0 : 1)),
-                'is_single' => (int) ($sourceType->is_single ?? 1),
-                'is_objective' => $isObjective,
-                'schema_key' => $schemaKey,
-                'objective_type_id' => null,
-                'column_per_row' => (int) ($sourceType->column_per_row ?? 1),
-                'status' => 1,
-                'created_by' => $creatorId,
-            ],
-        );
+        $questionType = QuestionType::query()->firstOrNew(['name' => $name]);
+        $questionType->fill([
+            'name_ur' => $this->limitedString($sourceType->type_name_ur ?? null, 100),
+            'heading_en' => $this->limitedString($sourceType->heading_en ?? null, 150) ?? $baseName,
+            'heading_ur' => $this->limitedString($sourceType->heading_ur ?? null, 150),
+            'description_en' => $this->nullableString($sourceType->description_en ?? null),
+            'description_ur' => $this->nullableString($sourceType->description_ur ?? null),
+            'have_exercise' => (int) ($sourceType->have_exercise ?? 0),
+            'have_statement' => (int) ($sourceType->have_statment ?? 1),
+            'statement_label' => $this->limitedString($sourceType->statement_label ?? null, 100),
+            'have_description' => (int) ($sourceType->have_description ?? 0),
+            'description_label' => $this->limitedString($sourceType->description_label ?? null, 100),
+            'have_answer' => (int) ($sourceType->have_answer ?? ($hasOptions ? 0 : 1)),
+            'is_single' => (int) ($sourceType->is_single ?? 1),
+            'is_objective' => $isObjective,
+            'schema_key' => $schemaKey,
+            'objective_type_id' => null,
+            'column_per_row' => (int) ($sourceType->column_per_row ?? 1),
+            'status' => 1,
+            'created_by' => $creatorId,
+        ]);
+        $questionType->save();
 
         $this->questionTypeMap[$mapKey] = $questionType->id;
 
         return $questionType;
+    }
+
+    private function resolveLegacyQuestionType(
+        int $sourceTypeId,
+        bool $hasOptions,
+        bool $hasEmbeddedPassageItems,
+    ): ?object {
+        if ($hasEmbeddedPassageItems) {
+            $passageType = $this->source()
+                ->table('pk_question_types')
+                ->where('objective_type_id', 5)
+                ->where('is_objective', 1)
+                ->orderBy('id_order')
+                ->first();
+
+            if ($passageType) {
+                return $passageType;
+            }
+        }
+
+        // The legacy question stores the parent objective id; its child row
+        // owns the user-facing name and the printed English/Urdu headings.
+        $objectiveType = $this->source()
+            ->table('pk_question_types')
+            ->where('objective_type_id', $sourceTypeId)
+            ->where('is_objective', 1)
+            ->orderBy('id_order')
+            ->orderBy('id')
+            ->first();
+
+        if ($objectiveType) {
+            return $objectiveType;
+        }
+
+        return $this->source()->table('pk_question_types')->where('id', $sourceTypeId)->first()
+            ?? $this->resolveQuestionTypeByOrder($sourceTypeId, $hasOptions);
     }
 
     private function resolveQuestionTypeByOrder(int $sourceTypeId, bool $hasOptions): ?object
@@ -1180,6 +1238,87 @@ class LegacyContentTransferService
         ];
     }
 
+    private function validateTargetScope(array $options): void
+    {
+        $targetPatternId = ! empty($options['target_pattern_id'])
+            ? (int) $options['target_pattern_id']
+            : null;
+        $targetClassId = ! empty($options['target_class_id'])
+            ? (int) $options['target_class_id']
+            : null;
+        $targetSubjectId = ! empty($options['target_subject_id'])
+            ? (int) $options['target_subject_id']
+            : null;
+
+        if ($targetPatternId === null || $targetClassId === null || $targetSubjectId === null) {
+            return;
+        }
+
+        $isAttached = DB::table('class_subjects')
+            ->where('pattern_id', $targetPatternId)
+            ->where('class_id', $targetClassId)
+            ->where('subject_id', $targetSubjectId)
+            ->exists();
+
+        if (! $isAttached) {
+            throw new RuntimeException(
+                'The selected target subject is not attached to the selected target pattern and class.',
+            );
+        }
+    }
+
+    private function validateSourceSelection(
+        string $sourcePattern,
+        int $sourceClassId,
+        int $sourceSubjectId,
+        array $sourceChapterIds,
+        array $sourceTopicIds,
+    ): void {
+        $afaq = $this->sourceAfaq($sourcePattern);
+        $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
+
+        if ($sourceChapterIds !== []) {
+            $validChapterIds = $this->source()
+                ->table('pk_chapter')
+                ->whereIn('id', $sourceChapterIds)
+                ->where('class_id', $sourceClassId)
+                ->where('subject_id', $sourceSubjectId)
+                ->where('afaq', $afaq)
+                ->where($statusColumn, 1)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $invalidChapterIds = array_diff($sourceChapterIds, $validChapterIds);
+            if ($invalidChapterIds !== []) {
+                throw new RuntimeException(
+                    'One or more selected source chapters do not belong to the selected source pattern, class, and subject.',
+                );
+            }
+        }
+
+        if ($sourceTopicIds !== []) {
+            $validTopicIds = $this->source()
+                ->table('pk_topics as topic')
+                ->join('pk_chapter as chapter', 'chapter.id', '=', 'topic.chapter_id')
+                ->whereIn('topic.id', $sourceTopicIds)
+                ->where('topic.status', 1)
+                ->where('chapter.class_id', $sourceClassId)
+                ->where('chapter.subject_id', $sourceSubjectId)
+                ->where('chapter.afaq', $afaq)
+                ->where("chapter.{$statusColumn}", 1)
+                ->pluck('topic.id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $invalidTopicIds = array_diff($sourceTopicIds, $validTopicIds);
+            if ($invalidTopicIds !== []) {
+                throw new RuntimeException(
+                    'One or more selected source topics do not belong to the selected source pattern, class, and subject.',
+                );
+            }
+        }
+    }
     private function sourceSubjectType(string $sourcePattern, int $sourceClassId, int $sourceSubjectId): string
     {
         $afaq = $this->sourceAfaq($sourcePattern);

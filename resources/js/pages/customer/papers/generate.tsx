@@ -90,12 +90,16 @@ interface ClassSubject {
 interface Topic {
     id: number;
     name: string;
+    name_eng?: string | null;
+    name_ur?: string | null;
     question_count?: number;
 }
 
 interface Chapter {
     id: number;
     name: string;
+    name_eng?: string | null;
+    name_ur?: string | null;
     chapter_number: number | null;
     group_name: string | null;
     group_heading: string | null;
@@ -225,6 +229,7 @@ interface QuestionSelectionSection {
     questionTypeId: number;
     category: SectionCategory;
     title: string;
+    heading?: string;
     availableCount: number;
     /** Default column count (1–5) for this question type, from the DB. */
     columnPerRow: number;
@@ -242,6 +247,7 @@ interface QuestionTypeCount {
     questionTypeId: number;
     category: SectionCategory;
     title: string;
+    heading?: string;
     availableCount: number;
     columnPerRow: number;
 }
@@ -775,6 +781,7 @@ function mergeQuestionSections(
             questionTypeId: item.questionTypeId,
             category: item.category,
             title: item.title,
+            heading: item.heading || item.title,
             availableCount: item.availableCount,
             columnPerRow: item.columnPerRow,
             rows: normalizeSectionRows(
@@ -1090,6 +1097,7 @@ export default function GeneratePaper({
     const [klass, setKlass] = useState<ComboboxOptionItem | null>(null);
     const [subject, setSubject] = useState<ComboboxOptionItem | null>(null);
     const [chapters, setChapters] = useState<Chapter[] | null>(null);
+    const [chapterMedium, setChapterMedium] = useState<ContentMedium>('English');
     const [loadingChapters, setLoadingChapters] = useState(false);
     const [selected, setSelected] = useState<Record<number, Set<number>>>({});
     const [selectionMode, setSelectionMode] =
@@ -1492,7 +1500,10 @@ export default function GeneratePaper({
                     ? response.json()
                     : Promise.reject(response.statusText),
             )
-            .then((data: { chapters: Chapter[] }) => setChapters(data.chapters))
+            .then((data: { chapters: Chapter[]; medium?: ContentMedium }) => {
+                setChapters(data.chapters);
+                setChapterMedium(data.medium ?? 'English');
+            })
             .catch((error) => {
                 if (error?.name !== 'AbortError') {
                     setChapters([]);
@@ -2235,7 +2246,7 @@ return;
                     id: `${section.id}_${row.id}`,
                     questionTypeId: section.questionTypeId,
                     category: section.category,
-                    title: section.title,
+                    title: section.heading || section.title,
                     requiredQuestions: toNumber(row.requiredQuestions),
                     totalQuestions: rowTarget(row),
                     marksEach: toNumber(row.marksPerQuestion),
@@ -3225,7 +3236,7 @@ return '';
             id: nextPaperSectionId('paper_sec'),
             questionTypeId: questionType.questionTypeId,
             category: questionType.category,
-            title: questionType.title,
+            title: questionType.heading || questionType.title,
             requiredQuestions,
             totalQuestions,
             marksEach,
@@ -3928,6 +3939,9 @@ return '';
                                                                         group={
                                                                             group
                                                                         }
+                                                                        medium={
+                                                                            chapterMedium
+                                                                        }
                                                                         state={chapterGroupState(
                                                                             group,
                                                                         )}
@@ -3974,6 +3988,9 @@ return '';
                                                                                         }
                                                                                         chapter={
                                                                                             chapter
+                                                                                        }
+                                                                                        medium={
+                                                                                            chapterMedium
                                                                                         }
                                                                                         state={chapterState(
                                                                                             chapter,
@@ -6362,14 +6379,75 @@ function manualQuestionChapterLabel(question: ManualQuestion): string {
         : `CH ${String(question.chapter.chapterNumber).padStart(2, '0')} ${question.chapter.name}`;
 }
 
+function BilingualPickerName({
+    english,
+    urdu,
+    medium,
+    className,
+}: {
+    english?: string | null;
+    urdu?: string | null;
+    medium: ContentMedium;
+    className?: string;
+}) {
+    const englishName = (english ?? '').trim();
+    const urduName = (urdu ?? '').trim();
+    const englishValue = englishName || urduName;
+    const urduValue = urduName || englishName;
+
+    if (medium === 'Both' && englishName && urduName) {
+        return (
+            <span
+                className={cn(
+                    'flex min-w-0 flex-1 items-center justify-between gap-6',
+                    className,
+                )}
+            >
+                <span className="min-w-0 flex-1 truncate" title={englishName}>
+                    {englishName}
+                </span>
+                <span
+                    dir="rtl"
+                    className="min-w-0 flex-1 truncate text-right"
+                    title={urduName}
+                >
+                    {urduName}
+                </span>
+            </span>
+        );
+    }
+
+    if (medium === 'Urdu') {
+        return (
+            <span
+                dir="rtl"
+                className={cn('min-w-0 flex-1 truncate text-right', className)}
+                title={urduValue}
+            >
+                {urduValue}
+            </span>
+        );
+    }
+
+    return (
+        <span
+            className={cn('min-w-0 flex-1 truncate', className)}
+            title={englishValue}
+        >
+            {englishValue}
+        </span>
+    );
+}
 function DirectChapterGroup({
     group,
+    medium,
     state,
     selected,
     onToggleGroup,
     onToggleChapter,
 }: {
     group: ChapterGroup;
+    medium: ContentMedium;
     state: 'unchecked' | 'checked' | 'indeterminate';
     selected: Record<number, Set<number>>;
     onToggleGroup: () => void;
@@ -6385,6 +6463,7 @@ function DirectChapterGroup({
                     <DirectChapterRow
                         key={chapter.id}
                         chapter={chapter}
+                        medium={medium}
                         checked={
                             selected[chapter.id]?.has(CHAPTER_ONLY_SELECTION) ??
                             false
@@ -6421,6 +6500,7 @@ function DirectChapterGroup({
                     <DirectChapterRow
                         key={chapter.id}
                         chapter={chapter}
+                        medium={medium}
                         checked={
                             selected[chapter.id]?.has(CHAPTER_ONLY_SELECTION) ??
                             false
@@ -6435,11 +6515,13 @@ function DirectChapterGroup({
 
 function DirectChapterRow({
     chapter,
+    medium,
     checked,
     onToggleChapter,
     standalone = false,
 }: {
     chapter: Chapter;
+    medium: ContentMedium;
     checked: boolean;
     onToggleChapter: (chapter: Chapter) => void;
     standalone?: boolean;
@@ -6484,22 +6566,11 @@ function DirectChapterRow({
                         CH {String(chapter.chapter_number).padStart(2, '0')}
                     </span>
                 )}
-                <span className="truncate" title={chapter.name}>
-                    {chapter.name}
-                </span>
-                {typeof chapter.question_count === 'number' && (
-                    <span
-                        className={cn(
-                            'ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums',
-                            chapter.question_count > 0
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
-                                : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
-                        )}
-                        title={`${chapter.question_count} question${chapter.question_count === 1 ? '' : 's'}`}
-                    >
-                        {chapter.question_count}
-                    </span>
-                )}
+                <BilingualPickerName
+                    english={chapter.name_eng ?? chapter.name}
+                    urdu={chapter.name_ur}
+                    medium={medium}
+                />
             </button>
         </li>
     );
@@ -6507,12 +6578,14 @@ function DirectChapterRow({
 
 function ChapterCard({
     chapter,
+    medium,
     state,
     selectedTopics,
     onToggleChapter,
     onToggleTopic,
 }: {
     chapter: Chapter;
+    medium: ContentMedium;
     state: 'unchecked' | 'checked' | 'indeterminate';
     selectedTopics: Set<number>;
     onToggleChapter: () => void;
@@ -6554,25 +6627,13 @@ function ChapterCard({
                                 )}
                             </span>
                         )}
-                        <h3
-                            className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100"
-                            title={chapter.name}
-                        >
-                            {chapter.name}
+                        <h3 className="flex min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            <BilingualPickerName
+                                english={chapter.name_eng ?? chapter.name}
+                                urdu={chapter.name_ur}
+                                medium={medium}
+                            />
                         </h3>
-                        {typeof chapter.question_count === 'number' && (
-                            <span
-                                className={cn(
-                                    'ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums',
-                                    chapter.question_count > 0
-                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
-                                        : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
-                                )}
-                                title={`${chapter.question_count} question${chapter.question_count === 1 ? '' : 's'} available`}
-                            >
-                                {chapter.question_count}
-                            </span>
-                        )}
                     </div>
                 </div>
             </div>
@@ -6605,22 +6666,14 @@ function ChapterCard({
                                 <button
                                     type="button"
                                     onClick={() => onToggleTopic(topic.id)}
-                                    className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px]"
+                                    className="flex min-w-0 flex-1 cursor-pointer items-center text-left text-[13px]"
                                 >
-                                    {topic.name}
+                                    <BilingualPickerName
+                                        english={topic.name_eng ?? topic.name}
+                                        urdu={topic.name_ur}
+                                        medium={medium}
+                                    />
                                 </button>
-                                {typeof topic.question_count === 'number' && (
-                                    <span
-                                        className={cn(
-                                            'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
-                                            topic.question_count > 0
-                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
-                                                : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
-                                        )}
-                                    >
-                                        {topic.question_count}
-                                    </span>
-                                )}
                             </li>
                         );
                     })}
