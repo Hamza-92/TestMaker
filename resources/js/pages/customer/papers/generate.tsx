@@ -1452,6 +1452,33 @@ export default function GeneratePaper({
         chapters.length > 0 &&
         chapters.every((chapter) => chapter.topics.length === 0);
 
+    const renderChapterCard = (chapter: Chapter) => (
+        <ChapterCard
+            key={chapter.id}
+            chapter={chapter}
+            medium={chapterMedium}
+            state={chapterState(chapter)}
+            selectedTopics={selected[chapter.id] ?? new Set()}
+            onToggleChapter={() => toggleChapter(chapter)}
+            onToggleTopic={(topicId) => toggleTopic(chapter.id, topicId)}
+        />
+    );
+
+    const renderDirectChapterGroup = (
+        group: ChapterGroup,
+        index: number,
+    ) => (
+        <DirectChapterGroup
+            key={`${group.heading ?? 'none'}-${index}`}
+            group={group}
+            medium={chapterMedium}
+            state={chapterGroupState(group)}
+            selected={selected}
+            onToggleGroup={() => toggleChapterGroup(group)}
+            onToggleChapter={toggleChapter}
+        />
+    );
+
     useEffect(() => {
         const sentinel = footerSentinelRef.current;
 
@@ -3928,38 +3955,31 @@ return '';
                                             chapters.length > 0 && (
                                                 <>
                                                     {isChapterWiseSubject ? (
-                                                        <div className="grid items-start gap-4 lg:grid-cols-2">
+                                                        <>
+                                                        <div className="space-y-4 lg:hidden">
                                                             {chapterGroups.map(
-                                                                (
-                                                                    group,
-                                                                    index,
-                                                                ) => (
-                                                                    <DirectChapterGroup
-                                                                        key={`${group.heading ?? 'none'}-${index}`}
-                                                                        group={
-                                                                            group
-                                                                        }
-                                                                        medium={
-                                                                            chapterMedium
-                                                                        }
-                                                                        state={chapterGroupState(
-                                                                            group,
-                                                                        )}
-                                                                        selected={
-                                                                            selected
-                                                                        }
-                                                                        onToggleGroup={() =>
-                                                                            toggleChapterGroup(
-                                                                                group,
-                                                                            )
-                                                                        }
-                                                                        onToggleChapter={
-                                                                            toggleChapter
-                                                                        }
-                                                                    />
-                                                                ),
+                                                                renderDirectChapterGroup,
                                                             )}
                                                         </div>
+                                                        <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+                                                            <div className="space-y-4">
+                                                                {chapterGroups
+                                                                    .filter(
+                                                                        (_, index) =>
+                                                                            index % 2 === 0,
+                                                                    )
+                                                                    .map(renderDirectChapterGroup)}
+                                                            </div>
+                                                            <div className="space-y-4">
+                                                                {chapterGroups
+                                                                    .filter(
+                                                                        (_, index) =>
+                                                                            index % 2 === 1,
+                                                                    )
+                                                                    .map(renderDirectChapterGroup)}
+                                                            </div>
+                                                        </div>
+                                                        </>
                                                     ) : (
                                                         <div className="space-y-6">
                                                             {chapterGroups.map(
@@ -3977,47 +3997,42 @@ return '';
                                                                                 }
                                                                             </h3>
                                                                         )}
-                                                                        <div className="grid gap-3 sm:grid-cols-2">
+                                                                        <div className="space-y-3 sm:hidden">
                                                                             {group.items.map(
-                                                                                (
-                                                                                    chapter,
-                                                                                ) => (
-                                                                                    <ChapterCard
-                                                                                        key={
-                                                                                            chapter.id
-                                                                                        }
-                                                                                        chapter={
-                                                                                            chapter
-                                                                                        }
-                                                                                        medium={
-                                                                                            chapterMedium
-                                                                                        }
-                                                                                        state={chapterState(
-                                                                                            chapter,
-                                                                                        )}
-                                                                                        selectedTopics={
-                                                                                            selected[
-                                                                                                chapter
-                                                                                                    .id
-                                                                                            ] ??
-                                                                                            new Set()
-                                                                                        }
-                                                                                        onToggleChapter={() =>
-                                                                                            toggleChapter(
-                                                                                                chapter,
-                                                                                            )
-                                                                                        }
-                                                                                        onToggleTopic={(
-                                                                                            topicId,
-                                                                                        ) =>
-                                                                                            toggleTopic(
-                                                                                                chapter.id,
-                                                                                                topicId,
-                                                                                            )
-                                                                                        }
-                                                                                    />
-                                                                                ),
+                                                                                renderChapterCard,
                                                                             )}
+                                                                        </div>
+                                                                        <div className="hidden gap-3 sm:grid sm:grid-cols-2">
+                                                                            <div className="space-y-3">
+                                                                                {group.items
+                                                                                    .filter(
+                                                                                        (
+                                                                                            _,
+                                                                                            index,
+                                                                                        ) =>
+                                                                                            index %
+                                                                                                2 ===
+                                                                                            0,
+                                                                                    )
+                                                                                    .map(
+                                                                                        renderChapterCard,
+                                                                                    )}
+                                                                            </div>
+                                                                            <div className="space-y-3">
+                                                                                {group.items
+                                                                                    .filter(
+                                                                                        (
+                                                                                            _,
+                                                                                            index,
+                                                                                        ) =>
+                                                                                            index %
+                                                                                                2 ===
+                                                                                            1,
+                                                                                    )
+                                                                                    .map(
+                                                                                        renderChapterCard,
+                                                                                    )}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 ),
@@ -5963,14 +5978,19 @@ return null;
                             header={{
                                 ...paper.header,
                                 marks: totalMarks,
-                                type: viewMode === 'answer_key'
-                                    ? `Answer Key${numSets > 1 ? ` — Set ${setLabelFor(activeSetIndex)}` : ''}`
-                                    : paper.header.type,
+                                type:
+                                    viewMode === 'answer_key'
+                                        ? `Answer Key${numSets > 1 ? ` — Set ${setLabelFor(activeSetIndex)}` : ''}`
+                                        : paper.header.type,
                             }}
                             logoUrl={defaultWatermarkLogoUrl}
                             address={schoolAddress}
                             showAddress={showSchoolAddress}
-                            onChange={viewMode === 'answer_key' ? () => {} : onHeaderChange}
+                            onChange={
+                                viewMode === 'answer_key'
+                                    ? () => {}
+                                    : onHeaderChange
+                            }
                         />
                         <div
                             className="flex flex-col"
@@ -6063,11 +6083,13 @@ return null;
                                             header={{
                                                 ...variantPaper.header,
                                                 marks: totalMarks,
-                                                type: viewMode === 'answer_key'
-                                                    ? `Answer Key — Set ${setLabelFor(index)}`
-                                                    : variantPaper.header.type
-                                                        ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
-                                                        : `Set ${setLabelFor(index)}`,
+                                                type:
+                                                    viewMode === 'answer_key'
+                                                        ? `Answer Key — Set ${setLabelFor(index)}`
+                                                        : variantPaper.header
+                                                                .type
+                                                          ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
+                                                          : `Set ${setLabelFor(index)}`,
                                             }}
                                             logoUrl={defaultWatermarkLogoUrl}
                                             address={schoolAddress}
