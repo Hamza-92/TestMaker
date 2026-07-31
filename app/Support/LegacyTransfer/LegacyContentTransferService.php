@@ -333,6 +333,7 @@ class LegacyContentTransferService
         $exerciseQuestion = isset($options['exercise_question'])
             ? (int) $options['exercise_question']
             : null;
+        $convertExercisesToTopics = (bool) ($options['convert_exercises_to_topics'] ?? false);
         $replaceExisting = (bool) ($options['replace_existing'] ?? false);
         $afaq = $this->sourceAfaq($sourcePattern);
         $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
@@ -384,7 +385,8 @@ class LegacyContentTransferService
             $sourcePattern,
             $statusColumn,
             $sourceTopicIds,
-            $exerciseQuestion
+            $exerciseQuestion,
+            $convertExercisesToTopics
         ): array {
             $pattern = $this->resolveTargetPattern($options, $creatorId);
             $class = $this->resolveTargetClass($options, $sourceClass, $creatorId);
@@ -413,8 +415,13 @@ class LegacyContentTransferService
                     sourceChapterIds: $sourceChapterIds,
                     sourceTopicIds: $sourceTopicIds,
                 );
-                $subjectType = $this->sourceSubjectType($sourcePattern, $sourceClassId, $sourceSubjectId);
+                $subjectType = $convertExercisesToTopics
+                    ? 'topic-wise'
+                    : $this->sourceSubjectType($sourcePattern, $sourceClassId, $sourceSubjectId);
                 $subject = $this->resolveTargetSubject($sourceSubject, $subjectType, $options, $creatorId);
+                if ($convertExercisesToTopics && $subject->subject_type !== 'topic-wise') {
+                    $subject->update(['subject_type' => 'topic-wise']);
+                }
 
                 $classSubject = ClassSubject::query()->firstOrCreate([
                     'class_id' => $class->id,
@@ -439,6 +446,7 @@ class LegacyContentTransferService
                     sourceChapterIds: $sourceChapterIds,
                     sourceTopicIds: $sourceTopicIds,
                     exerciseQuestion: $exerciseQuestion,
+                    convertExercisesToTopics: $convertExercisesToTopics,
                     statusColumn: $statusColumn,
                     targetClass: $class,
                     targetPattern: $pattern,
@@ -485,6 +493,7 @@ class LegacyContentTransferService
         array $sourceChapterIds,
         array $sourceTopicIds,
         ?int $exerciseQuestion,
+        bool $convertExercisesToTopics,
         string $statusColumn,
         SchoolClass $targetClass,
         Pattern $targetPattern,
@@ -552,16 +561,54 @@ class LegacyContentTransferService
 
             $counts['chapters']++;
 
-            $sourceTopics = $this->source()
-                ->table('pk_topics')
-                ->where('chapter_id', $sourceChapter->id)
-                ->where('status', 1)
-                ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('id', $sourceTopicIds))
-                ->orderBy('sort_int')
-                ->orderBy('id')
-                ->get();
-
             $chapterTopicIds = [];
+            $sourceTopics = $convertExercisesToTopics
+                ? collect()
+                : $this->source()
+                    ->table('pk_topics')
+                    ->where('chapter_id', $sourceChapter->id)
+                    ->where('status', 1)
+                    ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('id', $sourceTopicIds))
+                    ->orderBy('sort_int')
+                    ->orderBy('id')
+                    ->get();
+
+            $exerciseTopicMap = [];
+            if ($convertExercisesToTopics) {
+                $exerciseNames = $this->source()
+                    ->table('pk_question')
+                    ->where('chapter_id', $sourceChapter->id)
+                    ->where('afaq', $afaq)
+                    ->where('status', 1)
+                    ->when($exerciseQuestion !== null, fn ($query) => $query->where('exercise_question', $exerciseQuestion))
+                    ->where('type_id', '!=', 332)
+                    ->when($sourcePattern === 'pef', fn ($query) => $query->where('status_pef', 1))
+                    ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('topic_id', $sourceTopicIds))
+                    ->orderBy('id')
+                    ->pluck('exercise')
+                    ->map(fn ($exercise) => $this->legacyExerciseTopicKey($exercise))
+                    ->unique()
+                    ->values();
+
+                foreach ($exerciseNames as $sortId => $exerciseName) {
+                    $topicName = $exerciseName === '__other__'
+                        ? 'Other Questions'
+                        : $exerciseName;
+                    $topic = Topic::query()->updateOrCreate([
+                        'chapter_id' => $chapter->id,
+                        'name' => $this->limitedString($topicName, 150) ?? 'Other Questions',
+                    ], [
+                        'name_ur' => null,
+                        'sort_id' => (int) $sortId,
+                        'status' => 1,
+                        'created_by' => $creatorId,
+                    ]);
+                    $exerciseTopicMap[$exerciseName] = $topic->id;
+                    $chapterTopicIds[] = $topic->id;
+                    $counts['topics']++;
+                }
+            }
+
             foreach ($sourceTopics as $sourceTopic) {
                 $this->recordLocalizedPayload($languagePresence, [
                     'name_en' => $sourceTopic->name,
@@ -636,7 +683,9 @@ class LegacyContentTransferService
                     sourceOptions: $sourceOptions->all(),
                     questionType: $questionType,
                     targetChapterId: $chapter->id,
-                    targetTopicId: $topicMap[(int) ($sourceQuestion->topic_id ?? 0)] ?? null,
+                    targetTopicId: $convertExercisesToTopics
+                        ? ($exerciseTopicMap[$this->legacyExerciseTopicKey($sourceQuestion->exercise ?? null)] ?? null)
+                        : ($topicMap[(int) ($sourceQuestion->topic_id ?? 0)] ?? null),
                     creatorId: $creatorId,
                 );
 
@@ -1356,6 +1405,13 @@ class LegacyContentTransferService
                 ? Question::SOURCE_PAST_PAPER
                 : Question::SOURCE_ADDITIONAL,
         };
+    }
+
+    private function legacyExerciseTopicKey(mixed $value): string
+    {
+        $normalized = trim(preg_replace('/\s+/', ' ', (string) $value) ?? '');
+
+        return $normalized === '' ? '__other__' : $normalized;
     }
 
     private function sourceAfaq(string $sourcePattern): int

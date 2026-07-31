@@ -65,6 +65,7 @@ class DataTransferController extends Controller
             'source_topic_ids' => ['nullable', 'array'],
             'source_topic_ids.*' => ['integer'],
             'exercise_question' => ['nullable', 'integer', 'in:0,1,2,3,4'],
+            'convert_exercises_to_topics' => ['nullable', 'boolean'],
             'target_pattern_id' => ['nullable', 'integer', 'exists:patterns,id'],
             'target_pattern_name' => ['nullable', 'string', 'max:100', 'required_without:target_pattern_id'],
             'target_pattern_short_name' => ['nullable', 'string', 'max:50'],
