@@ -1515,6 +1515,34 @@ export default function GeneratePaper({
         return columns;
     }, [chapterGroups]);
 
+    const topicWiseColumns = useMemo<[Chapter[], Chapter[]]>(() => {
+        const topicWiseChapters = chapterGroups.flatMap(
+            (group) => group.items,
+        );
+        const columns: [Chapter[], Chapter[]] = [[], []];
+        const heights: [number, number] = [0, 0];
+        let activeColumn: 0 | 1 = 0;
+
+        for (const chapter of topicWiseChapters) {
+            const chapterHeight =
+                68 + Math.max(chapter.topics.length, 1) * 34;
+            const otherColumn: 0 | 1 = activeColumn === 0 ? 1 : 0;
+
+            if (
+                columns[0].length > 0 &&
+                heights[activeColumn] + chapterHeight > heights[otherColumn]
+            ) {
+                activeColumn = otherColumn;
+            }
+
+            columns[activeColumn].push(chapter);
+            heights[activeColumn] += chapterHeight;
+        }
+
+        return columns;
+    }, [chapterGroups]);
+
+
     useEffect(() => {
         const sentinel = footerSentinelRef.current;
 
@@ -4011,63 +4039,21 @@ return '';
                                                         </div>
                                                         </>
                                                     ) : (
-                                                        <div className="space-y-6">
-                                                            {chapterGroups.map(
-                                                                (
-                                                                    group,
-                                                                    index,
-                                                                ) => (
-                                                                    <div
-                                                                        key={`${group.heading ?? 'none'}-${index}`}
-                                                                    >
-                                                                        {group.heading && (
-                                                                            <h3 className="mb-2 text-[11px] font-semibold tracking-widest text-slate-400 uppercase dark:text-slate-500">
-                                                                                {
-                                                                                    group.heading
-                                                                                }
-                                                                            </h3>
-                                                                        )}
-                                                                        <div className="space-y-3 sm:hidden">
-                                                                            {group.items.map(
-                                                                                renderChapterCard,
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="hidden gap-3 sm:grid sm:grid-cols-2">
-                                                                            <div className="space-y-3">
-                                                                                {group.items
-                                                                                    .filter(
-                                                                                        (
-                                                                                            _,
-                                                                                            index,
-                                                                                        ) =>
-                                                                                            index %
-                                                                                                2 ===
-                                                                                            0,
-                                                                                    )
-                                                                                    .map(
-                                                                                        renderChapterCard,
-                                                                                    )}
-                                                                            </div>
-                                                                            <div className="space-y-3">
-                                                                                {group.items
-                                                                                    .filter(
-                                                                                        (
-                                                                                            _,
-                                                                                            index,
-                                                                                        ) =>
-                                                                                            index %
-                                                                                                2 ===
-                                                                                            1,
-                                                                                    )
-                                                                                    .map(
-                                                                                        renderChapterCard,
-                                                                                    )}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ),
-                                                            )}
+                                                        <>
+                                                        <div className="space-y-4 lg:hidden">
+                                                            {chapterGroups
+                                                                .flatMap((group) => group.items)
+                                                                .map(renderChapterCard)}
                                                         </div>
+                                                        <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+                                                            <div className="space-y-4">
+                                                                {topicWiseColumns[0].map(renderChapterCard)}
+                                                            </div>
+                                                            <div className="space-y-4">
+                                                                {topicWiseColumns[1].map(renderChapterCard)}
+                                                            </div>
+                                                        </div>
+                                                        </>
                                                     )}
                                                 </>
                                             )}
