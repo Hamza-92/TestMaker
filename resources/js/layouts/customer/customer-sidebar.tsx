@@ -1,4 +1,4 @@
-﻿import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     ActivityIcon,
     BookmarkIcon,
@@ -197,7 +197,7 @@ function SidebarContent({
 
     return (
         <>
-            {/* â”€â”€ Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Brand ──────────────────────────────────────────────────────── */}
             <div
                 className={[
                     'flex h-14 shrink-0 items-center gap-2.5 overflow-hidden border-b border-white/10',
@@ -219,7 +219,7 @@ function SidebarContent({
                 )}
             </div>
 
-            {/* â”€â”€ Nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Nav ────────────────────────────────────────────────────────── */}
             <nav
                 className={[
                     'scrollbar-slim flex-1 space-y-4 overflow-x-hidden overflow-y-auto pt-3 pb-3',
@@ -263,7 +263,7 @@ function SidebarContent({
                 ))}
             </nav>
 
-            {/* â”€â”€ Upgrade card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Upgrade card ───────────────────────────────────────────────── */}
             {!collapsed && (
                 <div className="mx-3 mb-3 rounded-lg border border-white/10 bg-white/[0.06] p-3">
                     <div className="mb-1.5 flex items-center gap-2">
@@ -291,7 +291,7 @@ export function CustomerSidebar() {
 
     return (
         <>
-            {/* â”€â”€ Desktop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Desktop ────────────────────────────────────────────────────── */}
             <aside
                 data-customer-sidebar
                 className={[
@@ -302,7 +302,7 @@ export function CustomerSidebar() {
                 <SidebarContent collapsed={collapsed} />
             </aside>
 
-            {/* â”€â”€ Mobile drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Mobile drawer ──────────────────────────────────────────────── */}
             {mobileOpen && (
                 <div className="fixed inset-0 z-50 md:hidden">
                     <div
@@ -330,6 +330,3 @@ export function CustomerSidebar() {
         </>
     );
 }
-
-
-

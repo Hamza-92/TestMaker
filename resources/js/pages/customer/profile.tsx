@@ -81,7 +81,7 @@ export default function Profile({ user, status }: { user: ProfileUser; status?: 
         <>
             <Head title="Profile" />
 
-            <div className="mx-auto max-w-5xl space-y-6">
+            <div className="w-full space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link href="/dashboard" className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100" aria-label="Back to dashboard">

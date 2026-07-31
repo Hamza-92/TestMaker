@@ -56,7 +56,7 @@ export default function TeachersUpgrade({
         <>
             <Head title="Teachers · Upgrade required" />
 
-            <div className="mx-auto max-w-4xl space-y-6">
+            <div className="w-full space-y-6">
                 <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                     <UsersIcon className="size-4" />
                     <span>Teachers</span>

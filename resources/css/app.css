@@ -178,6 +178,97 @@
     --progress: var(--color-brand-400);
 }
 
+/* == Accent-driven surfaces ===========================================
+   A single custom property, --tm-accent, colours both an item's leading
+   tile and the shadow it casts on hover. Set it inline from data the
+   server owns (a folder's colour, say) — those are arbitrary user-chosen
+   hex values, so they cannot be Tailwind classes.
+
+   Falls back to a neutral slate when unset, so both classes are safe to
+   use on items that have no accent. */
+.tm-accent-tile {
+    background-color: color-mix(
+        in oklab,
+        var(--tm-accent, oklch(0.55 0.02 264)) 14%,
+        transparent
+    );
+    color: var(--tm-accent, oklch(0.45 0.02 264));
+}
+
+.dark .tm-accent-tile {
+    background-color: color-mix(
+        in oklab,
+        var(--tm-accent, oklch(0.55 0.02 264)) 24%,
+        transparent
+    );
+    /* Raw folder colours are picked against white; lift them on dark. */
+    color: color-mix(
+        in oklab,
+        var(--tm-accent, oklch(0.55 0.02 264)) 75%,
+        white
+    );
+}
+
+/* Hover lift. Deliberately moves the card rather than tinting it: a
+   background change fights with the selected-row tint, a shadow does not. */
+.tm-lift {
+    transition:
+        transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 180ms ease;
+}
+
+.tm-lift:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 1px 2px
+            color-mix(
+                in oklab,
+                var(--tm-accent, oklch(0.55 0.02 264)) 12%,
+                transparent
+            ),
+        0 10px 22px -8px
+            color-mix(
+                in oklab,
+                var(--tm-accent, oklch(0.55 0.02 264)) 38%,
+                transparent
+            );
+}
+
+/* List entrance. Staggered by an inline animation-delay from the row index.
+   `backwards` fill is load-bearing: it hides the row during its delay, but
+   applies nothing once the animation ends — with `both`, the final keyframe
+   would keep winning the cascade and permanently block .tm-lift's hover
+   transform. */
+@keyframes tm-card-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.tm-appear {
+    animation: tm-card-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tm-lift {
+        transition: none;
+    }
+
+    .tm-lift:hover {
+        transform: none;
+    }
+
+    .tm-appear {
+        animation: none;
+    }
+}
+
 @layer base {
     * {
         @apply border-border;

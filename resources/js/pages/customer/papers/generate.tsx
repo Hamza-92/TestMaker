@@ -3849,7 +3849,7 @@ return '';
                 </>
             ) : (
                 <>
-                    <div className="mx-auto max-w-7xl space-y-6">
+                    <div className="w-full space-y-6">
                         {recoveryDraft && (
                             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-500/30 dark:bg-brand-500/10">
                                 <div className="flex items-center gap-3">
@@ -4242,7 +4242,7 @@ return '';
                                 : 'py-2.5',
                         )}
                     >
-                        <div className="mx-auto flex max-w-7xl justify-end">
+                        <div className="flex w-full justify-end">
                             {step === 'chapters' ? (
                                 <div className="flex items-center gap-2">
                                     <button

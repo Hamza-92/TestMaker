@@ -132,7 +132,7 @@ export default function CustomerDashboard({ stats, recentPapers }: Props) {
         <>
             <Head title="Dashboard" />
 
-            <div className="mx-auto max-w-6xl space-y-5">
+            <div className="w-full space-y-5">
                 {/* ── Page header ───────────────────────────────────────── */}
                 <div className="flex items-center justify-between gap-4">
                     <div>

@@ -49,7 +49,7 @@ export default function AttemptShow({
         <>
             <Head title={`${attempt.student_name} — ${test.title}`} />
 
-            <div className="mx-auto max-w-5xl space-y-6">
+            <div className="w-full space-y-6">
                 <div className="flex items-start gap-3">
                     <Link
                         href={`/online-tests/${test.id}`}

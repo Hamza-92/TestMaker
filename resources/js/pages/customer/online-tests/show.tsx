@@ -114,7 +114,7 @@ export default function ShowOnlineTest({
         <>
             <Head title={test.title} />
 
-            <div className="mx-auto max-w-6xl space-y-6">
+            <div className="w-full space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                         <Link

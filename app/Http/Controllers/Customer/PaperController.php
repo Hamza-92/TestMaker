@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Paper;
 use App\Models\PaperFolder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -15,6 +14,11 @@ use Inertia\Response;
 
 class PaperController extends Controller
 {
+    private const PER_PAGE = 25;
+
+    /** Upper bound on a single bulk request, so one call cannot delete a whole library. */
+    private const MAX_BULK = 200;
+
     public function index(Request $request): Response
     {
         $cols = ['id', 'name', 'subject', 'class_name', 'total_marks', 'user_id', 'folder_id', 'created_at', 'updated_at'];
@@ -61,12 +65,107 @@ class PaperController extends Controller
                 'papers_count' => (int) ($folder->papers_count ?? 0),
             ]);
 
+        // Only the active tab's rows are fetched. The other tab needs just a
+        // number for its badge, so it costs a COUNT instead of a full result
+        // set — before this, every paper AND every draft was serialised into
+        // the payload on each load and on each debounced search keystroke.
+        $tab = $request->query('tab') === 'drafts' ? 'drafts' : 'papers';
+
+        $papersCount = (clone $base)->where('is_draft', false)->count();
+        $draftsCount = (clone $base)->where('is_draft', true)->count();
+
+        $items = (clone $base)
+            ->where('is_draft', $tab === 'drafts')
+            ->paginate(self::PER_PAGE, $cols)
+            ->withQueryString();
+
+        // Sidebar totals ignore the current folder and search, exactly like
+        // the per-folder counts above — they are navigation targets, so they
+        // must not change as you filter. They used to be derived from the
+        // full client-side list, which no longer exists.
+        $allScope = Paper::query()->whereIn('user_id', $userIds);
+        $sidebar = [
+            'all'     => (clone $allScope)->count(),
+            'unfiled' => (clone $allScope)->whereNull('folder_id')->count(),
+        ];
+
         return Inertia::render('customer/papers/index', [
-            'papers'  => (clone $base)->where('is_draft', false)->get($cols)->map($map),
-            'drafts'  => (clone $base)->where('is_draft', true)->get($cols)->map($map),
+            'items' => [
+                'data'         => collect($items->items())->map($map)->values(),
+                'current_page' => $items->currentPage(),
+                'last_page'    => $items->lastPage(),
+                'per_page'     => $items->perPage(),
+                'total'        => $items->total(),
+                'from'         => $items->firstItem(),
+                'to'           => $items->lastItem(),
+            ],
+            'counts'  => ['papers' => $papersCount, 'drafts' => $draftsCount],
+            'sidebar' => $sidebar,
             'folders' => $folders,
-            'filters' => ['q' => $search, 'folder' => $folderFilter],
+            'filters' => ['q' => $search, 'folder' => $folderFilter, 'tab' => $tab],
         ]);
+    }
+
+    /**
+     * Restrict a set of submitted ids to papers the current user actually
+     * owns. Teachers can *see* colleagues' papers but must not be able to
+     * delete, move or duplicate them via a hand-crafted request.
+     */
+    private function ownedPapers(Request $request): \Illuminate\Support\Collection
+    {
+        $data = $request->validate([
+            'ids'   => ['required', 'array', 'min:1', 'max:' . self::MAX_BULK],
+            'ids.*' => ['integer'],
+        ]);
+
+        return Paper::whereIn('id', $data['ids'])
+            ->where('user_id', auth()->id())
+            ->get();
+    }
+
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $papers = $this->ownedPapers($request);
+
+        foreach ($papers as $paper) {
+            $paper->delete();
+        }
+
+        return response()->json(['deleted' => $papers->count()]);
+    }
+
+    public function bulkMove(Request $request): JsonResponse
+    {
+        $request->validate([
+            'folder_id' => ['nullable', 'integer', Rule::exists('paper_folders', 'id')->where('user_id', auth()->id())],
+        ]);
+
+        $folderId = $request->input('folder_id') ?: null;
+        $papers = $this->ownedPapers($request);
+
+        foreach ($papers as $paper) {
+            $paper->folder_id = $folderId;
+            $paper->save();
+        }
+
+        return response()->json(['moved' => $papers->count()]);
+    }
+
+    public function bulkDuplicate(Request $request): JsonResponse
+    {
+        $papers = $this->ownedPapers($request);
+        $created = 0;
+
+        foreach ($papers as $paper) {
+            $copy = $paper->replicate(['created_at', 'updated_at']);
+            $copy->user_id = auth()->id();
+            $copy->name = $this->buildCopyName($paper->name);
+            $copy->is_draft = false;
+            $copy->save();
+            $created++;
+        }
+
+        return response()->json(['duplicated' => $created]);
     }
 
     public function move(Request $request, Paper $paper): JsonResponse
@@ -163,13 +262,23 @@ class PaperController extends Controller
         ]);
     }
 
-    public function destroy(Paper $paper): RedirectResponse
+    /**
+     * Returns JSON, like every other write method here.
+     *
+     * This used to redirect to the index. Its only caller is a `fetch` from
+     * the papers page, so the browser silently followed that redirect and
+     * rendered the whole index server-side — after which the client called
+     * router.reload() and rendered it a second time. Two full renders per
+     * delete, and the response the client ended up inspecting was the
+     * followed page rather than the delete itself.
+     */
+    public function destroy(Paper $paper): JsonResponse
     {
         abort_if($paper->user_id !== auth()->id(), 403);
 
         $paper->delete();
 
-        return redirect()->route('customer.papers.index');
+        return response()->json(['deleted' => true]);
     }
 
     public function edit(Paper $paper): Response

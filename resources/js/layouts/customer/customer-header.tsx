@@ -1,4 +1,4 @@
-﻿import { Link, router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     BellIcon,
     ChevronDownIcon,
@@ -204,7 +204,7 @@ export function CustomerHeader() {
         >
             <SidebarToggle />
 
-            {/* â”€â”€ Greeting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Greeting ───────────────────────────────────────────────────── */}
             <p className="hidden min-w-0 flex-1 truncate text-sm text-slate-500 lg:block dark:text-slate-400">
                 {greeting()},{' '}
                 <span className="font-semibold text-slate-800 dark:text-slate-100">
@@ -212,17 +212,17 @@ export function CustomerHeader() {
                 </span>
             </p>
 
-            {/* â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Search ─────────────────────────────────────────────────────── */}
             <div className="relative flex-1 lg:max-w-xs">
                 <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400" />
                 <input
                     type="search"
-                    placeholder="Search papers, questionsâ€¦"
+                    placeholder="Search papers, questions…"
                     className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:bg-slate-900 dark:focus:ring-brand-400/20"
                 />
             </div>
 
-            {/* â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── Actions ────────────────────────────────────────────────────── */}
             <div className="flex items-center gap-0.5">
                 {isImpersonating && (
                     <button
@@ -241,5 +241,3 @@ export function CustomerHeader() {
         </header>
     );
 }
-
-

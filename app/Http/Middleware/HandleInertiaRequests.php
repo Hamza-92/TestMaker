@@ -50,6 +50,13 @@ class HandleInertiaRequests extends Middleware
                 'is_impersonating'    => $request->session()->has('impersonator_id') && $user?->isCustomer(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+
+            // Flashed toasts. Resolved lazily so the value is read per
+            // request rather than captured once. Controllers opt in with:
+            //   ->with('toast', ['type' => 'success', 'message' => '...'])
+            'flash' => [
+                'toast' => fn () => $request->session()->get('toast'),
+            ],
         ];
     }
 

@@ -72,6 +72,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
 
         Route::middleware('teacher.feature:manage_own_papers')->group(function () {
+            // Registered before the papers/{paper}/... routes on purpose:
+            // first match wins, so `papers/bulk/duplicate` would otherwise be
+            // swallowed by `papers/{paper}/duplicate` with {paper} = "bulk".
+            Route::post('papers/bulk/delete', [PaperController::class, 'bulkDestroy'])->name('customer.papers.bulk.delete');
+            Route::post('papers/bulk/move', [PaperController::class, 'bulkMove'])->name('customer.papers.bulk.move');
+            Route::post('papers/bulk/duplicate', [PaperController::class, 'bulkDuplicate'])->name('customer.papers.bulk.duplicate');
+
             Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
             Route::get('papers/{paper}/edit', [PaperController::class, 'edit'])->name('customer.papers.edit');
             Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
@@ -85,6 +92,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::get('templates', [PaperTemplateController::class, 'index'])->name('customer.templates.index');
             Route::post('templates', [PaperTemplateController::class, 'store'])->name('customer.templates.store');
+            // Before templates/{template}/... for the same reason as papers:
+            // first match wins, so a literal path must not sit behind a
+            // wildcard that could swallow it.
+            Route::post('templates/bulk/delete', [PaperTemplateController::class, 'bulkDestroy'])->name('customer.templates.bulk.delete');
+            Route::post('templates/{template}/duplicate', [PaperTemplateController::class, 'duplicate'])->name('customer.templates.duplicate');
             Route::put('templates/{template}', [PaperTemplateController::class, 'update'])->name('customer.templates.update');
             Route::delete('templates/{template}', [PaperTemplateController::class, 'destroy'])->name('customer.templates.destroy');
         });
