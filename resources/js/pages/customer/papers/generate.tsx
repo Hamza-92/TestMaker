@@ -1479,6 +1479,42 @@ export default function GeneratePaper({
         />
     );
 
+    const directChapterColumns = useMemo<
+        [ChapterGroup[], ChapterGroup[]]
+    >(() => {
+        const columns: [ChapterGroup[], ChapterGroup[]] = [[], []];
+
+        if (chapterGroups.length === 0) {
+            return columns;
+        }
+
+        const estimatedGroupHeight = (group: ChapterGroup) =>
+            48 + group.items.length * 44;
+        const firstGroup = chapterGroups[0];
+        const heights: [number, number] = [
+            estimatedGroupHeight(firstGroup),
+            0,
+        ];
+        let activeColumn: 0 | 1 = 1;
+
+        columns[0].push(firstGroup);
+
+        for (const group of chapterGroups.slice(1)) {
+            const groupHeight = estimatedGroupHeight(group);
+            const otherColumn: 0 | 1 = activeColumn === 0 ? 1 : 0;
+
+            if (heights[activeColumn] + groupHeight > heights[otherColumn]) {
+                activeColumn = otherColumn;
+
+            }
+
+            columns[activeColumn].push(group);
+            heights[activeColumn] += groupHeight;
+        }
+
+        return columns;
+    }, [chapterGroups]);
+
     useEffect(() => {
         const sentinel = footerSentinelRef.current;
 
@@ -3963,20 +3999,14 @@ return '';
                                                         </div>
                                                         <div className="hidden gap-4 lg:grid lg:grid-cols-2">
                                                             <div className="space-y-4">
-                                                                {chapterGroups
-                                                                    .filter(
-                                                                        (_, index) =>
-                                                                            index % 2 === 0,
-                                                                    )
-                                                                    .map(renderDirectChapterGroup)}
+                                                                {directChapterColumns[0].map(
+                                                                    renderDirectChapterGroup,
+                                                                )}
                                                             </div>
                                                             <div className="space-y-4">
-                                                                {chapterGroups
-                                                                    .filter(
-                                                                        (_, index) =>
-                                                                            index % 2 === 1,
-                                                                    )
-                                                                    .map(renderDirectChapterGroup)}
+                                                                {directChapterColumns[1].map(
+                                                                    renderDirectChapterGroup,
+                                                                )}
                                                             </div>
                                                         </div>
                                                         </>
