@@ -27,11 +27,13 @@ import {
     Trash2Icon,
     XIcon,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
+import { Button, Card } from '@/components/tm';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
@@ -952,6 +954,169 @@ function StepPill({
     );
 }
 
+function ScopeOptionCard({
+    option,
+    icon: Icon,
+    index,
+    onSelect,
+}: {
+    option: ComboboxOptionItem;
+    icon: LucideIcon;
+    index: number;
+    onSelect: () => void;
+}) {
+    return (
+        <Card
+            padding="none"
+            interactive
+            className="group tm-appear overflow-hidden"
+            style={{ animationDelay: String(Math.min(index, 9) * 28) + 'ms' }}
+        >
+            <button
+                type="button"
+                onClick={onSelect}
+                className="flex min-h-[62px] w-full items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+            >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                    <Icon className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {option.label}
+                </span>
+                <ArrowRightIcon className="size-4 shrink-0 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 dark:text-slate-500" />
+            </button>
+        </Card>
+    );
+}
+
+function ScopePicker({
+    pattern,
+    klass,
+    subject,
+    patternOptions,
+    classOptions,
+    subjectOptions,
+    onPatternChange,
+    onClassChange,
+    onSubjectChange,
+}: {
+    pattern: ComboboxOptionItem | null;
+    klass: ComboboxOptionItem | null;
+    subject: ComboboxOptionItem | null;
+    patternOptions: ComboboxOptionItem[];
+    classOptions: ComboboxOptionItem[];
+    subjectOptions: ComboboxOptionItem[];
+    onPatternChange: (value: ComboboxOptionItem | null) => void;
+    onClassChange: (value: ComboboxOptionItem | null) => void;
+    onSubjectChange: (value: ComboboxOptionItem | null) => void;
+}) {
+    const level = !pattern ? 'pattern' : !klass ? 'class' : !subject ? 'subject' : 'ready';
+    const options =
+        level === 'pattern'
+            ? patternOptions
+            : level === 'class'
+              ? classOptions
+              : subjectOptions;
+    const icon =
+        level === 'pattern'
+            ? FileTextIcon
+            : level === 'class'
+              ? GraduationCapIcon
+              : BookOpenIcon;
+    const title =
+        level === 'pattern'
+            ? 'Choose a pattern'
+            : level === 'class'
+              ? 'Choose a class'
+              : level === 'subject'
+                ? 'Choose a subject'
+                : null;
+    const select = (option: ComboboxOptionItem) => {
+        if (level === 'pattern') onPatternChange(option);
+        else if (level === 'class') onClassChange(option);
+        else onSubjectChange(option);
+    };
+
+    return (
+        <Card padding="md" className="overflow-hidden">
+            <div className="flex items-center gap-2">
+                {level !== 'pattern' && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size={level === 'ready' ? 'sm' : 'icon-sm'}
+                        className="-ml-2 shrink-0"
+                        aria-label="Go back"
+                        onClick={() =>
+                            level === 'ready'
+                                ? onSubjectChange(null)
+                                : level === 'subject'
+                                  ? onClassChange(null)
+                                  : onPatternChange(null)
+                        }
+                    >
+                        <ArrowLeftIcon />
+                        {level === 'ready' && 'Back'}
+                    </Button>
+                )}
+                {title && (
+                    <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                        {title}
+                    </h2>
+                )}
+            </div>
+
+            {(pattern || klass || subject) && (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {[
+                        pattern && { value: pattern, clear: onPatternChange },
+                        klass && { value: klass, clear: onClassChange },
+                        subject && { value: subject, clear: onSubjectChange },
+                    ].filter(Boolean).map((item, index) => {
+                        const crumb = item as {
+                            value: ComboboxOptionItem;
+                            clear: (value: ComboboxOptionItem | null) => void;
+                        };
+                        return (
+                            <span key={crumb.value.id} className="inline-flex items-center gap-1.5">
+                                {index > 0 && <ArrowRightIcon className="size-3.5 text-slate-400" />}
+                                <button
+                                    type="button"
+                                    onClick={() => crumb.clear(null)}
+                                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
+                                >
+                                    <span className="truncate">{crumb.value.label}</span>
+                                    <CheckIcon className="size-3.5 shrink-0" strokeWidth={2.5} />
+                                </button>
+                            </span>
+                        );
+                    })}
+                </div>
+            )}
+
+
+            {level !== 'ready' ? (
+                options.length > 0 ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {options.map((option, index) => (
+                            <ScopeOptionCard
+                                key={option.id}
+                                option={option}
+                                icon={icon}
+                                index={index}
+                                onSelect={() => select(option)}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+                        No options are available for this step.
+                    </div>
+                )
+            ) : null}
+        </Card>
+    );
+}
 function CategoryDivider({ title }: { title: SectionCategory }) {
     return (
         <div className="border-b border-slate-100 pb-2 dark:border-slate-800">
@@ -3921,42 +4086,17 @@ return '';
 
                         {step === 'chapters' && (
                             <>
-                                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.02] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/10">
-                                    <div className="mb-4 flex items-center gap-2">
-                                        <div className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-                                            <LayersIcon className="size-4" />
-                                        </div>
-                                        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                            Choose the scope
-                                        </h2>
-                                    </div>
-
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        <FloatingCombobox
-                                            label="Pattern"
-                                            leadingIcon={FileTextIcon}
-                                            options={patternOptions}
-                                            value={pattern}
-                                            onChange={handlePatternChange}
-                                        />
-                                        <FloatingCombobox
-                                            label="Class"
-                                            leadingIcon={GraduationCapIcon}
-                                            options={classOptions}
-                                            value={klass}
-                                            onChange={handleClassChange}
-                                            disabled={!pattern}
-                                        />
-                                        <FloatingCombobox
-                                            label="Subject"
-                                            leadingIcon={BookOpenIcon}
-                                            options={subjectOptions}
-                                            value={subject}
-                                            onChange={handleSubjectChange}
-                                            disabled={!klass}
-                                        />
-                                    </div>
-                                </section>
+                                <ScopePicker
+                                    pattern={pattern}
+                                    klass={klass}
+                                    subject={subject}
+                                    patternOptions={patternOptions}
+                                    classOptions={classOptions}
+                                    subjectOptions={subjectOptions}
+                                    onPatternChange={handlePatternChange}
+                                    onClassChange={handleClassChange}
+                                    onSubjectChange={handleSubjectChange}
+                                />
 
                                 {pattern && klass && subject && (
                                     <section>
