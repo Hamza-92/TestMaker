@@ -181,7 +181,6 @@ interface Props {
     patternClasses: PatternClass[];
     classSubjects: ClassSubject[];
     sourceOptions: SourceOption[];
-    difficultyOptions?: DifficultyOption[];
     savedPaper?: SavedPaperProp;
     appliedTemplate?: AppliedTemplate;
 }
@@ -190,17 +189,6 @@ interface SourceOption {
     value: string;
     label: string;
 }
-
-interface DifficultyOption {
-    value: string;
-    label: string;
-}
-
-const FALLBACK_DIFFICULTY_OPTIONS: DifficultyOption[] = [
-    { value: 'easy', label: 'Easy' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'hard', label: 'Hard' },
-];
 
 const DIFFICULTY_STYLES: Record<string, string> = {
     easy: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
@@ -1147,10 +1135,11 @@ function ScopePicker({
 }
 function CategoryDivider({ title }: { title: SectionCategory }) {
     return (
-        <div className="border-b border-slate-100 pb-2 dark:border-slate-800">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <div className="flex items-center gap-3">
+            <h3 className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
                 {title}
             </h3>
+            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
         </div>
     );
 }
@@ -1172,7 +1161,7 @@ function NumberField({
 }) {
     return (
         <label className="block min-w-0">
-            <span className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <span className="mb-1 block text-[10px] font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
                 {label}
             </span>
             <input autoComplete="off"
@@ -1268,15 +1257,9 @@ export default function GeneratePaper({
     patternClasses,
     classSubjects,
     sourceOptions,
-    difficultyOptions,
     savedPaper,
     appliedTemplate,
 }: Props) {
-    const difficultyFilters = useMemo(
-        () => (difficultyOptions && difficultyOptions.length > 0 ? difficultyOptions : FALLBACK_DIFFICULTY_OPTIONS),
-        [difficultyOptions],
-    );
-    const [activeDifficulties, setActiveDifficulties] = useState<string[]>([]);
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
     const schoolAddress = typeof auth.user.address === 'string' ? auth.user.address : '';
@@ -1815,9 +1798,6 @@ export default function GeneratePaper({
         activeSourceValues.forEach((source) =>
             params.append('sources[]', source),
         );
-        activeDifficulties.forEach((difficulty) =>
-            params.append('difficulties[]', difficulty),
-        );
 
         queueMicrotask(() => {
             if (!abortController.signal.aborted) {
@@ -1863,7 +1843,7 @@ export default function GeneratePaper({
             .finally(() => setLoadingQuestionSections(false));
 
         return () => abortController.abort();
-    }, [activeSourceValues, activeDifficulties, selectedChapterIds, selectedTopicIds, step]);
+    }, [activeSourceValues, selectedChapterIds, selectedTopicIds, step]);
 
     useEffect(() => {
         if (
@@ -1962,9 +1942,6 @@ export default function GeneratePaper({
         activeSourceValues.forEach((source) =>
             params.append('sources[]', source),
         );
-        activeDifficulties.forEach((difficulty) =>
-            params.append('difficulties[]', difficulty),
-        );
 
         queueMicrotask(() => {
             if (!abortController.signal.aborted) {
@@ -2004,7 +1981,6 @@ export default function GeneratePaper({
     }, [
         activeManualQuestionTypeId,
         activeSourceValues,
-        activeDifficulties,
         manualPickerTarget,
         selectedChapterIds,
         selectedTopicIds,
@@ -2416,14 +2392,9 @@ return;
         const chapterIds = filters?.chapterIds ?? selectedChapterIds;
         const topicIds = filters?.topicIds ?? selectedTopicIds;
         const sources = filters?.sources ?? activeSourceValues;
-        const difficulties = activeDifficulties;
-
         chapterIds.forEach((id) => params.append('chapter_ids[]', String(id)));
         topicIds.forEach((id) => params.append('topic_ids[]', String(id)));
         sources.forEach((source) => params.append('sources[]', source));
-        difficulties.forEach((difficulty) =>
-            params.append('difficulties[]', difficulty),
-        );
 
         return params;
     }
@@ -4218,11 +4189,21 @@ return '';
                                                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                                                         Question Selection
                                                     </h2>
-                                                    <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                                                        {pattern?.label} /{' '}
-                                                        {klass?.label} /{' '}
-                                                        {subject?.label}
-                                                    </p>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                        {[pattern, klass, subject].map(
+                                                            (item) =>
+                                                                item && (
+                                                                    <span
+                                                                        key={item.id}
+                                                                        className="inline-flex h-7 max-w-full items-center rounded-md bg-brand-50 px-2 text-[11px] font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+                                                                    >
+                                                                        <span className="truncate">
+                                                                            {item.label}
+                                                                        </span>
+                                                                    </span>
+                                                                ),
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -4253,35 +4234,6 @@ return '';
                                                         ),
                                                     )}
                                                 </div>
-                                                <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-800">
-                                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                                        Difficulty
-                                                    </span>
-                                                    {difficultyFilters.map((item) => {
-                                                        const checked = activeDifficulties.includes(item.value);
-                                                        return (
-                                                            <button
-                                                                key={item.value}
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    setActiveDifficulties((current) =>
-                                                                        current.includes(item.value)
-                                                                            ? current.filter((v) => v !== item.value)
-                                                                            : [...current, item.value],
-                                                                    )
-                                                                }
-                                                                className={cn(
-                                                                    'inline-flex cursor-pointer items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
-                                                                    checked
-                                                                        ? DIFFICULTY_STYLES[item.value] ?? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300'
-                                                                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800',
-                                                                )}
-                                                            >
-                                                                {item.label}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
                                             </div>
                                         </div>
 
@@ -4302,7 +4254,7 @@ return '';
                                     </div>
                                 )}
 
-                                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.02] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/10">
+                                <div className="space-y-5">
                                     {loadingQuestionSections && (
                                         <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-sm font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
                                             <Loader2Icon className="size-4 animate-spin" />
@@ -4333,7 +4285,7 @@ return '';
                                     {!loadingQuestionSections &&
                                         questionSelection.sections.length >
                                             0 && (
-                                            <div className="space-y-5">
+                                            <div className="space-y-5 pt-2">
                                                 {renderQuestionCategory(
                                                     'Objective Questions',
                                                 )}
@@ -6908,7 +6860,7 @@ function QuestionSelectionCard({
             onDragOver={(event) => onDragOver(event, section)}
             onDrop={(event) => onDrop(event, section)}
             className={cn(
-                'rounded-xl border bg-white px-4 py-3 transition-colors dark:bg-slate-950/40',
+                'rounded-xl border bg-white px-5 py-4 transition-colors dark:bg-slate-950/40',
                 isDragging
                     ? 'border-slate-300 opacity-55 dark:border-slate-700'
                     : isDragTarget
@@ -6926,36 +6878,37 @@ function QuestionSelectionCard({
                         onDragEnd={onDragEnd}
                         aria-label={`Drag to reorder ${section.title}`}
                         title={`Drag to reorder ${section.title}`}
-                        className="flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                        className="flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg bg-slate-50 text-brand-500 transition-colors hover:bg-brand-50 hover:text-brand-700 active:cursor-grabbing dark:bg-slate-800 dark:text-brand-300 dark:hover:bg-brand-500/10 dark:hover:text-brand-200"
                     >
                         <GripVerticalIcon className="size-4" />
                     </div>
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         {section.title}
                     </h4>
-                    <span className="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+                    <span className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
                         {section.availableCount} available
                     </span>
                 </div>
                 <button
                     type="button"
                     onClick={() => onAddRow(section.id)}
-                    aria-label={`Add another ${section.title} row`}
-                    title={`Add another ${section.title} row`}
-                    className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-brand-50 text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200 dark:hover:bg-brand-500/20"
+                    aria-label={'Add another ' + section.title + ' row'}
+                    title={'Add another ' + section.title + ' row'}
+                    className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
                 >
-                    <PlusIcon className="size-4" />
+                    <PlusIcon className="size-3.5" />
+                    Add row
                 </button>
             </div>
 
-            <div className="mt-3 space-y-3">
+            <div className="mt-4 space-y-4">
                 {section.rows.map((row, index) => (
                     <div
                         key={row.id}
-                        className="grid gap-2.5 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
+                        className="grid gap-2.5 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
                     >
                         <NumberField
-                            label="Total questions (choice)"
+                            label="Choice"
                             value={row.choiceQuestions}
                             placeholder="0"
                             max={availableForQuestionRow(section, row.id)}
