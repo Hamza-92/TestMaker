@@ -868,6 +868,36 @@ function SourceCheckbox({
     );
 }
 
+function MediumSelector({
+    value,
+    onChange,
+}: {
+    value: ContentMedium;
+    onChange: (medium: ContentMedium) => void;
+}) {
+    const options: ContentMedium[] = ['Both', 'English', 'Urdu'];
+
+    return (
+        <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-800 dark:bg-slate-950/60">
+            {options.map((option) => (
+                <button
+                    key={option}
+                    type="button"
+                    aria-pressed={value === option}
+                    onClick={() => onChange(option)}
+                    className={cn(
+                        'inline-flex h-7 cursor-pointer items-center rounded-md px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+                        value === option
+                            ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-800 dark:text-brand-300'
+                            : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+                    )}
+                >
+                    {option}
+                </button>
+            ))}
+        </div>
+    );
+}
 function AutoPickSwitch({
     enabled,
     onChange,
@@ -1802,6 +1832,7 @@ export default function GeneratePaper({
         activeSourceValues.forEach((source) =>
             params.append('sources[]', source),
         );
+        params.set('medium', chapterMedium);
 
         queueMicrotask(() => {
             if (!abortController.signal.aborted) {
@@ -1946,6 +1977,7 @@ export default function GeneratePaper({
         activeSourceValues.forEach((source) =>
             params.append('sources[]', source),
         );
+        params.set('medium', chapterMedium);
 
         queueMicrotask(() => {
             if (!abortController.signal.aborted) {
@@ -2408,6 +2440,7 @@ return;
         chapterIds.forEach((id) => params.append('chapter_ids[]', String(id)));
         topicIds.forEach((id) => params.append('topic_ids[]', String(id)));
         sources.forEach((source) => params.append('sources[]', source));
+        params.set('medium', chapterMedium);
 
         return params;
     }
@@ -4222,7 +4255,10 @@ return '';
                                             </div>
 
                                             <div className="mt-3 flex flex-wrap items-center gap-3">
-
+                                                <MediumSelector
+                                                    value={chapterMedium}
+                                                    onChange={setChapterMedium}
+                                                />
                                                 <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-800">
                                                     {sourceFilters.map(
                                                         (item) => (

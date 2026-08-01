@@ -179,8 +179,8 @@ class GeneratePaperController extends Controller
 
     public function questionTypes(Request $request): JsonResponse
     {
-        [$chapterIds, $validTopicIds, $sources, $difficulties] = $this->questionScope($request);
-        $displayMedium = $this->subjectMediumForChapters($chapterIds);
+        [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium] = $this->questionScope($request);
+        $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
 
         if ($sources->isEmpty()) {
             return response()->json(['sections' => []]);
@@ -224,7 +224,7 @@ class GeneratePaperController extends Controller
 
     public function questions(Request $request): JsonResponse
     {
-        [$chapterIds, $validTopicIds, $sources, $difficulties] = $this->questionScope($request);
+        [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium] = $this->questionScope($request);
         $data = $request->validate([
             'question_type_id' => ['required', 'integer', 'exists:question_types,id'],
         ]);
@@ -233,7 +233,7 @@ class GeneratePaperController extends Controller
             return response()->json(['questions' => []]);
         }
 
-        $displayMedium = $this->subjectMediumForChapters($chapterIds);
+        $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
         $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->where('questions.question_type_id', $data['question_type_id'])
             ->with([
@@ -325,6 +325,7 @@ class GeneratePaperController extends Controller
             'sources.*' => ['string', Rule::in(Question::sourceValues())],
             'difficulties' => ['array'],
             'difficulties.*' => ['string', Rule::in(Question::difficultyValues())],
+            'medium' => ['nullable', Rule::in(['English', 'Urdu', 'Both'])],
         ]);
 
         $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
@@ -354,6 +355,7 @@ class GeneratePaperController extends Controller
         $difficulties = collect($data['difficulties'] ?? [])
             ->filter(fn ($value) => in_array($value, Question::difficultyValues(), true))
             ->values();
+        $requestedMedium = $data['medium'] ?? null;
         $validTopicIds = $topicIds->isEmpty()
             ? collect()
             : DB::table('topics')
@@ -361,7 +363,7 @@ class GeneratePaperController extends Controller
                 ->whereIn('chapter_id', $chapterIds)
                 ->pluck('id');
 
-        return [$chapterIds, $validTopicIds, $sources, $difficulties];
+        return [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium];
     }
 
     private function subjectMedium(int $patternId, int $classId, int $subjectId): string
