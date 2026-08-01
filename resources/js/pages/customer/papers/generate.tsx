@@ -4232,11 +4232,11 @@ return '';
                                                 <div className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
                                                     <FileTextIcon className="size-4" />
                                                 </div>
-                                                <div>
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                                                         Question Selection
                                                     </h2>
-                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                    <div className="flex flex-wrap items-center gap-1.5">
                                                         {[pattern, klass, subject].map(
                                                             (item) =>
                                                                 item && (
