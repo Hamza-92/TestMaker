@@ -223,9 +223,15 @@ interface QuestionSelectionSection {
     availableCount: number;
     /** Default column count (1–5) for this question type, from the DB. */
     columnPerRow: number;
+    selectionMode?: SelectionMode;
     rows: QuestionSelectionRow[];
 }
 
+function questionSectionSelectionMode(
+    section: Pick<QuestionSelectionSection, 'selectionMode'>,
+): SelectionMode {
+    return section.selectionMode ?? 'automatic';
+}
 interface QuestionSelectionState {
     globalFilters: Record<SourceFilterKey, boolean>;
     sections: QuestionSelectionSection[];
@@ -774,6 +780,7 @@ function mergeQuestionSections(
             heading: item.heading || item.title,
             availableCount: item.availableCount,
             columnPerRow: item.columnPerRow,
+            selectionMode: current?.selectionMode ?? 'automatic',
             rows: normalizeSectionRows(
                 current?.rows ?? [createQuestionRow(`${sectionId}_row_001`)],
                 item.availableCount,
@@ -861,42 +868,41 @@ function SourceCheckbox({
     );
 }
 
-function SelectionModeToggle({
-    value,
+function AutoPickSwitch({
+    enabled,
     onChange,
 }: {
-    value: SelectionMode;
-    onChange: (mode: SelectionMode) => void;
+    enabled: boolean;
+    onChange: (enabled: boolean) => void;
 }) {
     return (
-        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-950/60">
-            <button
-                type="button"
-                onClick={() => onChange('automatic')}
+        <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label="Auto Pick"
+            onClick={() => onChange(!enabled)}
+            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/10"
+        >
+            <SparklesIcon className="size-3.5 text-brand-600 dark:text-brand-300" />
+            <span>Auto Pick</span>
+            <span
                 className={cn(
-                    'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors',
-                    value === 'automatic'
-                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+                    'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                    enabled
+                        ? 'bg-brand-600 dark:bg-brand-500'
+                        : 'bg-slate-300 dark:bg-slate-700',
                 )}
+                aria-hidden="true"
             >
-                <SparklesIcon className="size-3.5" />
-                Auto Pick
-            </button>
-            <button
-                type="button"
-                onClick={() => onChange('manual')}
-                className={cn(
-                    'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors',
-                    value === 'manual'
-                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
-                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
-                )}
-            >
-                <ListChecksIcon className="size-3.5" />
-                Pick Manually
-            </button>
-        </div>
+                <span
+                    className={cn(
+                        'size-4 rounded-full bg-white shadow-sm transition-transform dark:bg-slate-100',
+                        enabled ? 'translate-x-4' : 'translate-x-0.5',
+                    )}
+                />
+            </span>
+        </button>
     );
 }
 
@@ -1276,8 +1282,6 @@ export default function GeneratePaper({
     const [chapterMedium, setChapterMedium] = useState<ContentMedium>('English');
     const [loadingChapters, setLoadingChapters] = useState(false);
     const [selected, setSelected] = useState<Record<number, Set<number>>>({});
-    const [selectionMode, setSelectionMode] =
-        useState<SelectionMode>('automatic');
     const [isFooterSticky, setIsFooterSticky] = useState(false);
     const footerSentinelRef = useRef<HTMLDivElement>(null);
     const questionRowSequence = useRef(0);
@@ -1419,7 +1423,7 @@ export default function GeneratePaper({
 
     const selectedChapterCount = selectedChapterIds.length;
     const canContinueToQuestions = selectedChapterCount > 0;
-    const manualPickerRows = useMemo(
+    const questionSelectionRows = useMemo(
         () =>
             questionSelection.sections.flatMap((section) =>
                 section.rows
@@ -1431,6 +1435,14 @@ export default function GeneratePaper({
                     .filter((item) => item.target > 0),
             ),
         [questionSelection.sections],
+    );
+    const manualPickerRows = useMemo(
+        () =>
+            questionSelectionRows.filter(
+                (item) =>
+                    questionSectionSelectionMode(item.section) === 'manual',
+            ),
+        [questionSelectionRows],
     );
     const activeManualPickerRow = useMemo(
         () =>
@@ -1446,24 +1458,16 @@ export default function GeneratePaper({
     const selectedManualQuestionIds = useMemo(
         () =>
             new Set(
-                questionSelection.sections.flatMap((section) =>
-                    section.rows.flatMap((row) => row.selectedQuestionIds),
-                ),
+                manualPickerRows.flatMap((item) => item.row.selectedQuestionIds),
             ),
-        [questionSelection.sections],
+        [manualPickerRows],
     );
-    const totalManualQuestionsRequired = manualPickerRows.reduce(
-        (sum, item) => sum + item.target,
-        0,
+    const isManualSelectionComplete = manualPickerRows.every(
+        (item) => item.row.selectedQuestionIds.length === item.target,
     );
-    const isManualSelectionComplete =
-        totalManualQuestionsRequired > 0 &&
-        manualPickerRows.every(
-            (item) => item.row.selectedQuestionIds.length === item.target,
-        );
     const isQuestionSelectionReady =
-        manualPickerRows.length > 0 &&
-        manualPickerRows.every(
+        questionSelectionRows.length > 0 &&
+        questionSelectionRows.every(
             (item) =>
                 toNumber(item.row.requiredQuestions) > 0 &&
                 toNumber(item.row.marksPerQuestion) > 0,
@@ -1471,7 +1475,7 @@ export default function GeneratePaper({
     const canGeneratePaper =
         questionSelection.totalMarks > 0 &&
         isQuestionSelectionReady &&
-        (selectionMode === 'manual' ? isManualSelectionComplete : true);
+        isManualSelectionComplete;
     const activeManualQuestionTypeId =
         activeManualPickerRow?.section.questionTypeId ?? null;
     const activeManualSelectedQuestionIds = useMemo(
@@ -2128,7 +2132,6 @@ return;
             sections: [],
             totalMarks: 0,
         });
-        setSelectionMode('automatic');
         setManualPickerTarget(null);
         setManualQuestions([]);
         setManualQuestionError(null);
@@ -2342,11 +2345,21 @@ return;
         setStep('chapters');
     }
 
-    function handleSelectionModeChange(mode: SelectionMode) {
-        setSelectionMode(mode);
+    function handleAutoPickChange(sectionId: string, enabled: boolean) {
+        setQuestionSelection((current) => ({
+            ...current,
+            sections: current.sections.map((section) =>
+                section.id === sectionId
+                    ? {
+                          ...section,
+                          selectionMode: enabled ? 'automatic' : 'manual',
+                      }
+                    : section,
+            ),
+        }));
 
-        if (mode === 'automatic') {
-            setManualPickerTarget(null);
+        if (enabled && manualPickerTarget?.sectionId === sectionId) {
+            closeManualQuestionPicker();
         }
     }
 
@@ -2472,7 +2485,7 @@ return;
             const sections = activeRows.map(({ section, row }) => {
                 const pool = pools[section.questionTypeId] ?? [];
                 const selectedQuestions =
-                    selectionMode === 'manual'
+                    questionSectionSelectionMode(section) === 'manual'
                         ? row.selectedQuestionIds
                               .map((id) =>
                                   pool.find((question) => question.id === id),
@@ -3799,7 +3812,8 @@ return '';
                         <QuestionSelectionCard
                             key={section.id}
                             section={section}
-                            selectionMode={selectionMode}
+                            autoPick={questionSectionSelectionMode(section) === 'automatic'}
+                            onAutoPickChange={handleAutoPickChange}
                             onChange={updateSectionValue}
                             onDeleteRow={deleteQuestionRow}
                             onAddRow={addQuestionRow}
@@ -4208,12 +4222,7 @@ return '';
                                             </div>
 
                                             <div className="mt-3 flex flex-wrap items-center gap-3">
-                                                <SelectionModeToggle
-                                                    value={selectionMode}
-                                                    onChange={
-                                                        handleSelectionModeChange
-                                                    }
-                                                />
+
                                                 <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-800">
                                                     {sourceFilters.map(
                                                         (item) => (
@@ -6817,7 +6826,8 @@ function ChapterCard({
 
 function QuestionSelectionCard({
     section,
-    selectionMode,
+    autoPick,
+    onAutoPickChange,
     onChange,
     onDeleteRow,
     onAddRow,
@@ -6830,7 +6840,8 @@ function QuestionSelectionCard({
     onDragEnd,
 }: {
     section: QuestionSelectionSection;
-    selectionMode: SelectionMode;
+    autoPick: boolean;
+    onAutoPickChange: (sectionId: string, enabled: boolean) => void;
     onChange: (
         sectionId: string,
         rowId: string,
@@ -6889,16 +6900,24 @@ function QuestionSelectionCard({
                         {section.availableCount} available
                     </span>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => onAddRow(section.id)}
-                    aria-label={'Add another ' + section.title + ' row'}
-                    title={'Add another ' + section.title + ' row'}
-                    className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
-                >
-                    <PlusIcon className="size-3.5" />
-                    Add row
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                    <AutoPickSwitch
+                        enabled={autoPick}
+                        onChange={(enabled) =>
+                            onAutoPickChange(section.id, enabled)
+                        }
+                    />
+                    <button
+                        type="button"
+                        onClick={() => onAddRow(section.id)}
+                        aria-label={'Add another ' + section.title + ' row'}
+                        title={'Add another ' + section.title + ' row'}
+                        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
+                    >
+                        <PlusIcon className="size-3.5" />
+                        Add row
+                    </button>
+                </div>
             </div>
 
             <div className="mt-4 space-y-4">
@@ -6951,7 +6970,7 @@ function QuestionSelectionCard({
                             }
                         />
                         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                            {selectionMode === 'manual' && (
+                            {!autoPick && (
                                 <button
                                     type="button"
                                     disabled={rowTarget(row) === 0}
