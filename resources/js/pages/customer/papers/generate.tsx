@@ -975,7 +975,7 @@ function ScopeOptionCard({
             <button
                 type="button"
                 onClick={onSelect}
-                className="flex min-h-[62px] w-full items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+                className="flex min-h-[62px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
             >
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
                     <Icon className="size-4" />
@@ -999,6 +999,9 @@ function ScopePicker({
     onPatternChange,
     onClassChange,
     onSubjectChange,
+    chapters,
+    allChaptersState,
+    onToggleAllChapters,
 }: {
     pattern: ComboboxOptionItem | null;
     klass: ComboboxOptionItem | null;
@@ -1009,6 +1012,9 @@ function ScopePicker({
     onPatternChange: (value: ComboboxOptionItem | null) => void;
     onClassChange: (value: ComboboxOptionItem | null) => void;
     onSubjectChange: (value: ComboboxOptionItem | null) => void;
+    chapters: Chapter[] | null;
+    allChaptersState: () => 'unchecked' | 'checked' | 'indeterminate';
+    onToggleAllChapters: () => void;
 }) {
     const level = !pattern ? 'pattern' : !klass ? 'class' : !subject ? 'subject' : 'ready';
     const options =
@@ -1030,7 +1036,7 @@ function ScopePicker({
               ? 'Choose a class'
               : level === 'subject'
                 ? 'Choose a subject'
-                : null;
+                : 'Chapters & topics';
     const select = (option: ComboboxOptionItem) => {
         if (level === 'pattern') onPatternChange(option);
         else if (level === 'class') onClassChange(option);
@@ -1039,31 +1045,53 @@ function ScopePicker({
 
     return (
         <Card padding="md" className="overflow-hidden">
-            <div className="flex items-center gap-2">
-                {level !== 'pattern' && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size={level === 'ready' ? 'sm' : 'icon-sm'}
-                        className="-ml-2 shrink-0"
-                        aria-label="Go back"
-                        onClick={() =>
-                            level === 'ready'
-                                ? onSubjectChange(null)
-                                : level === 'subject'
-                                  ? onClassChange(null)
-                                  : onPatternChange(null)
-                        }
-                    >
-                        <ArrowLeftIcon />
-                        {level === 'ready' && 'Back'}
-                    </Button>
-                )}
-                {title && (
-                    <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                        {title}
-                    </h2>
-                )}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                    {level !== 'pattern' && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size={level === 'ready' ? 'sm' : 'icon-sm'}
+                            className="-ml-2 shrink-0 cursor-pointer"
+                            aria-label="Go back"
+                            onClick={() =>
+                                level === 'ready'
+                                    ? onSubjectChange(null)
+                                    : level === 'subject'
+                                      ? onClassChange(null)
+                                      : onPatternChange(null)
+                            }
+                        >
+                            <ArrowLeftIcon />
+                            {level === 'ready' && 'Back'}
+                        </Button>
+                    )}
+                    {title && (
+                        <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                            {title}
+                        </h2>
+                    )}
+                </div>
+                {level === 'ready' &&
+                    chapters &&
+                    chapters.length > 0 && (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="w-full cursor-pointer sm:w-auto"
+                            onClick={onToggleAllChapters}
+                        >
+                            {allChaptersState() === 'checked' ? (
+                                <MinusIcon />
+                            ) : (
+                                <CheckIcon />
+                            )}
+                            {allChaptersState() === 'checked'
+                                ? 'Clear all'
+                                : 'Select all'}
+                        </Button>
+                    )}
             </div>
 
             {(pattern || klass || subject) && (
@@ -1083,7 +1111,7 @@ function ScopePicker({
                                 <button
                                     type="button"
                                     onClick={() => crumb.clear(null)}
-                                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
+                                    className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
                                 >
                                     <span className="truncate">{crumb.value.label}</span>
                                     <CheckIcon className="size-3.5 shrink-0" strokeWidth={2.5} />
@@ -4096,38 +4124,13 @@ return '';
                                     onPatternChange={handlePatternChange}
                                     onClassChange={handleClassChange}
                                     onSubjectChange={handleSubjectChange}
+                                    chapters={chapters}
+                                    allChaptersState={allChaptersState}
+                                    onToggleAllChapters={toggleAllChapters}
                                 />
 
                                 {pattern && klass && subject && (
-                                    <section>
-                                        <div className="mb-3 flex items-center justify-between gap-3">
-                                            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                                Chapters &amp; topics
-                                            </h2>
-                                            {chapters &&
-                                                chapters.length > 0 && (
-                                                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-                                                        <TriCheckbox
-                                                            state={allChaptersState()}
-                                                            onChange={
-                                                                toggleAllChapters
-                                                            }
-                                                            label="Select all chapters and topics"
-                                                            size="sm"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={
-                                                                toggleAllChapters
-                                                            }
-                                                            className="cursor-pointer text-xs font-medium text-slate-700 transition-colors hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300"
-                                                        >
-                                                            Select all
-                                                        </button>
-                                                    </div>
-                                                )}
-                                        </div>
-
+                                    <section className="space-y-4">
                                         {loadingChapters && (
                                             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                                 {Array.from({ length: 6 }).map(
@@ -6657,13 +6660,13 @@ function DirectChapterGroup({
     return (
         <div
             className={cn(
-                'overflow-hidden rounded-xl border bg-white transition-colors dark:bg-slate-900',
+                'overflow-hidden rounded-xl border bg-white shadow-sm shadow-slate-900/[0.02] transition-all dark:bg-slate-900 dark:shadow-black/10',
                 isActive
-                    ? 'border-brand-300 dark:border-brand-500/40'
-                    : 'border-slate-200 dark:border-slate-800',
+                    ? 'border-brand-300 ring-1 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
+                    : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:hover:border-slate-700 dark:hover:shadow-black/20',
             )}
         >
-            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3 transition-colors dark:border-slate-800 dark:bg-slate-950/30">
                 <TriCheckbox
                     state={state}
                     onChange={onToggleGroup}
@@ -6707,13 +6710,16 @@ function DirectChapterRow({
     return (
         <li
             className={cn(
-                'flex items-center gap-3 bg-white px-4 py-3 dark:bg-slate-900',
+                'flex min-h-11 items-center gap-3 bg-white px-4 py-2.5 transition-colors dark:bg-slate-900',
                 standalone &&
-                    'rounded-xl border transition-colors dark:border-slate-800',
+                    'rounded-xl border shadow-sm shadow-slate-900/[0.02] transition-all dark:border-slate-800 dark:shadow-black/10',
                 standalone &&
                     (checked
-                        ? 'border-brand-300 dark:border-brand-500/40'
+                        ? 'border-brand-300 ring-1 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
                         : 'border-slate-200'),
+                checked
+                    ? 'bg-brand-50/70 hover:bg-brand-100/70 dark:bg-brand-500/10 dark:hover:bg-brand-500/15'
+                    : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/50',
             )}
         >
             <TriCheckbox
@@ -6774,14 +6780,14 @@ function ChapterCard({
     return (
         <div
             className={cn(
-                'group rounded-2xl border bg-white p-4 transition-all',
+                'overflow-hidden rounded-xl border bg-white shadow-sm shadow-slate-900/[0.02] transition-all dark:shadow-black/10',
                 isActive
-                    ? 'border-brand-300 ring-2 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
-                    : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700',
+                    ? 'border-brand-300 ring-1 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
+                    : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:hover:border-slate-700 dark:hover:shadow-black/20',
                 'dark:bg-slate-900',
             )}
         >
-            <div className="flex items-start gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+            <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/30">
                 <TriCheckbox
                     state={state}
                     onChange={onToggleChapter}
@@ -6816,12 +6822,8 @@ function ChapterCard({
                 </div>
             </div>
 
-            {chapter.topics.length === 0 ? (
-                <p className="px-1 py-3 text-xs text-slate-400 italic dark:text-slate-500">
-                    This chapter can be selected directly.
-                </p>
-            ) : (
-                <ul className="mt-2 space-y-0.5">
+            {chapter.topics.length > 0 ? (
+                <ul className="divide-y divide-slate-100 px-2 py-1 dark:divide-slate-800">
                     {chapter.topics.map((topic) => {
                         const checked = selectedTopics.has(topic.id);
 
@@ -6829,10 +6831,10 @@ function ChapterCard({
                             <li
                                 key={topic.id}
                                 className={cn(
-                                    'flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors',
+                                    'flex min-h-10 items-center gap-2.5 rounded-lg px-2 transition-colors',
                                     checked
-                                        ? 'text-brand-700 dark:text-brand-300'
-                                        : 'text-slate-600 dark:text-slate-300',
+                                        ? 'bg-brand-50/70 text-brand-700 hover:bg-brand-100/70 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/15'
+                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50',
                                 )}
                             >
                                 <TriCheckbox
@@ -6856,7 +6858,7 @@ function ChapterCard({
                         );
                     })}
                 </ul>
-            )}
+            ) : null}
         </div>
     );
 }
@@ -6911,7 +6913,7 @@ function QuestionSelectionCard({
                     ? 'border-slate-300 opacity-55 dark:border-slate-700'
                     : isDragTarget
                       ? 'border-brand-400 bg-brand-50/40 ring-2 ring-brand-500/10 dark:border-brand-500/60 dark:bg-brand-500/5'
-                      : 'border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700',
+                      : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:hover:border-slate-700 dark:hover:shadow-black/20',
             )}
         >
             <div className="flex items-center justify-between gap-3">
