@@ -3829,7 +3829,7 @@ return '';
             {generatedPaper ? (
                 <>
                     {recoveryDraft && (
-                        <div className="mx-auto mb-3 flex max-w-[76rem] flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10 print:hidden">
+                        <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10 print:hidden">
                             <div className="flex items-center gap-3">
                                 <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
                                     <ClockIcon className="size-4" />
@@ -5863,7 +5863,7 @@ return null;
 
     return (
         <>
-            <div data-paper-shell className="mx-auto max-w-[76rem] space-y-3">
+            <div data-paper-shell className="w-full space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
                     <div className="flex items-center gap-2">
                         <Link
