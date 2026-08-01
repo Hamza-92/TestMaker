@@ -69,7 +69,7 @@ import {
     normalizePaperSettings
 } from './paper-layouts/types';
 import type { PaperHeaderTemplate } from './paper-layouts/types';
-import type {GeneratedPaper, GeneratedPaperHeader, GeneratedPaperQuestion, GeneratedPaperSection, PaperImageSize, PaperQuestionOption, PaperSettings} from './paper-layouts/types';
+import type { GeneratedPaper, GeneratedPaperHeader, GeneratedPaperQuestion, GeneratedPaperSection, PaperImageSize, PaperQuestionOption, PaperSettings } from './paper-layouts/types';
 
 interface Pattern {
     id: number;
@@ -146,8 +146,8 @@ function deserializeChapterSelection(
     plain: Record<string, number[]> | null | undefined,
 ): Record<number, Set<number>> {
     if (!plain) {
-return {};
-}
+        return {};
+    }
 
     const out: Record<number, Set<number>> = {};
 
@@ -190,11 +190,8 @@ interface SourceOption {
     label: string;
 }
 
-const DIFFICULTY_STYLES: Record<string, string> = {
-    easy: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
-    medium: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
-    hard: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30',
-};
+
+
 
 type StepState = 'active' | 'done' | 'upcoming';
 type FormStep = 'chapters' | 'questions';
@@ -480,8 +477,8 @@ function localizedPaperHtml(
         (englishText !== '' && urduText !== ''
             ? 'Both'
             : urduText !== ''
-              ? 'Urdu'
-              : 'English');
+                ? 'Urdu'
+                : 'English');
 
     if (resolvedMedium === 'English') {
         return englishText || urduText || fallback;
@@ -505,10 +502,41 @@ function localizedPaperHtml(
 }
 
 function plainQuestionText(value: string): string {
-    return value
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    const normalizedEntities = value
+        .replace(/&(?:nbsp|npsp);/gi, ' ')
+        .replace(/&#(?:160|xA0);/gi, ' ')
+        .replace(/<[^>]*>/g, ' ');
+
+    if (typeof DOMParser === 'undefined') {
+        return normalizedEntities.replace(/\s+/g, ' ').trim();
+    }
+
+    const decoded =
+        new DOMParser().parseFromString(normalizedEntities, 'text/html').body
+            .textContent ?? normalizedEntities;
+
+    return decoded.replace(/\s+/g, ' ').trim();
+}
+
+function manualQuestionDisplayTextForMedium(
+    question: ManualQuestion,
+    medium: 'English' | 'Urdu',
+): string {
+    const content = question.content as Record<string, unknown> | null;
+    const passageKey = medium === 'English' ? 'passage_en' : 'passage_ur';
+    const passageValue = content?.[passageKey];
+    const passageText =
+        typeof passageValue === 'string' ? passageValue.trim() : '';
+    const summaryText =
+        medium === 'English'
+            ? question.summaryTextEn?.trim() ?? ''
+            : question.summaryTextUr?.trim() ?? '';
+
+    return plainQuestionText(
+        question.schemaKey === 'objective_passage_mcq' && passageText !== ''
+            ? passageText
+            : summaryText || question.summaryText,
+    );
 }
 
 function paperQuestionFromManual(
@@ -524,11 +552,11 @@ function paperQuestionFromManual(
         text: passageQuestions
             ? passageText
             : localizedPaperHtml(
-                  question.summaryTextEn,
-                  question.summaryTextUr,
-                  question.medium,
-                  question.summaryText,
-              ),
+                question.summaryTextEn,
+                question.summaryTextUr,
+                question.medium,
+                question.summaryText,
+            ),
         source: question.source,
         sourceLabel: question.sourceLabel,
         chapterLabel: manualQuestionChapterLabel(question),
@@ -817,8 +845,8 @@ function TriCheckbox({
                 state === 'checked'
                     ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
                     : state === 'indeterminate'
-                      ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
-                      : 'border-slate-300 bg-white hover:border-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-400',
+                        ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
+                        : 'border-slate-300 bg-white hover:border-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-400',
             )}
         >
             {state === 'checked' && (
@@ -951,11 +979,11 @@ function StepPill({
                 className={cn(
                     'flex size-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors',
                     state === 'active' &&
-                        'bg-brand-600 text-white ring-4 ring-brand-500/15 dark:bg-brand-500 dark:text-white dark:ring-brand-400/15',
+                    'bg-brand-600 text-white ring-4 ring-brand-500/15 dark:bg-brand-500 dark:text-white dark:ring-brand-400/15',
                     state === 'done' &&
-                        'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300',
+                    'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300',
                     state === 'upcoming' &&
-                        'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+                    'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
                 )}
             >
                 {state === 'done' ? (
@@ -1045,22 +1073,22 @@ function ScopePicker({
         level === 'pattern'
             ? patternOptions
             : level === 'class'
-              ? classOptions
-              : subjectOptions;
+                ? classOptions
+                : subjectOptions;
     const icon =
         level === 'pattern'
             ? FileTextIcon
             : level === 'class'
-              ? GraduationCapIcon
-              : BookOpenIcon;
+                ? GraduationCapIcon
+                : BookOpenIcon;
     const title =
         level === 'pattern'
             ? 'Choose a pattern'
             : level === 'class'
-              ? 'Choose a class'
-              : level === 'subject'
-                ? 'Choose a subject'
-                : 'Chapters & topics';
+                ? 'Choose a class'
+                : level === 'subject'
+                    ? 'Choose a subject'
+                    : 'Chapters & topics';
     const select = (option: ComboboxOptionItem) => {
         if (level === 'pattern') onPatternChange(option);
         else if (level === 'class') onClassChange(option);
@@ -1082,8 +1110,8 @@ function ScopePicker({
                                 level === 'ready'
                                     ? onSubjectChange(null)
                                     : level === 'subject'
-                                      ? onClassChange(null)
-                                      : onPatternChange(null)
+                                        ? onClassChange(null)
+                                        : onPatternChange(null)
                             }
                         >
                             <ArrowLeftIcon />
@@ -1220,18 +1248,18 @@ function draftTimeAgo(timestamp: number): string {
     const minutes = Math.floor(diff / 60000);
 
     if (minutes < 1) {
-return 'just now';
-}
+        return 'just now';
+    }
 
     if (minutes < 60) {
-return `${minutes}m ago`;
-}
+        return `${minutes}m ago`;
+    }
 
     const hours = Math.floor(minutes / 60);
 
     if (hours < 24) {
-return `${hours}h ago`;
-}
+        return `${hours}h ago`;
+    }
 
     return `${Math.floor(hours / 24)}d ago`;
 }
@@ -1445,7 +1473,7 @@ export default function GeneratePaper({
                 .filter(
                     (item) =>
                         questionSelection.globalFilters[item.value] ??
-                            item.value === 'exercise',
+                        item.value === 'exercise',
                 )
                 .map((item) => item.value),
         [questionSelection.globalFilters, sourceFilters],
@@ -1478,10 +1506,10 @@ export default function GeneratePaper({
         () =>
             manualPickerTarget
                 ? (manualPickerRows.find(
-                      (item) =>
-                          item.section.id === manualPickerTarget.sectionId &&
-                          item.row.id === manualPickerTarget.rowId,
-                  ) ?? null)
+                    (item) =>
+                        item.section.id === manualPickerTarget.sectionId &&
+                        item.row.id === manualPickerTarget.rowId,
+                ) ?? null)
                 : null,
         [manualPickerRows, manualPickerTarget],
     );
@@ -1600,7 +1628,7 @@ export default function GeneratePaper({
         const search = paperQuestionSearch.trim().toLowerCase();
         const pool =
             questionPoolsByType[
-                activePaperPickerContext.section.questionTypeId
+            activePaperPickerContext.section.questionTypeId
             ] ?? [];
 
         return pool.filter((question) => {
@@ -1629,10 +1657,10 @@ export default function GeneratePaper({
             step === 'questions'
                 ? 'done'
                 : pattern && klass && subject
-                  ? canContinueToQuestions
-                      ? 'done'
-                      : 'active'
-                  : 'upcoming',
+                    ? canContinueToQuestions
+                        ? 'done'
+                        : 'active'
+                    : 'upcoming',
         questions: step === 'questions' ? 'active' : 'upcoming',
     };
 
@@ -1943,12 +1971,12 @@ export default function GeneratePaper({
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      settings: normalizePaperSettings({
-                          ...current.settings,
-                          ...pendingTemplate.settings,
-                      }),
-                  }
+                    ...current,
+                    settings: normalizePaperSettings({
+                        ...current.settings,
+                        ...pendingTemplate.settings,
+                    }),
+                }
                 : current,
         );
         templateSettingsAppliedRef.current = true;
@@ -2031,8 +2059,8 @@ export default function GeneratePaper({
             const raw = localStorage.getItem(draftKey(savedPaper?.id ?? null));
 
             if (raw) {
-setRecoveryDraft(JSON.parse(raw) as DraftPayload);
-}
+                setRecoveryDraft(JSON.parse(raw) as DraftPayload);
+            }
         } catch {
             // ignore corrupted draft
         }
@@ -2046,18 +2074,18 @@ setRecoveryDraft(JSON.parse(raw) as DraftPayload);
         // changes already sitting in localStorage with the server's last-saved
         // state — silently destroying recovery data.
         if (!isDirty) {
-return;
-}
+            return;
+        }
 
         if (!generatedPaper || !pattern || !klass || !subject) {
-return;
-}
+            return;
+        }
 
         setDraftStatus('saving');
 
         if (autoSaveRef.current) {
-clearTimeout(autoSaveRef.current);
-}
+            clearTimeout(autoSaveRef.current);
+        }
 
         autoSaveRef.current = setTimeout(() => {
             try {
@@ -2080,8 +2108,8 @@ clearTimeout(autoSaveRef.current);
 
         return () => {
             if (autoSaveRef.current) {
-clearTimeout(autoSaveRef.current);
-}
+                clearTimeout(autoSaveRef.current);
+            }
         };
     }, [
         isDirty,
@@ -2097,8 +2125,8 @@ clearTimeout(autoSaveRef.current);
 
     useEffect(() => {
         if (draftStatus !== 'saved') {
-return;
-}
+            return;
+        }
 
         const timer = setTimeout(() => setDraftStatus('idle'), 3000);
 
@@ -2107,8 +2135,8 @@ return;
 
     useEffect(() => {
         if (!savedPaper) {
-return;
-}
+            return;
+        }
 
         isRestoringRef.current = true;
         // Backfill / migrate settings: handles the original single-fontFamily
@@ -2142,8 +2170,8 @@ return;
 
     useEffect(() => {
         if (generatedPaper === null) {
-return;
-}
+            return;
+        }
 
         // Mount-time and post-save restores set isRestoringRef so the freshly
         // applied server state doesn't get mis-flagged as dirty. Any other
@@ -2383,9 +2411,9 @@ return;
             sections: current.sections.map((section) =>
                 section.id === sectionId
                     ? {
-                          ...section,
-                          selectionMode: enabled ? 'automatic' : 'manual',
-                      }
+                        ...section,
+                        selectionMode: enabled ? 'automatic' : 'manual',
+                    }
                     : section,
             ),
         }));
@@ -2520,18 +2548,18 @@ return;
                 const selectedQuestions =
                     questionSectionSelectionMode(section) === 'manual'
                         ? row.selectedQuestionIds
-                              .map((id) =>
-                                  pool.find((question) => question.id === id),
-                              )
-                              .filter((question): question is ManualQuestion =>
-                                  Boolean(question),
-                              )
+                            .map((id) =>
+                                pool.find((question) => question.id === id),
+                            )
+                            .filter((question): question is ManualQuestion =>
+                                Boolean(question),
+                            )
                         : shuffledQuestions(
-                              pool.filter(
-                                  (question) =>
-                                      !usedQuestionIds.has(question.id),
-                              ),
-                          ).slice(0, rowTarget(row));
+                            pool.filter(
+                                (question) =>
+                                    !usedQuestionIds.has(question.id),
+                            ),
+                        ).slice(0, rowTarget(row));
 
                 if (selectedQuestions.length < rowTarget(row)) {
                     throw new Error(
@@ -2595,8 +2623,8 @@ return;
 
     function returnToPaperSetup() {
         if (autoSaveRef.current) {
-clearTimeout(autoSaveRef.current);
-}
+            clearTimeout(autoSaveRef.current);
+        }
 
         setGeneratedPaper(null);
         setPaperQuestionPickerTarget(null);
@@ -2619,8 +2647,8 @@ clearTimeout(autoSaveRef.current);
 
     function saveDraft() {
         if (!generatedPaper || !pattern || !klass || !subject) {
-return;
-}
+            return;
+        }
 
         try {
             localStorage.setItem(
@@ -2679,8 +2707,8 @@ return;
     // also navigates back to setup after saving.
     async function saveAsDraft() {
         if (isSavingDraft) {
-return;
-}
+            return;
+        }
 
         setIsSavingDraft(true);
 
@@ -2704,8 +2732,8 @@ return;
 
     async function saveDraftAndBack() {
         if (isSavingDraft) {
-return;
-}
+            return;
+        }
 
         setIsSavingDraft(true);
         saveDraft();
@@ -2720,7 +2748,7 @@ return;
         } else {
             toast.error(
                 savePaperError ??
-                    'Could not save draft. Your work is still here.',
+                'Could not save draft. Your work is still here.',
             );
         }
     }
@@ -2775,17 +2803,17 @@ return;
             const response =
                 savedPaperId !== null
                     ? await fetch(`/papers/${savedPaperId}`, {
-                          method: 'PUT',
-                          headers,
-                          body: JSON.stringify(payload),
-                          credentials: 'same-origin',
-                      })
+                        method: 'PUT',
+                        headers,
+                        body: JSON.stringify(payload),
+                        credentials: 'same-origin',
+                    })
                     : await fetch('/papers', {
-                          method: 'POST',
-                          headers,
-                          body: JSON.stringify(payload),
-                          credentials: 'same-origin',
-                      });
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(payload),
+                        credentials: 'same-origin',
+                    });
 
             if (!response.ok) {
                 throw new Error(
@@ -2815,8 +2843,8 @@ return;
 
     async function savePaperToServer(values: SavePaperValues) {
         if (!generatedPaper || isSavingPaper) {
-return;
-}
+            return;
+        }
 
         setIsSavingPaper(true);
         setSavePaperError(null);
@@ -2873,8 +2901,8 @@ return;
                 });
 
                 if (!res.ok) {
-throw new Error('Failed to save paper.');
-}
+                    throw new Error('Failed to save paper.');
+                }
             } else {
                 const res = await fetch('/papers', {
                     method: 'POST',
@@ -2889,8 +2917,8 @@ throw new Error('Failed to save paper.');
                 });
 
                 if (!res.ok) {
-throw new Error('Failed to save paper.');
-}
+                    throw new Error('Failed to save paper.');
+                }
 
                 const data = (await res.json()) as { id: number };
                 newId = data.id;
@@ -2919,8 +2947,8 @@ throw new Error('Failed to save paper.');
 
     function defaultPaperName(): string {
         if (!generatedPaper) {
-return '';
-}
+            return '';
+        }
 
         return (
             [
@@ -2995,12 +3023,12 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      header: {
-                          ...current.header,
-                          [field]: field === 'marks' ? toNumber(value) : value,
-                      },
-                  }
+                    ...current,
+                    header: {
+                        ...current.header,
+                        [field]: field === 'marks' ? toNumber(value) : value,
+                    },
+                }
                 : current,
         );
     }
@@ -3009,16 +3037,16 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      // Spread DEFAULT first so any field missing from an
-                      // older in-memory settings object gets backfilled, then
-                      // the loaded settings, then the patch wins.
-                      settings: {
-                          ...DEFAULT_PAPER_SETTINGS,
-                          ...(current.settings ?? {}),
-                          ...patch,
-                      },
-                  }
+                    ...current,
+                    // Spread DEFAULT first so any field missing from an
+                    // older in-memory settings object gets backfilled, then
+                    // the loaded settings, then the patch wins.
+                    settings: {
+                        ...DEFAULT_PAPER_SETTINGS,
+                        ...(current.settings ?? {}),
+                        ...patch,
+                    },
+                }
                 : current,
         );
     }
@@ -3031,21 +3059,21 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? { ...question, text: value }
-                                                : question,
-                                    ),
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                questions: section.questions.map(
+                                    (question) =>
+                                        question.id === questionId
+                                            ? { ...question, text: value }
+                                            : question,
+                                ),
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3058,21 +3086,21 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? { ...question, imageSize }
-                                                : question,
-                                    ),
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                questions: section.questions.map(
+                                    (question) =>
+                                        question.id === questionId
+                                            ? { ...question, imageSize }
+                                            : question,
+                                ),
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3085,24 +3113,24 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? {
-                                                      ...question,
-                                                      answerLines,
-                                                  }
-                                                : question,
-                                    ),
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                questions: section.questions.map(
+                                    (question) =>
+                                        question.id === questionId
+                                            ? {
+                                                ...question,
+                                                answerLines,
+                                            }
+                                            : question,
+                                ),
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3115,24 +3143,24 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? {
-                                                      ...question,
-                                                      answerLineSpacing,
-                                                  }
-                                                : question,
-                                    ),
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                questions: section.questions.map(
+                                    (question) =>
+                                        question.id === questionId
+                                            ? {
+                                                ...question,
+                                                answerLineSpacing,
+                                            }
+                                            : question,
+                                ),
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3166,30 +3194,30 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? {
-                                                      ...paperQuestionFromManual(
-                                                          replacement,
-                                                          question.id,
-                                                      ),
-                                                      imageSize:
-                                                          question.imageSize,
-                                                      answerLines:
-                                                          question.answerLines,
-                                                  }
-                                                : question,
-                                    ),
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                questions: section.questions.map(
+                                    (question) =>
+                                        question.id === questionId
+                                            ? {
+                                                ...paperQuestionFromManual(
+                                                    replacement,
+                                                    question.id,
+                                                ),
+                                                imageSize:
+                                                    question.imageSize,
+                                                answerLines:
+                                                    question.answerLines,
+                                            }
+                                            : question,
+                                ),
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3279,20 +3307,20 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((item) =>
-                          item.id === sectionId
-                              ? {
-                                    ...item,
-                                    totalQuestions: item.totalQuestions + 1,
-                                    questions: [
-                                        ...item.questions,
-                                        paperQuestion,
-                                    ],
-                                }
-                              : item,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((item) =>
+                        item.id === sectionId
+                            ? {
+                                ...item,
+                                totalQuestions: item.totalQuestions + 1,
+                                questions: [
+                                    ...item.questions,
+                                    paperQuestion,
+                                ],
+                            }
+                            : item,
+                    ),
+                }
                 : current,
         );
     }
@@ -3305,20 +3333,20 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    totalQuestions: section.totalQuestions + 1,
-                                    questions: [
-                                        ...section.questions,
-                                        paperQuestion,
-                                    ],
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                totalQuestions: section.totalQuestions + 1,
+                                questions: [
+                                    ...section.questions,
+                                    paperQuestion,
+                                ],
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3327,27 +3355,27 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) => {
-                          if (section.id !== sectionId) {
-                              return section;
-                          }
+                    ...current,
+                    sections: current.sections.map((section) => {
+                        if (section.id !== sectionId) {
+                            return section;
+                        }
 
-                          const questions = section.questions.filter(
-                              (question) => question.id !== questionId,
-                          );
+                        const questions = section.questions.filter(
+                            (question) => question.id !== questionId,
+                        );
 
-                          return {
-                              ...section,
-                              totalQuestions: questions.length,
-                              requiredQuestions: Math.min(
-                                  section.requiredQuestions,
-                                  questions.length,
-                              ),
-                              questions,
-                          };
-                      }),
-                  }
+                        return {
+                            ...section,
+                            totalQuestions: questions.length,
+                            requiredQuestions: Math.min(
+                                section.requiredQuestions,
+                                questions.length,
+                            ),
+                            questions,
+                        };
+                    }),
+                }
                 : current,
         );
     }
@@ -3372,21 +3400,21 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === activePaperSectionEditorContext.id
-                              ? {
-                                    ...section,
-                                    title: values.title,
-                                    requiredQuestions: Math.min(
-                                        values.requiredQuestions,
-                                        section.questions.length,
-                                    ),
-                                    marksEach: values.marksEach,
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === activePaperSectionEditorContext.id
+                            ? {
+                                ...section,
+                                title: values.title,
+                                requiredQuestions: Math.min(
+                                    values.requiredQuestions,
+                                    section.questions.length,
+                                ),
+                                marksEach: values.marksEach,
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
         closePaperSectionEditor();
@@ -3396,11 +3424,11 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.filter(
-                          (section) => section.id !== sectionId,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.filter(
+                        (section) => section.id !== sectionId,
+                    ),
+                }
                 : current,
         );
     }
@@ -3439,16 +3467,16 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    columns: clampSectionColumns(value),
-                                }
-                              : section,
-                      ),
-                  }
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                columns: clampSectionColumns(value),
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3457,40 +3485,40 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: shuffleItems(
-                                        section.questions,
-                                    ).map((question) => ({
-                                        ...question,
-                                        options:
-                                            section.category ===
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                ...section,
+                                questions: shuffleItems(
+                                    section.questions,
+                                ).map((question) => ({
+                                    ...question,
+                                    options:
+                                        section.category ===
                                             'Objective Questions'
-                                                ? shuffleItems(question.options)
-                                                : question.options,
-                                        passageQuestions:
-                                            section.category ===
-                                                'Objective Questions' &&
+                                            ? shuffleItems(question.options)
+                                            : question.options,
+                                    passageQuestions:
+                                        section.category ===
+                                            'Objective Questions' &&
                                             question.passageQuestions
-                                                ? shuffleItems(
-                                                      question.passageQuestions,
-                                                  ).map(
-                                                      (passageQuestion) => ({
-                                                          ...passageQuestion,
-                                                          options: shuffleItems(
-                                                              passageQuestion.options,
-                                                          ),
-                                                      }),
-                                                  )
-                                                : question.passageQuestions,
-                                    })),
-                                }
-                              : section,
-                      ),
-                  }
+                                            ? shuffleItems(
+                                                question.passageQuestions,
+                                            ).map(
+                                                (passageQuestion) => ({
+                                                    ...passageQuestion,
+                                                    options: shuffleItems(
+                                                        passageQuestion.options,
+                                                    ),
+                                                }),
+                                            )
+                                            : question.passageQuestions,
+                                })),
+                            }
+                            : section,
+                    ),
+                }
                 : current,
         );
     }
@@ -3550,9 +3578,9 @@ return '';
         setGeneratedPaper((current) =>
             current
                 ? {
-                      ...current,
-                      sections: [...current.sections, newSection],
-                  }
+                    ...current,
+                    sections: [...current.sections, newSection],
+                }
                 : current,
         );
         closeAddPaperSectionModal();
@@ -3574,41 +3602,41 @@ return '';
             sections: current.sections.map((section) =>
                 section.id === activeSection.id
                     ? {
-                          ...section,
-                          rows: section.rows.map((row) => {
-                              if (row.id !== activeRow.id) {
-                                  return row;
-                              }
+                        ...section,
+                        rows: section.rows.map((row) => {
+                            if (row.id !== activeRow.id) {
+                                return row;
+                            }
 
-                              const isSelected =
-                                  row.selectedQuestionIds.includes(questionId);
+                            const isSelected =
+                                row.selectedQuestionIds.includes(questionId);
 
-                              if (isSelected) {
-                                  return {
-                                      ...row,
-                                      selectedQuestionIds:
-                                          row.selectedQuestionIds.filter(
-                                              (id) => id !== questionId,
-                                          ),
-                                  };
-                              }
+                            if (isSelected) {
+                                return {
+                                    ...row,
+                                    selectedQuestionIds:
+                                        row.selectedQuestionIds.filter(
+                                            (id) => id !== questionId,
+                                        ),
+                                };
+                            }
 
-                              if (
-                                  selectedManualQuestionIds.has(questionId) ||
-                                  row.selectedQuestionIds.length >= target
-                              ) {
-                                  return row;
-                              }
+                            if (
+                                selectedManualQuestionIds.has(questionId) ||
+                                row.selectedQuestionIds.length >= target
+                            ) {
+                                return row;
+                            }
 
-                              return {
-                                  ...row,
-                                  selectedQuestionIds: [
-                                      ...row.selectedQuestionIds,
-                                      questionId,
-                                  ],
-                              };
-                          }),
-                      }
+                            return {
+                                ...row,
+                                selectedQuestionIds: [
+                                    ...row.selectedQuestionIds,
+                                    questionId,
+                                ],
+                            };
+                        }),
+                    }
                     : section,
             ),
         }));
@@ -3664,21 +3692,21 @@ return '';
                 sections: current.sections.map((section) =>
                     section.id === sectionId
                         ? {
-                              ...section,
-                              rows: section.rows.map((row) => {
-                                  if (row.id !== rowId) {
-                                      return row;
-                                  }
+                            ...section,
+                            rows: section.rows.map((row) => {
+                                if (row.id !== rowId) {
+                                    return row;
+                                }
 
-                                  return normalizeQuestionRow(
-                                      {
-                                          ...row,
-                                          [field]: value,
-                                      },
-                                      availableForQuestionRow(section, rowId),
-                                  );
-                              }),
-                          }
+                                return normalizeQuestionRow(
+                                    {
+                                        ...row,
+                                        [field]: value,
+                                    },
+                                    availableForQuestionRow(section, rowId),
+                                );
+                            }),
+                        }
                         : section,
                 ),
             }),
@@ -3692,11 +3720,11 @@ return '';
                 sections: current.sections.map((section) =>
                     section.id === sectionId && section.rows.length > 1
                         ? {
-                              ...section,
-                              rows: section.rows.filter(
-                                  (row) => row.id !== rowId,
-                              ),
-                          }
+                            ...section,
+                            rows: section.rows.filter(
+                                (row) => row.id !== rowId,
+                            ),
+                        }
                         : section,
                 ),
             }),
@@ -3713,9 +3741,9 @@ return '';
                 sections: current.sections.map((section) =>
                     section.id === sectionId
                         ? {
-                              ...section,
-                              rows: [...section.rows, createQuestionRow(rowId)],
-                          }
+                            ...section,
+                            rows: [...section.rows, createQuestionRow(rowId)],
+                        }
                         : section,
                 ),
             }),
@@ -4012,8 +4040,8 @@ return '';
                                 timeAllowed: generatedPaper.header.duration,
                                 examMarks: String(
                                     paperTotalMarks(generatedPaper) ||
-                                        generatedPaper.header.marks ||
-                                        '',
+                                    generatedPaper.header.marks ||
+                                    '',
                                 ),
                                 passingMarks: String(
                                     generatedPaper.header.passingMarks || '',
@@ -4181,39 +4209,39 @@ return '';
                                                 <>
                                                     {isChapterWiseSubject ? (
                                                         <>
-                                                        <div className="space-y-4 lg:hidden">
-                                                            {chapterGroups.map(
-                                                                renderDirectChapterGroup,
-                                                            )}
-                                                        </div>
-                                                        <div className="hidden gap-4 lg:grid lg:grid-cols-2">
-                                                            <div className="space-y-4">
-                                                                {directChapterColumns[0].map(
+                                                            <div className="space-y-4 lg:hidden">
+                                                                {chapterGroups.map(
                                                                     renderDirectChapterGroup,
                                                                 )}
                                                             </div>
-                                                            <div className="space-y-4">
-                                                                {directChapterColumns[1].map(
-                                                                    renderDirectChapterGroup,
-                                                                )}
+                                                            <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+                                                                <div className="space-y-4">
+                                                                    {directChapterColumns[0].map(
+                                                                        renderDirectChapterGroup,
+                                                                    )}
+                                                                </div>
+                                                                <div className="space-y-4">
+                                                                    {directChapterColumns[1].map(
+                                                                        renderDirectChapterGroup,
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
                                                         </>
                                                     ) : (
                                                         <>
-                                                        <div className="space-y-4 lg:hidden">
-                                                            {chapterGroups
-                                                                .flatMap((group) => group.items)
-                                                                .map(renderChapterCard)}
-                                                        </div>
-                                                        <div className="hidden gap-4 lg:grid lg:grid-cols-2">
-                                                            <div className="space-y-4">
-                                                                {topicWiseColumns[0].map(renderChapterCard)}
+                                                            <div className="space-y-4 lg:hidden">
+                                                                {chapterGroups
+                                                                    .flatMap((group) => group.items)
+                                                                    .map(renderChapterCard)}
                                                             </div>
-                                                            <div className="space-y-4">
-                                                                {topicWiseColumns[1].map(renderChapterCard)}
+                                                            <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+                                                                <div className="space-y-4">
+                                                                    {topicWiseColumns[0].map(renderChapterCard)}
+                                                                </div>
+                                                                <div className="space-y-4">
+                                                                    {topicWiseColumns[1].map(renderChapterCard)}
+                                                                </div>
                                                             </div>
-                                                        </div>
                                                         </>
                                                     )}
                                                 </>
@@ -4254,7 +4282,7 @@ return '';
                                                 </div>
                                             </div>
 
-                                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                                            <div className="mt-4 flex flex-wrap items-center gap-3">
                                                 <MediumSelector
                                                     value={chapterMedium}
                                                     onChange={setChapterMedium}
@@ -4317,7 +4345,7 @@ return '';
                                     {!loadingQuestionSections &&
                                         !questionSectionError &&
                                         questionSelection.sections.length ===
-                                            0 && (
+                                        0 && (
                                             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70 py-14 text-center dark:border-slate-700 dark:bg-slate-950/40">
                                                 <SearchXIcon className="mb-3 size-6 text-slate-400" />
                                                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -4329,7 +4357,7 @@ return '';
 
                                     {!loadingQuestionSections &&
                                         questionSelection.sections.length >
-                                            0 && (
+                                        0 && (
                                             <div className="space-y-5 pt-2">
                                                 {renderQuestionCategory(
                                                     'Objective Questions',
@@ -4346,6 +4374,7 @@ return '';
                         {activeManualPickerRow && (
                             <ManualQuestionPickerModal
                                 activeRow={activeManualPickerRow}
+                                medium={chapterMedium}
                                 questions={filteredManualQuestions}
                                 loading={loadingManualQuestions}
                                 error={manualQuestionError}
@@ -4448,6 +4477,7 @@ return '';
 
 function ManualQuestionPickerModal({
     activeRow,
+    medium,
     questions,
     loading,
     error,
@@ -4461,6 +4491,7 @@ function ManualQuestionPickerModal({
     onClose,
 }: {
     activeRow: ManualPickerRow;
+    medium: ContentMedium;
     questions: ManualQuestion[];
     loading: boolean;
     error: string | null;
@@ -4475,6 +4506,8 @@ function ManualQuestionPickerModal({
 }) {
     const activeSelectedCount = activeRow.row.selectedQuestionIds.length;
     const isActiveRowComplete = activeSelectedCount === activeRow.target;
+    const isBilingual = medium === 'Both';
+    const singleMedium = medium === 'Urdu' ? 'Urdu' : 'English';
 
     useEffect(() => {
         function closeOnEscape(event: KeyboardEvent) {
@@ -4491,69 +4524,72 @@ function ManualQuestionPickerModal({
     return (
         <div
             role="presentation"
-            onMouseDown={onClose}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 sm:p-6"
         >
             <section
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="manual-question-picker-title"
-                onMouseDown={(event) => event.stopPropagation()}
-                className="flex max-h-[min(48rem,calc(100vh-2rem))] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+                className="flex max-h-[min(52rem,calc(100vh-1.5rem))] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40"
             >
-                <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-3.5 dark:border-slate-800">
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <div className="flex size-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-                                <ListChecksIcon className="size-4" />
-                            </div>
-                            <div className="min-w-0">
+                <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-3.5 sm:px-5 dark:border-slate-800">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                            <ListChecksIcon className="size-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <h2
                                     id="manual-question-picker-title"
-                                    className="text-base font-semibold text-slate-900 dark:text-slate-100"
+                                    className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100"
                                 >
                                     Select questions
                                 </h2>
+                                <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                    {activeRow.section.title}
+                                </span>
                             </div>
+
                         </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        <div className="flex h-9 items-center justify-center rounded-lg bg-brand-600 px-3 text-sm font-bold text-white dark:bg-brand-500 dark:text-white">
+                        <span className="inline-flex h-9 items-center rounded-lg bg-brand-50 px-3 text-sm font-semibold tabular-nums text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
                             {activeSelectedCount}/{activeRow.target}
-                        </div>
+                        </span>
                         <button
                             type="button"
                             onClick={onClose}
                             aria-label="Close question picker"
                             title="Close"
-                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                         >
                             <XIcon className="size-4" />
                         </button>
                     </div>
-                </div>
+                </header>
 
-                <div className="flex flex-col gap-2.5 border-b border-slate-100 p-4 sm:flex-row sm:items-center dark:border-slate-800">
+                <div className="flex flex-col gap-2.5 border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:px-5 dark:border-slate-800 dark:bg-slate-950/35">
                     <label className="relative min-w-0 flex-1">
                         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                        <input autoComplete="off"
+                        <input
+                            autoComplete="off"
                             type="search"
                             value={search}
                             onChange={(event) =>
                                 onSearchChange(event.target.value)
                             }
                             placeholder="Search questions"
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-400"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-[13px] font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-brand-400"
                         />
                     </label>
                     <button
                         type="button"
                         onClick={onSelectedOnlyChange}
                         className={cn(
-                            'inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors',
+                            'inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
                             showSelectedOnly
                                 ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
-                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800',
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800',
                         )}
                     >
                         <CheckIcon className="size-3.5" />
@@ -4561,22 +4597,22 @@ function ManualQuestionPickerModal({
                     </button>
                 </div>
 
-                <div className="flex-1 space-y-2 overflow-y-auto p-4">
+                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/55 p-3 sm:p-4 dark:bg-slate-950/25">
                     {loading && (
-                        <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 py-12 text-sm font-medium text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                        <div className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white text-sm font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
                             <Loader2Icon className="size-4 animate-spin" />
                             Loading questions
                         </div>
                     )}
 
                     {!loading && error && (
-                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
                             {error}
                         </div>
                     )}
 
                     {!loading && !error && questions.length === 0 && (
-                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-12 text-center dark:border-slate-700">
+                        <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-center dark:border-slate-700 dark:bg-slate-900">
                             <SearchXIcon className="mb-2 size-5 text-slate-400" />
                             <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
                                 No matching questions
@@ -4584,96 +4620,110 @@ function ManualQuestionPickerModal({
                         </div>
                     )}
 
-                    {!loading &&
-                        !error &&
-                        questions.map((question) => {
-                            const checked = selectedQuestionIds.has(
-                                question.id,
-                            );
-                            const selectedElsewhere =
-                                !checked &&
-                                allSelectedQuestionIds.has(question.id);
-                            const reachedLimit =
-                                !checked &&
-                                activeSelectedCount >= activeRow.target;
-                            const disabled = selectedElsewhere || reachedLimit;
+                    {!loading && !error && questions.length > 0 && (
+                        <div className="space-y-2">
+                            {questions.map((question) => {
+                                const checked = selectedQuestionIds.has(
+                                    question.id,
+                                );
+                                const selectedElsewhere =
+                                    !checked &&
+                                    allSelectedQuestionIds.has(question.id);
+                                const reachedLimit =
+                                    !checked &&
+                                    activeSelectedCount >= activeRow.target;
+                                const disabled =
+                                    selectedElsewhere || reachedLimit;
+                                const displayMedium = isBilingual
+                                    ? 'English'
+                                    : singleMedium;
 
-                            return (
-                                <button
-                                    key={question.id}
-                                    type="button"
-                                    disabled={disabled}
-                                    onClick={() =>
-                                        onToggleQuestion(question.id)
-                                    }
-                                    className={cn(
-                                        'flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
-                                        checked
-                                            ? 'border-brand-300 bg-brand-50/60 dark:border-brand-500/40 dark:bg-brand-500/10'
-                                            : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/30 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/5',
-                                        disabled &&
-                                            'cursor-not-allowed opacity-50',
-                                    )}
-                                >
-                                    <span
+                                return (
+                                    <button
+                                        key={question.id}
+                                        type="button"
+                                        disabled={disabled}
+                                        onClick={() =>
+                                            onToggleQuestion(question.id)
+                                        }
                                         className={cn(
-                                            'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            'group flex w-full cursor-pointer items-start gap-3 rounded-xl border border-l-4 bg-white p-3 text-left transition-[border-color,box-shadow,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 dark:bg-slate-900',
                                             checked
-                                                ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
-                                                : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900',
+                                                ? 'border-brand-300 border-l-brand-600 bg-brand-50/45 shadow-sm shadow-brand-900/5 dark:border-brand-500/45 dark:border-l-brand-400 dark:bg-brand-500/10'
+                                                : 'border-slate-200 border-l-slate-200 hover:border-brand-200 hover:shadow-sm dark:border-slate-800 dark:border-l-slate-800 dark:hover:border-brand-500/35',
+                                            disabled &&
+                                            'cursor-not-allowed opacity-50',
                                         )}
                                     >
-                                        {checked && (
-                                            <CheckIcon
-                                                className="size-3"
-                                                strokeWidth={3}
-                                            />
-                                        )}
-                                    </span>
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
-                                            {manualQuestionDisplayText(question)}
-                                        </span>
-                                        <span className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                {question.sourceLabel ??
-                                                    question.source ??
-                                                    'No source'}
-                                            </span>
-                                            {question.difficulty && (
-                                                <span
-                                                    className={cn(
-                                                        'rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase',
-                                                        DIFFICULTY_STYLES[question.difficulty] ?? '',
-                                                    )}
-                                                >
-                                                    {question.difficulty}
+
+                                        <span className="min-w-0 flex-1">
+                                            <span
+                                                className={cn(
+                                                    'grid min-w-0 gap-3',
+                                                    isBilingual &&
+                                                    'md:grid-cols-2',
+                                                )}
+                                            >
+                                                <span className="min-w-0">
+
+                                                    <span
+                                                        dir={displayMedium === 'Urdu' ? 'rtl' : 'ltr'}
+                                                        className={cn(
+                                                            'block text-[13px] font-medium leading-5 text-slate-800 dark:text-slate-100',
+                                                            displayMedium === 'Urdu' && 'text-right',
+                                                        )}
+                                                    >
+                                                        {manualQuestionDisplayTextForMedium(
+                                                            question,
+                                                            displayMedium,
+                                                        )}
+                                                    </span>
                                                 </span>
-                                            )}
-                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                {manualQuestionChapterLabel(
-                                                    question,
+                                                {isBilingual && (
+                                                    <span
+                                                        dir="rtl"
+                                                        className="min-w-0 text-right md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-700"
+                                                    >
+
+                                                        <span className="block text-[13px] font-medium leading-6 text-slate-800 dark:text-slate-100">
+                                                            {manualQuestionDisplayTextForMedium(
+                                                                question,
+                                                                'Urdu',
+                                                            )}
+                                                        </span>
+                                                    </span>
                                                 )}
                                             </span>
-                                            {question.topic && (
+                                            <span className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                                 <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                    {question.topic.name}
+                                                    {manualQuestionChapterLabel(
+                                                        question,
+                                                    )}
                                                 </span>
-                                            )}
-                                            {selectedElsewhere && (
-                                                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                                                    Used in another row
+                                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                    {question.sourceLabel ??
+                                                        question.source ??
+                                                        'No source'}
                                                 </span>
-                                            )}
+                                                {selectedElsewhere && (
+                                                    <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                                        Used elsewhere
+                                                    </span>
+                                                )}
+                                            </span>
                                         </span>
-                                    </span>
-                                </button>
-                            );
-                        })}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
-                <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <footer className="flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-5 dark:border-slate-800 dark:bg-slate-900">
+                    <p
+                        aria-live="polite"
+                        className="text-xs font-medium text-slate-500 dark:text-slate-400"
+                    >
                         {isActiveRowComplete
                             ? 'Selection complete'
                             : `${activeRow.target - activeSelectedCount} more required`}
@@ -4681,16 +4731,15 @@ function ManualQuestionPickerModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
+                        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-700 active:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 dark:bg-brand-500 dark:hover:bg-brand-400"
                     >
                         Done
                     </button>
-                </div>
+                </footer>
             </section>
         </div>
     );
 }
-
 type AddSectionTab = 'show' | 'picked' | 'chapters';
 
 function AddPaperSectionModal({
@@ -4795,8 +4844,8 @@ function AddPaperSectionModal({
         sourceValue === ''
             ? []
             : sourceValue === '__all__'
-              ? availableSources.map((source) => source.value)
-              : [sourceValue];
+                ? availableSources.map((source) => source.value)
+                : [sourceValue];
     const modalChapterIds = useMemo(
         () =>
             chapters
@@ -4804,8 +4853,8 @@ function AddPaperSectionModal({
                     chapter.topics.length === 0
                         ? localChapterIds.has(chapter.id)
                         : chapter.topics.some((topic) =>
-                              localTopicIds.has(topic.id),
-                          ),
+                            localTopicIds.has(topic.id),
+                        ),
                 )
                 .map((chapter) => chapter.id),
         [chapters, localChapterIds, localTopicIds],
@@ -5577,7 +5626,7 @@ function ChapterTopicFilterPanel({
                     chapter.topics.length === 0
                         ? localChapterIds.has(chapter.id)
                         : chapterTopicIds.length > 0 &&
-                          chapterTopicIds.every((id) => localTopicIds.has(id));
+                        chapterTopicIds.every((id) => localTopicIds.has(id));
                 const partial =
                     chapter.topics.length > 0 &&
                     !checked &&
@@ -5856,8 +5905,8 @@ function GeneratedPaperView({
     // fallback in app.css whenever a paper is on screen.
     const pageNumberContent = (() => {
         if (!settings.pageNumbersEnabled) {
-return null;
-}
+            return null;
+        }
 
         if (settings.pageNumberFormat === 'n-of-m') {
             return '"" counter(page) " of " counter(pages)';
@@ -6029,8 +6078,8 @@ return null;
                                 savedPaperId !== null && !isDirty
                                     ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400'
                                     : savedPaperId !== null && isDirty
-                                      ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400'
-                                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+                                        ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
                             )}
                         >
                             {isSavingPaper ? (
@@ -6144,7 +6193,7 @@ return null;
                             showAddress={showSchoolAddress}
                             onChange={
                                 viewMode === 'answer_key'
-                                    ? () => {}
+                                    ? () => { }
                                     : onHeaderChange
                             }
                         />
@@ -6243,14 +6292,14 @@ return null;
                                                     viewMode === 'answer_key'
                                                         ? `Answer Key — Set ${setLabelFor(index)}`
                                                         : variantPaper.header
-                                                                .type
-                                                          ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
-                                                          : `Set ${setLabelFor(index)}`,
+                                                            .type
+                                                            ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
+                                                            : `Set ${setLabelFor(index)}`,
                                             }}
                                             logoUrl={defaultWatermarkLogoUrl}
                                             address={schoolAddress}
                                             showAddress={showSchoolAddress}
-                                            onChange={() => {}}
+                                            onChange={() => { }}
                                         />
                                         <div
                                             className="flex flex-col"
@@ -6280,21 +6329,21 @@ return null;
                                                             numberingFormat={settings.questionNumberingFormat}
                                                             canMoveUp={false}
                                                             canMoveDown={false}
-                                                            onEditSection={() => {}}
-                                                            onDeleteSection={() => {}}
-                                                            onMoveUp={() => {}}
-                                                            onMoveDown={() => {}}
-                                                            onShuffleQuestions={() => {}}
-                                                            onAddRandomQuestion={() => {}}
-                                                            onAddCustomQuestion={() => {}}
-                                                            onEditQuestion={() => {}}
-                                                            onRandomQuestion={() => {}}
-                                                            onPickQuestion={() => {}}
-                                                            onRemoveQuestion={() => {}}
-                                                            onAnswerLinesChange={() => {}}
-                                                            onAnswerLineSpacingChange={() => {}}
-                                                            onQuestionImageSizeChange={() => {}}
-                                                            onColumnsChange={() => {}}
+                                                            onEditSection={() => { }}
+                                                            onDeleteSection={() => { }}
+                                                            onMoveUp={() => { }}
+                                                            onMoveDown={() => { }}
+                                                            onShuffleQuestions={() => { }}
+                                                            onAddRandomQuestion={() => { }}
+                                                            onAddCustomQuestion={() => { }}
+                                                            onEditQuestion={() => { }}
+                                                            onRandomQuestion={() => { }}
+                                                            onPickQuestion={() => { }}
+                                                            onRemoveQuestion={() => { }}
+                                                            onAnswerLinesChange={() => { }}
+                                                            onAnswerLineSpacingChange={() => { }}
+                                                            onQuestionImageSizeChange={() => { }}
+                                                            onColumnsChange={() => { }}
                                                         />
                                                     );
                                                 })
@@ -6709,11 +6758,11 @@ function DirectChapterRow({
             className={cn(
                 'flex min-h-11 items-center gap-3 bg-white px-4 py-2.5 transition-colors dark:bg-slate-900',
                 standalone &&
-                    'rounded-xl border shadow-sm shadow-slate-900/[0.02] transition-all dark:border-slate-800 dark:shadow-black/10',
+                'rounded-xl border shadow-sm shadow-slate-900/[0.02] transition-all dark:border-slate-800 dark:shadow-black/10',
                 standalone &&
-                    (checked
-                        ? 'border-brand-300 ring-1 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
-                        : 'border-slate-200'),
+                (checked
+                    ? 'border-brand-300 ring-1 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
+                    : 'border-slate-200'),
                 checked
                     ? 'bg-brand-50/70 hover:bg-brand-100/70 dark:bg-brand-500/10 dark:hover:bg-brand-500/15'
                     : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/50',
@@ -6911,8 +6960,8 @@ function QuestionSelectionCard({
                 isDragging
                     ? 'border-slate-300 opacity-55 dark:border-slate-700'
                     : isDragTarget
-                      ? 'border-brand-400 bg-brand-50/40 ring-2 ring-brand-500/10 dark:border-brand-500/60 dark:bg-brand-500/5'
-                      : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:hover:border-slate-700 dark:hover:shadow-black/20',
+                        ? 'border-brand-400 bg-brand-50/40 ring-2 ring-brand-500/10 dark:border-brand-500/60 dark:bg-brand-500/5'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:hover:border-slate-700 dark:hover:shadow-black/20',
             )}
         >
             <div className="flex items-center justify-between gap-3">
