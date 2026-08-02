@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Enums\AuditEvent;
 use App\Enums\TeacherPermission;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\PaperFolder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -27,17 +30,17 @@ class PaperController extends Controller
         $search = trim((string) $request->query('q', ''));
         $folderParam = $request->query('folder');
         $folderFilter = $folderParam === null || $folderParam === '' ? null : $folderParam;
-        $map  = fn (Paper $paper) => [
-            'id'          => $paper->id,
-            'name'        => $paper->name,
-            'subject'     => $paper->subject,
-            'class_name'  => $paper->class_name,
+        $map = fn (Paper $paper) => [
+            'id' => $paper->id,
+            'name' => $paper->name,
+            'subject' => $paper->subject,
+            'class_name' => $paper->class_name,
             'total_marks' => $paper->total_marks,
-            'folder_id'   => $paper->folder_id,
-            'created_at'  => $paper->created_at->toISOString(),
-            'updated_at'  => $paper->updated_at->toISOString(),
+            'folder_id' => $paper->folder_id,
+            'created_at' => $paper->created_at->toISOString(),
+            'updated_at' => $paper->updated_at->toISOString(),
             'author_name' => $paper->relationLoaded('user') ? $paper->user?->name : null,
-            'is_mine'     => (int) $paper->user_id === (int) $user->id,
+            'is_mine' => (int) $paper->user_id === (int) $user->id,
         ];
 
         $base = Paper::query()
@@ -59,9 +62,9 @@ class PaperController extends Controller
             ->withCount(['papers as papers_count' => fn ($q) => $q->whereIn('user_id', $userIds)])
             ->get(['id', 'name', 'color'])
             ->map(fn (PaperFolder $folder) => [
-                'id'           => $folder->id,
-                'name'         => $folder->name,
-                'color'        => $folder->color,
+                'id' => $folder->id,
+                'name' => $folder->name,
+                'color' => $folder->color,
                 'papers_count' => (int) ($folder->papers_count ?? 0),
             ]);
 
@@ -85,21 +88,21 @@ class PaperController extends Controller
         // full client-side list, which no longer exists.
         $allScope = Paper::query()->whereIn('user_id', $userIds);
         $sidebar = [
-            'all'     => (clone $allScope)->count(),
+            'all' => (clone $allScope)->count(),
             'unfiled' => (clone $allScope)->whereNull('folder_id')->count(),
         ];
 
         return Inertia::render('customer/papers/index', [
             'items' => [
-                'data'         => collect($items->items())->map($map)->values(),
+                'data' => collect($items->items())->map($map)->values(),
                 'current_page' => $items->currentPage(),
-                'last_page'    => $items->lastPage(),
-                'per_page'     => $items->perPage(),
-                'total'        => $items->total(),
-                'from'         => $items->firstItem(),
-                'to'           => $items->lastItem(),
+                'last_page' => $items->lastPage(),
+                'per_page' => $items->perPage(),
+                'total' => $items->total(),
+                'from' => $items->firstItem(),
+                'to' => $items->lastItem(),
             ],
-            'counts'  => ['papers' => $papersCount, 'drafts' => $draftsCount],
+            'counts' => ['papers' => $papersCount, 'drafts' => $draftsCount],
             'sidebar' => $sidebar,
             'folders' => $folders,
             'filters' => ['q' => $search, 'folder' => $folderFilter, 'tab' => $tab],
@@ -111,10 +114,10 @@ class PaperController extends Controller
      * owns. Teachers can *see* colleagues' papers but must not be able to
      * delete, move or duplicate them via a hand-crafted request.
      */
-    private function ownedPapers(Request $request): \Illuminate\Support\Collection
+    private function ownedPapers(Request $request): Collection
     {
         $data = $request->validate([
-            'ids'   => ['required', 'array', 'min:1', 'max:' . self::MAX_BULK],
+            'ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_BULK],
             'ids.*' => ['integer'],
         ]);
 
@@ -128,6 +131,7 @@ class PaperController extends Controller
         $papers = $this->ownedPapers($request);
 
         foreach ($papers as $paper) {
+            $this->recordPaperActivity($paper, AuditEvent::Deleted, 'deleted', true);
             $paper->delete();
         }
 
@@ -162,6 +166,7 @@ class PaperController extends Controller
             $copy->name = $this->buildCopyName($paper->name);
             $copy->is_draft = false;
             $copy->save();
+            $this->recordPaperActivity($copy, AuditEvent::Created, 'duplicated');
             $created++;
         }
 
@@ -191,9 +196,10 @@ class PaperController extends Controller
         $copy->name = $this->buildCopyName($paper->name);
         $copy->is_draft = false;
         $copy->save();
+        $this->recordPaperActivity($copy, AuditEvent::Created, 'duplicated');
 
         return response()->json([
-            'id'   => $copy->id,
+            'id' => $copy->id,
             'name' => $copy->name,
         ], 201);
     }
@@ -225,19 +231,24 @@ class PaperController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
-            'subject'     => 'nullable|string|max:150',
-            'class_name'  => 'nullable|string|max:150',
+            'name' => 'required|string|max:255',
+            'subject' => 'nullable|string|max:150',
+            'class_name' => 'nullable|string|max:150',
             'total_marks' => 'required|integer|min:0',
-            'paper_data'  => 'required|array',
-            'is_draft'    => 'boolean',
+            'paper_data' => 'required|array',
+            'is_draft' => 'boolean',
         ]);
 
         $paper = auth()->user()->papers()->create($data);
+        $this->recordPaperActivity(
+            $paper,
+            AuditEvent::Created,
+            $paper->is_draft ? 'drafted' : 'generated',
+        );
 
         return response()->json([
-            'id'         => $paper->id,
-            'name'       => $paper->name,
+            'id' => $paper->id,
+            'name' => $paper->name,
             'updated_at' => $paper->updated_at->toISOString(),
         ], 201);
     }
@@ -247,15 +258,32 @@ class PaperController extends Controller
         abort_if($paper->user_id !== auth()->id(), 403);
 
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
-            'subject'     => 'nullable|string|max:150',
-            'class_name'  => 'nullable|string|max:150',
+            'name' => 'required|string|max:255',
+            'subject' => 'nullable|string|max:150',
+            'class_name' => 'nullable|string|max:150',
             'total_marks' => 'required|integer|min:0',
-            'paper_data'  => 'required|array',
-            'is_draft'    => 'boolean',
+            'paper_data' => 'required|array',
+            'is_draft' => 'boolean',
         ]);
 
+        $wasDraft = (bool) $paper->is_draft;
+        $oldValues = $paper->only(['name', 'subject', 'class_name', 'total_marks', 'is_draft']);
         $paper->update($data);
+
+        $action = $paper->is_draft
+            ? 'drafted'
+            : ($wasDraft ? 'saved' : 'updated');
+
+        AuditLog::record(
+            model: $paper,
+            event: AuditEvent::Updated,
+            oldValues: $oldValues,
+            newValues: [
+                ...$paper->only(['name', 'subject', 'class_name', 'total_marks', 'is_draft']),
+                'activity' => $action,
+            ],
+            notes: "Paper {$action}.",
+        );
 
         return response()->json([
             'updated_at' => $paper->fresh()->updated_at->toISOString(),
@@ -277,6 +305,7 @@ class PaperController extends Controller
         abort_if($paper->user_id !== auth()->id(), 403);
 
         $paper->delete();
+        $this->recordPaperActivity($paper, AuditEvent::Deleted, 'deleted', true);
 
         return response()->json(['deleted' => true]);
     }
@@ -288,14 +317,14 @@ class PaperController extends Controller
         $paperData = $paper->paper_data;
 
         $savedPaper = [
-            'id'                  => $paper->id,
-            'name'                => $paper->name,
-            'is_draft'            => $paper->is_draft,
-            'paper'               => $paperData['paper'] ?? null,
+            'id' => $paper->id,
+            'name' => $paper->name,
+            'is_draft' => $paper->is_draft,
+            'paper' => $paperData['paper'] ?? null,
             'questionPoolsByType' => $paperData['questionPoolsByType'] ?? [],
-            'questionSelection'   => $paperData['questionSelection'] ?? null,
-            'chapterSelection'    => $paperData['chapterSelection'] ?? null,
-            'meta'                => $paperData['meta'] ?? null,
+            'questionSelection' => $paperData['questionSelection'] ?? null,
+            'chapterSelection' => $paperData['chapterSelection'] ?? null,
+            'meta' => $paperData['meta'] ?? null,
         ];
 
         return Inertia::render('customer/papers/generate', array_merge(
@@ -330,5 +359,25 @@ class PaperController extends Controller
         }
 
         return $ids;
+    }
+
+    private function recordPaperActivity(
+        Paper $paper,
+        AuditEvent $event,
+        string $action,
+        bool $asOldValues = false,
+    ): void {
+        $values = [
+            ...$paper->only(['name', 'subject', 'class_name', 'total_marks', 'is_draft']),
+            'activity' => $action,
+        ];
+
+        AuditLog::record(
+            model: $paper,
+            event: $event,
+            oldValues: $asOldValues ? $values : null,
+            newValues: $asOldValues ? null : $values,
+            notes: "Paper {$action}.",
+        );
     }
 }

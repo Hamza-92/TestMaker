@@ -13,10 +13,16 @@ use Inertia\Inertia;
 
 class PatternController extends Controller
 {
+    private const ICONS = [
+        'graduation-cap', 'landmark', 'book-open', 'mountain',
+        'feather', 'sun', 'school', 'lightbulb',
+        'grid', 'library', 'atom', 'shapes',
+    ];
+
     public function index()
     {
         $patterns = Pattern::orderByDesc('created_at')
-            ->get(['id', 'name', 'short_name', 'status', 'created_at']);
+            ->get(['id', 'name', 'short_name', 'description', 'icon', 'color', 'status', 'created_at']);
 
         return Inertia::render('superadmin/patterns', [
             'patterns' => $patterns,
@@ -32,23 +38,26 @@ class PatternController extends Controller
 
         return Inertia::render('superadmin/patterns/show', [
             'pattern' => [
-                'id'         => $pattern->id,
-                'name'       => $pattern->name,
+                'id' => $pattern->id,
+                'name' => $pattern->name,
                 'short_name' => $pattern->short_name,
-                'status'     => $pattern->status,
+                'description' => $pattern->description,
+                'icon' => $pattern->icon,
+                'color' => $pattern->color,
+                'status' => $pattern->status,
                 'created_at' => $pattern->created_at?->toISOString(),
-                'classes'    => $pattern->classes->map(fn ($c) => [
-                    'id'     => $c->id,
-                    'name'   => $c->name,
+                'classes' => $pattern->classes->map(fn ($c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
                     'status' => $c->status,
                 ]),
                 'audit_logs' => $pattern->auditLogs->map(fn ($log) => [
-                    'id'             => $log->id,
-                    'event'          => $log->event?->value,
-                    'old_values'     => $log->old_values ?? [],
-                    'new_values'     => $log->new_values ?? [],
-                    'changed_by'     => $log->changedBy?->name ?? 'System',
-                    'created_at'     => $log->created_at?->toISOString(),
+                    'id' => $log->id,
+                    'event' => $log->event?->value,
+                    'old_values' => $log->old_values ?? [],
+                    'new_values' => $log->new_values ?? [],
+                    'changed_by' => $log->changedBy?->name ?? 'System',
+                    'created_at' => $log->created_at?->toISOString(),
                 ]),
             ],
         ]);
@@ -62,19 +71,22 @@ class PatternController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'       => ['required', 'string', 'max:100', 'unique:patterns,name'],
+            'name' => ['required', 'string', 'max:100', 'unique:patterns,name'],
             'short_name' => ['nullable', 'string', 'max:50'],
-            'status'     => ['required', 'boolean'],
+            'description' => ['nullable', 'string', 'max:180'],
+            'icon' => ['nullable', 'string', Rule::in(self::ICONS)],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'status' => ['required', 'boolean'],
         ]);
 
         $validated['created_by'] = auth()->id();
         $pattern = Pattern::create($validated);
 
         AuditLog::record(
-            model:     $pattern,
-            event:     AuditEvent::Created,
-            newValues: ['name' => $pattern->name, 'short_name' => $pattern->short_name, 'status' => $pattern->status],
-            notes:     'Pattern created.',
+            model: $pattern,
+            event: AuditEvent::Created,
+            newValues: $pattern->only(['name', 'short_name', 'description', 'icon', 'color', 'status']),
+            notes: 'Pattern created.',
         );
 
         return redirect()->route('superadmin.patterns')
@@ -84,19 +96,22 @@ class PatternController extends Controller
     public function edit(Pattern $pattern)
     {
         return Inertia::render('superadmin/patterns/edit', [
-            'pattern' => $pattern->only(['id', 'name', 'short_name', 'status']),
+            'pattern' => $pattern->only(['id', 'name', 'short_name', 'description', 'icon', 'color', 'status']),
         ]);
     }
 
     public function update(Request $request, Pattern $pattern)
     {
         $validated = $request->validate([
-            'name'       => ['required', 'string', 'max:100', Rule::unique('patterns', 'name')->ignore($pattern->id)],
+            'name' => ['required', 'string', 'max:100', Rule::unique('patterns', 'name')->ignore($pattern->id)],
             'short_name' => ['nullable', 'string', 'max:50'],
-            'status'     => ['required', 'boolean'],
+            'status' => ['required', 'boolean'],
+            'description' => ['nullable', 'string', 'max:180'],
+            'icon' => ['nullable', 'string', Rule::in(self::ICONS)],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
-        $oldValues = $pattern->only(['name', 'short_name', 'status']);
+        $oldValues = $pattern->only(['name', 'short_name', 'description', 'icon', 'color', 'status']);
         $pattern->update($validated);
         $changes = array_filter(
             $validated,
@@ -104,13 +119,13 @@ class PatternController extends Controller
             ARRAY_FILTER_USE_BOTH
         );
 
-        if (!empty($changes)) {
+        if (! empty($changes)) {
             AuditLog::record(
-                model:     $pattern,
-                event:     AuditEvent::Updated,
+                model: $pattern,
+                event: AuditEvent::Updated,
                 oldValues: array_intersect_key($oldValues, $changes),
                 newValues: $changes,
-                notes:     'Pattern updated.',
+                notes: 'Pattern updated.',
             );
         }
 
@@ -131,32 +146,32 @@ class PatternController extends Controller
         $subjectsByPattern = $class->classSubjects
             ->groupBy('pattern_id')
             ->map(fn ($items) => [
-                'pattern'  => $items->first()->pattern,
+                'pattern' => $items->first()->pattern,
                 'subjects' => $items->map(fn ($cs) => $cs->subject)->filter()->values(),
             ])
             ->values();
 
         return Inertia::render('superadmin/classes/show', [
             'schoolClass' => [
-                'id'                  => $class->id,
-                'name'                => $class->name,
-                'status'              => $class->status,
-                'created_at'          => $class->created_at?->toISOString(),
-                'patterns'            => $class->patterns,
+                'id' => $class->id,
+                'name' => $class->name,
+                'status' => $class->status,
+                'created_at' => $class->created_at?->toISOString(),
+                'patterns' => $class->patterns,
                 'subjects_by_pattern' => $subjectsByPattern,
-                'audit_logs'          => $class->auditLogs->map(fn ($log) => [
-                    'id'         => $log->id,
-                    'event'      => $log->event?->value,
+                'audit_logs' => $class->auditLogs->map(fn ($log) => [
+                    'id' => $log->id,
+                    'event' => $log->event?->value,
                     'old_values' => $log->old_values ?? [],
                     'new_values' => $log->new_values ?? [],
                     'changed_by' => $log->changedBy?->name ?? 'System',
                     'created_at' => $log->created_at?->toISOString(),
                 ]),
             ],
-            'backHref'      => "/superadmin/patterns/{$pattern->id}",
+            'backHref' => "/superadmin/patterns/{$pattern->id}",
             'scopedPattern' => [
-                'id'         => $pattern->id,
-                'name'       => $pattern->name,
+                'id' => $pattern->id,
+                'name' => $pattern->name,
                 'short_name' => $pattern->short_name,
             ],
         ]);
@@ -165,10 +180,10 @@ class PatternController extends Controller
     public function destroy(Pattern $pattern)
     {
         AuditLog::record(
-            model:     $pattern,
-            event:     AuditEvent::Deleted,
+            model: $pattern,
+            event: AuditEvent::Deleted,
             oldValues: ['name' => $pattern->name],
-            notes:     'Pattern deleted.',
+            notes: 'Pattern deleted.',
         );
 
         $pattern->delete();

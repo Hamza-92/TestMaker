@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Enums\AuditEvent;
 use App\Enums\TeacherPermission;
 use App\Enums\UserType;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Pattern;
 use App\Models\SchoolClass;
 use App\Models\Subject;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Support\SubscriptionAccess;
 use App\Support\TeacherAccess;
@@ -32,19 +35,19 @@ class TeacherController extends Controller
             ->orderByDesc('created_at')
             ->get(['id', 'name', 'email', 'status', 'teacher_permissions', 'created_at'])
             ->map(fn (User $teacher) => [
-                'id'                  => $teacher->id,
-                'name'                => $teacher->name,
-                'email'               => $teacher->email,
-                'status'              => $teacher->status?->value,
-                'permission_count'    => count((array) ($teacher->teacher_permissions ?? [])),
-                'created_at'          => $teacher->created_at?->toISOString(),
+                'id' => $teacher->id,
+                'name' => $teacher->name,
+                'email' => $teacher->email,
+                'status' => $teacher->status?->value,
+                'permission_count' => count((array) ($teacher->teacher_permissions ?? [])),
+                'created_at' => $teacher->created_at?->toISOString(),
             ]);
 
         return Inertia::render('customer/teachers/index', [
             'teachers' => $teachers,
-            'quota'    => [
-                'used'  => $teachers->count(),
-                'max'   => $subscription?->max_teachers,
+            'quota' => [
+                'used' => $teachers->count(),
+                'max' => $subscription?->max_teachers,
                 'allow' => (bool) ($subscription?->allow_teachers ?? false),
             ],
         ]);
@@ -69,25 +72,38 @@ class TeacherController extends Controller
         $this->ensureCanAddTeacher();
 
         $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'email', 'max:255', 'unique:users,email'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
-            'status'   => ['required', Rule::in(['active', 'inactive', 'suspended'])],
+            'status' => ['required', Rule::in(['active', 'inactive', 'suspended'])],
         ]);
 
         $owner = auth()->user();
 
-        User::create([
-            'name'                => $validated['name'],
-            'email'               => $validated['email'],
-            'password'            => Hash::make($validated['password']),
-            'status'              => $validated['status'],
-            'user_type'           => UserType::Teacher->value,
-            'school_id'           => $owner->id,
-            'created_by'          => $owner->id,
+        $teacher = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'status' => $validated['status'],
+            'user_type' => UserType::Teacher->value,
+            'school_id' => $owner->id,
+            'created_by' => $owner->id,
             'teacher_permissions' => TeacherPermission::defaults(),
-            'access_scope'        => null,
+            'access_scope' => null,
         ]);
+
+        AuditLog::record(
+            model: $teacher,
+            event: AuditEvent::Created,
+            newValues: [
+                'name' => $teacher->name,
+                'email' => $teacher->email,
+                'user_type' => UserType::Teacher->value,
+                'school_id' => $owner->id,
+                'activity' => 'added',
+            ],
+            notes: 'Teacher added.',
+        );
 
         return redirect()->route('customer.teachers.index')
             ->with('success', 'Teacher created successfully.');
@@ -114,14 +130,15 @@ class TeacherController extends Controller
         $this->authorizeTeacher($teacher);
 
         $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($teacher->id)],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($teacher->id)],
             'password' => ['nullable', 'string', 'min:6', 'confirmed'],
-            'status'   => ['required', Rule::in(['active', 'inactive', 'suspended'])],
+            'status' => ['required', Rule::in(['active', 'inactive', 'suspended'])],
         ]);
 
-        $teacher->name   = $validated['name'];
-        $teacher->email  = $validated['email'];
+        $oldValues = $teacher->only(['name', 'email', 'status']);
+        $teacher->name = $validated['name'];
+        $teacher->email = $validated['email'];
         $teacher->status = $validated['status'];
 
         if (! empty($validated['password'])) {
@@ -129,8 +146,21 @@ class TeacherController extends Controller
         }
 
         $teacher->save();
+        AuditLog::record(
+            model: $teacher,
+            event: AuditEvent::Updated,
+            oldValues: $oldValues,
+            newValues: [
+                ...$teacher->only(['name', 'email', 'status']),
+                'user_type' => UserType::Teacher->value,
+                'school_id' => $teacher->school_id,
+                'activity' => 'updated',
+            ],
+            notes: 'Teacher updated.',
+        );
 
         return redirect()->route('customer.teachers.index')
+
             ->with('success', 'Teacher updated successfully.');
     }
 
@@ -138,6 +168,17 @@ class TeacherController extends Controller
     {
         $this->authorizeTeacher($teacher);
 
+        AuditLog::record(
+            model: $teacher,
+            event: AuditEvent::Deleted,
+            oldValues: [
+                ...$teacher->only(['name', 'email', 'status']),
+                'user_type' => UserType::Teacher->value,
+                'school_id' => $teacher->school_id,
+                'activity' => 'removed',
+            ],
+            notes: 'Teacher removed.',
+        );
         $teacher->delete();
 
         return redirect()->route('customer.teachers.index')
@@ -163,26 +204,26 @@ class TeacherController extends Controller
         $teacherScope = TeacherAccess::boundedScope($teacher->access_scope, $ceiling, $resources);
 
         $catalog = collect(TeacherPermission::cases())->map(fn (TeacherPermission $case) => [
-            'name'        => $case->value,
-            'label'       => $case->label(),
+            'name' => $case->value,
+            'label' => $case->label(),
             'description' => $case->description(),
         ])->values();
 
         return Inertia::render('customer/teachers/permissions', [
             'teacher' => [
-                'id'                  => $teacher->id,
-                'name'                => $teacher->name,
-                'email'               => $teacher->email,
+                'id' => $teacher->id,
+                'name' => $teacher->name,
+                'email' => $teacher->email,
                 'teacher_permissions' => (array) ($teacher->teacher_permissions ?? []),
-                'access_scope'        => $teacherScope,
+                'access_scope' => $teacherScope,
             ],
             'permissionCatalog' => $catalog,
-            'ceilingScope'      => $ceiling,
-            'patterns'          => $resources['patterns'],
-            'classes'           => $resources['classes'],
-            'subjects'          => $resources['subjects'],
-            'patternClassMap'   => $this->limitPatternClassMap($resources['patternClassMap'], $ceiling),
-            'classSubjectMap'   => $this->limitClassSubjectMap($resources['classSubjectMap'], $ceiling),
+            'ceilingScope' => $ceiling,
+            'patterns' => $resources['patterns'],
+            'classes' => $resources['classes'],
+            'subjects' => $resources['subjects'],
+            'patternClassMap' => $this->limitPatternClassMap($resources['patternClassMap'], $ceiling),
+            'classSubjectMap' => $this->limitClassSubjectMap($resources['classSubjectMap'], $ceiling),
         ]);
     }
 
@@ -191,9 +232,9 @@ class TeacherController extends Controller
         $this->authorizeTeacher($teacher);
 
         $validated = $request->validate([
-            'permissions'   => ['array'],
+            'permissions' => ['array'],
             'permissions.*' => ['string', Rule::in(TeacherPermission::values())],
-            'access_scope'  => ['nullable', 'array'],
+            'access_scope' => ['nullable', 'array'],
         ]);
 
         $owner = auth()->user();
@@ -237,7 +278,7 @@ class TeacherController extends Controller
         }
     }
 
-    private function upgradeViewIfBlocked(User $owner, ?\App\Models\Subscription $subscription)
+    private function upgradeViewIfBlocked(User $owner, ?Subscription $subscription)
     {
         if ($subscription !== null && $subscription->allow_teachers) {
             return null;
@@ -246,17 +287,17 @@ class TeacherController extends Controller
         $reason = $subscription === null ? 'no_subscription' : 'plan_excludes_teachers';
 
         return Inertia::render('customer/teachers/upgrade', [
-            'reason'      => $reason,
-            'planName'    => $subscription?->name,
+            'reason' => $reason,
+            'planName' => $subscription?->name,
             'accountType' => $owner->account_type?->value,
-            'expiresAt'   => $subscription?->expired_at?->toISOString(),
-            'features'    => [
+            'expiresAt' => $subscription?->expired_at?->toISOString(),
+            'features' => [
                 'Add teachers to your school account',
                 'Assign patterns, classes, and subjects per teacher',
                 'Control which features each teacher can access',
                 'Track paper activity per teacher',
             ],
-            'support'     => [
+            'support' => [
                 'email' => config('mail.support_address') ?: 'support@testmaker.app',
                 'phone' => config('app.support_phone'),
             ],
@@ -275,7 +316,7 @@ class TeacherController extends Controller
     {
         return [
             'patterns' => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
-            'classes'  => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
+            'classes' => SchoolClass::where('status', 1)->orderBy('name')->get(['id', 'name']),
             'subjects' => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
             ...SubscriptionAccess::buildMaps(),
         ];

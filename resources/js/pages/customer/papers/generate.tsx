@@ -31,11 +31,12 @@ import type { LucideIcon } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
 import { toast } from 'sonner';
+import { Button, Card } from '@/components/tm';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
-import { Button, Card } from '@/components/tm';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
+import { AnswerKeySheet } from './paper-layouts/answer-key-sheet';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
 import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
@@ -44,12 +45,11 @@ import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
 import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
-import { SavePaperModal } from './paper-layouts/save-paper-modal';
-import type { SavePaperValues } from './paper-layouts/save-paper-modal';
+import { SET_LABELS, setLabelFor, variantForSet } from './paper-layouts/paper-variant';
 import { SaveAsTemplateModal } from './paper-layouts/save-as-template-modal';
 import type { SaveAsTemplateValues } from './paper-layouts/save-as-template-modal';
-import { AnswerKeySheet } from './paper-layouts/answer-key-sheet';
-import { SET_LABELS, setLabelFor, variantForSet } from './paper-layouts/paper-variant';
+import { SavePaperModal } from './paper-layouts/save-paper-modal';
+import type { SavePaperValues } from './paper-layouts/save-paper-modal';
 // Lazy-loaded: this modal pulls in browser-only editors (tinymce, mathlive)
 // that have no SSR-safe exports. A static import drags them into the SSR
 // module graph and crashes server rendering of /papers/generate with
@@ -183,6 +183,7 @@ interface Props {
     sourceOptions: SourceOption[];
     savedPaper?: SavedPaperProp;
     appliedTemplate?: AppliedTemplate;
+    initialPatternId?: number | null;
 }
 
 interface SourceOption {
@@ -668,12 +669,22 @@ function passageQuestionsFromManual(
 
 function answerTextFromManual(question: ManualQuestion): string | null {
     const content = question.content as Record<string, unknown> | null;
-    if (!content) return null;
+
+    if (!content) {
+return null;
+}
 
     if (question.schemaKey === 'objective_true_false') {
         const flag = String(content.correct_boolean ?? '').toLowerCase();
-        if (flag === 'true') return 'True';
-        if (flag === 'false') return 'False';
+
+        if (flag === 'true') {
+return 'True';
+}
+
+        if (flag === 'false') {
+return 'False';
+}
+
         return null;
     }
 
@@ -705,6 +716,7 @@ function paperOptionsFromManual(
 ): PaperQuestionOption[] {
     if (question.schemaKey === 'objective_true_false') {
         const flag = String((question.content as Record<string, unknown>).correct_boolean ?? '').toLowerCase();
+
         return [
             { id: `${question.id}_true`, text: 'True', isCorrect: flag === 'true' },
             { id: `${question.id}_false`, text: 'False', isCorrect: flag === 'false' },
@@ -1090,9 +1102,13 @@ function ScopePicker({
                     ? 'Choose a subject'
                     : 'Chapters & topics';
     const select = (option: ComboboxOptionItem) => {
-        if (level === 'pattern') onPatternChange(option);
-        else if (level === 'class') onClassChange(option);
-        else onSubjectChange(option);
+        if (level === 'pattern') {
+onPatternChange(option);
+} else if (level === 'class') {
+onClassChange(option);
+} else {
+onSubjectChange(option);
+}
     };
 
     return (
@@ -1157,6 +1173,7 @@ function ScopePicker({
                             value: ComboboxOptionItem;
                             clear: (value: ComboboxOptionItem | null) => void;
                         };
+
                         return (
                             <span key={crumb.value.id} className="inline-flex items-center gap-1.5">
                                 {index > 0 && <ArrowRightIcon className="size-3.5 text-slate-400" />}
@@ -1323,6 +1340,7 @@ export default function GeneratePaper({
     sourceOptions,
     savedPaper,
     appliedTemplate,
+    initialPatternId,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
@@ -1333,7 +1351,15 @@ export default function GeneratePaper({
         [sourceOptions],
     );
     const [step, setStep] = useState<FormStep>('chapters');
-    const [pattern, setPattern] = useState<ComboboxOptionItem | null>(null);
+    const [pattern, setPattern] = useState<ComboboxOptionItem | null>(() => {
+        const initialPattern = patterns.find(
+            (item) => item.id === initialPatternId,
+        );
+
+        return initialPattern
+            ? { id: initialPattern.id, label: initialPattern.name }
+            : null;
+    });
     const [klass, setKlass] = useState<ComboboxOptionItem | null>(null);
     const [subject, setSubject] = useState<ComboboxOptionItem | null>(null);
     const [chapters, setChapters] = useState<Chapter[] | null>(null);
@@ -1918,6 +1944,7 @@ export default function GeneratePaper({
         }
 
         const structureByType = new Map<number, AppliedTemplate['structure']['sections'][number]>();
+
         for (const section of pendingTemplate.structure.sections) {
             if (typeof section.questionTypeId === 'number') {
                 structureByType.set(section.questionTypeId, section);
@@ -1933,7 +1960,10 @@ export default function GeneratePaper({
                 ...current,
                 sections: current.sections.map((section) => {
                     const match = structureByType.get(section.questionTypeId);
-                    if (!match) return section;
+
+                    if (!match) {
+return section;
+}
 
                     const rows = section.rows.length > 0 ? [...section.rows] : [createQuestionRow(String(questionRowSequence.current++))];
                     const firstRow = rows[0];
@@ -2962,7 +2992,9 @@ export default function GeneratePaper({
     }
 
     async function saveAsTemplateToServer(values: SaveAsTemplateValues) {
-        if (!generatedPaper || isSavingTemplate) return;
+        if (!generatedPaper || isSavingTemplate) {
+return;
+}
 
         setIsSavingTemplate(true);
         setSaveTemplateError(null);
@@ -6013,7 +6045,10 @@ function GeneratedPaperView({
                                 onChange={(e) => {
                                     const next = Number(e.target.value);
                                     onNumSetsChange(next);
-                                    if (activeSetIndex >= next) onActiveSetChange(next - 1);
+
+                                    if (activeSetIndex >= next) {
+onActiveSetChange(next - 1);
+}
                                 }}
                                 className="cursor-pointer border-none bg-transparent text-sm font-semibold text-slate-700 outline-none dark:text-slate-200"
                             >
@@ -6273,8 +6308,12 @@ function GeneratedPaperView({
                 {printAllSets && numSets > 1 && (
                     <div className="hidden print:block">
                         {Array.from({ length: numSets }).map((_, index) => {
-                            if (index === activeSetIndex) return null;
+                            if (index === activeSetIndex) {
+return null;
+}
+
                             const variantPaper = variantForSet(rawPaper, index);
+
                             return (
                                 <main
                                     key={`variant-${index}`}
@@ -6321,6 +6360,7 @@ function GeneratedPaperView({
                                                         settings.questionLayout,
                                                         section.category,
                                                     );
+
                                                     return (
                                                         <Template
                                                             key={section.id}

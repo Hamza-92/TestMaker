@@ -13,6 +13,9 @@ class Pattern extends Model
     protected $fillable = [
         'name',
         'short_name',
+        'description',
+        'icon',
+        'color',
         'status',
         'created_by',
     ];

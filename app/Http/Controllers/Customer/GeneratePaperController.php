@@ -101,6 +101,11 @@ class GeneratePaperController extends Controller
             }
         }
 
+        $requestedPatternId = (int) $request->query('pattern', 0);
+        $props['initialPatternId'] = $props['patterns']->contains('id', $requestedPatternId)
+            ? $requestedPatternId
+            : null;
+
         return Inertia::render('customer/papers/generate', $props);
     }
 

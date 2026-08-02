@@ -4,11 +4,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { PatternAppearanceFields } from './_appearance-fields';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface FormData {
     name: string;
     short_name: string;
+    description: string;
+    icon: string;
+    color: string;
     status: string;
     [key: string]: string | boolean;
 }
@@ -37,6 +41,9 @@ export default function AddPattern() {
     const { data, setData, post, processing, errors } = useForm<FormData>({
         name:       '',
         short_name: '',
+        description: '',
+        icon:       'graduation-cap',
+        color:      '#4f46e5',
         status:     '1',
     });
 
@@ -96,6 +103,20 @@ export default function AddPattern() {
                             </Field>
                         </div>
 
+
+                        <PatternAppearanceFields
+                            description={data.description}
+                            icon={data.icon}
+                            color={data.color}
+                            onDescriptionChange={(value) => setData('description', value)}
+                            onIconChange={(value) => setData('icon', value)}
+                            onColorChange={(value) => setData('color', value)}
+                            errors={{
+                                description: errors.description,
+                                icon: errors.icon,
+                                color: errors.color,
+                            }}
+                        />
                         <Field label="Status" required error={errors.status}>
                             <Select value={data.status} onValueChange={(v) => setData('status', v)}>
                                 <SelectTrigger className="w-full">

@@ -4,12 +4,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { PatternAppearanceFields } from './_appearance-fields';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Pattern {
     id: number;
     name: string;
     short_name: string | null;
+    description: string | null;
+    icon: string | null;
+    color: string | null;
     status: number;
 }
 
@@ -17,6 +21,9 @@ interface FormData {
     _method: string;
     name: string;
     short_name: string;
+    description: string;
+    icon: string;
+    color: string;
     status: string;
     [key: string]: string | boolean;
 }
@@ -47,6 +54,9 @@ export default function EditPattern({ pattern }: { pattern: Pattern }) {
         name:       pattern.name,
         short_name: pattern.short_name ?? '',
         status:     String(pattern.status),
+        description: pattern.description ?? '',
+        icon:       pattern.icon ?? 'graduation-cap',
+        color:      pattern.color ?? '#4f46e5',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -105,7 +115,21 @@ export default function EditPattern({ pattern }: { pattern: Pattern }) {
                             </Field>
                         </div>
 
+                        <PatternAppearanceFields
+                            description={data.description}
+                            icon={data.icon}
+                            color={data.color}
+                            onDescriptionChange={(value) => setData('description', value)}
+                            onIconChange={(value) => setData('icon', value)}
+                            onColorChange={(value) => setData('color', value)}
+                            errors={{
+                                description: errors.description,
+                                icon: errors.icon,
+                                color: errors.color,
+                            }}
+                        />
                         <Field label="Status" required error={errors.status}>
+
                             <Select value={data.status} onValueChange={(v) => setData('status', v)}>
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
