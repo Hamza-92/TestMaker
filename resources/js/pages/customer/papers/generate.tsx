@@ -4,6 +4,7 @@ import {
     ArrowRightIcon,
     BookmarkIcon,
     BookOpenIcon,
+    ChevronDownIcon,
     CheckIcon,
     ClockIcon,
     FileTextIcon,
@@ -5889,6 +5890,24 @@ function GeneratedPaperView({
 }) {
     const [isConfirmingBack, setIsConfirmingBack] = useState(false);
     const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+    const [isSetsMenuOpen, setIsSetsMenuOpen] = useState(false);
+    const setsMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isSetsMenuOpen) {
+            return;
+        }
+
+        const handlePointerDown = (event: PointerEvent) => {
+            if (!setsMenuRef.current?.contains(event.target as Node)) {
+                setIsSetsMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
+    }, [isSetsMenuOpen]);
 
     // Compose a per-character font-family cascade — Latin glyphs get the
     // English font, Urdu glyphs fall through to the Urdu font automatically.
@@ -6032,46 +6051,78 @@ function GeneratedPaperView({
                                 />
                             </span>
                         </button>
-                        <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
-                            <ShuffleIcon className="size-4 text-slate-400" />
-                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                Sets
-                            </span>
-                            <select
-                                value={numSets}
-                                onChange={(e) => {
-                                    const next = Number(e.target.value);
-                                    onNumSetsChange(next);
-
-                                    if (activeSetIndex >= next) {
-onActiveSetChange(next - 1);
-}
-                                }}
-                                className="cursor-pointer border-none bg-transparent text-sm font-semibold text-slate-700 outline-none dark:text-slate-200"
+                        <div ref={setsMenuRef} className="relative">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded={isSetsMenuOpen}
+                                onClick={() => setIsSetsMenuOpen((open) => !open)}
+                                className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
-                                {[1, 2, 3].map((n) => (
-                                    <option key={n} value={n}>
-                                        {n}
-                                    </option>
-                                ))}
-                            </select>
-                            {numSets > 1 && (
-                                <div className="flex items-center gap-0.5 border-l border-slate-200 pl-2 dark:border-slate-800">
-                                    {SET_LABELS.slice(0, numSets).map((label, index) => (
-                                        <button
-                                            key={label}
-                                            type="button"
-                                            onClick={() => onActiveSetChange(index)}
-                                            className={cn(
-                                                'inline-flex size-6 items-center justify-center rounded text-xs font-bold transition-colors',
-                                                activeSetIndex === index
-                                                    ? 'bg-brand-600 text-white'
-                                                    : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800',
-                                            )}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
+                                <ShuffleIcon className="size-4 text-slate-400" />
+                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                    Sets
+                                </span>
+                                <span>{numSets}</span>
+                                <ChevronDownIcon
+                                    className={cn(
+                                        'size-3.5 text-slate-400 transition-transform',
+                                        isSetsMenuOpen && 'rotate-180',
+                                    )}
+                                />
+                            </button>
+                            {isSetsMenuOpen && (
+                                <div
+                                    role="menu"
+                                    className="absolute top-full left-0 z-30 mt-2 min-w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900"
+                                >
+                                    <div className="space-y-0.5">
+                                        {[1, 2, 3].map((n) => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => {
+                                                    onNumSetsChange(n);
+
+                                                    if (activeSetIndex >= n) {
+                                                        onActiveSetChange(n - 1);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    'flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                                    numSets === n
+                                                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+                                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                                )}
+                                            >
+                                                <span>{n}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {numSets > 1 && (
+                                        <>
+                                            <div className="my-1.5 border-t border-slate-200 dark:border-slate-800" />
+                                            <div className="flex items-center gap-1">
+                                                {SET_LABELS.slice(0, numSets).map((label, index) => (
+                                                    <button
+                                                        key={label}
+                                                        type="button"
+                                                        role="menuitem"
+                                                        onClick={() => onActiveSetChange(index)}
+                                                        className={cn(
+                                                            'flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg px-2 py-2 text-sm font-medium transition-colors',
+                                                            activeSetIndex === index
+                                                                ? 'bg-brand-600 text-white'
+                                                                : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                                        )}
+                                                    >
+                                                        <span>{label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
