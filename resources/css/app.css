@@ -510,6 +510,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: inherit;
 }
 
+[data-print-paper] [data-paper-urdu-content],
+[data-print-paper] [data-paper-urdu-content] * {
+    font-family: var(--paper-urdu-font) !important;
+}
+
 @media print {
     /* The @page size/margin rule is injected per-paper by the React component
        so it can react to the user's paper-size + margin settings. */

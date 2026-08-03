@@ -23,7 +23,7 @@ export function BilingualQuestionRow({
         return (
             <div className="min-w-0 text-left">
                 <span className="font-bold">
-                    Q. No. {indexLabel}
+                    Q. No. {indexLabel}:-
                 </span>{' '}
                 <QuestionContent value={value} inline className="align-baseline" />
             </div>
@@ -37,7 +37,7 @@ export function BilingualQuestionRow({
                 className="min-w-0 text-left"
             >
                 <span className="font-bold">
-                    Q. No. {indexLabel}
+                    Q. No. {indexLabel}:-
                 </span>{' '}
                 <QuestionContent
                     value={parts.english}
@@ -52,11 +52,12 @@ export function BilingualQuestionRow({
 
             <div
                 dir="rtl"
+                data-paper-urdu-content
                 className="min-w-0 text-right"
-                style={{ fontFamily: 'var(--paper-urdu-font, inherit)' }}
+                style={{ fontFamily: 'var(--paper-urdu-font)' }}
             >
                 <span className="font-bold">
-                    &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {indexLabel}
+                    &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {indexLabel}:-
                 </span>{' '}
                 <QuestionContent
                     value={parts.urdu}
