@@ -1,5 +1,6 @@
 import { BilingualQuestionRow } from '../questions/bilingual-question-row';
 import { PassageQuestionContent } from '../questions/passage-question-content';
+import { QuestionTypeHeading } from '../questions/question-type-heading';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type {
     GeneratedPaperQuestion,
@@ -73,24 +74,14 @@ export function TwoColumnSubjectiveSection({
     return (
         <section className="paper-section">
             {/* Heading is a standalone box — border on all 4 sides controlled by --paper-heading-border-*. */}
-            <div
-                data-paper-heading
-                className="grid grid-cols-[3rem_1fr_8rem] text-sm font-bold"
-            >
-                <div data-paper-heading-divider className="px-1 py-1">
-                    Q.{index + 1}
-                </div>
-                <div data-paper-heading-divider className="px-2 py-1">
-                    {section.title}
-                </div>
-                <div
-                    data-paper-heading-divider
-                    className="px-2 py-1 text-right"
-                >
-                    ({section.requiredQuestions}x{section.marksEach}=
-                    {section.requiredQuestions * section.marksEach})
-                </div>
-            </div>
+            <QuestionTypeHeading
+                index={index}
+                title={section.title}
+                titleEnglish={section.titleEnglish}
+                titleUrdu={section.titleUrdu}
+                requiredQuestions={section.requiredQuestions}
+                marksEach={section.marksEach}
+            />
 
             {/* Question container — border on all 4 sides; subjective items sit
                 in an N-column grid (no inter-row dividers — collapsed-table mode

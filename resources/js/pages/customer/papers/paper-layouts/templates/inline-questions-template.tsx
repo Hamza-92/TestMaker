@@ -1,5 +1,6 @@
-import { QuestionContent } from '../questions/question-content';
 import { PassageQuestionContent } from '../questions/passage-question-content';
+import { QuestionContent } from '../questions/question-content';
+import { QuestionTypeHeading } from '../questions/question-type-heading';
 import { SectionControls } from '../sections/section-actions';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type { SectionTemplate } from './template-props';
@@ -35,24 +36,14 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
 
     return (
         <section className="paper-section text-black">
-            <div
-                data-paper-heading
-                className="grid grid-cols-[3rem_1fr_8rem] text-sm font-bold"
-            >
-                <div data-paper-heading-divider className="px-1 py-1">
-                    Q.{index + 1}
-                </div>
-                <div data-paper-heading-divider className="px-2 py-1">
-                    {section.title}
-                </div>
-                <div
-                    data-paper-heading-divider
-                    className="px-2 py-1 text-right"
-                >
-                    ({section.requiredQuestions}x{section.marksEach}=
-                    {section.requiredQuestions * section.marksEach})
-                </div>
-            </div>
+            <QuestionTypeHeading
+                index={index}
+                title={section.title}
+                titleEnglish={section.titleEnglish}
+                titleUrdu={section.titleUrdu}
+                requiredQuestions={section.requiredQuestions}
+                marksEach={section.marksEach}
+            />
 
             {/* Inline question stream — each question rendered as a span with a
                 bold label prefix, separated by a generous gap. Wraps naturally.

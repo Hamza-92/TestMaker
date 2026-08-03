@@ -37,6 +37,9 @@ export interface GeneratedPaperSection {
     questionTypeId: number | null;
     category: PaperSectionCategory;
     title: string;
+    /** Separate labels used when both paper mediums are rendered. */
+    titleEnglish?: string | null;
+    titleUrdu?: string | null;
     requiredQuestions: number;
     totalQuestions: number;
     marksEach: number;

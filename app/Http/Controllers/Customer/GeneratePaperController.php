@@ -215,11 +215,15 @@ class GeneratePaperController extends Controller
             'questionTypeId' => (int) $row->id,
             'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
             'title' => $this->localizedLabel($row->name, $row->name_ur, $displayMedium),
+            'titleEnglish' => trim((string) $row->name),
+            'titleUrdu' => trim((string) $row->name_ur),
             'heading' => $this->localizedLabel(
                 $row->heading_en,
                 $row->heading_ur,
                 $displayMedium,
             ) ?: $this->localizedLabel($row->name, $row->name_ur, $displayMedium),
+            'headingEnglish' => trim((string) ($row->heading_en ?: $row->name)),
+            'headingUrdu' => trim((string) ($row->heading_ur ?: $row->name_ur)),
             'availableCount' => (int) $row->available_count,
             'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
         ]);

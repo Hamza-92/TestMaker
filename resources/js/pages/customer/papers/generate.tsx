@@ -218,7 +218,11 @@ interface QuestionSelectionSection {
     questionTypeId: number;
     category: SectionCategory;
     title: string;
+    titleEnglish?: string | null;
+    titleUrdu?: string | null;
     heading?: string;
+    headingEnglish?: string | null;
+    headingUrdu?: string | null;
     availableCount: number;
     /** Default column count (1–5) for this question type, from the DB. */
     columnPerRow: number;
@@ -242,7 +246,11 @@ interface QuestionTypeCount {
     questionTypeId: number;
     category: SectionCategory;
     title: string;
+    titleEnglish?: string | null;
+    titleUrdu?: string | null;
     heading?: string;
+    headingEnglish?: string | null;
+    headingUrdu?: string | null;
     availableCount: number;
     columnPerRow: number;
 }
@@ -818,7 +826,11 @@ function mergeQuestionSections(
             questionTypeId: item.questionTypeId,
             category: item.category,
             title: item.title,
+            titleEnglish: item.titleEnglish,
+            titleUrdu: item.titleUrdu,
             heading: item.heading || item.title,
+            headingEnglish: item.headingEnglish,
+            headingUrdu: item.headingUrdu,
             availableCount: item.availableCount,
             columnPerRow: item.columnPerRow,
             selectionMode: current?.selectionMode ?? 'automatic',
@@ -2611,6 +2623,18 @@ return section;
                     questionTypeId: section.questionTypeId,
                     category: section.category,
                     title: section.heading || section.title,
+                    titleEnglish:
+                        chapterMedium !== 'Urdu'
+                            ? section.headingEnglish ||
+                              section.titleEnglish ||
+                              section.title
+                            : null,
+                    titleUrdu:
+                        chapterMedium !== 'English'
+                            ? section.headingUrdu ||
+                              section.titleUrdu ||
+                              section.title
+                            : null,
                     requiredQuestions: toNumber(row.requiredQuestions),
                     totalQuestions: rowTarget(row),
                     marksEach: toNumber(row.marksPerQuestion),
@@ -3603,6 +3627,18 @@ return;
             questionTypeId: questionType.questionTypeId,
             category: questionType.category,
             title: questionType.heading || questionType.title,
+            titleEnglish:
+                chapterMedium !== 'Urdu'
+                    ? questionType.headingEnglish ||
+                      questionType.titleEnglish ||
+                      questionType.title
+                    : null,
+            titleUrdu:
+                chapterMedium !== 'English'
+                    ? questionType.headingUrdu ||
+                      questionType.titleUrdu ||
+                      questionType.title
+                    : null,
             requiredQuestions,
             totalQuestions,
             marksEach,
