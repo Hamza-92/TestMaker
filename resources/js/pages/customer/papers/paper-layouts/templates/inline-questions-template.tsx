@@ -32,7 +32,8 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     const fallbackFormat = isObjective ? 'numeric' : 'roman';
     // Legacy default of 1 preserves the original single-flow look for papers
     // saved before per-block columns existed.
-    const columns = clampSectionColumns(section.columns, 1);
+    const columns = clampSectionColumns(section.columns, 1);    const isUrduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
+
 
     return (
         <section className="paper-section text-black">
@@ -70,13 +71,26 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                             key={question.id}
                             data-paper-question
                             className="mr-4 inline align-baseline"
-                            style={
-                                columns > 1
-                                    ? { breakInside: 'avoid' }
-                                    : undefined
-                            }
+                            dir={isUrduOnly ? 'rtl' : undefined}
+                            data-paper-urdu-content={isUrduOnly ? true : undefined}
+                            style={{
+                                ...(columns > 1 ? { breakInside: 'avoid' } : {}),
+                                ...(isUrduOnly
+                                    ? { fontFamily: 'var(--paper-urdu-font)' }
+                                    : {}),
+                            }}
                         >
-                            <span className="font-bold">({label})</span>{' '}
+                            {isUrduOnly ? (
+                                <>
+                                    <span className="font-bold">
+                                        &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {label}:-
+                                    </span>{' '}
+                                </>
+                            ) : (
+                                <>
+                                    <span className="font-bold">({label})</span>{' '}
+                                </>
+                            )}
                             <QuestionContent
                                 value={question.text}
                                 inline

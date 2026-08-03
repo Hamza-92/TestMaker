@@ -5,6 +5,7 @@ interface BilingualQuestionRowProps {
     value: string;
     indexLabel: string;
     marks: number;
+    urduOnly?: boolean;
 }
 
 interface BilingualParts {
@@ -16,10 +17,31 @@ export function BilingualQuestionRow({
     value,
     indexLabel,
     marks,
+    urduOnly = false,
 }: BilingualQuestionRowProps) {
     const parts = splitBilingualParts(value);
 
     if (!parts) {
+        if (urduOnly) {
+            return (
+                <div
+                    dir="rtl"
+                    data-paper-urdu-content
+                    className="min-w-0 text-right"
+                    style={{ fontFamily: 'var(--paper-urdu-font)' }}
+                >
+                    <span className="font-bold">
+                        &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {indexLabel}:-
+                    </span>{' '}
+                    <QuestionContent
+                        value={value}
+                        inline
+                        className="align-baseline text-right"
+                    />
+                </div>
+            );
+        }
+
         return (
             <div className="min-w-0 text-left">
                 <span className="font-bold">

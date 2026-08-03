@@ -534,6 +534,8 @@ input[type='date']::-webkit-calendar-picker-indicator {
     font-size: var(--paper-urdu-heading-size) !important;
     line-height: var(--paper-urdu-heading-line-height) !important;
 }
+[data-print-paper] [data-paper-question][data-paper-urdu-content],
+[data-print-paper] [data-paper-question][dir='rtl'],
 [data-print-paper] [data-paper-question] [data-paper-urdu-content],
 [data-print-paper] [data-paper-question] [dir='rtl'] {
     font-size: var(--paper-urdu-question-size) !important;

@@ -179,6 +179,7 @@ function ObjectiveQuestionRow({
                     value={question.text}
                     indexLabel={formatQuestionLabel(index, numberingFormat, 'numeric')}
                     marks={section.marksEach}
+                urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
                 />
             </div>
 
