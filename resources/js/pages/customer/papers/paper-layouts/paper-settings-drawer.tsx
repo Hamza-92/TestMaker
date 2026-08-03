@@ -165,6 +165,7 @@ const HEADER_TEMPLATE_OPTIONS: Array<FontOption<PaperHeaderTemplate>> = [
 
 const MARGIN_BOUNDS = { min: 0, max: 50 };
 const SECTION_SPACING_BOUNDS = { min: 0, max: 20 };
+const HEADER_PADDING_BOUNDS = { min: 0, max: 24 };
 
 const LINE_HEIGHT_BOUNDS = { min: 1, max: 3 };
 const BORDER_WIDTH_BOUNDS = { min: 0, max: 6 };
@@ -609,6 +610,22 @@ export function PaperSettingsDrawer({
                                 onChange({ headerLineHeight: v })
                             }
                         />
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                            <LabeledStepper
+                                label="Padding X (px)"
+                                value={settings.headerPaddingX}
+                                min={HEADER_PADDING_BOUNDS.min}
+                                max={HEADER_PADDING_BOUNDS.max}
+                                onChange={(v) => onChange({ headerPaddingX: v })}
+                            />
+                            <LabeledStepper
+                                label="Padding Y (px)"
+                                value={settings.headerPaddingY}
+                                min={HEADER_PADDING_BOUNDS.min}
+                                max={HEADER_PADDING_BOUNDS.max}
+                                onChange={(v) => onChange({ headerPaddingY: v })}
+                            />
+                        </div>
                         <BorderControls
                             width={settings.headerBorderWidth}
                             style={settings.headerBorderStyle}

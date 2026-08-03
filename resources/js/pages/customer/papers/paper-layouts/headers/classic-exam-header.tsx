@@ -1,7 +1,11 @@
 ﻿import type { GeneratedPaperHeader } from '../types';
+import { HeaderLogo } from './header-logo';
 
 interface ClassicExamHeaderProps {
     header: GeneratedPaperHeader;
+    logoUrl?: string;
+    paddingX: number;
+    paddingY: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
 }
 
@@ -23,26 +27,24 @@ const rightFields: Array<[keyof GeneratedPaperHeader, string]> = [
 
 export function ClassicExamHeader({
     header,
+    logoUrl,
+    paddingX,
+    paddingY,
     onChange,
 }: ClassicExamHeaderProps) {
     return (
-        <div data-paper-header-frame>
-            <div className="grid min-h-36 grid-cols-[12rem_1fr_1fr]">
-                <div
+        <div data-paper-header-frame data-paper-header data-paper-header-padding-x={paddingX} data-paper-header-padding-y={paddingY}>
+            <div className="grid grid-cols-[12rem_1fr_1fr]">
+                <div data-paper-header-cell
                     data-paper-header-divider="r"
                     className="flex items-center justify-center p-3"
                 >
                     {/* Initials circle keeps its own decorative 2px outline so
                         it doesn't disappear when the user sets header border to 0. */}
-                    <div className="flex size-28 items-center justify-center rounded-full border-2 border-current text-center text-3xl leading-none font-bold">
-                        {header.schoolName
-                            .split(/\s+/)
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map((word) => word[0])
-                            .join('')
-                            .toUpperCase() || 'TM'}
-                    </div>
+                    <HeaderLogo logoUrl={logoUrl} schoolName={header.schoolName}
+                        initialSize={112}
+                        imageClassName=""
+                        fallbackClassName="flex size-28 items-center justify-center rounded-full border-2 border-current text-center text-3xl leading-none font-bold" />
                 </div>
 
                 <HeaderColumn

@@ -1,30 +1,33 @@
 ﻿import type { GeneratedPaperHeader } from '../types';
+import { HeaderLogo } from './header-logo';
 
 interface BannerExamHeaderProps {
     header: GeneratedPaperHeader;
+    logoUrl?: string;
+    paddingX: number;
+    paddingY: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
 }
 
-export function BannerExamHeader({ header, onChange }: BannerExamHeaderProps) {
-    const initials =
-        header.schoolName
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((w) => w[0])
-            .join('')
-            .toUpperCase() || 'TM';
+export function BannerExamHeader({
+    header,
+    logoUrl,
+    paddingX,
+    paddingY,
+    onChange,
+}: BannerExamHeaderProps) {
 
     return (
-        <div data-paper-header-frame data-paper-header>
+        <div data-paper-header-frame data-paper-header data-paper-header-padding-x={paddingX} data-paper-header-padding-y={paddingY}>
             {/* Top: initials circle (left) + school name centered (flex-1) */}
             <div
                 data-paper-header-divider="b"
                 className="flex items-center gap-3 px-4 py-2"
             >
-                <div className="flex size-14 shrink-0 items-center justify-center rounded-full border-2 border-current text-center text-lg leading-none font-bold">
-                    {initials}
-                </div>
+                <HeaderLogo logoUrl={logoUrl} schoolName={header.schoolName}
+                    initialSize={56}
+                    imageClassName="shrink-0"
+                    fallbackClassName="flex items-center justify-center rounded-full border-2 border-current text-center text-lg leading-none font-bold" />
                 <div className="flex-1 text-center">
                     <input autoComplete="off"
                         value={header.schoolName}

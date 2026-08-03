@@ -1,4 +1,5 @@
 ﻿import type { GeneratedPaperHeader } from '../types';
+import { HeaderLogo } from './header-logo';
 
 interface TabularExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -6,6 +7,8 @@ interface TabularExamHeaderProps {
     address?: string;
     showAddress?: boolean;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
+    paddingX: number;
+    paddingY: number;
 }
 
 export function TabularExamHeader({
@@ -14,35 +17,20 @@ export function TabularExamHeader({
     address,
     showAddress,
     onChange,
+    paddingX,
+    paddingY,
 }: TabularExamHeaderProps) {
-    const initials =
-        header.schoolName
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((w) => w[0])
-            .join('')
-            .toUpperCase() || 'TM';
-
     return (
-        <div data-paper-header-frame data-paper-header className="grid grid-cols-[5rem_1fr]">
+        <div data-paper-header-frame data-paper-header data-paper-header-padding-x={paddingX} data-paper-header-padding-y={paddingY} className="grid grid-cols-[5rem_1fr]">
             {/* Logo — spans all 4 rows on the right */}
-            <div
+            <div data-paper-header-cell
                 data-paper-header-divider="r"
                 className="row-span-4 flex items-center justify-center p-2"
             >
-                {logoUrl ? (
-                    <img
-                        src={logoUrl}
-                        alt=""
-                        draggable={false}
-                        className="max-h-20 max-w-full object-contain"
-                    />
-                ) : (
-                    <div className="flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none">
-                        {initials}
-                    </div>
-                )}
+                <HeaderLogo logoUrl={logoUrl} schoolName={header.schoolName}
+                    initialSize={80}
+                    imageClassName=""
+                    fallbackClassName="flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none" />
             </div>
 
             {/* Row 1: School name + address — centered */}

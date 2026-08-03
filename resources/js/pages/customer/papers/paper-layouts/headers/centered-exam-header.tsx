@@ -1,4 +1,5 @@
 ﻿import type { GeneratedPaperHeader } from '../types';
+import { HeaderLogo } from './header-logo';
 
 interface CenteredExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -6,6 +7,8 @@ interface CenteredExamHeaderProps {
     address?: string;
     showAddress?: boolean;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
+    paddingX: number;
+    paddingY: number;
 }
 
 export function CenteredExamHeader({
@@ -14,32 +17,17 @@ export function CenteredExamHeader({
     address,
     showAddress,
     onChange,
+    paddingX,
+    paddingY,
 }: CenteredExamHeaderProps) {
-    const initials =
-        header.schoolName
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((w) => w[0])
-            .join('')
-            .toUpperCase() || 'TM';
-
     return (
-        <div data-paper-header>
+        <div data-paper-header data-paper-header-padding-x={paddingX} data-paper-header-padding-y={paddingY}>
             {/* Top: logo + school name + subtitle — no outer border */}
             <div className="flex flex-col items-center py-2 text-center">
-                {logoUrl ? (
-                    <img
-                        src={logoUrl}
-                        alt=""
-                        draggable={false}
-                        className="mb-1 max-h-16 max-w-[8rem] object-contain"
-                    />
-                ) : (
-                    <div className="mb-1 flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none">
-                        {initials}
-                    </div>
-                )}
+                <HeaderLogo logoUrl={logoUrl} schoolName={header.schoolName}
+                    initialSize={64}
+                    imageClassName="mb-1"
+                    fallbackClassName="mb-1 flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none" />
                 <input autoComplete="off"
                     value={header.schoolName}
                     onChange={(e) => onChange('schoolName', e.target.value)}

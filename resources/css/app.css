@@ -417,11 +417,19 @@ input[type='date']::-webkit-calendar-picker-indicator {
 /* Font sizing (already in place from the typography work). */
 [data-print-paper] [data-paper-header] {
     font-size: var(--paper-header-size, 0.875rem);
-    line-height: var(--paper-header-line-height, 1.5);
+    line-height: var(--paper-header-line-height, 1);
 }
 [data-print-paper] [data-paper-header] * {
     font-size: inherit;
     line-height: inherit;
+}
+[data-print-paper] [data-paper-header] [class*='p-'],
+[data-print-paper] [data-paper-header] [class*='px-'],
+[data-print-paper] [data-paper-header] [class*='py-'] {
+    padding-left: var(--paper-header-padding-x, 8px) !important;
+    padding-right: var(--paper-header-padding-x, 8px) !important;
+    padding-top: var(--paper-header-padding-y, 8px) !important;
+    padding-bottom: var(--paper-header-padding-y, 8px) !important;
 }
 
 /* Outer frame of the exam header block (school + fields). The configured

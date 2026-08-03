@@ -1306,6 +1306,8 @@ function PaperHeader({
     logoUrl,
     address,
     showAddress,
+    paddingX,
+    paddingY,
     onChange,
 }: {
     template: PaperHeaderTemplate;
@@ -1313,25 +1315,27 @@ function PaperHeader({
     logoUrl: string;
     address: string;
     showAddress: boolean;
+    paddingX: number;
+    paddingY: number;
     onChange: Parameters<typeof ClassicExamHeader>[0]['onChange'];
 }) {
     if (template === 'banner') {
-        return <BannerExamHeader header={header} onChange={onChange} />;
+        return <BannerExamHeader header={header} logoUrl={logoUrl || undefined} paddingX={paddingX} paddingY={paddingY} onChange={onChange} />;
     }
 
     if (template === 'formal') {
-        return <FormalExamHeader header={header} onChange={onChange} />;
+        return <FormalExamHeader header={header} logoUrl={logoUrl || undefined} paddingX={paddingX} paddingY={paddingY} onChange={onChange} />;
     }
 
     if (template === 'centered') {
-        return <CenteredExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} onChange={onChange} />;
+        return <CenteredExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} paddingX={paddingX} paddingY={paddingY} onChange={onChange} />;
     }
 
     if (template === 'tabular') {
-        return <TabularExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} onChange={onChange} />;
+        return <TabularExamHeader header={header} logoUrl={logoUrl || undefined} address={address} showAddress={showAddress} paddingX={paddingX} paddingY={paddingY} onChange={onChange} />;
     }
 
-    return <ClassicExamHeader header={header} onChange={onChange} />;
+    return <ClassicExamHeader header={header} logoUrl={logoUrl || undefined} paddingX={paddingX} paddingY={paddingY} onChange={onChange} />;
 }
 
 export default function GeneratePaper({
@@ -5936,6 +5940,8 @@ function GeneratedPaperView({
         paddingTop: `${settings.marginTop}mm`,
         paddingRight: `${settings.marginRight}mm`,
         paddingBottom: `${settings.marginBottom}mm`,
+        '--paper-header-padding-x': String(settings.headerPaddingX) + 'px',
+        '--paper-header-padding-y': String(settings.headerPaddingY) + 'px',
         paddingLeft: `${settings.marginLeft}mm`,
         '--paper-header-size': `${settings.headerSize}px`,
         '--paper-header-line-height': settings.headerLineHeight,
@@ -6279,6 +6285,8 @@ function GeneratedPaperView({
                                     ? () => { }
                                     : onHeaderChange
                             }
+                            paddingX={settings.headerPaddingX}
+                            paddingY={settings.headerPaddingY}
                         />
                         <div
                             className="flex flex-col"
@@ -6387,6 +6395,8 @@ return null;
                                             address={schoolAddress}
                                             showAddress={showSchoolAddress}
                                             onChange={() => { }}
+                                            paddingX={settings.headerPaddingX}
+                                            paddingY={settings.headerPaddingY}
                                         />
                                         <div
                                             className="flex flex-col"

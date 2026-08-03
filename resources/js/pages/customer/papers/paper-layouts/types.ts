@@ -113,6 +113,10 @@ export interface PaperSettings {
     headerSize: number;
     /** Paper header line-height (unitless multiplier). */
     headerLineHeight: number;
+    /** Horizontal inner spacing applied to paper-header cells, in px. */
+    headerPaddingX: number;
+    /** Vertical inner spacing applied to paper-header cells, in px. */
+    headerPaddingY: number;
     /** Section heading font size in px (the "Q.1 Title (5x1=5)" rows). */
     headingSize: number;
     /** Section heading line-height (unitless multiplier). */
@@ -177,7 +181,9 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     englishFont: 'sans',
     urduFont: 'jameel-noori',
     headerSize: 14,
-    headerLineHeight: 1.5,
+    headerLineHeight: 1,
+    headerPaddingX: 8,
+    headerPaddingY: 8,
     headingSize: 14,
     headingLineHeight: 1.5,
     questionSize: 14,
@@ -337,6 +343,18 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             typeof source.headerLineHeight === 'number'
                 ? source.headerLineHeight
                 : DEFAULT_PAPER_SETTINGS.headerLineHeight,
+        headerPaddingX:
+            typeof source.headerPaddingX === 'number'
+                ? source.headerPaddingX
+                : typeof source.headerCellPadding === 'number'
+                  ? source.headerCellPadding
+                  : DEFAULT_PAPER_SETTINGS.headerPaddingX,
+        headerPaddingY:
+            typeof source.headerPaddingY === 'number'
+                ? source.headerPaddingY
+                : typeof source.headerCellPadding === 'number'
+                  ? source.headerCellPadding
+                  : DEFAULT_PAPER_SETTINGS.headerPaddingY,
         headingSize:
             typeof source.headingSize === 'number'
                 ? source.headingSize

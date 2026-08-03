@@ -1,31 +1,36 @@
 ﻿import type { GeneratedPaperHeader } from '../types';
+import { HeaderLogo } from './header-logo';
 
 interface FormalExamHeaderProps {
     header: GeneratedPaperHeader;
+    logoUrl?: string;
+    paddingX: number;
+    paddingY: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
 }
 
-export function FormalExamHeader({ header, onChange }: FormalExamHeaderProps) {
+export function FormalExamHeader({
+    header,
+    logoUrl,
+    paddingX,
+    paddingY,
+    onChange,
+}: FormalExamHeaderProps) {
     return (
-        <div data-paper-header-frame data-paper-header>
+        <div data-paper-header-frame data-paper-header data-paper-header-padding-x={paddingX} data-paper-header-padding-y={paddingY}>
             {/* Top row: initials | school name (large centered) | marks box */}
             <div
                 data-paper-header-divider="b"
                 className="grid grid-cols-[9rem_1fr_9rem]"
             >
-                <div
+                <div data-paper-header-cell
                     data-paper-header-divider="r"
                     className="flex items-center justify-center p-3"
                 >
-                    <div className="flex size-20 items-center justify-center rounded-full border-2 border-current text-center text-2xl leading-none font-bold">
-                        {header.schoolName
-                            .split(/\s+/)
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map((w) => w[0])
-                            .join('')
-                            .toUpperCase() || 'TM'}
-                    </div>
+                    <HeaderLogo logoUrl={logoUrl} schoolName={header.schoolName}
+                        initialSize={80}
+                        imageClassName=""
+                        fallbackClassName="flex size-20 items-center justify-center rounded-full border-2 border-current text-center text-2xl leading-none font-bold" />
                 </div>
 
                 <div className="flex flex-col items-center justify-center px-4 py-2 text-center">
