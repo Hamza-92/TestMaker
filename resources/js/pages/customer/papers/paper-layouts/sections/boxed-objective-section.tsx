@@ -1,5 +1,6 @@
-import { QuestionContent } from '../questions/question-content';
+import { BilingualQuestionRow } from '../questions/bilingual-question-row';
 import { PassageQuestionContent } from '../questions/passage-question-content';
+import { QuestionContent } from '../questions/question-content';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type {
     GeneratedPaperQuestion,
@@ -182,16 +183,11 @@ function ObjectiveQuestionRow({
 
     return (
         <div data-paper-question className="group/question relative">
-            <div className="grid grid-cols-[2rem_1fr] text-sm">
-                <div
-                    data-paper-question-divider="r"
-                    className="px-2 py-1 text-center font-bold"
-                >
-                    {formatQuestionLabel(index, numberingFormat, 'numeric')}
-                </div>
-                <QuestionContent
+            <div className="px-2 py-1 text-sm">
+                <BilingualQuestionRow
                     value={question.text}
-                    className="px-2 py-1 leading-6"
+                    indexLabel={formatQuestionLabel(index, numberingFormat, 'numeric')}
+                    marks={section.marksEach}
                 />
             </div>
 

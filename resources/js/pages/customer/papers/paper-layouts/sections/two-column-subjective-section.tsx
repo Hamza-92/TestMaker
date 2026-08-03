@@ -1,4 +1,4 @@
-import { QuestionContent } from '../questions/question-content';
+import { BilingualQuestionRow } from '../questions/bilingual-question-row';
 import { PassageQuestionContent } from '../questions/passage-question-content';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type {
@@ -177,13 +177,14 @@ function SubjectiveQuestionItem({
     return (
         <div
             data-paper-question
-            className="group/question relative flex gap-1 text-sm leading-6"
+            className="group/question relative text-sm leading-6"
         >
-            <span className="w-8 shrink-0 font-bold">
-                ({formatQuestionLabel(index, numberingFormat, 'roman')})
-            </span>
-            <div className="min-w-0 flex-1">
-                <QuestionContent value={question.text} />
+            <BilingualQuestionRow
+                value={question.text}
+                indexLabel={formatQuestionLabel(index, numberingFormat, 'roman')}
+                marks={section.marksEach}
+            />
+            <div className="mt-2 min-w-0">
                 {question.imageUrl && (
                     <div className="mt-2">
                         <img

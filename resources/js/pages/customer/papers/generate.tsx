@@ -5941,6 +5941,7 @@ function GeneratedPaperView({
         paddingRight: `${settings.marginRight}mm`,
         paddingBottom: `${settings.marginBottom}mm`,
         '--paper-header-padding-x': String(settings.headerPaddingX) + 'px',
+        '--paper-urdu-font': urduStack[settings.urduFont],
         '--paper-header-padding-y': String(settings.headerPaddingY) + 'px',
         paddingLeft: `${settings.marginLeft}mm`,
         '--paper-header-size': `${settings.headerSize}px`,
