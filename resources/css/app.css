@@ -515,6 +515,29 @@ input[type='date']::-webkit-calendar-picker-indicator {
 [data-print-paper] [dir='rtl'],
 [data-print-paper] [dir='rtl'] * {
     font-family: var(--paper-urdu-font) !important;
+    transform: translateY(var(--paper-urdu-vertical-offset, -0.16em));
+}
+
+/*
+ * Urdu typefaces do not share the same x-height or line box. Use the
+ * paper-wide font-size/leading settings as the baseline, then apply the
+ * selected family's calibrated metrics so Nastaliq glyphs neither look too
+ * small beside Latin text nor clip into the line above/below.
+ */
+[data-print-paper] [data-paper-header] [data-paper-urdu-content],
+[data-print-paper] [data-paper-header] [dir='rtl'] {
+    font-size: var(--paper-urdu-header-size) !important;
+    line-height: var(--paper-urdu-header-line-height) !important;
+}
+[data-print-paper] [data-paper-heading] [data-paper-urdu-content],
+[data-print-paper] [data-paper-heading] [dir='rtl'] {
+    font-size: var(--paper-urdu-heading-size) !important;
+    line-height: var(--paper-urdu-heading-line-height) !important;
+}
+[data-print-paper] [data-paper-question] [data-paper-urdu-content],
+[data-print-paper] [data-paper-question] [dir='rtl'] {
+    font-size: var(--paper-urdu-question-size) !important;
+    line-height: var(--paper-urdu-question-line-height) !important;
 }
 
 @media print {

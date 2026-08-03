@@ -67,6 +67,7 @@ import {
     clampSectionColumns,
     DEFAULT_PAPER_SETTINGS,
     getPageDimensions,
+    PAPER_URDU_FONT_METRICS,
     normalizePaperSettings
 } from './paper-layouts/types';
 import type { PaperHeaderTemplate } from './paper-layouts/types';
@@ -5968,6 +5969,7 @@ function GeneratedPaperView({
         settings.paperSize,
         settings.orientation,
     );
+    const urduMetrics = PAPER_URDU_FONT_METRICS[settings.urduFont];
     const paperShellStyle = {
         fontFamily: `${englishStack[settings.englishFont]}, ${urduStack[settings.urduFont]}`,
         color: settings.textColor,
@@ -5978,6 +5980,13 @@ function GeneratedPaperView({
         paddingBottom: `${settings.marginBottom}mm`,
         '--paper-header-padding-x': String(settings.headerPaddingX) + 'px',
         '--paper-urdu-font': urduStack[settings.urduFont],
+        '--paper-urdu-vertical-offset': `${urduMetrics.verticalOffsetEm}em`,
+        '--paper-urdu-header-size': `${settings.headerSize * urduMetrics.sizeScale}px`,
+        '--paper-urdu-header-line-height': settings.headerLineHeight * urduMetrics.lineHeightScale,
+        '--paper-urdu-heading-size': `${settings.headingSize * urduMetrics.sizeScale}px`,
+        '--paper-urdu-heading-line-height': settings.headingLineHeight * urduMetrics.lineHeightScale,
+        '--paper-urdu-question-size': `${settings.questionSize * urduMetrics.sizeScale}px`,
+        '--paper-urdu-question-line-height': settings.questionLineHeight * urduMetrics.lineHeightScale,
         '--paper-header-padding-y': String(settings.headerPaddingY) + 'px',
         paddingLeft: `${settings.marginLeft}mm`,
         '--paper-header-size': `${settings.headerSize}px`,

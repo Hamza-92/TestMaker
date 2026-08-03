@@ -90,6 +90,19 @@ export interface GeneratedPaperHeader {
 
 export type PaperEnglishFont = 'sans' | 'serif' | 'mono';
 export type PaperUrduFont = 'jameel-noori' | 'noto-nastaliq' | 'mehr-nastaliq';
+/**
+ * Nastaliq fonts have different x-heights and built-in vertical metrics.
+ * These small per-family adjustments keep Urdu visually comparable to the
+ * selected English size while preserving enough leading for tall glyphs.
+ */
+export const PAPER_URDU_FONT_METRICS: Record<
+    PaperUrduFont,
+    { sizeScale: number; lineHeightScale: number; verticalOffsetEm: number }
+> = {
+    'jameel-noori': { sizeScale: 1.18, lineHeightScale: 1.22, verticalOffsetEm: -0.16 },
+    'noto-nastaliq': { sizeScale: 1.24, lineHeightScale: 1.3, verticalOffsetEm: -0.22 },
+    'mehr-nastaliq': { sizeScale: 1.18, lineHeightScale: 1.22, verticalOffsetEm: -0.16 },
+};
 export type PaperSize = 'A4' | 'Letter' | 'Legal';
 export type PaperOrientation = 'portrait' | 'landscape';
 export type PageNumberPosition =
