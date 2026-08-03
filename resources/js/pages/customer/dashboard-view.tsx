@@ -215,12 +215,16 @@ function ActionCard({
                     ? 'border-violet-100 bg-violet-50 hover:border-violet-200 dark:border-violet-900/60 dark:bg-violet-950/35'
                     : 'border-emerald-100 bg-emerald-50 hover:border-emerald-200 dark:border-emerald-900/60 dark:bg-emerald-950/30',
             )}
+            style={{ '--tm-accent': violet ? '#7c3aed' : '#059669' } as CSSProperties}
         >
             <div className="min-w-0">
                 <p className={cn('text-sm font-semibold', violet ? 'text-violet-950 dark:text-violet-100' : 'text-emerald-950 dark:text-emerald-100')}>{title}</p>
                 <p className="mt-1 max-w-44 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{description}</p>
             </div>
-            <div className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm', violet ? 'bg-violet-600 dark:bg-violet-500' : 'bg-emerald-600 dark:bg-emerald-500')}>
+            <div
+                className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm', violet ? 'bg-violet-600 dark:bg-violet-500' : 'bg-emerald-600 dark:bg-emerald-500')}
+                style={{ boxShadow: violet ? '0 8px 18px -6px rgba(124, 58, 237, 0.55)' : '0 8px 18px -6px rgba(5, 150, 105, 0.55)' }}
+            >
                 <Icon className="size-5" />
             </div>
         </Link>
@@ -361,7 +365,7 @@ export default function CustomerDashboard({
                             <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center">
                                 <div className="min-w-0 flex-1">
                                     <div className="flex min-w-0 items-center gap-3.5">
-                                        <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/80 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                                        <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/80 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
                                             {logoUrl ? (
                                                 <img src={logoUrl} alt={school.name} className="size-full object-cover" />
                                             ) : (
@@ -453,7 +457,6 @@ export default function CustomerDashboard({
                                                 <div className="mt-auto pt-4">
                                                     <p className="truncate text-sm font-semibold">{pattern.name}</p>
                                                     {pattern.description && <p className="mt-0.5 truncate text-[10px] text-white/75">{pattern.description}</p>}
-                                                    <p className="mt-1.5 truncate text-[11px] font-medium text-white/85">{pattern.classes_label}</p>
                                                 </div>
                                             </Link>
                                         );
