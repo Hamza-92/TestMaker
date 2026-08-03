@@ -6,6 +6,7 @@ use App\Enums\UserType;
 use App\Models\Paper;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -42,6 +43,9 @@ test('a teacher who can generate papers can save and update their paper', functi
     $paper = Paper::findOrFail($response->json('id'));
     expect($paper->user_id)->toBe($teacher->id);
 
+    expect(DB::table('papers')->where('id', $paper->id)->value('paper_data'))
+        ->toContain('__tm_compressed');
+    expect($paper->paper_data)->toBe($payload['paper_data']);
     $this
         ->actingAs($teacher)
         ->putJson(route('customer.papers.update', $paper), [

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserType;
+use App\Http\Controllers\Customer\ActivityController;
 use App\Http\Controllers\Customer\GeneratePaperController;
 use App\Http\Controllers\Customer\OnlineTestAttemptController;
 use App\Http\Controllers\Customer\OnlineTestController;
@@ -31,8 +32,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-
-
 Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
@@ -51,10 +50,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'description' => 'Customer settings are being prepared and will be available soon.',
     ])->middleware('app.user')->name('customer.settings');
 
-    Route::inertia('customer/activity', 'customer/coming-soon', [
-        'title' => 'Activity Log',
-        'description' => 'Your school activity history will be available here soon.',
-    ])->middleware('app.user')->name('customer.activity');
+    Route::get('customer/activity', [ActivityController::class, 'index'])
+        ->middleware('app.user')
+        ->name('customer.activity');
     Route::get('customer/profile', [ProfileController::class, 'edit'])->middleware('app.user')->name('customer.profile');
     Route::patch('customer/profile', [ProfileController::class, 'update'])->middleware('app.user')->name('customer.profile.update');
 
@@ -361,7 +359,3 @@ Route::post('take-test/attempt/{attemptToken}/submit', [PublicOnlineTestControll
 Route::get('take-test/attempt/{attemptToken}/complete', [PublicOnlineTestController::class, 'complete'])->name('online-tests.public.complete');
 
 require __DIR__.'/settings.php';
-
-
-
-
