@@ -26,9 +26,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('class_subjects', function (Blueprint $table) {
+            $table->dropForeign(['pattern_id']);
             $table->dropUnique(['class_id', 'pattern_id', 'subject_id']);
             $table->dropIndex(['pattern_id']);
-            $table->dropForeign(['pattern_id']);
             $table->dropColumn('pattern_id');
 
             $table->unique(['class_id', 'subject_id', 'medium_id']);
