@@ -5958,11 +5958,11 @@ function GeneratedPaperView({
     };
     const urduStack: Record<string, string> = {
         'jameel-noori':
-            '"Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", "Urdu Typesetting", serif',
+            '"Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif',
         'noto-nastaliq':
             '"Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Urdu Typesetting", serif',
         'mehr-nastaliq':
-            '"Mehr Nastaliq Web", "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif',
+            '"Mehr Nastaliq Web", "Arabic Typesetting", "Urdu Typesetting", serif',
     };
     const pageDims = getPageDimensions(
         settings.paperSize,

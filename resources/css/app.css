@@ -511,7 +511,9 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 [data-print-paper] [data-paper-urdu-content],
-[data-print-paper] [data-paper-urdu-content] * {
+[data-print-paper] [data-paper-urdu-content] *,
+[data-print-paper] [dir='rtl'],
+[data-print-paper] [dir='rtl'] * {
     font-family: var(--paper-urdu-font) !important;
 }
 

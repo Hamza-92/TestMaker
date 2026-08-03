@@ -1,4 +1,4 @@
-﻿import {
+import {
     Combobox,
     ComboboxButton,
     ComboboxInput,
@@ -79,7 +79,7 @@ const URDU_FONT_OPTIONS: Array<FontOption<PaperUrduFont>> = [
         value: 'jameel-noori',
         label: 'Jameel Noori',
         previewFontFamily:
-            '"Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", serif',
+            '"Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif',
     },
     {
         value: 'noto-nastaliq',
@@ -90,7 +90,7 @@ const URDU_FONT_OPTIONS: Array<FontOption<PaperUrduFont>> = [
     {
         value: 'mehr-nastaliq',
         label: 'Mehr Nastaliq',
-        previewFontFamily: '"Mehr Nastaliq Web", "Noto Nastaliq Urdu", serif',
+        previewFontFamily: '"Mehr Nastaliq Web", "Arabic Typesetting", "Urdu Typesetting", serif',
     },
 ];
 
