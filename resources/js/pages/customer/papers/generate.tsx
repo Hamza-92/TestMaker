@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -5992,13 +5992,6 @@ function GeneratedPaperView({
             <div data-paper-shell className="w-full space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
                     <div className="flex items-center gap-2">
-                        <Link
-                            href="/papers"
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-                        >
-                            <BookmarkIcon className="size-4" />
-                            My Papers
-                        </Link>
                         <button
                             type="button"
                             onClick={onAddSection}
@@ -6007,34 +6000,38 @@ function GeneratedPaperView({
                             <PlusIcon className="size-4" />
                             Add Section
                         </button>
-                        <div className="inline-flex rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                            <button
-                                type="button"
-                                onClick={() => onViewModeChange('paper')}
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={viewMode === 'answer_key'}
+                            onClick={() =>
+                                onViewModeChange(
+                                    viewMode === 'answer_key' ? 'paper' : 'answer_key',
+                                )
+                            }
+                            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            <KeyRoundIcon className="size-4 text-slate-400" />
+                            <span>Answer Key</span>
+                            <span
+                                aria-hidden="true"
                                 className={cn(
-                                    'inline-flex cursor-pointer items-center gap-1.5 rounded-l-lg px-3 py-2 text-sm font-medium transition-colors',
-                                    viewMode === 'paper'
-                                        ? 'bg-brand-600 text-white'
-                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
-                                )}
-                            >
-                                <FileTextIcon className="size-4" />
-                                Paper
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => onViewModeChange('answer_key')}
-                                className={cn(
-                                    'inline-flex cursor-pointer items-center gap-1.5 rounded-r-lg px-3 py-2 text-sm font-medium transition-colors',
+                                    'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors',
                                     viewMode === 'answer_key'
-                                        ? 'bg-brand-600 text-white'
-                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                        ? 'bg-brand-600'
+                                        : 'bg-slate-200 dark:bg-slate-700',
                                 )}
                             >
-                                <KeyRoundIcon className="size-4" />
-                                Answer Key
-                            </button>
-                        </div>
+                                <span
+                                    className={cn(
+                                        'size-4 rounded-full bg-white shadow-sm transition-transform',
+                                        viewMode === 'answer_key'
+                                            ? 'translate-x-4'
+                                            : 'translate-x-0',
+                                    )}
+                                />
+                            </span>
+                        </button>
                         <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
                             <ShuffleIcon className="size-4 text-slate-400" />
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
