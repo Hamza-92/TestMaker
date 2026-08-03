@@ -6009,14 +6009,14 @@ function GeneratedPaperView({
     return (
         <>
             <div data-paper-shell className="w-full space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 print:hidden">
+                    <div className="flex items-center gap-1.5">
                         <button
                             type="button"
                             onClick={onAddSection}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
                         >
-                            <PlusIcon className="size-4" />
+                            <PlusIcon className="size-3.5" />
                             Add Section
                         </button>
                         <button
@@ -6028,14 +6028,14 @@ function GeneratedPaperView({
                                     viewMode === 'answer_key' ? 'paper' : 'answer_key',
                                 )
                             }
-                            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
-                            <KeyRoundIcon className="size-4 text-slate-400" />
+                            <KeyRoundIcon className="size-3.5 text-slate-400" />
                             <span>Answer Key</span>
                             <span
                                 aria-hidden="true"
                                 className={cn(
-                                    'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                    'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
                                     viewMode === 'answer_key'
                                         ? 'bg-brand-600'
                                         : 'bg-slate-200 dark:bg-slate-700',
@@ -6043,9 +6043,9 @@ function GeneratedPaperView({
                             >
                                 <span
                                     className={cn(
-                                        'size-4 rounded-full bg-white shadow-sm transition-transform',
+                                        'size-3.5 rounded-full bg-white shadow-sm transition-transform',
                                         viewMode === 'answer_key'
-                                            ? 'translate-x-4'
+                                            ? 'translate-x-3.5'
                                             : 'translate-x-0',
                                     )}
                                 />
@@ -6057,16 +6057,16 @@ function GeneratedPaperView({
                                 aria-haspopup="menu"
                                 aria-expanded={isSetsMenuOpen}
                                 onClick={() => setIsSetsMenuOpen((open) => !open)}
-                                className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
-                                <ShuffleIcon className="size-4 text-slate-400" />
+                                <ShuffleIcon className="size-3.5 text-slate-400" />
                                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                     Sets
                                 </span>
                                 <span>{numSets}</span>
                                 <ChevronDownIcon
                                     className={cn(
-                                        'size-3.5 text-slate-400 transition-transform',
+                                        'size-3 text-slate-400 transition-transform',
                                         isSetsMenuOpen && 'rotate-180',
                                     )}
                                 />
@@ -6074,7 +6074,7 @@ function GeneratedPaperView({
                             {isSetsMenuOpen && (
                                 <div
                                     role="menu"
-                                    className="absolute top-full left-0 z-30 mt-2 min-w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900"
+                                    className="absolute top-full left-0 z-30 mt-1.5 min-w-36 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900"
                                 >
                                     <div className="space-y-0.5">
                                         {[1, 2, 3].map((n) => (
@@ -6090,7 +6090,7 @@ function GeneratedPaperView({
                                                     }
                                                 }}
                                                 className={cn(
-                                                    'flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                                    'flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold transition-colors',
                                                     numSets === n
                                                         ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
                                                         : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
@@ -6102,7 +6102,7 @@ function GeneratedPaperView({
                                     </div>
                                     {numSets > 1 && (
                                         <>
-                                            <div className="my-1.5 border-t border-slate-200 dark:border-slate-800" />
+                                            <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
                                             <div className="flex items-center gap-1">
                                                 {SET_LABELS.slice(0, numSets).map((label, index) => (
                                                     <button
@@ -6111,7 +6111,7 @@ function GeneratedPaperView({
                                                         role="menuitem"
                                                         onClick={() => onActiveSetChange(index)}
                                                         className={cn(
-                                                            'flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-lg px-2 py-2 text-sm font-medium transition-colors',
+                                                            'flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-xs font-semibold transition-colors',
                                                             activeSetIndex === index
                                                                 ? 'bg-brand-600 text-white'
                                                                 : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
@@ -6127,18 +6127,18 @@ function GeneratedPaperView({
                             )}
                         </div>
                         {isDraft && savedPaperId !== null && (
-                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                                 <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
                                 Draft
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <button
                             type="button"
                             onClick={onSaveDraft}
                             disabled={isSavingDraft || isSavingPaper}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
                         >
                             {isSavingDraft ? (
                                 <>
@@ -6147,7 +6147,7 @@ function GeneratedPaperView({
                                 </>
                             ) : (
                                 <>
-                                    <BookmarkIcon className="size-4" />
+                                    <BookmarkIcon className="size-3.5" />
                                     Save as Draft
                                 </>
                             )}
@@ -6157,7 +6157,7 @@ function GeneratedPaperView({
                             onClick={onOpenSavePaperModal}
                             disabled={isSavingPaper || isSavingDraft}
                             className={cn(
-                                'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                                'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                                 savedPaperId !== null && !isDirty
                                     ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400'
                                     : savedPaperId !== null && isDirty
@@ -6172,18 +6172,18 @@ function GeneratedPaperView({
                                 </>
                             ) : savedPaperId !== null && !isDirty ? (
                                 <>
-                                    <CheckIcon className="size-4" />
+                                    <CheckIcon className="size-3.5" />
                                     Saved
                                 </>
                             ) : savedPaperId !== null && isDirty ? (
                                 <>
-                                    <SaveIcon className="size-4" />
+                                    <SaveIcon className="size-3.5" />
                                     Save Paper
                                     <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
                                 </>
                             ) : (
                                 <>
-                                    <SaveIcon className="size-4" />
+                                    <SaveIcon className="size-3.5" />
                                     Save Paper
                                 </>
                             )}
@@ -6192,17 +6192,17 @@ function GeneratedPaperView({
                             type="button"
                             onClick={onOpenSaveAsTemplate}
                             title="Save as template"
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                         >
-                            <LayoutTemplateIcon className="size-4" />
+                            <LayoutTemplateIcon className="size-3.5" />
                             Save as Template
                         </button>
                         <button
                             type="button"
                             onClick={() => (numSets > 1 ? onPrintAllSets() : window.print())}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white"
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white"
                         >
-                            <PrinterIcon className="size-4" />
+                            <PrinterIcon className="size-3.5" />
                             {numSets > 1 ? `Print ${numSets} Sets` : 'Print'}
                         </button>
                     </div>
