@@ -65,6 +65,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
             Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
             Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
+            Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
+            Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
         });
 
         Route::middleware('teacher.feature:manage_own_papers,view_school_papers')->group(function () {
@@ -79,9 +81,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('papers/bulk/move', [PaperController::class, 'bulkMove'])->name('customer.papers.bulk.move');
             Route::post('papers/bulk/duplicate', [PaperController::class, 'bulkDuplicate'])->name('customer.papers.bulk.duplicate');
 
-            Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
             Route::get('papers/{paper}/edit', [PaperController::class, 'edit'])->name('customer.papers.edit');
-            Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
             Route::delete('papers/{paper}', [PaperController::class, 'destroy'])->name('customer.papers.destroy');
             Route::post('papers/{paper}/duplicate', [PaperController::class, 'duplicate'])->name('customer.papers.duplicate');
             Route::patch('papers/{paper}/folder', [PaperController::class, 'move'])->name('customer.papers.move');
