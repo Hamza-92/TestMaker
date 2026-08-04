@@ -171,6 +171,7 @@ function ObjectiveQuestionRow({
     ) => void;
 }) {
     const options = question.options.slice(0, 4);
+    const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
 
     return (
         <div data-paper-question className="group/question relative">
@@ -179,7 +180,7 @@ function ObjectiveQuestionRow({
                     value={question.text}
                     indexLabel={formatQuestionLabel(index, numberingFormat, 'numeric')}
                     marks={section.marksEach}
-                urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
+                    urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
                 />
             </div>
 
@@ -228,13 +229,19 @@ function ObjectiveQuestionRow({
             {options.length > 0 && (
                 <div
                     data-paper-question-divider="t"
-                    className="grid grid-cols-4 pl-8 text-sm"
+                    dir={urduOnly ? 'rtl' : undefined}
+                    data-paper-urdu-content={urduOnly ? true : undefined}
+                    className={
+                        urduOnly
+                            ? 'grid grid-cols-4 text-right text-sm'
+                            : 'grid grid-cols-4 text-sm'
+                    }
                 >
                     {options.map((option, optionIndex) => (
                         <div
                             key={option.id}
                             data-paper-question-divider="r"
-                            className="px-2 py-1"
+                            className={urduOnly ? 'px-2 py-1 text-right' : 'px-2 py-1'}
                         >
                             <span className="font-semibold">
                                 ({optionLabels[optionIndex]})
