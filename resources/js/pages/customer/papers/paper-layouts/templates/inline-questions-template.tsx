@@ -1,3 +1,4 @@
+import { BilingualOptionContent } from '../questions/bilingual-option-content';
 import { PassageQuestionContent } from '../questions/passage-question-content';
 import { QuestionContent } from '../questions/question-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
@@ -80,7 +81,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                     : {}),
                             }}
                         >
-                            {isUrduOnly ? (
+                            {!isObjective && (isUrduOnly ? (
                                 <>
                                     <span className="font-bold">
                                         &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {label}:-
@@ -90,7 +91,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                 <>
                                     <span className="font-bold">({label})</span>{' '}
                                 </>
-                            )}
+                            ))}
                             <QuestionContent
                                 value={question.text}
                                 inline
@@ -103,13 +104,10 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                             key={option.id}
                                             className="ml-2 align-baseline"
                                         >
-                                            <span className="font-semibold">
-                                                ({optionLabels[optionIndex]})
-                                            </span>{' '}
-                                            <QuestionContent
+                                            <BilingualOptionContent
                                                 value={option.text}
-                                                inline
-                                                className="align-baseline"
+                                                label={optionLabels[optionIndex]}
+                                                urduOnly={isUrduOnly}
                                             />
                                         </span>
                                     ))}

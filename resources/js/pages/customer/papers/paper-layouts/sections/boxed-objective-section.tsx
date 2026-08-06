@@ -1,6 +1,6 @@
+import { BilingualOptionContent } from '../questions/bilingual-option-content';
 import { BilingualQuestionRow } from '../questions/bilingual-question-row';
 import { PassageQuestionContent } from '../questions/passage-question-content';
-import { QuestionContent } from '../questions/question-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
 import { clampSectionColumns, formatQuestionLabel } from '../types';
 import type {
@@ -181,6 +181,7 @@ function ObjectiveQuestionRow({
                     indexLabel={formatQuestionLabel(index, numberingFormat, 'numeric')}
                     marks={section.marksEach}
                     urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
+                    hideMarks
                 />
             </div>
 
@@ -243,13 +244,10 @@ function ObjectiveQuestionRow({
                             data-paper-question-divider="r"
                             className={urduOnly ? 'px-2 py-1 text-right' : 'px-2 py-1'}
                         >
-                            <span className="font-semibold">
-                                ({optionLabels[optionIndex]})
-                            </span>{' '}
-                            <QuestionContent
+                            <BilingualOptionContent
                                 value={option.text}
-                                inline
-                                className="align-baseline"
+                                label={optionLabels[optionIndex]}
+                                urduOnly={urduOnly}
                             />
                         </div>
                     ))}

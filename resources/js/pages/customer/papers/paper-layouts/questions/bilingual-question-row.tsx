@@ -6,9 +6,10 @@ interface BilingualQuestionRowProps {
     indexLabel: string;
     marks: number;
     urduOnly?: boolean;
+    hideMarks?: boolean;
 }
 
-interface BilingualParts {
+export interface BilingualParts {
     english: string;
     urdu: string;
 }
@@ -18,6 +19,7 @@ export function BilingualQuestionRow({
     indexLabel,
     marks,
     urduOnly = false,
+    hideMarks = false,
 }: BilingualQuestionRowProps) {
     const parts = splitBilingualParts(value);
 
@@ -44,23 +46,22 @@ export function BilingualQuestionRow({
 
         return (
             <div className="min-w-0 text-left">
-                <span className="font-bold">
-                    Q. No. {indexLabel}:-
-                </span>{' '}
+                <span className="font-bold">Q. No. {indexLabel}:-</span>{' '}
                 <QuestionContent value={value} inline className="align-baseline" />
             </div>
         );
     }
 
     return (
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3">
-            <div
-                dir="ltr"
-                className="min-w-0 text-left"
-            >
-                <span className="font-bold">
-                    Q. No. {indexLabel}:-
-                </span>{' '}
+        <div
+            className={
+                hideMarks
+                    ? 'grid min-w-0 grid-cols-2 items-start gap-x-3'
+                    : 'grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3'
+            }
+        >
+            <div dir="ltr" className="min-w-0 text-left">
+                <span className="font-bold">Q. No. {indexLabel}:-</span>{' '}
                 <QuestionContent
                     value={parts.english}
                     inline
@@ -68,9 +69,11 @@ export function BilingualQuestionRow({
                 />
             </div>
 
-            <span className="self-start px-1 text-center text-xs font-semibold">
-                ({marks})
-            </span>
+            {!hideMarks && (
+                <span className="self-start px-1 text-center text-xs font-semibold">
+                    ({marks})
+                </span>
+            )}
 
             <div
                 dir="rtl"
@@ -91,7 +94,7 @@ export function BilingualQuestionRow({
     );
 }
 
-function splitBilingualParts(value: string): BilingualParts | null {
+export function splitBilingualParts(value: string): BilingualParts | null {
     const html = questionTextToHtml(value);
 
     if (typeof document !== 'undefined') {

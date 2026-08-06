@@ -8,6 +8,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+    font-family: 'Jameel Noori Nastaleeq';
+    src: url('/fonts/Jameel-Noori-Nastaleeq-Regular.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
 @theme {
     --font-sans:
         'Montserrat', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
@@ -361,6 +369,27 @@ input[type='date']::-webkit-calendar-picker-indicator {
 
 .paper-rich-text.inline,
 .paper-rich-text.inline :where(p, div) {
+    display: inline;
+}
+.paper-bilingual-option {
+    display: inline-flex;
+    flex-direction: column;
+    max-width: 100%;
+    vertical-align: top;
+}
+
+.paper-bilingual-option__english,
+.paper-bilingual-option__urdu {
+    display: block;
+    max-width: 100%;
+}
+
+.paper-bilingual-option__urdu {
+    margin-top: 0.2em;
+    text-align: right;
+}
+
+.paper-option-line {
     display: inline;
 }
 
