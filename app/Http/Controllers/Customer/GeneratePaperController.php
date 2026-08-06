@@ -214,16 +214,24 @@ class GeneratePaperController extends Controller
             'id' => 'sec_'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
             'questionTypeId' => (int) $row->id,
             'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
-            'title' => $this->localizedLabel($row->name, $row->name_ur, $displayMedium),
-            'titleEnglish' => trim((string) $row->name),
-            'titleUrdu' => trim((string) $row->name_ur),
-            'heading' => $this->localizedLabel(
-                $row->heading_en,
-                $row->heading_ur,
+            'title' => $this->localizedLabel(
+                $this->visibleQuestionTypeLabel($row->name),
+                $this->visibleQuestionTypeLabel($row->name_ur),
                 $displayMedium,
-            ) ?: $this->localizedLabel($row->name, $row->name_ur, $displayMedium),
-            'headingEnglish' => trim((string) ($row->heading_en ?: $row->name)),
-            'headingUrdu' => trim((string) ($row->heading_ur ?: $row->name_ur)),
+            ),
+            'titleEnglish' => $this->visibleQuestionTypeLabel($row->name),
+            'titleUrdu' => $this->visibleQuestionTypeLabel($row->name_ur),
+            'heading' => $this->localizedLabel(
+                $this->visibleQuestionTypeLabel($row->heading_en),
+                $this->visibleQuestionTypeLabel($row->heading_ur),
+                $displayMedium,
+            ) ?: $this->localizedLabel(
+                $this->visibleQuestionTypeLabel($row->name),
+                $this->visibleQuestionTypeLabel($row->name_ur),
+                $displayMedium,
+            ),
+            'headingEnglish' => $this->visibleQuestionTypeLabel($row->heading_en ?: $row->name),
+            'headingUrdu' => $this->visibleQuestionTypeLabel($row->heading_ur ?: $row->name_ur),
             'availableCount' => (int) $row->available_count,
             'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
         ]);
@@ -482,6 +490,16 @@ class GeneratePaperController extends Controller
         return null;
     }
 
+    private function visibleQuestionTypeLabel(mixed $value): string
+    {
+        $label = trim((string) $value);
+        $schemaKeys = array_map(
+            'strtolower',
+            array_keys(QuestionTypeSchemaRegistry::definitions()),
+        );
+
+        return in_array(strtolower($label), $schemaKeys, true) ? '' : $label;
+    }
     private function localizedLabel(
         mixed $english,
         mixed $urdu,

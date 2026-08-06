@@ -409,6 +409,19 @@ input[type='date']::-webkit-calendar-picker-indicator {
 .paper-rich-text :where(img) {
     max-width: 100%;
     height: auto;
+    vertical-align: middle;
+}
+
+/* Legacy fraction/equation images are inline content, not separate blocks. */
+.paper-rich-text.inline :where(img),
+.paper-option-line :where(img),
+.paper-bilingual-option :where(img) {
+    display: inline-block !important;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    vertical-align: middle;
+    break-inside: avoid;
 }
 
 .tm-equation {

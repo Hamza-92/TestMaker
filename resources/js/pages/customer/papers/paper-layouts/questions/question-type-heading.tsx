@@ -17,8 +17,15 @@ export function QuestionTypeHeading({
     requiredQuestions,
     marksEach,
 }: QuestionTypeHeadingProps) {
-    const english = titleEnglish?.trim() || '';
-    const urdu = titleUrdu?.trim() || '';
+    const hideInternalSchemaLabel = (value: string | null | undefined) =>
+        value?.trim().toLowerCase() === 'subjective_same_statement';
+    const english = hideInternalSchemaLabel(titleEnglish)
+        ? ''
+        : titleEnglish?.trim() || '';
+    const urdu = hideInternalSchemaLabel(titleUrdu)
+        ? ''
+        : titleUrdu?.trim() || '';
+    const visibleTitle = hideInternalSchemaLabel(title) ? '' : title;
     const isBilingual = english !== '' && urdu !== '';
     const totalMarks = requiredQuestions * marksEach;
 
@@ -59,7 +66,7 @@ export function QuestionTypeHeading({
                         <>
                             <span className="font-bold">Q.{index + 1}:-</span>{' '}
                             <QuestionContent
-                                value={english || title}
+                                value={english || visibleTitle}
                                 inline
                                 className="align-baseline"
                             />

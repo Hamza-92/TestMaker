@@ -23,16 +23,31 @@ class LegacyAssetMigrator
 
     public function migrateHtml(?string $html): ?string
     {
-        if ($html === null || trim($html) === '' || stripos($html, '<img') === false) {
+        if ($html === null || trim($html) === '') {
             return $html;
         }
 
-        return preg_replace_callback(
-            '/(<img\b[^>]*?\bsrc\s*=\s*)(["\'])(.*?)\2/isu',
-            function (array $match): string {
-                $url = $this->migrateSource(html_entity_decode($match[3], ENT_QUOTES | ENT_HTML5));
+        // Some legacy editor values contain the complete image markup encoded
+        // as text. Decode only when that reveals an image tag, preserving all
+        // other entities in ordinary question text.
+        if (stripos($html, '<img') === false) {
+            $decodedHtml = html_entity_decode($html, ENT_QUOTES | ENT_HTML5);
 
-                return $match[1].$match[2].htmlspecialchars($url, ENT_QUOTES | ENT_HTML5).$match[2];
+            if (stripos($decodedHtml, '<img') === false) {
+                return $html;
+            }
+
+            $html = $decodedHtml;
+        }
+
+        return preg_replace_callback(
+            '/(<img\b[^>]*?\bsrc\s*=\s*)(?:(["\'])(.*?)\2|([^\s>]+))/isu',
+            function (array $match): string {
+                $quote = $match[2] ?? '';
+                $source = $match[3] ?? ($match[4] ?? '');
+                $url = $this->migrateSource(html_entity_decode($source, ENT_QUOTES | ENT_HTML5));
+
+                return $match[1].$quote.htmlspecialchars($url, ENT_QUOTES | ENT_HTML5).$quote;
             },
             $html,
         ) ?? $html;
@@ -83,6 +98,12 @@ class LegacyAssetMigrator
         $rootPath = realpath($root);
         $sourcePath = realpath(rtrim($root, '\\/').DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath));
 
+        // The legacy preview retries broken images under ULC/; use the same
+        // fallback before reporting an asset as missing.
+        if (($sourcePath === false || ! is_file($sourcePath)) && ! Str::startsWith($relativePath, 'ULC/')) {
+            $fallbackRelativePath = 'ULC/'.$relativePath;
+            $sourcePath = realpath(rtrim($root, '\/').DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $fallbackRelativePath));
+        }
         if ($rootPath === false || $sourcePath === false || ! is_file($sourcePath)) {
             $this->missing[$source] = true;
 
