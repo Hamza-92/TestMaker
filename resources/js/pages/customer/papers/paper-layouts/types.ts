@@ -19,6 +19,8 @@ export interface GeneratedPaperQuestion {
     id: string;
     sourceQuestionId: number | null;
     text: string;
+    /** One shared statement rendered between the English and Urdu question statements. */
+    sameStatement?: string | null;
     source: string | null;
     sourceLabel: string | null;
     chapterLabel: string | null;

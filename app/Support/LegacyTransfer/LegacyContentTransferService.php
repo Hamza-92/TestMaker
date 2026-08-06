@@ -21,6 +21,9 @@ class LegacyContentTransferService
 {
     private const SOURCE_CONNECTION = 'legacy_mysql';
 
+    /** Legacy same-statement types print each language statement around one shared middle statement. */
+    private const LEGACY_SAME_STATEMENT_TYPES = [336, 386];
+
     private const SOURCE_PATTERNS = [
         'punjab' => [
             'key' => 'punjab',
@@ -890,6 +893,14 @@ class LegacyContentTransferService
                     'right_ur' => $answerUr ?? '',
                 ]],
             ],
+            QuestionTypeSchemaRegistry::SUBJECTIVE_SAME_STATEMENT => [
+                'prompt_en' => $statementEn ?? '',
+                'prompt_ur' => $statementUr ?? '',
+                'shared_en' => $descriptionEn ?? '',
+                'shared_ur' => $descriptionUr ?? '',
+                'answer_en' => $answerEn ?? '',
+                'answer_ur' => $answerUr ?? '',
+            ],
             default => [
                 'prompt_en' => $statementEn ?? '',
                 'prompt_ur' => $statementUr ?? '',
@@ -1060,7 +1071,10 @@ class LegacyContentTransferService
             ];
         }
 
-        $isObjective = (bool) ($sourceType->is_objective ?? $hasOptions);
+        $isSameStatement = in_array($sourceTypeId, self::LEGACY_SAME_STATEMENT_TYPES, true);
+        $isObjective = $isSameStatement
+            ? false
+            : (bool) ($sourceType->is_objective ?? $hasOptions);
         // Group objective rows by their legacy parent objective type.
         $objectiveGroupId = (int) ($sourceType->objective_type_id ?? 0);
         $mapKey = $isObjective
@@ -1071,11 +1085,13 @@ class LegacyContentTransferService
             return QuestionType::query()->findOrFail($this->questionTypeMap[$mapKey]);
         }
 
-        $schemaKey = QuestionTypeSchemaRegistry::infer($isObjective, [
-            'objective_type_id' => (int) ($sourceType->objective_type_id ?? 0),
-            'have_description' => (bool) ($sourceType->have_description ?? false),
-            'have_answer' => (bool) ($sourceType->have_answer ?? true),
-        ]);
+        $schemaKey = $isSameStatement
+            ? QuestionTypeSchemaRegistry::SUBJECTIVE_SAME_STATEMENT
+            : QuestionTypeSchemaRegistry::infer($isObjective, [
+                'objective_type_id' => (int) ($sourceType->objective_type_id ?? 0),
+                'have_description' => (bool) ($sourceType->have_description ?? false),
+                'have_answer' => (bool) ($sourceType->have_answer ?? true),
+            ]);
         $baseName = $this->limitedString($sourceType->type_name, 100) ?? "Legacy Type {$sourceTypeId}";
         $name = $this->uniqueQuestionTypeName($baseName, $schemaKey);
         $questionType = QuestionType::query()->firstOrNew(['name' => $name]);
@@ -1086,12 +1102,22 @@ class LegacyContentTransferService
             'description_en' => $this->nullableString($sourceType->description_en ?? null),
             'description_ur' => $this->nullableString($sourceType->description_ur ?? null),
             'have_exercise' => (int) ($sourceType->have_exercise ?? 0),
-            'have_statement' => (int) ($sourceType->have_statment ?? 1),
-            'statement_label' => $this->limitedString($sourceType->statement_label ?? null, 100),
-            'have_description' => (int) ($sourceType->have_description ?? 0),
-            'description_label' => $this->limitedString($sourceType->description_label ?? null, 100),
+            'have_statement' => $isSameStatement
+                ? 1
+                : (int) ($sourceType->have_statment ?? 1),
+            'statement_label' => $isSameStatement
+                ? 'Question'
+                : $this->limitedString($sourceType->statement_label ?? null, 100),
+            'have_description' => $isSameStatement
+                ? 1
+                : (int) ($sourceType->have_description ?? 0),
+            'description_label' => $isSameStatement
+                ? 'Shared Statement'
+                : $this->limitedString($sourceType->description_label ?? null, 100),
             'have_answer' => (int) ($sourceType->have_answer ?? ($hasOptions ? 0 : 1)),
-            'is_single' => (int) ($sourceType->is_single ?? 1),
+            'is_single' => $isSameStatement
+                ? 0
+                : (int) ($sourceType->is_single ?? 1),
             'is_objective' => $isObjective,
             'schema_key' => $schemaKey,
             'objective_type_id' => null,

@@ -175,6 +175,7 @@ function SubjectiveQuestionItem({
                 indexLabel={formatQuestionLabel(index, numberingFormat, 'roman')}
                 marks={section.marksEach}
                 urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
+                sameStatement={question.sameStatement}
             />
             <div className="mt-2 min-w-0">
                 {question.imageUrl && (

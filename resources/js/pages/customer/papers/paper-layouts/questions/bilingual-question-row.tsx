@@ -7,6 +7,7 @@ interface BilingualQuestionRowProps {
     marks: number;
     urduOnly?: boolean;
     hideMarks?: boolean;
+    sameStatement?: string | null;
 }
 
 export interface BilingualParts {
@@ -20,8 +21,49 @@ export function BilingualQuestionRow({
     marks,
     urduOnly = false,
     hideMarks = false,
+    sameStatement = null,
 }: BilingualQuestionRowProps) {
     const parts = splitBilingualParts(value);
+    const sharedParts = sameStatement ? splitBilingualParts(sameStatement) : null;
+
+    if (sameStatement && parts) {
+        return (
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3">
+                <div dir="ltr" className="min-w-0 text-left">
+                    <span className="font-bold">Q. No. {indexLabel}:-</span>{' '}
+                    <QuestionContent
+                        value={parts.english}
+                        inline
+                        className="align-baseline"
+                    />
+                </div>
+
+                <div dir="ltr" className="min-w-0 max-w-[18rem] text-center">
+                    <QuestionContent
+                        value={sharedParts?.english ?? sameStatement}
+                        inline
+                        className="align-baseline"
+                    />
+                </div>
+
+                <div
+                    dir="rtl"
+                    data-paper-urdu-content
+                    className="min-w-0 text-right"
+                    style={{ fontFamily: 'var(--paper-urdu-font)' }}
+                >
+                    <span className="font-bold">
+                        &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {indexLabel}:-
+                    </span>{' '}
+                    <QuestionContent
+                        value={parts.urdu}
+                        inline
+                        className="align-baseline text-right"
+                    />
+                </div>
+            </div>
+        );
+    }
 
     if (!parts) {
         if (urduOnly) {
@@ -40,6 +82,16 @@ export function BilingualQuestionRow({
                         inline
                         className="align-baseline text-right"
                     />
+                    {sameStatement && (
+                        <>
+                            {' - '}
+                            <QuestionContent
+                                value={sameStatement}
+                                inline
+                                className="align-baseline text-right"
+                            />
+                        </>
+                    )}
                 </div>
             );
         }
@@ -48,6 +100,16 @@ export function BilingualQuestionRow({
             <div className="min-w-0 text-left">
                 <span className="font-bold">Q. No. {indexLabel}:-</span>{' '}
                 <QuestionContent value={value} inline className="align-baseline" />
+                {sameStatement && (
+                    <>
+                        {' - '}
+                        <QuestionContent
+                            value={sameStatement}
+                            inline
+                            className="align-baseline"
+                        />
+                    </>
+                )}
             </div>
         );
     }

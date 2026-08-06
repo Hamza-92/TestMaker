@@ -22,6 +22,8 @@ class QuestionTypeSchemaRegistry
 
     public const SUBJECTIVE_STANDARD = 'subjective_standard';
 
+    public const SUBJECTIVE_SAME_STATEMENT = 'subjective_same_statement';
+
     public const SUBJECTIVE_GROUPED = 'subjective_grouped';
 
     public const SUBJECTIVE_PAIRS = 'subjective_pairs';
@@ -89,6 +91,16 @@ class QuestionTypeSchemaRegistry
                     'supports_single_toggle' => false,
                 ],
             ],
+            self::SUBJECTIVE_SAME_STATEMENT => [
+                'key' => self::SUBJECTIVE_SAME_STATEMENT,
+                'kind' => 'subjective',
+                'label' => 'Same Statement / Shared Prompt',
+                'description' => 'A question with one shared statement printed between English and Urdu versions.',
+                'settings' => [
+                    'supports_answer_toggle' => true,
+                    'supports_single_toggle' => false,
+                ],
+            ],
             self::SUBJECTIVE_GROUPED => [
                 'key' => self::SUBJECTIVE_GROUPED,
                 'kind' => 'subjective',
@@ -149,6 +161,10 @@ class QuestionTypeSchemaRegistry
             };
         }
 
+        if ((bool) ($legacy['same_statement'] ?? false)) {
+            return self::SUBJECTIVE_SAME_STATEMENT;
+        }
+
         if ((bool) ($legacy['have_description'] ?? false) && ! (bool) ($legacy['have_answer'] ?? false)) {
             return self::SUBJECTIVE_GROUPED;
         }
@@ -190,6 +206,14 @@ class QuestionTypeSchemaRegistry
                 'prompt_en' => '',
                 'prompt_ur' => '',
                 'pairs' => [self::emptyPair()],
+            ],
+            self::SUBJECTIVE_SAME_STATEMENT => [
+                'prompt_en' => '',
+                'prompt_ur' => '',
+                'shared_en' => '',
+                'shared_ur' => '',
+                'answer_en' => '',
+                'answer_ur' => '',
             ],
             default => [
                 'prompt_en' => '',
@@ -266,6 +290,17 @@ class QuestionTypeSchemaRegistry
                 'objective_type_id' => null,
                 'column_per_row' => 1,
             ],
+            self::SUBJECTIVE_SAME_STATEMENT => [
+                'have_exercise' => false,
+                'have_statement' => true,
+                'statement_label' => 'Question',
+                'have_description' => true,
+                'description_label' => 'Shared Statement',
+                'have_answer' => $collectAnswers,
+                'is_single' => false,
+                'objective_type_id' => null,
+                'column_per_row' => 1,
+            ],
             self::SUBJECTIVE_STANDARD => [
                 'have_exercise' => false,
                 'have_statement' => true,
@@ -302,6 +337,18 @@ class QuestionTypeSchemaRegistry
 
         $base = self::emptyContent($schemaKey);
         $stored = is_array($question->content) ? $question->content : [];
+
+        if ($schemaKey === self::SUBJECTIVE_SAME_STATEMENT) {
+            $content = array_replace_recursive($base, $stored);
+            $content['prompt_en'] = self::firstFilled($content['prompt_en'] ?? null, $question->statement_en ?? '') ?? '';
+            $content['prompt_ur'] = self::firstFilled($content['prompt_ur'] ?? null, $question->statement_ur ?? '') ?? '';
+            $content['shared_en'] = self::firstFilled($content['shared_en'] ?? null, $content['guidance_en'] ?? null, $question->description_en ?? '') ?? '';
+            $content['shared_ur'] = self::firstFilled($content['shared_ur'] ?? null, $content['guidance_ur'] ?? null, $question->description_ur ?? '') ?? '';
+            $content['answer_en'] = self::firstFilled($content['answer_en'] ?? null, $question->answer_en ?? '') ?? '';
+            $content['answer_ur'] = self::firstFilled($content['answer_ur'] ?? null, $question->answer_ur ?? '') ?? '';
+
+            return $content;
+        }
 
         if ($stored !== []) {
             return array_replace_recursive($base, $stored);
@@ -343,6 +390,14 @@ class QuestionTypeSchemaRegistry
                 'prompt_en' => $question->statement_en ?? '',
                 'prompt_ur' => $question->statement_ur ?? '',
                 'pairs' => [self::emptyPair()],
+            ],
+            self::SUBJECTIVE_SAME_STATEMENT => [
+                'prompt_en' => $question->statement_en ?? '',
+                'prompt_ur' => $question->statement_ur ?? '',
+                'shared_en' => $question->description_en ?? '',
+                'shared_ur' => $question->description_ur ?? '',
+                'answer_en' => $question->answer_en ?? '',
+                'answer_ur' => $question->answer_ur ?? '',
             ],
             default => [
                 'prompt_en' => $question->statement_en ?? '',
@@ -441,6 +496,23 @@ class QuestionTypeSchemaRegistry
                 'answer_ur' => null,
                 'options' => [],
             ],
+            self::SUBJECTIVE_SAME_STATEMENT => [
+                'content' => [
+                    'prompt_en' => self::normalizeText($normalized['prompt_en'] ?? null),
+                    'prompt_ur' => self::normalizeText($normalized['prompt_ur'] ?? null),
+                    'shared_en' => self::normalizeText($normalized['shared_en'] ?? null),
+                    'shared_ur' => self::normalizeText($normalized['shared_ur'] ?? null),
+                    'answer_en' => self::normalizeText($normalized['answer_en'] ?? null),
+                    'answer_ur' => self::normalizeText($normalized['answer_ur'] ?? null),
+                ],
+                'statement_en' => self::normalizeText($normalized['prompt_en'] ?? null),
+                'statement_ur' => self::normalizeText($normalized['prompt_ur'] ?? null),
+                'description_en' => self::normalizeText($normalized['shared_en'] ?? null),
+                'description_ur' => self::normalizeText($normalized['shared_ur'] ?? null),
+                'answer_en' => $questionType->have_answer ? self::normalizeText($normalized['answer_en'] ?? null) : null,
+                'answer_ur' => $questionType->have_answer ? self::normalizeText($normalized['answer_ur'] ?? null) : null,
+                'options' => [],
+            ],
             default => [
                 'content' => [
                     'prompt_en' => self::normalizeText($normalized['prompt_en'] ?? null),
@@ -505,6 +577,11 @@ class QuestionTypeSchemaRegistry
                 $content,
                 $validator,
             ),
+            self::SUBJECTIVE_SAME_STATEMENT => self::validateSameStatementQuestion(
+                $content,
+                $validator,
+                $questionType->have_answer,
+            ),
             default => self::validateStandardSubjectiveQuestion(
                 $content,
                 $validator,
@@ -540,6 +617,12 @@ class QuestionTypeSchemaRegistry
                 Arr::get($content, 'pairs.0.left_en'),
                 Arr::get($content, 'pairs.0.left_ur'),
             ) ?? 'Pair question',
+            self::SUBJECTIVE_SAME_STATEMENT => self::firstFilled(
+                $content['prompt_en'] ?? null,
+                $content['prompt_ur'] ?? null,
+                $content['shared_en'] ?? null,
+                $content['shared_ur'] ?? null,
+            ) ?? 'Same-statement question',
             default => self::firstFilled(
                 $content['prompt_en'] ?? null,
                 $content['prompt_ur'] ?? null,
@@ -592,6 +675,11 @@ class QuestionTypeSchemaRegistry
                 'correct_options_count' => 0,
                 'items_count' => count($content['pairs'] ?? []),
             ],
+            self::SUBJECTIVE_SAME_STATEMENT => [
+                'options_count' => 0,
+                'correct_options_count' => 0,
+                'items_count' => 1,
+            ],
             default => [
                 'options_count' => is_iterable($fallbackOptions) ? count(is_array($fallbackOptions) ? $fallbackOptions : iterator_to_array($fallbackOptions)) : 0,
                 'correct_options_count' => 0,
@@ -614,7 +702,26 @@ class QuestionTypeSchemaRegistry
             self::OBJECTIVE_BLANK_CHOICE,
             self::OBJECTIVE_BLANK_OPEN,
             self::SUBJECTIVE_STANDARD,
+            self::SUBJECTIVE_SAME_STATEMENT,
         ], true);
+    }
+
+    private static function validateSameStatementQuestion(
+        array $content,
+        Validator $validator,
+        bool $haveAnswer,
+    ): void {
+        if (! self::hasLocalizedValue($content, 'prompt')) {
+            $validator->errors()->add('content.prompt_en', 'Question statement is required.');
+        }
+
+        if (! self::firstFilled($content['shared_en'] ?? null, $content['shared_ur'] ?? null)) {
+            $validator->errors()->add('content.shared_en', 'Shared statement is required.');
+        }
+
+        if ($haveAnswer && ! self::hasLocalizedValue($content, 'answer')) {
+            $validator->errors()->add('content.answer_en', 'Answer is required for this question type.');
+        }
     }
 
     private static function buildTrueFalsePayload(array $content): array

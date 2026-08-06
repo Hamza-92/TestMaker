@@ -527,6 +527,14 @@ class QuestionBulkImporter
                 'answer_en' => $questionType->have_answer ? ($answerEn ?? '') : '',
                 'answer_ur' => $questionType->have_answer ? ($answerUr ?? '') : '',
             ],
+            QuestionTypeSchemaRegistry::SUBJECTIVE_SAME_STATEMENT => [
+                'prompt_en' => $statementEn ?? '',
+                'prompt_ur' => $statementUr ?? '',
+                'shared_en' => $descriptionEn ?? '',
+                'shared_ur' => $descriptionUr ?? '',
+                'answer_en' => $questionType->have_answer ? ($answerEn ?? '') : '',
+                'answer_ur' => $questionType->have_answer ? ($answerUr ?? '') : '',
+            ],
             default => null,
         };
     }

@@ -97,6 +97,16 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                 inline
                                 className="align-baseline"
                             />
+                            {question.sameStatement && (
+                                <>
+                                    {' - '}
+                                    <QuestionContent
+                                        value={question.sameStatement}
+                                        inline
+                                        className="align-baseline"
+                                    />
+                                </>
+                            )}
                             {options.length > 0 && (
                                 <span className="ml-1 align-baseline">
                                     {options.map((option, optionIndex) => (

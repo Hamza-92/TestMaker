@@ -31,6 +31,8 @@ interface QuestionData {
     content: {
         prompt_en?: string;
         prompt_ur?: string;
+        shared_en?: string;
+        shared_ur?: string;
         guidance_en?: string;
         guidance_ur?: string;
         answer_en?: string;
@@ -414,6 +416,28 @@ function renderContent(question: QuestionData) {
                             ))}
                         </div>
                     </div>
+                </div>
+            );
+        case 'subjective_same_statement':
+            return (
+                <div className="space-y-6">
+                    <TextPanel
+                        title="Question statement"
+                        english={content.prompt_en}
+                        urdu={content.prompt_ur}
+                    />
+                    <TextPanel
+                        title="Shared statement / expression"
+                        english={content.shared_en}
+                        urdu={content.shared_ur}
+                    />
+                    {questionType.have_answer ? (
+                        <TextPanel
+                            title="Answer"
+                            english={content.answer_en}
+                            urdu={content.answer_ur}
+                        />
+                    ) : null}
                 </div>
             );
         case 'subjective_grouped':

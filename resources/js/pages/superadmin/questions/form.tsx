@@ -103,6 +103,8 @@ export interface QuestionPairFormData {
 export interface QuestionContentFormData {
     prompt_en: string;
     prompt_ur: string;
+    shared_en: string;
+    shared_ur: string;
     guidance_en: string;
     guidance_ur: string;
     answer_en: string;
@@ -223,6 +225,8 @@ export function createEmptyQuestionContent(
     return {
         prompt_en: '',
         prompt_ur: '',
+        shared_en: '',
+        shared_ur: '',
         guidance_en: '',
         guidance_ur: '',
         answer_en: '',
@@ -1050,6 +1054,22 @@ export function QuestionForm({
                     <div className="space-y-4">
                         {renderLocalizedEditor('passage_en', 'passage_ur', true)}
                         {renderPassageItems()}
+                    </div>
+                );
+            case 'subjective_same_statement':
+                return (
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium">Question statement</p>
+                            {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        </div>
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium">Shared statement / expression</p>
+                            {renderLocalizedEditor('shared_en', 'shared_ur', true)}
+                        </div>
+                        {selectedType?.have_answer
+                            ? renderLocalizedEditor('answer_en', 'answer_ur', true, 'input')
+                            : null}
                     </div>
                 );
             case 'subjective_grouped':

@@ -181,7 +181,8 @@ function ObjectiveQuestionRow({
                     indexLabel={formatQuestionLabel(index, numberingFormat, 'numeric')}
                     marks={section.marksEach}
                     urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
-                    hideMarks
+                    hideMarks={section.category === 'Objective Questions'}
+                    sameStatement={question.sameStatement}
                 />
             </div>
 

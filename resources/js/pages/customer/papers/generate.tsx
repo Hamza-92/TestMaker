@@ -480,6 +480,7 @@ function localizedPaperHtml(
     urdu: unknown,
     medium: ContentMedium | null | undefined,
     fallback = '',
+    forceBilingual = false,
 ): string {
     const englishText = typeof english === 'string' ? english.trim() : '';
     const urduText = typeof urdu === 'string' ? urdu.trim() : '';
@@ -499,7 +500,7 @@ function localizedPaperHtml(
         return urduText || englishText || fallback;
     }
 
-    if (englishText !== '' && urduText !== '' && englishText !== urduText) {
+    if (englishText !== '' && urduText !== '' && (forceBilingual || englishText !== urduText)) {
         return (
             '<div>' +
             englishText +
@@ -550,6 +551,30 @@ function manualQuestionDisplayTextForMedium(
     );
 }
 
+function sameStatementFromManual(question: ManualQuestion): string | null {
+    if (question.schemaKey !== 'subjective_same_statement') {
+        return null;
+    }
+
+    const content = question.content as Record<string, unknown> | null;
+    const sharedEn = typeof content?.shared_en === 'string' ? content.shared_en.trim() : '';
+    const sharedUr = typeof content?.shared_ur === 'string' ? content.shared_ur.trim() : '';
+
+    if (question.medium === 'Urdu') {
+        return sharedUr !== ''
+            ? localizedPaperHtml('', sharedUr, 'Urdu')
+            : sharedEn !== ''
+                ? localizedPaperHtml(sharedEn, '', 'English')
+                : null;
+    }
+
+    const shared = sharedEn || sharedUr;
+
+    return shared === ''
+        ? null
+        : localizedPaperHtml(shared, '', 'English');
+}
+
 function paperQuestionFromManual(
     question: ManualQuestion,
     id: string,
@@ -567,7 +592,9 @@ function paperQuestionFromManual(
                 question.summaryTextUr,
                 question.medium,
                 question.summaryText,
+                question.schemaKey === 'subjective_same_statement',
             ),
+        sameStatement: sameStatementFromManual(question),
         source: question.source,
         sourceLabel: question.sourceLabel,
         chapterLabel: manualQuestionChapterLabel(question),
