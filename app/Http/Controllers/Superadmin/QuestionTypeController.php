@@ -8,6 +8,8 @@ use App\Http\Requests\Superadmin\QuestionTypeUpsertRequest;
 use App\Models\AuditLog;
 use App\Models\QuestionType;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class QuestionTypeController extends Controller
@@ -29,10 +31,19 @@ class QuestionTypeController extends Controller
 
     private function renderIndex(string $initialKind)
     {
-        $questionTypes = QuestionType::with('objectiveType:id,name')
-            ->withCount(['questions', 'objectiveChildren'])
-            ->orderByDesc('created_at')
-            ->get([
+        $questionTypesQuery = QuestionType::with('objectiveType:id,name')
+            ->withCount(['questions', 'objectiveChildren']);
+
+        if ($initialKind === 'subjective') {
+            $questionTypesQuery
+                ->orderByRaw('sort_order IS NULL')
+                ->orderBy('sort_order')
+                ->orderBy('id');
+        } else {
+            $questionTypesQuery->orderByDesc('created_at');
+        }
+
+        $questionTypes = $questionTypesQuery->get([
                 'id',
                 'name',
                 'name_ur',
@@ -50,6 +61,7 @@ class QuestionTypeController extends Controller
                 'objective_type_id',
                 'column_per_row',
                 'status',
+                'sort_order',
                 'created_at',
             ]);
 
@@ -61,6 +73,36 @@ class QuestionTypeController extends Controller
         ]);
     }
 
+    public function reorder(Request $request, string $kind)
+    {
+        abort_unless(in_array($kind, ['objective', 'subjective'], true), 404);
+
+        $validated = $request->validate([
+            'order' => ['required', 'array', 'min:1'],
+            'order.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        $isObjective = $kind === 'objective';
+        $questionTypes = QuestionType::query()
+            ->where('is_objective', $isObjective)
+            ->get(['id']);
+        $submittedIds = collect($validated['order'])->map(fn ($id) => (int) $id);
+
+        abort_unless(
+            $submittedIds->count() === $questionTypes->count()
+                && $submittedIds->diff($questionTypes->pluck('id'))->isEmpty(),
+            422,
+            'The question type order is out of date. Please refresh and try again.',
+        );
+
+        DB::transaction(function () use ($submittedIds): void {
+            foreach ($submittedIds->values() as $index => $id) {
+                QuestionType::query()->whereKey($id)->update(['sort_order' => $index + 1]);
+            }
+        });
+
+        return back()->with('success', ucfirst($kind).' question type order saved.');
+    }
     public function show(QuestionType $questionType)
     {
         return $this->renderShow($questionType, '/superadmin/question-types');
@@ -326,6 +368,7 @@ class QuestionTypeController extends Controller
             'schema_key' => $schema['key'],
             'schema' => $schema,
             'status' => $questionType->status,
+            'sort_order' => $questionType->sort_order,
             'created_at' => $questionType->created_at?->toISOString(),
             'questions_count' => $questionType->questions_count,
             'objective_children_count' => $questionType->objective_children_count,

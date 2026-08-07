@@ -194,8 +194,10 @@ class GeneratePaperController extends Controller
         $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.column_per_row')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.column_per_row', 'question_types.sort_order')
             ->orderByDesc('question_types.is_objective')
+            ->orderByRaw('question_types.sort_order IS NULL')
+            ->orderBy('question_types.sort_order')
             ->orderBy('question_types.name')
             ->select([
                 'question_types.id',
@@ -205,6 +207,7 @@ class GeneratePaperController extends Controller
                 'question_types.heading_ur',
                 'question_types.is_objective',
                 'question_types.column_per_row',
+                'question_types.sort_order',
                 DB::raw('COUNT(questions.id) as available_count'),
             ])
             ->get()
