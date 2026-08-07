@@ -5760,8 +5760,6 @@ function ChapterTopicFilterPanel({
                             </span>
                             <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                    {chapter.chapter_number !== null &&
-                                        `CH ${String(chapter.chapter_number).padStart(2, '0')} `}
                                     {chapter.name}
                                 </span>
                                 {chapter.topics.length > 0 && (
@@ -6955,18 +6953,7 @@ function DirectChapterRow({
                         : 'text-slate-700 hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300',
                 )}
             >
-                {chapter.chapter_number !== null && (
-                    <span
-                        className={cn(
-                            'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold whitespace-nowrap',
-                            checked
-                                ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200'
-                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-                        )}
-                    >
-                        CH {String(chapter.chapter_number).padStart(2, '0')}
-                    </span>
-                )}
+
                 <BilingualPickerName
                     english={chapter.name_eng ?? chapter.name}
                     urdu={chapter.name_ur}
@@ -7012,22 +6999,7 @@ function ChapterCard({
                 />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                        {chapter.chapter_number !== null && (
-                            <span
-                                className={cn(
-                                    'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold whitespace-nowrap transition-colors',
-                                    isActive
-                                        ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200'
-                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-                                )}
-                            >
-                                CH{' '}
-                                {String(chapter.chapter_number).padStart(
-                                    2,
-                                    '0',
-                                )}
-                            </span>
-                        )}
+
                         <h3 className="flex min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
                             <BilingualPickerName
                                 english={chapter.name_eng ?? chapter.name}
