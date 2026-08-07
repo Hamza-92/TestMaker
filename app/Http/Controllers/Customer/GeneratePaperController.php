@@ -217,6 +217,7 @@ class GeneratePaperController extends Controller
             'id' => 'sec_'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
             'questionTypeId' => (int) $row->id,
             'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
+            'sortOrder' => $row->sort_order === null ? null : (int) $row->sort_order,
             'title' => $this->localizedLabel(
                 $this->visibleQuestionTypeLabel($row->name),
                 $this->visibleQuestionTypeLabel($row->name_ur),
