@@ -34,7 +34,7 @@ class QuestionTypeController extends Controller
         $questionTypesQuery = QuestionType::with('objectiveType:id,name')
             ->withCount(['questions', 'objectiveChildren']);
 
-        if ($initialKind === 'subjective') {
+        if (in_array($initialKind, ['objective', 'subjective'], true)) {
             $questionTypesQuery
                 ->orderByRaw('sort_order IS NULL')
                 ->orderBy('sort_order')
