@@ -27,7 +27,7 @@ test('an available dashboard pattern can be preselected on the paper generator',
 
     TrialSetting::current()->update(['access_scope' => null]);
 
-    $this
+    $response = $this
         ->actingAs($customer)
         ->get(route('customer.papers.generate', ['pattern' => $pattern->id]))
         ->assertOk()
@@ -35,4 +35,7 @@ test('an available dashboard pattern can be preselected on the paper generator',
             ->component('customer/papers/generate')
             ->where('initialPatternId', $pattern->id)
         );
+
+    expect(substr_count($response->headers->get('Link', ''), '<'))
+        ->toBeLessThanOrEqual(20);
 });
