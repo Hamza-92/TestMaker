@@ -12,10 +12,8 @@ import {
     SaveIcon,
     XIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
-import { questionTextToHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
-import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import {
     Dialog,
@@ -32,6 +30,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { usePermission } from '@/hooks/use-permission';
+import { questionTextToHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
 
 interface QuestionType {
     id: number;
@@ -56,13 +56,49 @@ interface QuestionType {
         };
     };
     status: number;
-    sort_order: number | null;
     created_at: string | null;
     questions_count: number;
     objective_children_count: number;
 }
 
+interface OrderPattern {
+    id: number;
+    name: string;
+}
+
+interface OrderClass {
+    pattern_id: number;
+    id: number;
+    name: string;
+}
+
+interface OrderSubject {
+    pattern_id: number;
+    class_id: number;
+    subject_id: number;
+    name: string;
+}
+
+interface OrderCatalog {
+    patterns: OrderPattern[];
+    patternClasses: OrderClass[];
+    classSubjects: OrderSubject[];
+}
+
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
+
+function orderQuestionTypes(
+    questionTypes: QuestionType[],
+    orderIds: number[],
+): QuestionType[] {
+    const rank = new Map(orderIds.map((id, index) => [id, index]));
+
+    return [...questionTypes].sort(
+        (a, b) =>
+            (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+                (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) || a.id - b.id,
+    );
+}
 
 function StatusBadge({ status }: { status: number }) {
     return status === 1 ? (
@@ -103,7 +139,10 @@ function KindBadge({ isObjective }: { isObjective: boolean }) {
 }
 
 function TraitPill({ label, active }: { label: string; active: boolean }) {
-    if (!active) return null;
+    if (!active) {
+        return null;
+    }
+
     return (
         <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0 text-[11px] font-normal text-amber-700">
             {label}
@@ -120,42 +159,139 @@ const PAGE_TITLES: Record<string, string> = {
 export default function QuestionTypes({
     questionTypes,
     initialKind = 'all',
+    orderCatalog,
 }: {
     questionTypes: QuestionType[];
     initialKind?: string;
+    orderCatalog?: OrderCatalog;
 }) {
     const { can } = usePermission();
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [answerFilter, setAnswerFilter] = useState('all');
     const [schemaFilter, setSchemaFilter] = useState('all');
-    const [kindFilter, setKindFilter] = useState(initialKind);
+    const kindFilter = initialKind;
     const [pageSize, setPageSize] = useState(10);
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<QuestionType | null>(null);
     const [deleting, setDeleting] = useState(false);
-    const [orderedQuestionTypes, setOrderedQuestionTypes] =
-        useState(questionTypes);
     const [sortingEnabled, setSortingEnabled] = useState(false);
-    const [sortSnapshot, setSortSnapshot] = useState<QuestionType[]>([]);
+    const [sortingItems, setSortingItems] = useState<QuestionType[]>([]);
     const [sortDirty, setSortDirty] = useState(false);
     const [draggedId, setDraggedId] = useState<number | null>(null);
     const [sortSaving, setSortSaving] = useState(false);
+    const [scopeLoading, setScopeLoading] = useState(false);
+    const [scopePatternId, setScopePatternId] = useState<number | null>(null);
+    const [scopeClassId, setScopeClassId] = useState<number | null>(null);
+    const [scopeSubjectId, setScopeSubjectId] = useState<number | null>(null);
 
-    useEffect(() => {
-        setKindFilter(initialKind);
-        setPage(1);
-    }, [initialKind]);
+    const patternOptions = orderCatalog?.patterns ?? [];
+    const classOptions = useMemo(
+        () =>
+            (orderCatalog?.patternClasses ?? []).filter(
+                (item) => item.pattern_id === scopePatternId,
+            ),
+        [orderCatalog, scopePatternId],
+    );
+    const subjectOptions = useMemo(
+        () =>
+            (orderCatalog?.classSubjects ?? []).filter(
+                (item) =>
+                    item.pattern_id === scopePatternId &&
+                    item.class_id === scopeClassId,
+            ),
+        [orderCatalog, scopePatternId, scopeClassId],
+    );
+    const scopeReady =
+        scopePatternId !== null &&
+        scopeClassId !== null &&
+        scopeSubjectId !== null;
 
-    useEffect(() => {
-        setOrderedQuestionTypes(questionTypes);
-    }, [questionTypes]);
+    const clearScopedList = () => {
+        setSortingItems([]);
+        setSortDirty(false);
+        setDraggedId(null);
+        setScopeLoading(false);
+    };
+
+    const closeSorting = () => {
+        setSortingEnabled(false);
+        setScopePatternId(null);
+        setScopeClassId(null);
+        setScopeSubjectId(null);
+        clearScopedList();
+    };
+
+    const loadScopedOrder = (
+        patternId: number,
+        classId: number,
+        subjectId: number,
+    ) => {
+        router.get(
+            `/superadmin/question-types/${initialKind}`,
+            {
+                pattern_id: patternId,
+                class_id: classId,
+                subject_id: subjectId,
+            },
+            {
+                only: ['scopedQuestionTypes', 'scopedOrderIds'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                onSuccess: (page) => {
+                    const scopedProps = page.props as unknown as {
+                        scopedQuestionTypes?: QuestionType[];
+                        scopedOrderIds?: number[];
+                    };
+
+                    setSortingItems(
+                        orderQuestionTypes(
+                            scopedProps.scopedQuestionTypes ?? [],
+                            scopedProps.scopedOrderIds ?? [],
+                        ),
+                    );
+                    setSortDirty(false);
+                    setScopeLoading(false);
+                },
+                onError: () => setScopeLoading(false),
+            },
+        );
+    };
+
+    const selectPattern = (value: string) => {
+        const id = value === 'none' ? null : Number(value);
+        setScopePatternId(id);
+        setScopeClassId(null);
+        setScopeSubjectId(null);
+        clearScopedList();
+    };
+
+    const selectClass = (value: string) => {
+        const id = value === 'none' ? null : Number(value);
+        setScopeClassId(id);
+        setScopeSubjectId(null);
+        clearScopedList();
+    };
+
+    const selectSubject = (value: string) => {
+        const id = value === 'none' ? null : Number(value);
+        setScopeSubjectId(id);
+        clearScopedList();
+        setScopeLoading(id !== null);
+
+        if (scopePatternId !== null && scopeClassId !== null && id !== null) {
+            loadScopedOrder(scopePatternId, scopeClassId, id);
+        }
+    };
     const schemaOptions = useMemo(() => {
         const seen = new Map<string, string>();
         questionTypes.forEach((qt) => {
-            if (!seen.has(qt.schema_key))
+            if (!seen.has(qt.schema_key)) {
                 seen.set(qt.schema_key, qt.schema.label);
+            }
         });
+
         return Array.from(seen.entries()).map(([key, label]) => ({
             key,
             label,
@@ -165,36 +301,51 @@ export default function QuestionTypes({
     const filtered = useMemo(() => {
         const query = search.toLowerCase().trim();
 
-        return orderedQuestionTypes.filter((qt) => {
+        return questionTypes.filter((qt) => {
             if (
                 query !== '' &&
                 !qt.name.toLowerCase().includes(query) &&
                 !(qt.name_ur ?? '').toLowerCase().includes(query) &&
                 !qt.heading_en.toLowerCase().includes(query) &&
                 !qt.schema.label.toLowerCase().includes(query)
-            )
+            ) {
                 return false;
-
-            if (kindFilter !== 'all') {
-                if (kindFilter === 'objective' && !qt.is_objective)
-                    return false;
-                if (kindFilter === 'subjective' && qt.is_objective)
-                    return false;
             }
 
-            if (statusFilter === 'active' && qt.status !== 1) return false;
-            if (statusFilter === 'inactive' && qt.status !== 0) return false;
+            if (kindFilter !== 'all') {
+                if (kindFilter === 'objective' && !qt.is_objective) {
+                    return false;
+                }
 
-            if (answerFilter === 'yes' && !qt.have_answer) return false;
-            if (answerFilter === 'no' && qt.have_answer) return false;
+                if (kindFilter === 'subjective' && qt.is_objective) {
+                    return false;
+                }
+            }
 
-            if (schemaFilter !== 'all' && qt.schema_key !== schemaFilter)
+            if (statusFilter === 'active' && qt.status !== 1) {
                 return false;
+            }
+
+            if (statusFilter === 'inactive' && qt.status !== 0) {
+                return false;
+            }
+
+            if (answerFilter === 'yes' && !qt.have_answer) {
+                return false;
+            }
+
+            if (answerFilter === 'no' && qt.have_answer) {
+                return false;
+            }
+
+            if (schemaFilter !== 'all' && qt.schema_key !== schemaFilter) {
+                return false;
+            }
 
             return true;
         });
     }, [
-        orderedQuestionTypes,
+        questionTypes,
         search,
         kindFilter,
         statusFilter,
@@ -208,16 +359,16 @@ export default function QuestionTypes({
         (safePage - 1) * pageSize,
         safePage * pageSize,
     );
-    const sortableItems = orderedQuestionTypes.filter((qt) =>
-        initialKind === 'objective' ? qt.is_objective : !qt.is_objective,
-    );
+    const sortableItems = sortingItems;
     const rows = sortingEnabled ? sortableItems : paginated;
     const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
 
     const resetPage = () => setPage(1);
 
     const confirmDelete = () => {
-        if (!deleteTarget) return;
+        if (!deleteTarget) {
+            return;
+        }
 
         setDeleting(true);
         router.delete(`/superadmin/question-types/${deleteTarget.id}`, {
@@ -233,34 +384,38 @@ export default function QuestionTypes({
         can('question_types.edit');
 
     const beginSorting = () => {
-        setSortSnapshot([...orderedQuestionTypes]);
-        setSortDirty(false);
+        setScopePatternId(null);
+        setScopeClassId(null);
+        setScopeSubjectId(null);
+        clearScopedList();
         setSortingEnabled(true);
     };
 
     const cancelSorting = () => {
-        setOrderedQuestionTypes(sortSnapshot);
-        setSortDirty(false);
-        setDraggedId(null);
-        setSortingEnabled(false);
+        closeSorting();
     };
 
     const handleDrop = (targetId: number) => {
         if (draggedId === null || draggedId === targetId) {
             setDraggedId(null);
+
             return;
         }
 
-        setOrderedQuestionTypes((current) => {
+        setSortingItems((current) => {
             const fromIndex = current.findIndex(
                 (item) => item.id === draggedId,
             );
             const toIndex = current.findIndex((item) => item.id === targetId);
-            if (fromIndex < 0 || toIndex < 0) return current;
+
+            if (fromIndex < 0 || toIndex < 0) {
+                return current;
+            }
 
             const next = [...current];
             const [moved] = next.splice(fromIndex, 1);
             next.splice(toIndex, 0, moved);
+
             return next;
         });
         setSortDirty(true);
@@ -268,18 +423,22 @@ export default function QuestionTypes({
     };
 
     const saveSorting = () => {
+        if (!scopeReady) {
+            return;
+        }
+
         setSortSaving(true);
         router.post(
             `/superadmin/question-types/${initialKind}/reorder`,
             {
+                pattern_id: scopePatternId,
+                class_id: scopeClassId,
+                subject_id: scopeSubjectId,
                 order: sortableItems.map((item) => item.id),
             },
             {
                 preserveScroll: true,
-                onSuccess: () => {
-                    setSortingEnabled(false);
-                    setSortDirty(false);
-                },
+                onSuccess: closeSorting,
                 onFinish: () => setSortSaving(false),
             },
         );
@@ -305,10 +464,10 @@ export default function QuestionTypes({
                             <button
                                 type="button"
                                 onClick={beginSorting}
-                                className="flex shrink-0 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+                                className="flex shrink-0 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <span className="hidden sm:inline">
-                                    Enable sorting
+                                    Enable scoped sorting
                                 </span>
                             </button>
                         )}
@@ -326,7 +485,9 @@ export default function QuestionTypes({
                                 <button
                                     type="button"
                                     onClick={saveSorting}
-                                    disabled={!sortDirty || sortSaving}
+                                    disabled={
+                                        !scopeReady || !sortDirty || sortSaving
+                                    }
                                     className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
                                 >
                                     <SaveIcon className="size-4" />
@@ -334,7 +495,7 @@ export default function QuestionTypes({
                                 </button>
                             </div>
                         )}
-                        {can('question_types.create') && (
+                        {can('question_types.create') && !sortingEnabled && (
                             <Link
                                 href={
                                     initialKind === 'all'
@@ -354,97 +515,196 @@ export default function QuestionTypes({
                     </div>
                 </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative min-w-50 flex-1">
-                        <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            placeholder="Search name, heading, schema…"
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value);
-                                resetPage();
-                            }}
-                            className="pl-9"
-                        />
-                    </div>
+                {!sortingEnabled && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-50 flex-1">
+                            <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                placeholder="Search name, heading, schema…"
+                                value={search}
+                                onChange={(e) => {
+                                    setSearch(e.target.value);
+                                    resetPage();
+                                }}
+                                className="pl-9"
+                            />
+                        </div>
 
-                    <Select
-                        value={statusFilter}
-                        onValueChange={(v) => {
-                            setStatusFilter(v);
-                            resetPage();
-                        }}
-                    >
-                        <SelectTrigger className="w-32">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All statuses</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    <Select
-                        value={answerFilter}
-                        onValueChange={(v) => {
-                            setAnswerFilter(v);
-                            resetPage();
-                        }}
-                    >
-                        <SelectTrigger className="w-36">
-                            <SelectValue placeholder="Answer" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Any answer</SelectItem>
-                            <SelectItem value="yes">Has answer</SelectItem>
-                            <SelectItem value="no">No answer</SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    {schemaOptions.length > 1 && (
                         <Select
-                            value={schemaFilter}
+                            value={statusFilter}
                             onValueChange={(v) => {
-                                setSchemaFilter(v);
+                                setStatusFilter(v);
                                 resetPage();
                             }}
                         >
-                            <SelectTrigger className="w-44">
-                                <SelectValue placeholder="Schema" />
+                            <SelectTrigger className="w-32">
+                                <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All schemas</SelectItem>
-                                {schemaOptions.map((s) => (
-                                    <SelectItem key={s.key} value={s.key}>
-                                        {s.label}
+                                <SelectItem value="all">
+                                    All statuses
+                                </SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">
+                                    Inactive
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select
+                            value={answerFilter}
+                            onValueChange={(v) => {
+                                setAnswerFilter(v);
+                                resetPage();
+                            }}
+                        >
+                            <SelectTrigger className="w-36">
+                                <SelectValue placeholder="Answer" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Any answer</SelectItem>
+                                <SelectItem value="yes">Has answer</SelectItem>
+                                <SelectItem value="no">No answer</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {schemaOptions.length > 1 && (
+                            <Select
+                                value={schemaFilter}
+                                onValueChange={(v) => {
+                                    setSchemaFilter(v);
+                                    resetPage();
+                                }}
+                            >
+                                <SelectTrigger className="w-44">
+                                    <SelectValue placeholder="Schema" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All schemas
+                                    </SelectItem>
+                                    {schemaOptions.map((s) => (
+                                        <SelectItem key={s.key} value={s.key}>
+                                            {s.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+
+                        <Select
+                            value={String(pageSize)}
+                            onValueChange={(v) => {
+                                setPageSize(Number(v));
+                                resetPage();
+                            }}
+                        >
+                            <SelectTrigger className="w-20">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PAGE_SIZE_OPTIONS.map((n) => (
+                                    <SelectItem key={n} value={String(n)}>
+                                        {n}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
-                    )}
+                    </div>
+                )}
 
-                    <Select
-                        value={String(pageSize)}
-                        onValueChange={(v) => {
-                            setPageSize(Number(v));
-                            resetPage();
-                        }}
-                    >
-                        <SelectTrigger className="w-20">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {PAGE_SIZE_OPTIONS.map((n) => (
-                                <SelectItem key={n} value={String(n)}>
-                                    {n}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
+                {canSort && sortingEnabled && (
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                        <div className="mb-3">
+                            <p className="text-sm font-semibold">
+                                Question type order scope
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                Choose a pattern, class, and subject before
+                                setting the order used in generated papers.
+                            </p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <Select
+                                value={
+                                    scopePatternId === null
+                                        ? 'none'
+                                        : String(scopePatternId)
+                                }
+                                onValueChange={selectPattern}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select pattern" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">
+                                        Select pattern
+                                    </SelectItem>
+                                    {patternOptions.map((pattern) => (
+                                        <SelectItem
+                                            key={pattern.id}
+                                            value={String(pattern.id)}
+                                        >
+                                            {pattern.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select
+                                value={
+                                    scopeClassId === null
+                                        ? 'none'
+                                        : String(scopeClassId)
+                                }
+                                onValueChange={selectClass}
+                                disabled={scopePatternId === null}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select class" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">
+                                        Select class
+                                    </SelectItem>
+                                    {classOptions.map((schoolClass) => (
+                                        <SelectItem
+                                            key={`${schoolClass.pattern_id}-${schoolClass.id}`}
+                                            value={String(schoolClass.id)}
+                                        >
+                                            {schoolClass.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select
+                                value={
+                                    scopeSubjectId === null
+                                        ? 'none'
+                                        : String(scopeSubjectId)
+                                }
+                                onValueChange={selectSubject}
+                                disabled={scopeClassId === null}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select subject" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">
+                                        Select subject
+                                    </SelectItem>
+                                    {subjectOptions.map((subject) => (
+                                        <SelectItem
+                                            key={`${subject.pattern_id}-${subject.class_id}-${subject.subject_id}`}
+                                            value={String(subject.subject_id)}
+                                        >
+                                            {subject.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                )}
                 {/* Table */}
                 <div className="overflow-hidden rounded-xl border shadow-sm">
                     <div className="overflow-x-auto">
@@ -477,7 +737,13 @@ export default function QuestionTypes({
                                             className="py-16 text-center text-muted-foreground"
                                         >
                                             <SearchIcon className="mx-auto mb-2 size-8 opacity-30" />
-                                            No question types found
+                                            {scopeLoading
+                                                ? 'Loading question types…'
+                                                : sortingEnabled && !scopeReady
+                                                  ? 'Select a pattern, class, and subject to load question types.'
+                                                  : sortingEnabled
+                                                    ? 'No active question types with questions are available for this subject.'
+                                                    : 'No question types found'}
                                         </td>
                                     </tr>
                                 ) : (
@@ -651,7 +917,11 @@ export default function QuestionTypes({
                     <div className="flex flex-col gap-3 border-t bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
                         <p className="text-sm text-muted-foreground">
                             {sortingEnabled
-                                ? `${sortableItems.length} question types - drag to set their order`
+                                ? scopeLoading
+                                    ? 'Loading question types…'
+                                    : !scopeReady
+                                      ? 'Select a pattern, class, and subject'
+                                      : `${sortableItems.length} scoped question types - drag to set their order`
                                 : filtered.length === 0
                                   ? 'No results'
                                   : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}

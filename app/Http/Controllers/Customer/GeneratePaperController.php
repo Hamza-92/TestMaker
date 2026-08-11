@@ -184,7 +184,7 @@ class GeneratePaperController extends Controller
 
     public function questionTypes(Request $request): JsonResponse
     {
-        [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium] = $this->questionScope($request);
+        [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium, $scope] = $this->questionScope($request);
         $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
 
         if ($sources->isEmpty()) {
@@ -193,12 +193,18 @@ class GeneratePaperController extends Controller
 
         $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
+            ->leftJoin('question_type_orders as question_type_orders', function ($join) use ($scope): void {
+                $join->on('question_type_orders.question_type_id', '=', 'question_types.id')
+                    ->where('question_type_orders.pattern_id', $scope->pattern_id)
+                    ->where('question_type_orders.class_id', $scope->class_id)
+                    ->where('question_type_orders.subject_id', $scope->subject_id);
+            })
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.column_per_row', 'question_types.sort_order')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.column_per_row', 'question_type_orders.sort_order')
             ->orderByDesc('question_types.is_objective')
-            ->orderByRaw('question_types.sort_order IS NULL')
-            ->orderBy('question_types.sort_order')
-            ->orderBy('question_types.name')
+            ->orderByRaw('question_type_orders.sort_order IS NULL')
+            ->orderBy('question_type_orders.sort_order')
+            ->orderBy('question_types.id')
             ->select([
                 'question_types.id',
                 'question_types.name',
@@ -207,7 +213,7 @@ class GeneratePaperController extends Controller
                 'question_types.heading_ur',
                 'question_types.is_objective',
                 'question_types.column_per_row',
-                'question_types.sort_order',
+                DB::raw('question_type_orders.sort_order as sort_order'),
                 DB::raw('COUNT(questions.id) as available_count'),
             ])
             ->get()
@@ -352,7 +358,7 @@ class GeneratePaperController extends Controller
         $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
 
         $access = AppUserAccess::resolve(auth()->user());
-        $allowedChapterIds = DB::table('chapters')
+        $allowedChapters = DB::table('chapters')
             ->whereIn('id', $chapterIds)
             ->get(['id', 'pattern_id', 'class_id', 'subject_id'])
             ->filter(fn ($row) => AppUserAccess::allowsSubject(
@@ -361,10 +367,17 @@ class GeneratePaperController extends Controller
                 (int) $row->class_id,
                 (int) $row->subject_id,
             ))
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id);
+            ->values();
+        $allowedChapterIds = $allowedChapters->pluck('id')->map(fn ($id) => (int) $id);
 
         abort_if($allowedChapterIds->count() !== $chapterIds->count(), 403);
+
+        $scopeKeys = $allowedChapters
+            ->map(fn ($row) => "{$row->pattern_id}:{$row->class_id}:{$row->subject_id}")
+            ->unique()
+            ->values();
+        abort_unless($scopeKeys->count() === 1, 422, 'Select chapters from one pattern, class, and subject.');
+        $scope = $allowedChapters->first();
 
         $topicIds = collect($data['topic_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
@@ -384,7 +397,7 @@ class GeneratePaperController extends Controller
                 ->whereIn('chapter_id', $chapterIds)
                 ->pluck('id');
 
-        return [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium];
+        return [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium, $scope];
     }
 
     private function subjectMedium(int $patternId, int $classId, int $subjectId): string
@@ -504,6 +517,7 @@ class GeneratePaperController extends Controller
 
         return in_array(strtolower($label), $schemaKeys, true) ? '' : $label;
     }
+
     private function localizedLabel(
         mixed $english,
         mixed $urdu,

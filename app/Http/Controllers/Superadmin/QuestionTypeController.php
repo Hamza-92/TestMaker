@@ -6,70 +6,72 @@ use App\Enums\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Superadmin\QuestionTypeUpsertRequest;
 use App\Models\AuditLog;
+use App\Models\Pattern;
 use App\Models\QuestionType;
+use App\Models\QuestionTypeOrder;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class QuestionTypeController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return $this->renderIndex('all');
+        return $this->renderIndex('all', $request);
     }
 
-    public function objectiveIndex()
+    public function objectiveIndex(Request $request)
     {
-        return $this->renderIndex('objective');
+        return $this->renderIndex('objective', $request);
     }
 
-    public function subjectiveIndex()
+    public function subjectiveIndex(Request $request)
     {
-        return $this->renderIndex('subjective');
+        return $this->renderIndex('subjective', $request);
     }
 
-    private function renderIndex(string $initialKind)
+    private function renderIndex(string $initialKind, Request $request)
     {
         $questionTypesQuery = QuestionType::with('objectiveType:id,name')
             ->withCount(['questions', 'objectiveChildren']);
 
         if (in_array($initialKind, ['objective', 'subjective'], true)) {
-            $questionTypesQuery
-                ->orderByRaw('sort_order IS NULL')
-                ->orderBy('sort_order')
-                ->orderBy('id');
+            $questionTypesQuery->orderBy('id');
         } else {
             $questionTypesQuery->orderByDesc('created_at');
         }
 
         $questionTypes = $questionTypesQuery->get([
-                'id',
-                'name',
-                'name_ur',
-                'heading_en',
-                'heading_ur',
-                'description_en',
-                'description_ur',
-                'have_exercise',
-                'have_statement',
-                'have_description',
-                'have_answer',
-                'is_single',
-                'is_objective',
-                'schema_key',
-                'objective_type_id',
-                'column_per_row',
-                'status',
-                'sort_order',
-                'created_at',
-            ]);
+            'id',
+            'name',
+            'name_ur',
+            'heading_en',
+            'heading_ur',
+            'description_en',
+            'description_ur',
+            'have_exercise',
+            'have_statement',
+            'have_description',
+            'have_answer',
+            'is_single',
+            'is_objective',
+            'schema_key',
+            'objective_type_id',
+            'column_per_row',
+            'status',
+            'created_at',
+        ]);
 
         return Inertia::render('superadmin/question-types', [
             'questionTypes' => $questionTypes
                 ->map(fn (QuestionType $questionType) => $this->transformQuestionType($questionType))
                 ->values(),
             'initialKind' => $initialKind,
+            'orderCatalog' => $this->orderCatalog(),
+            'scopedQuestionTypes' => $this->scopedQuestionTypes($initialKind, $request),
+            'scopedOrderIds' => $this->scopedOrderIds($initialKind, $request),
         ]);
     }
 
@@ -78,31 +80,66 @@ class QuestionTypeController extends Controller
         abort_unless(in_array($kind, ['objective', 'subjective'], true), 404);
 
         $validated = $request->validate([
-            'order' => ['required', 'array', 'min:1'],
+            'pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            'subject_id' => ['required', 'integer', 'exists:subjects,id'],
+            'order' => ['required', 'array'],
             'order.*' => ['required', 'integer', 'distinct'],
         ]);
 
-        $isObjective = $kind === 'objective';
-        $questionTypes = QuestionType::query()
-            ->where('is_objective', $isObjective)
-            ->get(['id']);
-        $submittedIds = collect($validated['order'])->map(fn ($id) => (int) $id);
+        $scopeExists = DB::table('pattern_classes')
+            ->where('pattern_id', $validated['pattern_id'])
+            ->where('class_id', $validated['class_id'])
+            ->exists()
+            && DB::table('class_subjects')
+                ->where('pattern_id', $validated['pattern_id'])
+                ->where('class_id', $validated['class_id'])
+                ->where('subject_id', $validated['subject_id'])
+                ->exists();
+
+        abort_unless($scopeExists, 422, 'The selected pattern, class, and subject are not linked.');
+
+        $questionTypeIds = $this->scopedQuestionTypeQuery(
+            $kind,
+            (int) $validated['pattern_id'],
+            (int) $validated['class_id'],
+            (int) $validated['subject_id'],
+        )
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $submittedIds = collect($validated['order'])->map(fn ($id) => (int) $id)->values();
 
         abort_unless(
-            $submittedIds->count() === $questionTypes->count()
-                && $submittedIds->diff($questionTypes->pluck('id'))->isEmpty(),
+            $submittedIds->count() === $questionTypeIds->count()
+                && $submittedIds->diff($questionTypeIds)->isEmpty(),
             422,
             'The question type order is out of date. Please refresh and try again.',
         );
 
-        DB::transaction(function () use ($submittedIds): void {
-            foreach ($submittedIds->values() as $index => $id) {
-                QuestionType::query()->whereKey($id)->update(['sort_order' => $index + 1]);
+        DB::transaction(function () use ($validated, $submittedIds, $questionTypeIds): void {
+            QuestionTypeOrder::query()
+                ->where('pattern_id', $validated['pattern_id'])
+                ->where('class_id', $validated['class_id'])
+                ->where('subject_id', $validated['subject_id'])
+                ->whereIn('question_type_id', $questionTypeIds)
+                ->delete();
+
+            foreach ($submittedIds as $index => $questionTypeId) {
+                QuestionTypeOrder::create([
+                    'pattern_id' => $validated['pattern_id'],
+                    'class_id' => $validated['class_id'],
+                    'subject_id' => $validated['subject_id'],
+                    'question_type_id' => $questionTypeId,
+                    'sort_order' => $index + 1,
+                ]);
             }
         });
 
-        return back()->with('success', ucfirst($kind).' question type order saved.');
+        return back()->with('success', ucfirst($kind).' question type order saved for the selected subject.');
     }
+
     public function show(QuestionType $questionType)
     {
         return $this->renderShow($questionType, '/superadmin/question-types');
@@ -342,6 +379,169 @@ class QuestionTypeController extends Controller
         ];
     }
 
+    private function orderCatalog(): array
+    {
+        return [
+            'patterns' => Pattern::query()
+                ->where('status', 1)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'patternClasses' => DB::table('pattern_classes')
+                ->join('patterns', 'patterns.id', '=', 'pattern_classes.pattern_id')
+                ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
+                ->where('patterns.status', 1)
+                ->where('classes.status', 1)
+                ->orderBy('patterns.name')
+                ->orderBy('classes.name')
+                ->get([
+                    'pattern_classes.pattern_id',
+                    'classes.id',
+                    'classes.name',
+                ]),
+            'classSubjects' => DB::table('class_subjects')
+                ->join('patterns', 'patterns.id', '=', 'class_subjects.pattern_id')
+                ->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
+                ->where('patterns.status', 1)
+                ->where('subjects.status', 1)
+                ->orderBy('patterns.name')
+                ->orderBy('subjects.name_eng')
+                ->get([
+                    'class_subjects.pattern_id',
+                    'class_subjects.class_id',
+                    'class_subjects.subject_id',
+                    'subjects.name_eng as name',
+                ]),
+        ];
+    }
+
+    private function scopedQuestionTypes(string $kind, Request $request): array
+    {
+        $scope = $this->requestedScope($kind, $request);
+        if ($scope === null) {
+            return [];
+        }
+
+        [$patternId, $classId, $subjectId] = $scope;
+        $questionTypes = $this->scopedQuestionTypeQuery($kind, $patternId, $classId, $subjectId)
+            ->with('objectiveType:id,name')
+            ->withCount([
+                'questions' => fn (Builder $query) => $query
+                    ->where('questions.status', 1)
+                    ->whereIn('questions.chapter_id', DB::table('chapters')
+                        ->where('chapters.pattern_id', $patternId)
+                        ->where('chapters.class_id', $classId)
+                        ->where('chapters.subject_id', $subjectId)
+                        ->select('chapters.id')),
+                'objectiveChildren',
+            ])
+            ->orderBy('id')
+            ->get([
+                'id',
+                'name',
+                'name_ur',
+                'heading_en',
+                'heading_ur',
+                'description_en',
+                'description_ur',
+                'have_exercise',
+                'have_statement',
+                'have_description',
+                'have_answer',
+                'is_single',
+                'is_objective',
+                'schema_key',
+                'objective_type_id',
+                'column_per_row',
+                'status',
+                'created_at',
+            ]);
+
+        return $questionTypes
+            ->map(fn (QuestionType $questionType) => $this->transformQuestionType($questionType))
+            ->values()
+            ->all();
+    }
+
+    private function scopedOrderIds(string $kind, Request $request): array
+    {
+        $scope = $this->requestedScope($kind, $request);
+        if ($scope === null) {
+            return [];
+        }
+
+        [$patternId, $classId, $subjectId] = $scope;
+        $allIds = $this->scopedQuestionTypeQuery($kind, $patternId, $classId, $subjectId)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+        $savedIds = QuestionTypeOrder::query()
+            ->where('pattern_id', $patternId)
+            ->where('class_id', $classId)
+            ->where('subject_id', $subjectId)
+            ->whereIn('question_type_id', $allIds)
+            ->orderBy('sort_order')
+            ->pluck('question_type_id')
+            ->map(fn ($id) => (int) $id);
+
+        return $savedIds
+            ->concat($allIds->diff($savedIds))
+            ->values()
+            ->all();
+    }
+
+    private function scopedQuestionTypeQuery(
+        string $kind,
+        int $patternId,
+        int $classId,
+        int $subjectId,
+    ): Builder {
+        return QuestionType::query()
+            ->where('is_objective', $kind === 'objective')
+            ->where('status', 1)
+            ->whereIn('question_types.id', DB::table('questions')
+                ->join('chapters', 'chapters.id', '=', 'questions.chapter_id')
+                ->where('questions.status', 1)
+                ->where('chapters.pattern_id', $patternId)
+                ->where('chapters.class_id', $classId)
+                ->where('chapters.subject_id', $subjectId)
+                ->select('questions.question_type_id'));
+    }
+
+    private function requestedScope(string $kind, Request $request): ?array
+    {
+        if (! in_array($kind, ['objective', 'subjective'], true)) {
+            return null;
+        }
+
+        $patternId = (int) $request->query('pattern_id', 0);
+        $classId = (int) $request->query('class_id', 0);
+        $subjectId = (int) $request->query('subject_id', 0);
+
+        if (
+            $patternId < 1
+            || $classId < 1
+            || $subjectId < 1
+            || ! $this->scopeExists($patternId, $classId, $subjectId)
+        ) {
+            return null;
+        }
+
+        return [$patternId, $classId, $subjectId];
+    }
+
+    private function scopeExists(int $patternId, int $classId, int $subjectId): bool
+    {
+        return DB::table('pattern_classes')
+            ->where('pattern_id', $patternId)
+            ->where('class_id', $classId)
+            ->exists()
+            && DB::table('class_subjects')
+                ->where('pattern_id', $patternId)
+                ->where('class_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->exists();
+    }
+
     private function transformQuestionType(QuestionType $questionType): array
     {
         $schema = QuestionTypeSchemaRegistry::resolve(
@@ -368,7 +568,6 @@ class QuestionTypeController extends Controller
             'schema_key' => $schema['key'],
             'schema' => $schema,
             'status' => $questionType->status,
-            'sort_order' => $questionType->sort_order,
             'created_at' => $questionType->created_at?->toISOString(),
             'questions_count' => $questionType->questions_count,
             'objective_children_count' => $questionType->objective_children_count,

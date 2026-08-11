@@ -28,7 +28,6 @@ class QuestionType extends Model
         'objective_type_id',
         'column_per_row',
         'status',
-        'sort_order',
         'created_by',
     ];
 
@@ -43,7 +42,6 @@ class QuestionType extends Model
             'is_objective' => 'boolean',
             'column_per_row' => 'integer',
             'status' => 'integer',
-            'sort_order' => 'integer',
         ];
     }
 

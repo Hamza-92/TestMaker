@@ -865,24 +865,7 @@ function mergeQuestionSections(
     const existingByType = new Map(
         existing.map((section) => [section.questionTypeId, section]),
     );
-    const incomingByType = new Map(
-        incoming.map((section) => [section.questionTypeId, section]),
-    );
-    const orderedIncoming =
-        existing.length === 0
-            ? sortIncomingQuestionTypes(incoming)
-            : [
-                  ...existing
-                      .map((section) =>
-                          incomingByType.get(section.questionTypeId),
-                      )
-                      .filter((section): section is QuestionTypeCount =>
-                          Boolean(section),
-                      ),
-                  ...incoming.filter(
-                      (section) => !existingByType.has(section.questionTypeId),
-                  ),
-              ];
+    const orderedIncoming = sortIncomingQuestionTypes(incoming);
 
     return orderedIncoming.map((item) => {
         const current = existingByType.get(item.questionTypeId);

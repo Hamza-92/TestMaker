@@ -5,10 +5,12 @@ use App\Models\Chapter;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
+use App\Models\QuestionTypeOrder;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -185,7 +187,7 @@ it('updates a question type', function () {
             'status' => false,
         ]);
 
-    $response->assertRedirect(route('superadmin.question-types.show', $questionType));
+    $response->assertRedirect(route('superadmin.question-types.objective.show', $questionType));
 
     $questionType->refresh();
 
@@ -215,4 +217,168 @@ it('does not delete a question type that is already linked to questions', functi
         ->assertSessionHas('error');
 
     expect(QuestionType::query()->whereKey($questionType->id)->exists())->toBeTrue();
+});
+
+it('sorts only question types available in the selected scope and keeps kinds independent', function () {
+    $admin = makeSuperAdmin();
+    $first = makeQuestionType($admin, ['name' => 'First scoped subjective']);
+    $second = makeQuestionType($admin, ['name' => 'Second scoped subjective']);
+    $outside = makeQuestionType($admin, ['name' => 'Outside scoped subjective']);
+    $objective = makeQuestionType($admin, [
+        'name' => 'Scoped objective',
+        'is_objective' => true,
+        'schema_key' => 'objective_mcq',
+    ]);
+
+    $pattern = Pattern::create([
+        'name' => 'Scoped Pattern',
+        'short_name' => 'SP',
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+    $class = SchoolClass::create([
+        'name' => 'Scoped Class',
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+    $subject = Subject::create([
+        'name_eng' => 'Scoped Subject',
+        'name_ur' => null,
+        'subject_type' => 'chapter-wise',
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+
+    DB::table('pattern_classes')->insert([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+    ]);
+    DB::table('class_subjects')->insert([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'medium_id' => null,
+    ]);
+
+    $chapter = Chapter::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'name' => 'Scoped Chapter',
+        'chapter_number' => 1,
+        'sort_id' => 1,
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+
+    foreach ([$first, $second, $objective] as $questionType) {
+        Question::create([
+            'question_type_id' => $questionType->id,
+            'chapter_id' => $chapter->id,
+            'statement_en' => 'Scoped question '.$questionType->id,
+            'source' => Question::SOURCE_EXERCISE,
+            'status' => 1,
+            'created_by' => $admin->id,
+        ]);
+    }
+
+    $otherClass = SchoolClass::create([
+        'name' => 'Other Scoped Class',
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+    DB::table('pattern_classes')->insert([
+        'pattern_id' => $pattern->id,
+        'class_id' => $otherClass->id,
+    ]);
+    DB::table('class_subjects')->insert([
+        'pattern_id' => $pattern->id,
+        'class_id' => $otherClass->id,
+        'subject_id' => $subject->id,
+        'medium_id' => null,
+    ]);
+    $otherChapter = Chapter::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $otherClass->id,
+        'subject_id' => $subject->id,
+        'name' => 'Other Scoped Chapter',
+        'chapter_number' => 1,
+        'sort_id' => 1,
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+    Question::create([
+        'question_type_id' => $outside->id,
+        'chapter_id' => $otherChapter->id,
+        'statement_en' => 'Question available only in the other class',
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+
+    $scope = [
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+    ];
+    $otherScope = [
+        'pattern_id' => $pattern->id,
+        'class_id' => $otherClass->id,
+        'subject_id' => $subject->id,
+    ];
+
+    $this->actingAs($admin)
+        ->get(route('superadmin.question-types.subjective', $scope))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('scopedQuestionTypes', 2)
+            ->where('scopedQuestionTypes.0.id', $first->id)
+            ->where('scopedQuestionTypes.1.id', $second->id)
+            ->where('scopedOrderIds', [$first->id, $second->id]),
+        );
+
+    $this->actingAs($admin)
+        ->get(route('superadmin.question-types.subjective', $otherScope))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('scopedQuestionTypes', 1)
+            ->where('scopedQuestionTypes.0.id', $outside->id)
+            ->where('scopedOrderIds', [$outside->id]),
+        );
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.question-types.reorder', ['kind' => 'subjective']), [
+            ...$scope,
+            'order' => [$second->id, $first->id],
+        ])
+        ->assertRedirect();
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.question-types.reorder', ['kind' => 'objective']), [
+            ...$scope,
+            'order' => [$objective->id],
+        ])
+        ->assertRedirect();
+
+    expect(QuestionTypeOrder::query()
+        ->where($scope)
+        ->whereIn('question_type_id', [$first->id, $second->id])
+        ->orderBy('sort_order')
+        ->pluck('question_type_id')
+        ->all())->toBe([$second->id, $first->id])
+        ->and(QuestionTypeOrder::query()
+            ->where($scope)
+            ->where('question_type_id', $objective->id)
+            ->value('sort_order'))->toBe(1)
+        ->and(QuestionTypeOrder::query()
+            ->where($scope)
+            ->where('question_type_id', $outside->id)
+            ->exists())->toBeFalse();
+
+    $this->actingAs($admin)
+        ->get(route('superadmin.question-types.subjective', $scope))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('scopedOrderIds', [$second->id, $first->id]),
+        );
 });
