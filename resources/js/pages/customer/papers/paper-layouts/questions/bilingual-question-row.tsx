@@ -24,13 +24,15 @@ export function BilingualQuestionRow({
     sameStatement = null,
 }: BilingualQuestionRowProps) {
     const parts = splitBilingualParts(value);
-    const sharedParts = sameStatement ? splitBilingualParts(sameStatement) : null;
+    const sharedParts = sameStatement
+        ? splitBilingualParts(sameStatement)
+        : null;
 
     if (sameStatement && parts) {
         return (
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3">
                 <div dir="ltr" className="min-w-0 text-left">
-                    <span className="font-bold">Q. No. {indexLabel}:-</span>{' '}
+                    <span className="font-bold">{indexLabel})</span>{' '}
                     <QuestionContent
                         value={parts.english}
                         inline
@@ -38,7 +40,7 @@ export function BilingualQuestionRow({
                     />
                 </div>
 
-                <div dir="ltr" className="min-w-0 max-w-[18rem] text-center">
+                <div dir="ltr" className="max-w-[18rem] min-w-0 text-center">
                     <QuestionContent
                         value={sharedParts?.english ?? sameStatement}
                         inline
@@ -52,13 +54,11 @@ export function BilingualQuestionRow({
                     className="min-w-0 text-right"
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
-                    <span className="font-bold">
-                        &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {indexLabel}:-
-                    </span>{' '}
+                    <span className="font-bold">{indexLabel})</span>{' '}
                     <QuestionContent
                         value={parts.urdu}
                         inline
-                        className="align-baseline text-right"
+                        className="text-right align-baseline"
                     />
                 </div>
             </div>
@@ -74,13 +74,11 @@ export function BilingualQuestionRow({
                     className="min-w-0 text-right"
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
-                    <span className="font-bold">
-                        &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {indexLabel}:-
-                    </span>{' '}
+                    <span className="font-bold">{indexLabel})</span>{' '}
                     <QuestionContent
                         value={value}
                         inline
-                        className="align-baseline text-right"
+                        className="text-right align-baseline"
                     />
                     {sameStatement && (
                         <>
@@ -88,7 +86,7 @@ export function BilingualQuestionRow({
                             <QuestionContent
                                 value={sameStatement}
                                 inline
-                                className="align-baseline text-right"
+                                className="text-right align-baseline"
                             />
                         </>
                     )}
@@ -98,8 +96,12 @@ export function BilingualQuestionRow({
 
         return (
             <div className="min-w-0 text-left">
-                <span className="font-bold">Q. No. {indexLabel}:-</span>{' '}
-                <QuestionContent value={value} inline className="align-baseline" />
+                <span className="font-bold">{indexLabel})</span>{' '}
+                <QuestionContent
+                    value={value}
+                    inline
+                    className="align-baseline"
+                />
                 {sameStatement && (
                     <>
                         {' - '}
@@ -123,7 +125,7 @@ export function BilingualQuestionRow({
             }
         >
             <div dir="ltr" className="min-w-0 text-left">
-                <span className="font-bold">Q. No. {indexLabel}:-</span>{' '}
+                <span className="font-bold">{indexLabel})</span>{' '}
                 <QuestionContent
                     value={parts.english}
                     inline
@@ -143,13 +145,11 @@ export function BilingualQuestionRow({
                 className="min-w-0 text-right"
                 style={{ fontFamily: 'var(--paper-urdu-font)' }}
             >
-                <span className="font-bold">
-                    &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {indexLabel}:-
-                </span>{' '}
+                <span className="font-bold">{indexLabel})</span>{' '}
                 <QuestionContent
                     value={parts.urdu}
                     inline
-                    className="align-baseline text-right"
+                    className="text-right align-baseline"
                 />
             </div>
         </div>

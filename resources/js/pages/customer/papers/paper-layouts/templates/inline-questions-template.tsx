@@ -91,15 +91,13 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                 (isUrduOnly ? (
                                     <>
                                         <span className="font-bold">
-                                            &#1587;&#1608;&#1575;&#1604;
-                                            &#1606;&#1605;&#1576;&#1585; {label}
-                                            :-
+                                            {label})
                                         </span>{' '}
                                     </>
                                 ) : (
                                     <>
                                         <span className="font-bold">
-                                            ({label})
+                                            {label})
                                         </span>{' '}
                                     </>
                                 ))}

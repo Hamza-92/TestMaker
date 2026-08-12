@@ -91,7 +91,7 @@ export function TwoColumnSubjectiveSection({
                 only applies to the "stacked" group variant). */}
             <div
                 data-paper-question-group="grid"
-                className="grid gap-2 px-4 py-3"
+                className="grid gap-0 px-2 py-1"
                 style={{
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
                 }}
@@ -184,65 +184,69 @@ function SubjectiveQuestionItem({
                 urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
                 sameStatement={question.sameStatement}
             />
-            <div className="mt-2 min-w-0">
-                {question.imageUrl && (
-                    <div className="mt-2">
-                        <img
-                            src={question.imageUrl}
-                            alt=""
-                            className={
-                                question.imageSize === 'sm'
-                                    ? 'max-h-24 object-contain'
-                                    : question.imageSize === 'lg'
-                                      ? 'max-h-64 object-contain'
-                                      : 'max-h-40 object-contain'
-                            }
-                        />
-                        <div className="mt-1 flex gap-1 print:hidden">
-                            {(['sm', 'md', 'lg'] as const).map((size) => (
-                                <button
-                                    key={size}
-                                    type="button"
-                                    onClick={() =>
-                                        onQuestionImageSizeChange(
-                                            section.id,
-                                            question.id,
-                                            size,
-                                        )
-                                    }
-                                    className="border border-slate-300 px-2 py-0.5 text-[11px] uppercase"
-                                >
-                                    {size}
-                                </button>
-                            ))}
+            {(question.imageUrl ||
+                question.passageQuestions ||
+                question.answerLines > 0) && (
+                <div className="min-w-0">
+                    {question.imageUrl && (
+                        <div className="mt-2">
+                            <img
+                                src={question.imageUrl}
+                                alt=""
+                                className={
+                                    question.imageSize === 'sm'
+                                        ? 'max-h-24 object-contain'
+                                        : question.imageSize === 'lg'
+                                          ? 'max-h-64 object-contain'
+                                          : 'max-h-40 object-contain'
+                                }
+                            />
+                            <div className="mt-1 flex gap-1 print:hidden">
+                                {(['sm', 'md', 'lg'] as const).map((size) => (
+                                    <button
+                                        key={size}
+                                        type="button"
+                                        onClick={() =>
+                                            onQuestionImageSizeChange(
+                                                section.id,
+                                                question.id,
+                                                size,
+                                            )
+                                        }
+                                        className="border border-slate-300 px-2 py-0.5 text-[11px] uppercase"
+                                    >
+                                        {size}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
-                {question.passageQuestions && (
-                    <PassageQuestionContent
-                        questions={question.passageQuestions}
-                    />
-                )}
-                {question.answerLines > 0 && (
-                    <div className="mt-2 flex flex-col">
-                        {Array.from({ length: question.answerLines }).map(
-                            (_, lineIndex) => (
-                                <div
-                                    key={lineIndex}
-                                    style={{
-                                        // Per-line height drives both writing
-                                        // space and inter-line gap; height=0
-                                        // collapses every line's bottom border
-                                        // onto the same Y, merging into one rule.
-                                        height: `${question.answerLineSpacing ?? 20}px`,
-                                    }}
-                                    className="border-b border-dotted border-slate-400"
-                                />
-                            ),
-                        )}
-                    </div>
-                )}
-            </div>
+                    )}
+                    {question.passageQuestions && (
+                        <PassageQuestionContent
+                            questions={question.passageQuestions}
+                        />
+                    )}
+                    {question.answerLines > 0 && (
+                        <div className="mt-2 flex flex-col">
+                            {Array.from({ length: question.answerLines }).map(
+                                (_, lineIndex) => (
+                                    <div
+                                        key={lineIndex}
+                                        style={{
+                                            // Per-line height drives both writing
+                                            // space and inter-line gap; height=0
+                                            // collapses every line's bottom border
+                                            // onto the same Y, merging into one rule.
+                                            height: `${question.answerLineSpacing ?? 20}px`,
+                                        }}
+                                        className="border-b border-dotted border-slate-400"
+                                    />
+                                ),
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
             <QuestionHoverActions
                 canSwap={section.questionTypeId !== null}
                 showAnswerLines

@@ -101,9 +101,21 @@ export const PAPER_URDU_FONT_METRICS: Record<
     PaperUrduFont,
     { sizeScale: number; lineHeightScale: number; verticalOffsetEm: number }
 > = {
-    'jameel-noori': { sizeScale: 1.18, lineHeightScale: 1.22, verticalOffsetEm: -0.16 },
-    'noto-nastaliq': { sizeScale: 1.24, lineHeightScale: 1.3, verticalOffsetEm: -0.22 },
-    'mehr-nastaliq': { sizeScale: 1.18, lineHeightScale: 1.22, verticalOffsetEm: -0.16 },
+    'jameel-noori': {
+        sizeScale: 1.18,
+        lineHeightScale: 1.22,
+        verticalOffsetEm: -0.16,
+    },
+    'noto-nastaliq': {
+        sizeScale: 1.24,
+        lineHeightScale: 1.3,
+        verticalOffsetEm: -0.22,
+    },
+    'mehr-nastaliq': {
+        sizeScale: 1.18,
+        lineHeightScale: 1.22,
+        verticalOffsetEm: -0.16,
+    },
 };
 export type PaperSize = 'A4' | 'Letter' | 'Legal';
 export type PaperOrientation = 'portrait' | 'landscape';
@@ -117,11 +129,7 @@ export type PaperQuestionNumberingFormat =
     | 'numeric'
     | 'roman'
     | 'alpha';
-export type PaperQuestionLayout =
-    | 'default'
-    | 'stacked'
-    | 'columns'
-    | 'inline';
+export type PaperQuestionLayout = 'default' | 'stacked' | 'columns' | 'inline';
 export type PaperWatermarkType = 'text' | 'logo';
 
 export interface PaperSettings {
@@ -193,7 +201,12 @@ export interface PaperSettings {
 }
 
 export type PaperBorderStyle = 'solid' | 'dashed' | 'dotted';
-export type PaperHeaderTemplate = 'classic' | 'banner' | 'formal' | 'centered' | 'tabular';
+export type PaperHeaderTemplate =
+    | 'classic'
+    | 'banner'
+    | 'formal'
+    | 'centered'
+    | 'tabular';
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     englishFont: 'sans',
@@ -228,7 +241,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     pageNumberPosition: 'footer-center',
     pageNumberFormat: 'page-n',
     repeatHeaderOnEachPage: false,
-    questionNumberingFormat: 'default',
+    questionNumberingFormat: 'roman',
     questionLayout: 'default',
     headerTemplate: 'classic',
 };
