@@ -571,7 +571,7 @@ export default function CustomerDashboard({
                                                 <p className="order-2 mt-3 text-2xl leading-none font-bold tracking-tight text-slate-950 tabular-nums dark:text-white">
                                                     {value.toLocaleString()}
                                                 </p>
-                                                <p className="order-1 truncate pt-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                <p className="order-1 break-words pt-0.5 text-xs leading-tight font-semibold text-slate-600 dark:text-slate-300">
                                                     {label}
                                                 </p>
                                             </div>
