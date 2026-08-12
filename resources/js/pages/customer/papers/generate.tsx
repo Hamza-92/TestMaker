@@ -51,6 +51,7 @@ import {
     setLabelFor,
     variantForSet,
 } from './paper-layouts/paper-variant';
+import { QuestionContent } from './paper-layouts/questions/question-content';
 import { SaveAsTemplateModal } from './paper-layouts/save-as-template-modal';
 import type { SaveAsTemplateValues } from './paper-layouts/save-as-template-modal';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
@@ -239,6 +240,12 @@ interface QuestionSelectionSection {
     sortOrder?: number | null;
     selectionMode?: SelectionMode;
     rows: QuestionSelectionRow[];
+}
+
+function englishQuestionTypeTitle(
+    section: Pick<QuestionSelectionSection, 'title' | 'titleEnglish'>,
+): string {
+    return section.titleEnglish?.trim() || section.title;
 }
 
 function questionSectionSelectionMode(
@@ -545,7 +552,23 @@ function plainQuestionText(value: string): string {
     return decoded.replace(/\s+/g, ' ').trim();
 }
 
-function manualQuestionDisplayTextForMedium(
+function RichTextLabel({
+    value,
+    className,
+}: {
+    value: string | null | undefined;
+    className?: string;
+}) {
+    if (!value) {
+        return null;
+    }
+
+    return (
+        <QuestionContent as="span" inline value={value} className={className} />
+    );
+}
+
+function manualQuestionDisplayHtmlForMedium(
     question: ManualQuestion,
     medium: 'English' | 'Urdu',
 ): string {
@@ -559,11 +582,9 @@ function manualQuestionDisplayTextForMedium(
             ? (question.summaryTextEn?.trim() ?? '')
             : (question.summaryTextUr?.trim() ?? '');
 
-    return plainQuestionText(
-        question.schemaKey === 'objective_passage_mcq' && passageText !== ''
-            ? passageText
-            : summaryText || question.summaryText,
-    );
+    return question.schemaKey === 'objective_passage_mcq' && passageText !== ''
+        ? passageText
+        : summaryText || question.summaryText;
 }
 
 function sameStatementFromManual(question: ManualQuestion): string | null {
@@ -643,13 +664,10 @@ function passageTextFromManual(question: ManualQuestion): string {
     );
 }
 
-function manualQuestionDisplayText(question: ManualQuestion): string {
-    const value =
-        question.schemaKey === 'objective_passage_mcq'
-            ? passageTextFromManual(question)
-            : question.summaryText;
-
-    return plainQuestionText(value);
+function manualQuestionDisplayHtml(question: ManualQuestion): string {
+    return question.schemaKey === 'objective_passage_mcq'
+        ? passageTextFromManual(question)
+        : question.summaryText;
 }
 
 function passageQuestionsFromManual(
@@ -1109,7 +1127,13 @@ function ScopeOptionCard({
                     <Icon className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {option.label}
+                    {option.displayLabel ?? (
+                        <QuestionContent
+                            as="span"
+                            inline
+                            value={option.label}
+                        />
+                    )}
                 </span>
                 <ArrowRightIcon className="size-4 shrink-0 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 dark:text-slate-500" />
             </button>
@@ -1260,7 +1284,13 @@ function ScopePicker({
                                         className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
                                     >
                                         <span className="truncate">
-                                            {crumb.value.label}
+                                            {crumb.value.displayLabel ?? (
+                                                <QuestionContent
+                                                    as="span"
+                                                    inline
+                                                    value={crumb.value.label}
+                                                />
+                                            )}
                                         </span>
                                         <CheckIcon
                                             className="size-3.5 shrink-0"
@@ -1582,7 +1612,15 @@ export default function GeneratePaper({
     const [isDirty, setIsDirty] = useState(false);
 
     const patternOptions = useMemo<ComboboxOptionItem[]>(
-        () => patterns.map((item) => ({ id: item.id, label: item.name })),
+        () =>
+            patterns.map((item) => ({
+                id: item.id,
+                label: item.name,
+                searchLabel: plainQuestionText(item.name),
+                displayLabel: (
+                    <QuestionContent as="span" inline value={item.name} />
+                ),
+            })),
         [patterns],
     );
 
@@ -1593,7 +1631,14 @@ export default function GeneratePaper({
 
         return patternClasses
             .filter((item) => item.pattern_id === pattern.id)
-            .map((item) => ({ id: item.id, label: item.name }));
+            .map((item) => ({
+                id: item.id,
+                label: item.name,
+                searchLabel: plainQuestionText(item.name),
+                displayLabel: (
+                    <QuestionContent as="span" inline value={item.name} />
+                ),
+            }));
     }, [pattern, patternClasses]);
 
     const subjectOptions = useMemo<ComboboxOptionItem[]>(() => {
@@ -1607,7 +1652,14 @@ export default function GeneratePaper({
                     item.pattern_id === pattern.id &&
                     item.class_id === klass.id,
             )
-            .map((item) => ({ id: item.subject_id, label: item.name }));
+            .map((item) => ({
+                id: item.subject_id,
+                label: item.name,
+                searchLabel: plainQuestionText(item.name),
+                displayLabel: (
+                    <QuestionContent as="span" inline value={item.name} />
+                ),
+            }));
     }, [pattern, klass, classSubjects]);
 
     const selectedChapterIds = useMemo(
@@ -1710,10 +1762,22 @@ export default function GeneratePaper({
                 activeManualSelectedQuestionIds.has(question.id);
             const matchesSearch =
                 search === '' ||
-                question.summaryText.toLowerCase().includes(search) ||
-                question.chapter.name.toLowerCase().includes(search) ||
-                question.topic?.name.toLowerCase().includes(search) ||
-                question.sourceLabel?.toLowerCase().includes(search);
+                plainQuestionText(question.summaryText)
+                    .toLowerCase()
+                    .includes(search) ||
+                plainQuestionText(question.chapter.name)
+                    .toLowerCase()
+                    .includes(search) ||
+                (question.topic
+                    ? plainQuestionText(question.topic.name)
+                          .toLowerCase()
+                          .includes(search)
+                    : false) ||
+                (question.sourceLabel
+                    ? plainQuestionText(question.sourceLabel)
+                          .toLowerCase()
+                          .includes(search)
+                    : false);
 
             return matchesSelected && matchesSearch;
         });
@@ -1795,10 +1859,22 @@ export default function GeneratePaper({
         return pool.filter((question) => {
             const matchesSearch =
                 search === '' ||
-                question.summaryText.toLowerCase().includes(search) ||
-                question.chapter.name.toLowerCase().includes(search) ||
-                question.topic?.name.toLowerCase().includes(search) ||
-                question.sourceLabel?.toLowerCase().includes(search);
+                plainQuestionText(question.summaryText)
+                    .toLowerCase()
+                    .includes(search) ||
+                plainQuestionText(question.chapter.name)
+                    .toLowerCase()
+                    .includes(search) ||
+                (question.topic
+                    ? plainQuestionText(question.topic.name)
+                          .toLowerCase()
+                          .includes(search)
+                    : false) ||
+                (question.sourceLabel
+                    ? plainQuestionText(question.sourceLabel)
+                          .toLowerCase()
+                          .includes(search)
+                    : false);
 
             return matchesSearch;
         });
@@ -2733,7 +2809,7 @@ export default function GeneratePaper({
 
                 if (selectedQuestions.length < rowTarget(row)) {
                     throw new Error(
-                        `Not enough questions found for ${section.title}.`,
+                        `Not enough questions found for ${plainQuestionText(section.title)}.`,
                     );
                 }
 
@@ -4307,9 +4383,19 @@ export default function GeneratePaper({
                                             Unsaved draft found
                                         </p>
                                         <p className="mt-0.5 text-xs text-brand-700 dark:text-brand-300">
-                                            {recoveryDraft.meta.subject.label}{' '}
+                                            <RichTextLabel
+                                                value={
+                                                    recoveryDraft.meta.subject
+                                                        .label
+                                                }
+                                            />{' '}
                                             &middot;{' '}
-                                            {recoveryDraft.meta.klass.label}{' '}
+                                            <RichTextLabel
+                                                value={
+                                                    recoveryDraft.meta.klass
+                                                        .label
+                                                }
+                                            />{' '}
                                             &middot;{' '}
                                             <ClockIcon className="mb-0.5 inline size-3" />{' '}
                                             {draftTimeAgo(
@@ -4772,7 +4858,11 @@ function ManualQuestionPickerModal({
                                     Select questions
                                 </h2>
                                 <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                    {activeRow.section.title}
+                                    <RichTextLabel
+                                        value={englishQuestionTypeTitle(
+                                            activeRow.section,
+                                        )}
+                                    />
                                 </span>
                             </div>
                         </div>
@@ -4903,10 +4993,12 @@ function ManualQuestionPickerModal({
                                                                 'text-right',
                                                         )}
                                                     >
-                                                        {manualQuestionDisplayTextForMedium(
-                                                            question,
-                                                            displayMedium,
-                                                        )}
+                                                        <RichTextLabel
+                                                            value={manualQuestionDisplayHtmlForMedium(
+                                                                question,
+                                                                displayMedium,
+                                                            )}
+                                                        />
                                                     </span>
                                                 </span>
                                                 {isBilingual && (
@@ -4915,24 +5007,42 @@ function ManualQuestionPickerModal({
                                                         className="min-w-0 text-right md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-700"
                                                     >
                                                         <span className="block text-[13px] leading-6 font-medium text-slate-800 dark:text-slate-100">
-                                                            {manualQuestionDisplayTextForMedium(
-                                                                question,
-                                                                'Urdu',
-                                                            )}
+                                                            <RichTextLabel
+                                                                value={manualQuestionDisplayHtmlForMedium(
+                                                                    question,
+                                                                    'Urdu',
+                                                                )}
+                                                            />
                                                         </span>
                                                     </span>
                                                 )}
                                             </span>
                                             <span className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                                 <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                    {manualQuestionChapterLabel(
-                                                        question,
-                                                    )}
+                                                    <RichTextLabel
+                                                        value={manualQuestionChapterLabel(
+                                                            question,
+                                                        )}
+                                                    />
                                                 </span>
+                                                {question.topic && (
+                                                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                        <RichTextLabel
+                                                            value={
+                                                                question.topic
+                                                                    .name
+                                                            }
+                                                        />
+                                                    </span>
+                                                )}
                                                 <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                    {question.sourceLabel ??
-                                                        question.source ??
-                                                        'No source'}
+                                                    <RichTextLabel
+                                                        value={
+                                                            question.sourceLabel ??
+                                                            question.source ??
+                                                            'No source'
+                                                        }
+                                                    />
                                                 </span>
                                                 {selectedElsewhere && (
                                                     <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
@@ -5031,6 +5141,10 @@ function AddPaperSectionModal({
             questionTypes.map((type) => ({
                 id: type.questionTypeId,
                 label: type.title,
+                searchLabel: plainQuestionText(type.title),
+                displayLabel: (
+                    <QuestionContent as="span" inline value={type.title} />
+                ),
                 hint: type.category,
             })),
         [questionTypes],
@@ -5695,7 +5809,7 @@ function QuestionResultPanel({
                 >
                     <div className="mb-3 rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-950/60">
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                            {chapterLabel}
+                            <RichTextLabel value={chapterLabel} />
                         </h3>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -5804,22 +5918,33 @@ function QuestionSearchRow({
                 </span>
                 <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {manualQuestionDisplayText(question)}
+                        <RichTextLabel
+                            value={manualQuestionDisplayHtml(question)}
+                        />
                     </span>
                     {options.length > 0 && (
                         <span className="mt-2 grid gap-2 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-4 dark:text-slate-300">
                             {options.map((option) => (
                                 <span key={option.id}>
-                                    {plainQuestionText(option.text)}
+                                    <RichTextLabel value={option.text} />
                                 </span>
                             ))}
                         </span>
                     )}
                     <span className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        {question.topic && (
+                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                <RichTextLabel value={question.topic.name} />
+                            </span>
+                        )}
                         <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                            {question.sourceLabel ??
-                                question.source ??
-                                'No source'}
+                            <RichTextLabel
+                                value={
+                                    question.sourceLabel ??
+                                    question.source ??
+                                    'No source'
+                                }
+                            />
                         </span>
                     </span>
                 </span>
@@ -5891,7 +6016,7 @@ function ChapterTopicFilterPanel({
                             </span>
                             <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                    {chapter.name}
+                                    <RichTextLabel value={chapter.name} />
                                 </span>
                                 {chapter.topics.length > 0 && (
                                     <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -5937,7 +6062,7 @@ function ChapterTopicFilterPanel({
                                                     />
                                                 )}
                                             </span>
-                                            {topic.name}
+                                            <RichTextLabel value={topic.name} />
                                         </button>
                                     );
                                 })}
@@ -6812,7 +6937,7 @@ function PaperQuestionPickerModal({
                             Pick replacement question
                         </h2>
                         <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">
-                            {target.section.title}
+                            <RichTextLabel value={target.section.title} />
                         </p>
                     </div>
                     <button
@@ -6903,22 +7028,34 @@ function PaperQuestionPickerModal({
                                 </span>
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
-                                        {manualQuestionDisplayText(question)}
+                                        <RichTextLabel
+                                            value={manualQuestionDisplayHtml(
+                                                question,
+                                            )}
+                                        />
                                     </span>
                                     <span className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                         <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                            {question.sourceLabel ??
-                                                question.source ??
-                                                'No source'}
+                                            <RichTextLabel
+                                                value={
+                                                    question.sourceLabel ??
+                                                    question.source ??
+                                                    'No source'
+                                                }
+                                            />
                                         </span>
                                         <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                            {manualQuestionChapterLabel(
-                                                question,
-                                            )}
+                                            <RichTextLabel
+                                                value={manualQuestionChapterLabel(
+                                                    question,
+                                                )}
+                                            />
                                         </span>
                                         {question.topic && (
                                             <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                {question.topic.name}
+                                                <RichTextLabel
+                                                    value={question.topic.name}
+                                                />
                                             </span>
                                         )}
                                         {isUsed && (
@@ -6967,15 +7104,18 @@ function BilingualPickerName({
                     className,
                 )}
             >
-                <span className="min-w-0 flex-1 truncate" title={englishName}>
-                    {englishName}
+                <span
+                    className="min-w-0 flex-1 truncate"
+                    title={plainQuestionText(englishName)}
+                >
+                    <RichTextLabel value={englishName} />
                 </span>
                 <span
                     dir="rtl"
                     className="min-w-0 flex-1 truncate text-right"
-                    title={urduName}
+                    title={plainQuestionText(urduName)}
                 >
-                    {urduName}
+                    <RichTextLabel value={urduName} />
                 </span>
             </span>
         );
@@ -6986,9 +7126,9 @@ function BilingualPickerName({
             <span
                 dir="rtl"
                 className={cn('min-w-0 flex-1 truncate text-right', className)}
-                title={urduValue}
+                title={plainQuestionText(urduValue)}
             >
-                {urduValue}
+                <RichTextLabel value={urduValue} />
             </span>
         );
     }
@@ -6996,9 +7136,9 @@ function BilingualPickerName({
     return (
         <span
             className={cn('min-w-0 flex-1 truncate', className)}
-            title={englishValue}
+            title={plainQuestionText(englishValue)}
         >
-            {englishValue}
+            <RichTextLabel value={englishValue} />
         </span>
     );
 }
@@ -7108,7 +7248,7 @@ function DirectChapterRow({
             <TriCheckbox
                 state={checked ? 'checked' : 'unchecked'}
                 onChange={() => onToggleChapter(chapter)}
-                label={`Toggle ${chapter.name}`}
+                label={`Toggle ${plainQuestionText(chapter.name)}`}
                 size="sm"
             />
             <button
@@ -7162,7 +7302,7 @@ function ChapterCard({
                 <TriCheckbox
                     state={state}
                     onChange={onToggleChapter}
-                    label={`Toggle all topics in ${chapter.name}`}
+                    label={`Toggle all topics in ${plainQuestionText(chapter.name)}`}
                 />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -7195,7 +7335,7 @@ function ChapterCard({
                                 <TriCheckbox
                                     state={checked ? 'checked' : 'unchecked'}
                                     onChange={() => onToggleTopic(topic.id)}
-                                    label={topic.name}
+                                    label={plainQuestionText(topic.name)}
                                     size="sm"
                                 />
                                 <button
@@ -7259,6 +7399,7 @@ function QuestionSelectionCard({
     onDragEnd: () => void;
 }) {
     const canDeleteRow = section.rows.length > 1;
+    const typeHeading = englishQuestionTypeTitle(section);
 
     return (
         <div
@@ -7281,14 +7422,14 @@ function QuestionSelectionCard({
                         tabIndex={0}
                         onDragStart={(event) => onDragStart(event, section.id)}
                         onDragEnd={onDragEnd}
-                        aria-label={`Drag to reorder ${section.title}`}
-                        title={`Drag to reorder ${section.title}`}
+                        aria-label={`Drag to reorder ${plainQuestionText(typeHeading)}`}
+                        title={`Drag to reorder ${plainQuestionText(typeHeading)}`}
                         className="flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg bg-slate-50 text-brand-500 transition-colors hover:bg-brand-50 hover:text-brand-700 active:cursor-grabbing dark:bg-slate-800 dark:text-brand-300 dark:hover:bg-brand-500/10 dark:hover:text-brand-200"
                     >
                         <GripVerticalIcon className="size-4" />
                     </div>
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {section.title}
+                        <RichTextLabel value={typeHeading} />
                     </h4>
                     <span className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
                         {section.availableCount} available
@@ -7304,8 +7445,16 @@ function QuestionSelectionCard({
                     <button
                         type="button"
                         onClick={() => onAddRow(section.id)}
-                        aria-label={'Add another ' + section.title + ' row'}
-                        title={'Add another ' + section.title + ' row'}
+                        aria-label={
+                            'Add another ' +
+                            plainQuestionText(typeHeading) +
+                            ' row'
+                        }
+                        title={
+                            'Add another ' +
+                            plainQuestionText(typeHeading) +
+                            ' row'
+                        }
                         className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
                     >
                         <PlusIcon className="size-3.5" />
@@ -7396,7 +7545,7 @@ function QuestionSelectionCard({
                                 type="button"
                                 disabled={!canDeleteRow}
                                 onClick={() => onDeleteRow(section.id, row.id)}
-                                aria-label={`Delete row ${index + 1} from ${section.title}`}
+                                aria-label={`Delete row ${index + 1} from ${plainQuestionText(typeHeading)}`}
                                 title={
                                     canDeleteRow
                                         ? `Delete row ${index + 1}`

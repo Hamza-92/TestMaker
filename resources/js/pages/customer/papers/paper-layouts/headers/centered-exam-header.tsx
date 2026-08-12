@@ -1,4 +1,5 @@
-﻿import type { GeneratedPaperHeader } from '../types';
+import { RichTextField } from '../questions/rich-text-field';
+import type { GeneratedPaperHeader } from '../types';
 import { HeaderLogo } from './header-logo';
 
 interface CenteredExamHeaderProps {
@@ -21,14 +22,22 @@ export function CenteredExamHeader({
     paddingY,
 }: CenteredExamHeaderProps) {
     return (
-        <div data-paper-header data-paper-header-padding-x={paddingX} data-paper-header-padding-y={paddingY}>
+        <div
+            data-paper-header
+            data-paper-header-padding-x={paddingX}
+            data-paper-header-padding-y={paddingY}
+        >
             {/* Top: logo + school name + subtitle — no outer border */}
             <div className="flex flex-col items-center py-2 text-center">
-                <HeaderLogo logoUrl={logoUrl} schoolName={header.schoolName}
+                <HeaderLogo
+                    logoUrl={logoUrl}
+                    schoolName={header.schoolName}
                     initialSize={64}
                     imageClassName="mb-1"
-                    fallbackClassName="mb-1 flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none" />
-                <input autoComplete="off"
+                    fallbackClassName="mb-1 flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none"
+                />
+                <input
+                    autoComplete="off"
                     value={header.schoolName}
                     onChange={(e) => onChange('schoolName', e.target.value)}
                     className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
@@ -44,17 +53,17 @@ export function CenteredExamHeader({
                 {/* Black bar: Subject | Class | Max Marks */}
                 <div
                     data-paper-header-divider="b"
-                    className="grid grid-cols-3 bg-slate-950 text-white [print-color-adjust:exact] [-webkit-print-color-adjust:exact]"
+                    className="grid grid-cols-3 bg-slate-950 text-white [-webkit-print-color-adjust:exact] [print-color-adjust:exact]"
                 >
                     <div
                         data-paper-header-divider="r"
                         className="flex items-center gap-1 px-3 py-1.5"
                     >
                         <span className="shrink-0 font-bold">Subject:</span>
-                        <input autoComplete="off"
+                        <RichTextField
                             value={header.subject}
-                            onChange={(e) => onChange('subject', e.target.value)}
-                            className="min-w-0 flex-1 bg-transparent font-normal text-white outline-none"
+                            onChange={(value) => onChange('subject', value)}
+                            className="min-w-0 flex-1 font-normal text-white"
                             placeholder="Subject"
                         />
                     </div>
@@ -63,16 +72,17 @@ export function CenteredExamHeader({
                         className="flex items-center justify-center gap-1 px-3 py-1.5"
                     >
                         <span className="shrink-0 font-bold">Class:</span>
-                        <input autoComplete="off"
+                        <RichTextField
                             value={header.className}
-                            onChange={(e) => onChange('className', e.target.value)}
-                            className="min-w-0 flex-1 bg-transparent font-normal text-white outline-none"
+                            onChange={(value) => onChange('className', value)}
+                            className="min-w-0 flex-1 font-normal text-white"
                             placeholder="Class"
                         />
                     </div>
                     <div className="flex items-center justify-end gap-1 px-3 py-1.5">
                         <span className="shrink-0 font-bold">Marks:</span>
-                        <input autoComplete="off"
+                        <input
+                            autoComplete="off"
                             value={String(header.marks ?? '')}
                             onChange={(e) => onChange('marks', e.target.value)}
                             className="w-10 min-w-0 bg-transparent text-center font-normal text-white outline-none"
@@ -153,7 +163,8 @@ function UnderlineField({
     return (
         <div className={`flex items-center gap-1 ${className}`}>
             <span className="shrink-0 font-bold">{label}:</span>
-            <input autoComplete="off"
+            <input
+                autoComplete="off"
                 value={String(header[field] ?? '')}
                 onChange={(e) => onChange(field, e.target.value)}
                 className="min-w-0 flex-1 border-b border-current bg-transparent font-normal outline-none"

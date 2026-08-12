@@ -7,11 +7,14 @@ import {
 } from '@headlessui/react';
 import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface ComboboxOptionItem {
     id: number | string;
     label: string;
+    searchLabel?: string;
+    displayLabel?: ReactNode;
     hint?: string;
 }
 
@@ -57,7 +60,9 @@ export function FloatingCombobox({
         query === ''
             ? options
             : options.filter((o) =>
-                  o.label.toLowerCase().includes(query.trim().toLowerCase()),
+                  (o.searchLabel ?? o.label)
+                      .toLowerCase()
+                      .includes(query.trim().toLowerCase()),
               );
 
     const isFilled = value !== null;
@@ -125,8 +130,13 @@ export function FloatingCombobox({
                             LeadingIcon ? 'pl-2' : 'pl-3',
                             'pr-2',
                             disabled && 'cursor-not-allowed',
+                            value?.displayLabel &&
+                                query === '' &&
+                                'text-transparent group-focus-within/field:text-slate-900 dark:text-transparent dark:group-focus-within/field:text-slate-100',
                         )}
-                        displayValue={(o: ComboboxOptionItem | null) => o?.label ?? ''}
+                        displayValue={(o: ComboboxOptionItem | null) =>
+                            o?.searchLabel ?? o?.label ?? ''
+                        }
                         onChange={(e) => setQuery(e.target.value)}
                         // Reopen the panel when the user clicks the input after a
                         // selection (HeadlessUI doesn't do this on its own).
@@ -139,6 +149,20 @@ export function FloatingCombobox({
                             }
                         }}
                     />
+
+                    {value?.displayLabel && query === '' && (
+                        <span
+                            aria-hidden="true"
+                            className={cn(
+                                'pointer-events-none absolute top-0 bottom-0 flex min-w-0 items-center overflow-hidden text-sm font-medium text-slate-900 dark:text-slate-100',
+                                LeadingIcon ? 'left-9' : 'left-3',
+                                value && !disabled ? 'right-16' : 'right-10',
+                                'group-focus-within/field:hidden',
+                            )}
+                        >
+                            {value.displayLabel}
+                        </span>
+                    )}
 
                     {/* Clear */}
                     {value && !disabled && (
@@ -208,7 +232,9 @@ export function FloatingCombobox({
                             {({ selected }) => (
                                 <>
                                     <span className="flex min-w-0 flex-col">
-                                        <span className="truncate">{option.label}</span>
+                                        <span className="truncate">
+                                            {option.displayLabel ?? option.label}
+                                        </span>
                                         {option.hint && (
                                             <span className="truncate text-[11px] font-normal text-slate-400 dark:text-slate-500">
                                                 {option.hint}
