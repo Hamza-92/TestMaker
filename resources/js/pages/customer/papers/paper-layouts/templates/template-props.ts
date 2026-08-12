@@ -13,6 +13,8 @@ import type {
 export interface SectionTemplateProps {
     section: GeneratedPaperSection;
     index: number;
+    /** Number printed in the type heading; null hides it for later objective blocks. */
+    headingNumber: number | null;
     numberingFormat: PaperQuestionNumberingFormat;
     canMoveUp: boolean;
     canMoveDown: boolean;

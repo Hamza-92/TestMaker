@@ -38,7 +38,7 @@ export function TabularExamHeader({
                 <HeaderLogo
                     logoUrl={logoUrl}
                     schoolName={header.schoolName}
-                    initialSize={80}
+                    initialSize={60}
                     imageClassName=""
                     fallbackClassName="flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none"
                 />

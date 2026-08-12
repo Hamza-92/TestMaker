@@ -14,6 +14,7 @@ import { QuestionHoverActions, SectionControls } from './section-actions';
 interface BoxedObjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
+    headingNumber: number | null;
     numberingFormat: PaperQuestionNumberingFormat;
     canMoveUp: boolean;
     canMoveDown: boolean;
@@ -51,6 +52,7 @@ const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
 export function BoxedObjectiveSection({
     section,
     index,
+    headingNumber,
     numberingFormat,
     canMoveUp,
     canMoveDown,
@@ -79,6 +81,7 @@ export function BoxedObjectiveSection({
             {/* Heading is a standalone box — border on all 4 sides controlled by --paper-heading-border-*. */}
             <QuestionTypeHeading
                 index={index}
+                headingNumber={headingNumber}
                 title={section.title}
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}
@@ -94,7 +97,9 @@ export function BoxedObjectiveSection({
                 className={columns > 1 ? 'grid gap-x-6' : undefined}
                 style={
                     columns > 1
-                        ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }
+                        ? {
+                              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                          }
                         : undefined
                 }
             >
@@ -178,9 +183,15 @@ function ObjectiveQuestionRow({
             <div className="px-2 py-1 text-sm">
                 <BilingualQuestionRow
                     value={question.text}
-                    indexLabel={formatQuestionLabel(index, numberingFormat, 'numeric')}
+                    indexLabel={formatQuestionLabel(
+                        index,
+                        numberingFormat,
+                        'numeric',
+                    )}
                     marks={section.marksEach}
-                    urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
+                    urduOnly={Boolean(
+                        section.titleUrdu && !section.titleEnglish,
+                    )}
                     hideMarks={section.category === 'Objective Questions'}
                     sameStatement={question.sameStatement}
                 />
@@ -243,7 +254,9 @@ function ObjectiveQuestionRow({
                         <div
                             key={option.id}
                             data-paper-question-divider="r"
-                            className={urduOnly ? 'px-2 py-1 text-right' : 'px-2 py-1'}
+                            className={
+                                urduOnly ? 'px-2 py-1 text-right' : 'px-2 py-1'
+                            }
                         >
                             <BilingualOptionContent
                                 value={option.text}

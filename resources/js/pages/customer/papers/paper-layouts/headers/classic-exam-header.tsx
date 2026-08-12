@@ -67,7 +67,7 @@ export function ClassicExamHeader({
                                             <HeaderLogo
                                                 logoUrl={logoUrl}
                                                 schoolName={header.schoolName}
-                                                initialSize={112}
+                                                initialSize={60}
                                                 imageClassName=""
                                                 fallbackClassName="flex size-28 items-center justify-center rounded-full border-2 border-current text-center text-3xl leading-none font-bold"
                                             />

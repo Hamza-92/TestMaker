@@ -2,6 +2,7 @@ import { QuestionContent } from './question-content';
 
 interface QuestionTypeHeadingProps {
     index: number;
+    headingNumber?: number | null;
     title: string;
     titleEnglish?: string | null;
     titleUrdu?: string | null;
@@ -11,6 +12,7 @@ interface QuestionTypeHeadingProps {
 
 export function QuestionTypeHeading({
     index,
+    headingNumber,
     title,
     titleEnglish,
     titleUrdu,
@@ -28,6 +30,8 @@ export function QuestionTypeHeading({
     const visibleTitle = hideInternalSchemaLabel(title) ? '' : title;
     const isBilingual = english !== '' && urdu !== '';
     const totalMarks = requiredQuestions * marksEach;
+    const printedHeadingNumber =
+        headingNumber === undefined ? index + 1 : headingNumber;
 
     if (!isBilingual) {
         const isUrdu = urdu !== '' && english === '';
@@ -40,9 +44,7 @@ export function QuestionTypeHeading({
             >
                 <div
                     className={
-                        isUrdu
-                            ? 'min-w-0 text-right'
-                            : 'min-w-0 text-left'
+                        isUrdu ? 'min-w-0 text-right' : 'min-w-0 text-left'
                     }
                     style={
                         isUrdu
@@ -53,18 +55,30 @@ export function QuestionTypeHeading({
                 >
                     {isUrdu ? (
                         <>
-                            <span className="font-bold">
-                                &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {index + 1}:-
-                            </span>{' '}
+                            {printedHeadingNumber !== null && (
+                                <>
+                                    <span className="font-bold">
+                                        &#1587;&#1608;&#1575;&#1604;
+                                        &#1606;&#1605;&#1576;&#1585;{' '}
+                                        {printedHeadingNumber}:-
+                                    </span>{' '}
+                                </>
+                            )}
                             <QuestionContent
                                 value={urdu}
                                 inline
-                                className="align-baseline text-right"
+                                className="text-right align-baseline"
                             />
                         </>
                     ) : (
                         <>
-                            <span className="font-bold">Q.{index + 1}:-</span>{' '}
+                            {printedHeadingNumber !== null && (
+                                <>
+                                    <span className="font-bold">
+                                        Q.{printedHeadingNumber}:-
+                                    </span>{' '}
+                                </>
+                            )}
                             <QuestionContent
                                 value={english || visibleTitle}
                                 inline
@@ -86,14 +100,20 @@ export function QuestionTypeHeading({
             className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 px-2 py-1 text-sm font-bold"
         >
             <div className="min-w-0 text-left" dir="ltr">
-                <span className="font-bold">Q.{index + 1}:-</span>{' '}
+                {printedHeadingNumber !== null && (
+                    <>
+                        <span className="font-bold">
+                            Q.{printedHeadingNumber}:-
+                        </span>{' '}
+                    </>
+                )}
                 <QuestionContent
                     value={english}
                     inline
                     className="align-baseline"
                 />
             </div>
-            <div className="shrink-0 self-start whitespace-nowrap text-center">
+            <div className="shrink-0 self-start text-center whitespace-nowrap">
                 ({requiredQuestions}x{marksEach}={totalMarks})
             </div>
             <div
@@ -102,13 +122,19 @@ export function QuestionTypeHeading({
                 data-paper-urdu-content
                 style={{ fontFamily: 'var(--paper-urdu-font)' }}
             >
-                <span className="font-bold">
-                    &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {index + 1}:-
-                </span>{' '}
+                {printedHeadingNumber !== null && (
+                    <>
+                        <span className="font-bold">
+                            &#1587;&#1608;&#1575;&#1604;
+                            &#1606;&#1605;&#1576;&#1585; {printedHeadingNumber}
+                            :-
+                        </span>{' '}
+                    </>
+                )}
                 <QuestionContent
                     value={urdu}
                     inline
-                    className="align-baseline text-right"
+                    className="text-right align-baseline"
                 />
             </div>
         </div>

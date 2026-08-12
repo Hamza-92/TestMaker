@@ -173,6 +173,30 @@ function deserializeChapterSelection(
     return out;
 }
 
+function sectionHeadingNumber(
+    sections: GeneratedPaperSection[],
+    sectionIndex: number,
+): number | null {
+    const section = sections[sectionIndex];
+
+    if (section.category === 'Objective Questions') {
+        return sections.findIndex(
+            (candidate) => candidate.category === 'Objective Questions',
+        ) === sectionIndex
+            ? 1
+            : null;
+    }
+
+    return (
+        2 +
+        sections
+            .slice(0, sectionIndex)
+            .filter(
+                (candidate) => candidate.category === 'Subjective Questions',
+            ).length
+    );
+}
+
 interface AppliedTemplate {
     id: number;
     name: string;
@@ -6661,6 +6685,10 @@ function GeneratedPaperView({
                                             key={section.id}
                                             section={section}
                                             index={sectionIndex}
+                                            headingNumber={sectionHeadingNumber(
+                                                paper.sections,
+                                                sectionIndex,
+                                            )}
                                             numberingFormat={
                                                 settings.questionNumberingFormat
                                             }
@@ -6780,6 +6808,10 @@ function GeneratedPaperView({
                                                                 index={
                                                                     sectionIndex
                                                                 }
+                                                                headingNumber={sectionHeadingNumber(
+                                                                    variantPaper.sections,
+                                                                    sectionIndex,
+                                                                )}
                                                                 numberingFormat={
                                                                     settings.questionNumberingFormat
                                                                 }

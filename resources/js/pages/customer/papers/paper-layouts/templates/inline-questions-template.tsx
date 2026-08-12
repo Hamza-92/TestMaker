@@ -17,6 +17,7 @@ const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
 export const InlineQuestionsTemplate: SectionTemplate = ({
     section,
     index,
+    headingNumber,
     numberingFormat,
     canMoveUp,
     canMoveDown,
@@ -33,13 +34,14 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     const fallbackFormat = isObjective ? 'numeric' : 'roman';
     // Legacy default of 1 preserves the original single-flow look for papers
     // saved before per-block columns existed.
-    const columns = clampSectionColumns(section.columns, 1);    const isUrduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
-
+    const columns = clampSectionColumns(section.columns, 1);
+    const isUrduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
 
     return (
         <section className="paper-section text-black">
             <QuestionTypeHeading
                 index={index}
+                headingNumber={headingNumber}
                 title={section.title}
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}
@@ -73,25 +75,34 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                             data-paper-question
                             className="mr-4 inline align-baseline"
                             dir={isUrduOnly ? 'rtl' : undefined}
-                            data-paper-urdu-content={isUrduOnly ? true : undefined}
+                            data-paper-urdu-content={
+                                isUrduOnly ? true : undefined
+                            }
                             style={{
-                                ...(columns > 1 ? { breakInside: 'avoid' } : {}),
+                                ...(columns > 1
+                                    ? { breakInside: 'avoid' }
+                                    : {}),
                                 ...(isUrduOnly
                                     ? { fontFamily: 'var(--paper-urdu-font)' }
                                     : {}),
                             }}
                         >
-                            {!isObjective && (isUrduOnly ? (
-                                <>
-                                    <span className="font-bold">
-                                        &#1587;&#1608;&#1575;&#1604; &#1606;&#1605;&#1576;&#1585; {label}:-
-                                    </span>{' '}
-                                </>
-                            ) : (
-                                <>
-                                    <span className="font-bold">({label})</span>{' '}
-                                </>
-                            ))}
+                            {!isObjective &&
+                                (isUrduOnly ? (
+                                    <>
+                                        <span className="font-bold">
+                                            &#1587;&#1608;&#1575;&#1604;
+                                            &#1606;&#1605;&#1576;&#1585; {label}
+                                            :-
+                                        </span>{' '}
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="font-bold">
+                                            ({label})
+                                        </span>{' '}
+                                    </>
+                                ))}
                             <QuestionContent
                                 value={question.text}
                                 inline
@@ -116,7 +127,9 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                         >
                                             <BilingualOptionContent
                                                 value={option.text}
-                                                label={optionLabels[optionIndex]}
+                                                label={
+                                                    optionLabels[optionIndex]
+                                                }
                                                 urduOnly={isUrduOnly}
                                             />
                                         </span>

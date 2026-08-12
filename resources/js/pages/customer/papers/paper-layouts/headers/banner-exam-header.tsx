@@ -32,7 +32,7 @@ export function BannerExamHeader({
                 <HeaderLogo
                     logoUrl={logoUrl}
                     schoolName={header.schoolName}
-                    initialSize={56}
+                    initialSize={60}
                     imageClassName="shrink-0"
                     fallbackClassName="flex items-center justify-center rounded-full border-2 border-current text-center text-lg leading-none font-bold"
                 />

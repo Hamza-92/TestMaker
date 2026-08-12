@@ -32,7 +32,7 @@ export function CenteredExamHeader({
                 <HeaderLogo
                     logoUrl={logoUrl}
                     schoolName={header.schoolName}
-                    initialSize={64}
+                    initialSize={60}
                     imageClassName="mb-1"
                     fallbackClassName="mb-1 flex size-14 items-center justify-center rounded-full border-2 border-current text-lg font-bold leading-none"
                 />

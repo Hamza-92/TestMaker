@@ -37,7 +37,7 @@ export function FormalExamHeader({
                     <HeaderLogo
                         logoUrl={logoUrl}
                         schoolName={header.schoolName}
-                        initialSize={80}
+                        initialSize={60}
                         imageClassName=""
                         fallbackClassName="flex size-20 items-center justify-center rounded-full border-2 border-current text-center text-2xl leading-none font-bold"
                     />

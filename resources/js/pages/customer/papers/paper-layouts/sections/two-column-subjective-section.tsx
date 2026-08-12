@@ -13,6 +13,7 @@ import { QuestionHoverActions, SectionControls } from './section-actions';
 interface TwoColumnSubjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
+    headingNumber: number | null;
     numberingFormat: PaperQuestionNumberingFormat;
     canMoveUp: boolean;
     canMoveDown: boolean;
@@ -48,6 +49,7 @@ interface TwoColumnSubjectiveSectionProps {
 export function TwoColumnSubjectiveSection({
     section,
     index,
+    headingNumber,
     numberingFormat,
     canMoveUp,
     canMoveDown,
@@ -76,6 +78,7 @@ export function TwoColumnSubjectiveSection({
             {/* Heading is a standalone box — border on all 4 sides controlled by --paper-heading-border-*. */}
             <QuestionTypeHeading
                 index={index}
+                headingNumber={headingNumber}
                 title={section.title}
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}
@@ -172,7 +175,11 @@ function SubjectiveQuestionItem({
         >
             <BilingualQuestionRow
                 value={question.text}
-                indexLabel={formatQuestionLabel(index, numberingFormat, 'roman')}
+                indexLabel={formatQuestionLabel(
+                    index,
+                    numberingFormat,
+                    'roman',
+                )}
                 marks={section.marksEach}
                 urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
                 sameStatement={question.sameStatement}
