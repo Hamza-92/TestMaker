@@ -162,7 +162,10 @@ function LabeledCell({
             data-paper-header-divider={divider ? 'r' : undefined}
             className="grid grid-cols-[auto_1fr]"
         >
-            <div className="bg-slate-100 px-2 py-1 text-xs font-bold uppercase">
+            <div
+                data-paper-header-label-cell
+                className="bg-slate-100 px-2 py-1 text-xs font-bold uppercase"
+            >
                 {label}
             </div>
             {field === 'className' || field === 'subject' ? (

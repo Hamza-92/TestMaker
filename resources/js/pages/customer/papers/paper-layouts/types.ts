@@ -201,7 +201,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     headerSize: 12,
     headerLineHeight: 1,
     headerPaddingX: 4,
-    headerPaddingY: 4,
+    headerPaddingY: 0,
     headingSize: 12,
     headingLineHeight: 1,
     questionSize: 12,
