@@ -78,7 +78,7 @@ export function BoxedObjectiveSection({
 
     return (
         <section className="paper-section">
-            {/* Heading is a standalone box — border on all 4 sides controlled by --paper-heading-border-*. */}
+            {/* Heading is a standalone box ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â border on all 4 sides controlled by --paper-heading-border-*. */}
             <QuestionTypeHeading
                 index={index}
                 headingNumber={headingNumber}
@@ -89,7 +89,7 @@ export function BoxedObjectiveSection({
                 marksEach={section.marksEach}
             />
 
-            {/* Question container — border on all 4 sides; question rows act as
+            {/* Question container ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â border on all 4 sides; question rows act as
                 collapsed-table rows, sharing one divider between each. Columns
                 >1 arrange the boxed rows into a grid instead of one long stack. */}
             <div
@@ -180,30 +180,24 @@ function ObjectiveQuestionRow({
 
     return (
         <div data-paper-question className="group/question relative">
-            <div className="px-2 py-1 text-sm">
-                {question.optionsOnly ? (
-                    <span className="font-bold">
-                        {formatQuestionLabel(index, numberingFormat, 'numeric')}
-                    </span>
-                ) : null}
-                {!question.optionsOnly ? (
-                <BilingualQuestionRow
-                    value={question.text}
-                    indexLabel={formatQuestionLabel(
-                        index,
-                        numberingFormat,
-                        'numeric',
-                    )}
-                    marks={section.marksEach}
-                    urduOnly={Boolean(
-                        section.titleUrdu && !section.titleEnglish,
-                    )}
-                    hideMarks={section.category === 'Objective Questions'}
-                    sameStatement={question.sameStatement}
-                />
-                ) : null}
-            </div>
-
+            {!question.optionsOnly && (
+                <div className="px-2 py-1 text-sm">
+                    <BilingualQuestionRow
+                        value={question.text}
+                        indexLabel={formatQuestionLabel(
+                            index,
+                            numberingFormat,
+                            'numeric',
+                        )}
+                        marks={section.marksEach}
+                        urduOnly={Boolean(
+                            section.titleUrdu && !section.titleEnglish,
+                        )}
+                        hideMarks={section.category === 'Objective Questions'}
+                        sameStatement={question.sameStatement}
+                    />
+                </div>
+            )}
             {question.imageUrl && (
                 <div data-paper-question-divider="t" className="px-12 py-2">
                     <img
@@ -251,30 +245,42 @@ function ObjectiveQuestionRow({
                     data-paper-question-divider="t"
                     dir={urduOnly ? 'rtl' : undefined}
                     data-paper-urdu-content={urduOnly ? true : undefined}
-                    className={
-                        urduOnly
-                            ? 'grid grid-cols-4 text-right text-sm'
-                            : 'grid grid-cols-4 text-sm'
-                    }
+                    className={question.optionsOnly ? 'flex w-full items-start text-sm' : undefined}
                 >
-                    {options.map((option, optionIndex) => (
-                        <div
-                            key={option.id}
-                            data-paper-question-divider="r"
-                            className={
-                                urduOnly ? 'px-2 py-1 text-right' : 'px-2 py-1'
-                            }
-                        >
-                            <BilingualOptionContent
-                                value={option.text}
-                                label={optionLabels[optionIndex]}
-                                urduOnly={urduOnly}
-                            />
-                        </div>
-                    ))}
+                    {question.optionsOnly ? (
+                        <span className="w-7 shrink-0 px-2 py-1 font-bold">
+                            {formatQuestionLabel(index, numberingFormat, 'numeric')})
+                        </span>
+                    ) : null}
+                    <div
+                        className={
+                            question.optionsOnly
+                                ? 'grid w-full min-w-0 flex-1 grid-cols-4'
+                                : urduOnly
+                                  ? 'grid grid-cols-4 text-right'
+                                  : 'grid grid-cols-4'
+                        }
+                    >
+                        {options.map((option, optionIndex) => (
+                            <div
+                                key={option.id}
+                                data-paper-question-divider="r"
+                                className={
+                                    urduOnly
+                                        ? 'min-w-0 px-2 py-1 text-right'
+                                        : 'min-w-0 px-2 py-1'
+                                }
+                            >
+                                <BilingualOptionContent
+                                    value={option.text}
+                                    label={optionLabels[optionIndex]}
+                                    urduOnly={urduOnly}
+                                />
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
-
             {question.answerLines > 0 && (
                 <div data-paper-question-divider="t" className="flex flex-col">
                     {Array.from({ length: question.answerLines }).map(
