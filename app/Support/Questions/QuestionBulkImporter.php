@@ -366,7 +366,7 @@ class QuestionBulkImporter
         $answerEn = $row['answer_en'] ?? null;
         $answerUr = $row['answer_ur'] ?? null;
 
-        if ($questionType->have_statement && $statementEn === null && $statementUr === null) {
+        if ($questionType->have_statement && ! $questionType->options_only && $statementEn === null && $statementUr === null) {
             $errors[] = "Row {$rowNumber}: Statement is required.";
         }
 

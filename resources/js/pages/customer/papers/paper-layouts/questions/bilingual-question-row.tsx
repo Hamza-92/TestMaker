@@ -31,12 +31,15 @@ export function BilingualQuestionRow({
     if (sameStatement && parts) {
         return (
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3">
-                <div dir="ltr" className="min-w-0 text-left">
-                    <span className="font-bold">{indexLabel})</span>{' '}
+                <div
+                    dir="ltr"
+                    className="flex min-w-0 items-baseline text-left"
+                >
+                    <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
                     <QuestionContent
                         value={parts.english}
                         inline
-                        className="align-baseline"
+                        className="min-w-0 flex-1 align-baseline"
                     />
                 </div>
 
@@ -51,14 +54,14 @@ export function BilingualQuestionRow({
                 <div
                     dir="rtl"
                     data-paper-urdu-content
-                    className="min-w-0 text-right"
+                    className="flex min-w-0 items-baseline text-right"
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
-                    <span className="font-bold">{indexLabel})</span>{' '}
+                    <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
                     <QuestionContent
                         value={parts.urdu}
                         inline
-                        className="text-right align-baseline"
+                        className="min-w-0 flex-1 text-right align-baseline"
                     />
                 </div>
             </div>
@@ -71,14 +74,14 @@ export function BilingualQuestionRow({
                 <div
                     dir="rtl"
                     data-paper-urdu-content
-                    className="min-w-0 text-right"
+                    className="flex min-w-0 items-baseline text-right"
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
-                    <span className="font-bold">{indexLabel})</span>{' '}
+                    <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
                     <QuestionContent
                         value={value}
                         inline
-                        className="text-right align-baseline"
+                        className="min-w-0 flex-1 text-right align-baseline"
                     />
                     {sameStatement && (
                         <>
@@ -95,12 +98,12 @@ export function BilingualQuestionRow({
         }
 
         return (
-            <div className="min-w-0 text-left">
-                <span className="font-bold">{indexLabel})</span>{' '}
+            <div className="flex min-w-0 items-baseline text-left">
+                <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
                 <QuestionContent
                     value={value}
                     inline
-                    className="align-baseline"
+                    className="min-w-0 flex-1 align-baseline"
                 />
                 {sameStatement && (
                     <>
@@ -124,12 +127,12 @@ export function BilingualQuestionRow({
                     : 'grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3'
             }
         >
-            <div dir="ltr" className="min-w-0 text-left">
-                <span className="font-bold">{indexLabel})</span>{' '}
+            <div dir="ltr" className="flex min-w-0 items-baseline text-left">
+                <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
                 <QuestionContent
                     value={parts.english}
                     inline
-                    className="align-baseline"
+                    className="min-w-0 flex-1 align-baseline"
                 />
             </div>
 
@@ -142,14 +145,14 @@ export function BilingualQuestionRow({
             <div
                 dir="rtl"
                 data-paper-urdu-content
-                className="min-w-0 text-right"
+                className="flex min-w-0 items-baseline text-right"
                 style={{ fontFamily: 'var(--paper-urdu-font)' }}
             >
-                <span className="font-bold">{indexLabel})</span>{' '}
+                <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
                 <QuestionContent
                     value={parts.urdu}
                     inline
-                    className="text-right align-baseline"
+                    className="min-w-0 flex-1 text-right align-baseline"
                 />
             </div>
         </div>

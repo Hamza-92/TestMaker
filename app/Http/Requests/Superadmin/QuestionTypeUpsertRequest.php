@@ -37,6 +37,7 @@ class QuestionTypeUpsertRequest extends FormRequest
             'have_answer' => ['required', 'boolean'],
             'is_single' => ['required', 'boolean'],
             'is_objective' => ['required', 'boolean'],
+            'options_only' => ['sometimes', 'boolean'],
             'schema_key' => [
                 'required',
                 'string',
@@ -66,6 +67,7 @@ class QuestionTypeUpsertRequest extends FormRequest
             'have_answer' => $this->boolean('have_answer'),
             'is_single' => $this->boolean('is_single'),
             'is_objective' => $this->boolean('is_objective'),
+            'options_only' => $this->boolean('options_only'),
             'schema_key' => $this->normalizeNullableString(
                 $this->input('schema_key'),
             ) ?? QuestionTypeSchemaRegistry::infer(

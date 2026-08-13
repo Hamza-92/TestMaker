@@ -30,6 +30,7 @@ export interface QuestionSchemaOption {
     settings: {
         supports_answer_toggle: boolean;
         supports_single_toggle: boolean;
+        supports_options_only: boolean;
     };
 }
 
@@ -43,6 +44,7 @@ export interface QuestionTypeFormData {
     have_answer: boolean;
     is_single: boolean;
     is_objective: boolean;
+    options_only: boolean;
     schema_key: string;
     status: string;
     [key: string]: boolean | string;
@@ -219,13 +221,16 @@ export function QuestionTypeForm({
                         />
                     ) : null}
 
-                    {selectedSchema.settings.supports_single_toggle ? (
+                    {selectedSchema.settings.supports_options_only ? (
                         <SwitchRow
-                            checked={form.data.is_single}
-                            label="Single correct"
-                            onCheckedChange={(checked) =>
-                                form.setData('is_single', checked)
-                            }
+                            checked={form.data.options_only}
+                            label="Options only"
+                            onCheckedChange={(checked) => {
+                                form.setData('options_only', checked);
+                                if (checked) {
+                                    form.setData('is_single', true);
+                                }
+                            }}
                         />
                     ) : null}
                 </div>

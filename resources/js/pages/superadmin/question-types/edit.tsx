@@ -13,6 +13,7 @@ interface QuestionTypePayload {
     have_answer: boolean;
     is_single: boolean;
     is_objective: boolean;
+    options_only: boolean;
     schema_key: string;
     status: number;
 }
@@ -36,6 +37,7 @@ export default function EditQuestionType({
         have_answer: questionType.have_answer,
         is_single: questionType.is_single,
         is_objective: questionType.is_objective,
+        options_only: questionType.options_only,
         schema_key: questionType.schema_key,
         status: String(questionType.status),
     });

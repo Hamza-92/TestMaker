@@ -29,6 +29,7 @@ export interface QuestionSchemaOption {
     settings: {
         supports_answer_toggle: boolean;
         supports_single_toggle: boolean;
+        supports_options_only: boolean;
     };
 }
 
@@ -37,6 +38,7 @@ export interface QuestionTypeOption {
     name: string;
     heading_en: string;
     is_objective: boolean;
+    options_only: boolean;
     is_single: boolean;
     have_answer: boolean;
     supports_simple_import: boolean;
@@ -1000,7 +1002,7 @@ export function QuestionForm({
             case 'objective_blank_choice':
                 return (
                     <div className="space-y-4">
-                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        {selectedType?.options_only ? null : renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
                         {renderOptionsEditor(
                             form.data.content.options,
                             setOptionValue,

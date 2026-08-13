@@ -18,6 +18,7 @@ export interface GeneratedPaperPassageQuestion {
 export interface GeneratedPaperQuestion {
     id: string;
     sourceQuestionId: number | null;
+    optionsOnly?: boolean;
     text: string;
     /** One shared statement rendered between the English and Urdu question statements. */
     sameStatement?: string | null;

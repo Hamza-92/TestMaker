@@ -181,6 +181,12 @@ function ObjectiveQuestionRow({
     return (
         <div data-paper-question className="group/question relative">
             <div className="px-2 py-1 text-sm">
+                {question.optionsOnly ? (
+                    <span className="font-bold">
+                        {formatQuestionLabel(index, numberingFormat, 'numeric')}
+                    </span>
+                ) : null}
+                {!question.optionsOnly ? (
                 <BilingualQuestionRow
                     value={question.text}
                     indexLabel={formatQuestionLabel(
@@ -195,6 +201,7 @@ function ObjectiveQuestionRow({
                     hideMarks={section.category === 'Objective Questions'}
                     sameStatement={question.sameStatement}
                 />
+                ) : null}
             </div>
 
             {question.imageUrl && (

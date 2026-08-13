@@ -200,7 +200,7 @@ class GeneratePaperController extends Controller
                     ->where('question_type_orders.subject_id', $scope->subject_id);
             })
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.column_per_row', 'question_type_orders.sort_order')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.options_only', 'question_types.column_per_row', 'question_type_orders.sort_order')
             ->orderByDesc('question_types.is_objective')
             ->orderByRaw('question_type_orders.sort_order IS NULL')
             ->orderBy('question_type_orders.sort_order')
@@ -212,6 +212,7 @@ class GeneratePaperController extends Controller
                 'question_types.heading_en',
                 'question_types.heading_ur',
                 'question_types.is_objective',
+                'question_types.options_only',
                 'question_types.column_per_row',
                 DB::raw('question_type_orders.sort_order as sort_order'),
                 DB::raw('COUNT(questions.id) as available_count'),
@@ -307,6 +308,7 @@ class GeneratePaperController extends Controller
                     'medium' => $displayMedium,
                     'schemaKey' => $schema['key'],
                     'isObjective' => (bool) $question->questionType->is_objective,
+                    'optionsOnly' => (bool) $question->questionType->options_only,
                     'content' => $content,
                     'source' => $question->source,
                     'sourceLabel' => Question::sourceLabel($question->source),
@@ -470,6 +472,10 @@ class GeneratePaperController extends Controller
         array $content,
         string $locale,
     ): ?string {
+        if ((bool) $question->questionType->options_only) {
+            return null;
+        }
+
         foreach ([
             "statement_{$locale}",
             "description_{$locale}",

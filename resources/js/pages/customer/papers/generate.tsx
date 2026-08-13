@@ -308,6 +308,7 @@ interface ManualQuestion {
     medium?: ContentMedium | null;
     schemaKey: string;
     isObjective: boolean;
+    optionsOnly?: boolean;
     content: Record<string, unknown>;
     source: string | null;
     sourceLabel: string | null;
@@ -645,7 +646,8 @@ function paperQuestionFromManual(
     return {
         id,
         sourceQuestionId: question.id,
-        text: passageQuestions
+        optionsOnly: question.optionsOnly,
+        text: question.optionsOnly ? '' : passageQuestions
             ? passageText
             : localizedPaperHtml(
                   question.summaryTextEn,
@@ -755,6 +757,10 @@ function passageQuestionsFromManual(
 
 function answerTextFromManual(question: ManualQuestion): string | null {
     const content = question.content as Record<string, unknown> | null;
+
+    if (question.optionsOnly) {
+        return null;
+    }
 
     if (!content) {
         return null;

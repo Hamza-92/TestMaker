@@ -24,6 +24,7 @@ export default function AddQuestionType({
         have_answer: true,
         is_single: false,
         is_objective: isObjective,
+        options_only: false,
         schema_key: defaultSchema?.key ?? 'subjective_standard',
         status: '1',
     });

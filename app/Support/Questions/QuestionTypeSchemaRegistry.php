@@ -39,6 +39,7 @@ class QuestionTypeSchemaRegistry
                 'settings' => [
                     'supports_answer_toggle' => false,
                     'supports_single_toggle' => true,
+                    'supports_options_only' => true,
                 ],
             ],
             self::OBJECTIVE_TRUE_FALSE => [
@@ -59,6 +60,7 @@ class QuestionTypeSchemaRegistry
                 'settings' => [
                     'supports_answer_toggle' => false,
                     'supports_single_toggle' => true,
+                    'supports_options_only' => true,
                 ],
             ],
             self::OBJECTIVE_BLANK_OPEN => [
@@ -233,8 +235,12 @@ class QuestionTypeSchemaRegistry
     ): array {
         $collectAnswers = (bool) ($validated['have_answer'] ?? false);
         $singleCorrect = (bool) ($validated['is_single'] ?? true);
+        $optionsOnly = $isObjective
+            && (bool) ($validated['options_only'] ?? false)
+            && in_array($schemaKey, [self::OBJECTIVE_MCQ, self::OBJECTIVE_BLANK_CHOICE], true);
 
-        return match ($schemaKey) {
+
+        $legacy = match ($schemaKey) {
             self::OBJECTIVE_TRUE_FALSE => [
                 'have_exercise' => false,
                 'have_statement' => true,
@@ -324,6 +330,18 @@ class QuestionTypeSchemaRegistry
                 'column_per_row' => 1,
             ],
         };
+
+        if ($optionsOnly) {
+            $legacy['have_statement'] = false;
+            $legacy['statement_label'] = null;
+            $legacy['is_single'] = true;
+        }
+
+        if ($isObjective && in_array($schemaKey, [self::OBJECTIVE_MCQ, self::OBJECTIVE_BLANK_CHOICE], true)) {
+            $legacy['is_single'] = true;
+        }
+
+        return $legacy + ['options_only' => $optionsOnly];
     }
 
     public static function contentFromQuestion(Question $question, QuestionType $questionType): array
@@ -351,14 +369,21 @@ class QuestionTypeSchemaRegistry
         }
 
         if ($stored !== []) {
-            return array_replace_recursive($base, $stored);
+            $content = array_replace_recursive($base, $stored);
+
+            if ($questionType->options_only) {
+                $content['prompt_en'] = '';
+                $content['prompt_ur'] = '';
+            }
+
+            return $content;
         }
 
         return match ($schemaKey) {
             self::OBJECTIVE_MCQ,
             self::OBJECTIVE_BLANK_CHOICE => [
-                'prompt_en' => $question->statement_en ?? '',
-                'prompt_ur' => $question->statement_ur ?? '',
+                'prompt_en' => $questionType->options_only ? '' : ($question->statement_en ?? ''),
+                'prompt_ur' => $questionType->options_only ? '' : ($question->statement_ur ?? ''),
                 'options' => $question->options
                     ->map(fn (QuestionOption $option) => [
                         'text_en' => $option->text_en ?? '',
@@ -426,12 +451,12 @@ class QuestionTypeSchemaRegistry
             self::OBJECTIVE_MCQ,
             self::OBJECTIVE_BLANK_CHOICE => [
                 'content' => [
-                    'prompt_en' => self::normalizeText($normalized['prompt_en'] ?? null),
-                    'prompt_ur' => self::normalizeText($normalized['prompt_ur'] ?? null),
+                    'prompt_en' => $questionType->options_only ? null : self::normalizeText($normalized['prompt_en'] ?? null),
+                    'prompt_ur' => $questionType->options_only ? null : self::normalizeText($normalized['prompt_ur'] ?? null),
                     'options' => self::normalizeOptions($normalized['options'] ?? []),
                 ],
-                'statement_en' => self::normalizeText($normalized['prompt_en'] ?? null),
-                'statement_ur' => self::normalizeText($normalized['prompt_ur'] ?? null),
+                'statement_en' => $questionType->options_only ? null : self::normalizeText($normalized['prompt_en'] ?? null),
+                'statement_ur' => $questionType->options_only ? null : self::normalizeText($normalized['prompt_ur'] ?? null),
                 'description_en' => null,
                 'description_ur' => null,
                 'answer_en' => null,
@@ -553,7 +578,8 @@ class QuestionTypeSchemaRegistry
             self::OBJECTIVE_BLANK_CHOICE => self::validateChoiceQuestion(
                 $content,
                 $validator,
-                $questionType->is_single,
+                true,
+                ! (bool) $questionType->options_only,
             ),
             self::OBJECTIVE_TRUE_FALSE => self::validateTrueFalseQuestion(
                 $content,
@@ -597,6 +623,13 @@ class QuestionTypeSchemaRegistry
             'have_description' => $questionType->have_description,
             'have_answer' => $questionType->have_answer,
         ]);
+
+        if ((bool) $questionType->options_only) {
+            return self::firstFilled(
+                Arr::get($content, 'options.0.text_en'),
+                Arr::get($content, 'options.0.text_ur'),
+            ) ?? 'Options-only question';
+        }
 
         return match ($schema['key']) {
             self::OBJECTIVE_PASSAGE_MCQ => self::firstFilled(
@@ -765,8 +798,9 @@ class QuestionTypeSchemaRegistry
         array $content,
         Validator $validator,
         bool $singleCorrect,
+        bool $requiresPrompt = true,
     ): void {
-        if (! self::hasLocalizedValue($content, 'prompt')) {
+        if ($requiresPrompt && ! self::hasLocalizedValue($content, 'prompt')) {
             $validator->errors()->add('content.prompt_en', 'Question statement is required.');
         }
 
