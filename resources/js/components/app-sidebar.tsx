@@ -14,7 +14,6 @@ import {
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
-import { usePermission } from '@/hooks/use-permission';
 import {
     Sidebar,
     SidebarContent,
@@ -24,6 +23,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { usePermission } from '@/hooks/use-permission';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
@@ -45,6 +45,7 @@ export function AppSidebar() {
             items: [
                 { title: 'Objective Types',  href: '/superadmin/question-types/objective' },
                 { title: 'Subjective Types', href: '/superadmin/question-types/subjective' },
+                { title: 'OR Pairing Settings', href: '/superadmin/question-type-pairings' },
             ],
         }] : []),
         ...(can('users.view')          ? [{ title: 'Users', href: '/superadmin/users', icon: UserCogIcon }] : []),
