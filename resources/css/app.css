@@ -388,6 +388,20 @@ input[type='date']::-webkit-calendar-picker-indicator {
     margin-top: 0.2em;
     text-align: right;
 }
+.paper-bilingual-option--compact {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.paper-bilingual-option--compact .paper-bilingual-option__urdu {
+    margin-top: 0;
+}
+
+.paper-bilingual-option__separator {
+    opacity: 0.65;
+}
 
 .paper-option-line {
     display: inline;
