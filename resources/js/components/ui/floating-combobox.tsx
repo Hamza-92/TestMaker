@@ -30,6 +30,7 @@ interface FloatingComboboxProps {
     leadingIcon?: React.ElementType;
     /** Keep the accessible label while hiding its floating visual treatment. */
     hideLabel?: boolean;
+    placeholder?: string;
     className?: string;
 }
 
@@ -49,6 +50,7 @@ export function FloatingCombobox({
     disabledHint,
     leadingIcon: LeadingIcon,
     hideLabel = false,
+    placeholder,
     className,
 }: FloatingComboboxProps) {
     const [query, setQuery] = useState('');
@@ -130,8 +132,12 @@ export function FloatingCombobox({
                         ref={inputRef}
                         autoComplete="off"
                         aria-label={label}
+                        placeholder={placeholder}
                         className={cn(
-                            'h-full w-full bg-transparent text-sm font-medium text-slate-900 placeholder:text-transparent outline-none dark:text-slate-100',
+                            'h-full w-full bg-transparent text-sm font-medium text-slate-900 outline-none dark:text-slate-100',
+                            hideLabel
+                                ? 'placeholder:text-slate-400 dark:placeholder:text-slate-500'
+                                : 'placeholder:text-transparent',
                             LeadingIcon ? 'pl-2' : 'pl-3',
                             'pr-2',
                             disabled && 'cursor-not-allowed',

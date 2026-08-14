@@ -8286,6 +8286,7 @@ function QuestionSelectionCard({
                         orOptions.length > 0 && (
                             <FloatingCombobox
                                 label="OR alternative"
+                                placeholder="Select OR group"
                                 hideLabel
                                 leadingIcon={Link2Icon}
                                 className="min-w-[15rem] flex-1 sm:w-64 sm:flex-none"
