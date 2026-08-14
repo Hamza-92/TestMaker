@@ -54,6 +54,40 @@ function answerForQuestion(question: GeneratedPaperQuestion): string {
     return '\u2014';
 }
 
+function answerSectionNumber(
+    sections: GeneratedPaperSection[],
+    sectionIndex: number,
+): number {
+    const section = sections[sectionIndex];
+
+    if (section.category === 'Objective Questions') {
+        return 1;
+    }
+
+    if (section.orRole === 'alternative' && section.orGroupId) {
+        const primaryIndex = sections.findIndex(
+            (candidate) =>
+                candidate.orGroupId === section.orGroupId &&
+                candidate.orRole === 'primary',
+        );
+
+        if (primaryIndex >= 0) {
+            return answerSectionNumber(sections, primaryIndex);
+        }
+    }
+
+    return (
+        2 +
+        sections
+            .slice(0, sectionIndex)
+            .filter(
+                (candidate) =>
+                    candidate.category === 'Subjective Questions' &&
+                    candidate.orRole !== 'alternative',
+            ).length
+    );
+}
+
 export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
     const showSetLabel = paper.sections.length > 0;
 
@@ -89,7 +123,10 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                     <SectionAnswers
                         key={section.id}
                         section={section}
-                        sectionIndex={sectionIndex}
+                        sectionNumber={answerSectionNumber(
+                            paper.sections,
+                            sectionIndex,
+                        )}
                         settings={settings}
                     />
                 ))}
@@ -100,11 +137,11 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
 
 function SectionAnswers({
     section,
-    sectionIndex,
+    sectionNumber,
     settings,
 }: {
     section: GeneratedPaperSection;
-    sectionIndex: number;
+    sectionNumber: number;
     settings: PaperSettings;
 }) {
     return (
@@ -113,7 +150,11 @@ function SectionAnswers({
                 className="mb-1.5 text-sm font-semibold"
                 style={{ color: settings.textColor }}
             >
-                <span>Q.{sectionIndex + 1}</span>{' '}
+                {section.orRole === 'alternative' ? (
+                    <span>{section.orLabel ?? 'OR'} ·</span>
+                ) : (
+                    <span>Q.{sectionNumber}</span>
+                )}{' '}
                 <QuestionContent as="span" inline value={section.title} />
             </p>
             <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -124,7 +165,7 @@ function SectionAnswers({
                         style={{ color: settings.textColor }}
                     >
                         <span className="min-w-[1.75rem] font-medium">
-                            {sectionIndex + 1}.{questionIndex + 1}
+                            {sectionNumber}.{questionIndex + 1}
                         </span>
                         <QuestionContent
                             as="span"

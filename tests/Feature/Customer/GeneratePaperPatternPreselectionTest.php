@@ -4,10 +4,12 @@ use App\Enums\AccountType;
 use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\Chapter;
+use App\Models\PaperTemplate;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\QuestionTypeOrder;
+use App\Models\QuestionTypePairing;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\TrialSetting;
@@ -136,6 +138,15 @@ test('paper generator returns question types in the saved pattern class subject 
         'sort_order' => 2,
     ]);
 
+    $pairing = QuestionTypePairing::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'question_type_a_id' => min($first->id, $second->id),
+        'question_type_b_id' => max($first->id, $second->id),
+        'is_active' => true,
+    ]);
+
     $this->actingAs($customer)
         ->getJson(route('customer.papers.generate.question-types', [
             'chapter_ids' => [$chapter->id],
@@ -145,5 +156,70 @@ test('paper generator returns question types in the saved pattern class subject 
         ->assertJsonPath('sections.0.questionTypeId', $second->id)
         ->assertJsonPath('sections.0.sortOrder', 1)
         ->assertJsonPath('sections.1.questionTypeId', $first->id)
-        ->assertJsonPath('sections.1.sortOrder', 2);
+        ->assertJsonPath('sections.1.sortOrder', 2)
+        ->assertJsonCount(1, 'pairings')
+        ->assertJsonPath('pairings.0.id', $pairing->id)
+        ->assertJsonPath('pairings.0.questionTypeAId', min($first->id, $second->id))
+        ->assertJsonPath('pairings.0.questionTypeBId', max($first->id, $second->id));
+
+    $pairing->update(['is_active' => false]);
+
+    $this->actingAs($customer)
+        ->getJson(route('customer.papers.generate.question-types', [
+            'chapter_ids' => [$chapter->id],
+            'sources' => [Question::SOURCE_EXERCISE],
+        ]))
+        ->assertOk()
+        ->assertJsonCount(0, 'pairings');
+});
+
+test('paper templates preserve OR metadata without double counting alternative marks', function () {
+    $customer = User::factory()->create([
+        'user_type' => UserType::Customer->value,
+        'status' => UserStatus::Active->value,
+        'account_type' => AccountType::Trial->value,
+    ]);
+    TrialSetting::current()->update(['access_scope' => null]);
+
+    $this->actingAs($customer)
+        ->postJson(route('customer.templates.store'), [
+            'name' => 'Paired subjective template',
+            'description' => null,
+            'settings' => ['headingSize' => 12],
+            'structure' => [
+                'sections' => [
+                    [
+                        'questionTypeId' => 10,
+                        'category' => 'Subjective Questions',
+                        'title' => 'Primary type',
+                        'requiredQuestions' => 2,
+                        'totalQuestions' => 3,
+                        'marksEach' => 5,
+                        'columns' => 1,
+                        'orPairingId' => 4,
+                        'orQuestionTypeId' => 11,
+                        'orRole' => 'primary',
+                    ],
+                    [
+                        'questionTypeId' => 11,
+                        'category' => 'Subjective Questions',
+                        'title' => 'Alternative type',
+                        'requiredQuestions' => 2,
+                        'totalQuestions' => 3,
+                        'marksEach' => 5,
+                        'columns' => 1,
+                        'orPairingId' => 4,
+                        'orQuestionTypeId' => 10,
+                        'orRole' => 'alternative',
+                    ],
+                ],
+            ],
+        ])
+        ->assertCreated();
+
+    $template = PaperTemplate::query()->where('user_id', $customer->id)->sole();
+
+    expect($template->structure['total_marks'])->toBe(10)
+        ->and($template->structure['sections'][0]['orRole'])->toBe('primary')
+        ->and($template->structure['sections'][1]['orRole'])->toBe('alternative');
 });

@@ -8,6 +8,7 @@ use App\Models\ClassSubject;
 use App\Models\PaperTemplate;
 use App\Models\Pattern;
 use App\Models\Question;
+use App\Models\QuestionTypePairing;
 use App\Support\AppUserAccess;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
@@ -188,7 +189,7 @@ class GeneratePaperController extends Controller
         $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
 
         if ($sources->isEmpty()) {
-            return response()->json(['sections' => []]);
+            return response()->json(['sections' => [], 'pairings' => []]);
         }
 
         $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
@@ -247,7 +248,31 @@ class GeneratePaperController extends Controller
             'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
         ]);
 
-        return response()->json(['sections' => $sections]);
+        $availableSubjectiveTypeIds = $rows
+            ->filter(fn ($row) => ! (bool) $row->is_objective)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        $pairings = QuestionTypePairing::query()
+            ->where('pattern_id', (int) $scope->pattern_id)
+            ->where('class_id', (int) $scope->class_id)
+            ->where('subject_id', (int) $scope->subject_id)
+            ->where('is_active', true)
+            ->whereIn('question_type_a_id', $availableSubjectiveTypeIds)
+            ->whereIn('question_type_b_id', $availableSubjectiveTypeIds)
+            ->orderBy('id')
+            ->get(['id', 'question_type_a_id', 'question_type_b_id'])
+            ->map(fn (QuestionTypePairing $pairing) => [
+                'id' => $pairing->id,
+                'questionTypeAId' => $pairing->question_type_a_id,
+                'questionTypeBId' => $pairing->question_type_b_id,
+            ])
+            ->values();
+
+        return response()->json([
+            'sections' => $sections,
+            'pairings' => $pairings,
+        ]);
     }
 
     public function questions(Request $request): JsonResponse

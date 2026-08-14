@@ -55,6 +55,12 @@ export interface GeneratedPaperSection {
      * back per-template via `clampSectionColumns`.
      */
     columns?: number;
+    /** Optional metadata for a subjective question type rendered as an OR group. */
+    orGroupId?: string | null;
+    orPairingId?: number | null;
+    orQuestionTypeId?: number | null;
+    orRole?: 'primary' | 'alternative' | null;
+    orLabel?: string | null;
 }
 
 export const MIN_SECTION_COLUMNS = 1;

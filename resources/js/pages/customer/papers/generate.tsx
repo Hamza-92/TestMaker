@@ -14,6 +14,7 @@ import {
     LayersIcon,
     LayoutTemplateIcon,
     ListChecksIcon,
+    Link2Icon,
     Loader2Icon,
     MinusIcon,
     PlusIcon,
@@ -179,9 +180,15 @@ function sectionHeadingNumber(
 ): number | null {
     const section = sections[sectionIndex];
 
+    if (section.orRole === 'alternative') {
+        return null;
+    }
+
     if (section.category === 'Objective Questions') {
         return sections.findIndex(
-            (candidate) => candidate.category === 'Objective Questions',
+            (candidate) =>
+                candidate.category === 'Objective Questions' &&
+                candidate.orRole !== 'alternative',
         ) === sectionIndex
             ? 1
             : null;
@@ -192,7 +199,9 @@ function sectionHeadingNumber(
         sections
             .slice(0, sectionIndex)
             .filter(
-                (candidate) => candidate.category === 'Subjective Questions',
+                (candidate) =>
+                    candidate.category === 'Subjective Questions' &&
+                    candidate.orRole !== 'alternative',
             ).length
     );
 }
@@ -210,6 +219,9 @@ interface AppliedTemplate {
             totalQuestions: number;
             marksEach: number;
             columns?: number;
+            orPairingId?: number | null;
+            orQuestionTypeId?: number | null;
+            orRole?: 'primary' | 'alternative' | null;
         }>;
         total_marks?: number;
     };
@@ -246,6 +258,13 @@ interface QuestionSelectionRow {
     marksPerQuestion: string;
     choiceQuestions: string;
     selectedQuestionIds: number[];
+    orSelectedQuestionIds?: number[];
+}
+
+interface QuestionTypePairing {
+    id: number;
+    questionTypeAId: number;
+    questionTypeBId: number;
 }
 
 interface QuestionSelectionSection {
@@ -263,6 +282,8 @@ interface QuestionSelectionSection {
     columnPerRow: number;
     sortOrder?: number | null;
     selectionMode?: SelectionMode;
+    orPairingId?: number | null;
+    orQuestionTypeId?: number | null;
     rows: QuestionSelectionRow[];
 }
 
@@ -324,15 +345,22 @@ interface ManualQuestion {
     } | null;
 }
 
+type ManualPickerSide = 'primary' | 'alternative';
+
 interface ManualPickerRow {
     section: QuestionSelectionSection;
     row: QuestionSelectionRow;
     target: number;
+    side: ManualPickerSide;
+    questionTypeId: number;
+    selectedQuestionIds: number[];
+    title: string;
 }
 
 interface ManualPickerTarget {
     sectionId: string;
     rowId: string;
+    side: ManualPickerSide;
 }
 
 interface PaperQuestionPickerTarget {
@@ -428,6 +456,7 @@ function createQuestionRow(id: string): QuestionSelectionRow {
         marksPerQuestion: '',
         choiceQuestions: '',
         selectedQuestionIds: [],
+        orSelectedQuestionIds: [],
     };
 }
 
@@ -467,6 +496,10 @@ function normalizeQuestionRow(
     return {
         ...normalized,
         selectedQuestionIds: normalized.selectedQuestionIds.slice(
+            0,
+            rowTarget(normalized),
+        ),
+        orSelectedQuestionIds: (normalized.orSelectedQuestionIds ?? []).slice(
             0,
             rowTarget(normalized),
         ),
@@ -871,7 +904,10 @@ function paperOptionsFromContent(
 
 function paperTotalMarks(paper: GeneratedPaper): number {
     return paper.sections.reduce(
-        (sum, section) => sum + section.requiredQuestions * section.marksEach,
+        (sum, section) =>
+            section.orRole === 'alternative'
+                ? sum
+                : sum + section.requiredQuestions * section.marksEach,
         0,
     );
 }
@@ -881,10 +917,19 @@ function sectionTotal(section: QuestionSelectionSection): number {
 }
 
 function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
+    const alternativeTypeIds = new Set(
+        state.sections
+            .map((section) => section.orQuestionTypeId)
+            .filter((id): id is number => typeof id === 'number'),
+    );
+
     return {
         ...state,
         totalMarks: state.sections.reduce(
-            (sum, section) => sum + sectionTotal(section),
+            (sum, section) =>
+                alternativeTypeIds.has(section.questionTypeId)
+                    ? sum
+                    : sum + sectionTotal(section),
             0,
         ),
     };
@@ -909,15 +954,36 @@ function sortIncomingQuestionTypes(
 function mergeQuestionSections(
     incoming: QuestionTypeCount[],
     existing: QuestionSelectionSection[],
+    pairings: QuestionTypePairing[],
 ): QuestionSelectionSection[] {
     const existingByType = new Map(
         existing.map((section) => [section.questionTypeId, section]),
     );
     const orderedIncoming = sortIncomingQuestionTypes(incoming);
+    const incomingIds = new Set(
+        orderedIncoming.map((section) => section.questionTypeId),
+    );
+    const pairingById = new Map(
+        pairings.map((pairing) => [pairing.id, pairing]),
+    );
 
-    return orderedIncoming.map((item) => {
+    const merged = orderedIncoming.map((item) => {
         const current = existingByType.get(item.questionTypeId);
         const sectionId = current?.id ?? `sec_type_${item.questionTypeId}`;
+        const pairing =
+            typeof current?.orPairingId === 'number'
+                ? pairingById.get(current.orPairingId)
+                : null;
+        const counterpartId =
+            pairing?.questionTypeAId === item.questionTypeId
+                ? pairing.questionTypeBId
+                : pairing?.questionTypeBId === item.questionTypeId
+                  ? pairing.questionTypeAId
+                  : null;
+        const keepsPairing =
+            counterpartId !== null &&
+            counterpartId === current?.orQuestionTypeId &&
+            incomingIds.has(counterpartId);
 
         return {
             id: sectionId,
@@ -933,10 +999,31 @@ function mergeQuestionSections(
             columnPerRow: item.columnPerRow,
             sortOrder: item.sortOrder,
             selectionMode: current?.selectionMode ?? 'automatic',
+            orPairingId: keepsPairing ? pairing?.id : null,
+            orQuestionTypeId: keepsPairing ? counterpartId : null,
             rows: normalizeSectionRows(
                 current?.rows ?? [createQuestionRow(`${sectionId}_row_001`)],
                 item.availableCount,
             ),
+        };
+    });
+
+    const mergedByType = new Map(
+        merged.map((section) => [section.questionTypeId, section]),
+    );
+
+    return merged.map((section) => {
+        const alternative =
+            typeof section.orQuestionTypeId === 'number'
+                ? mergedByType.get(section.orQuestionTypeId)
+                : null;
+        const availableCount = alternative
+            ? Math.min(section.availableCount, alternative.availableCount)
+            : section.availableCount;
+
+        return {
+            ...section,
+            rows: normalizeSectionRows(section.rows, availableCount),
         };
     });
 }
@@ -1610,6 +1697,9 @@ export default function GeneratePaper({
             sections: [],
             totalMarks: 0,
         });
+    const [questionTypePairings, setQuestionTypePairings] = useState<
+        QuestionTypePairing[]
+    >([]);
     const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved'>(
         'idle',
     );
@@ -1619,7 +1709,7 @@ export default function GeneratePaper({
     const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSavedRef = useRef<number | null>(null);
     const isRestoringRef = useRef(false);
-    const [pendingTemplate, setPendingTemplate] =
+    const [pendingTemplate] =
         useState<AppliedTemplate | null>(appliedTemplate ?? null);
     const templateStructureAppliedRef = useRef(false);
     const templateSettingsAppliedRef = useRef(false);
@@ -1722,26 +1812,72 @@ export default function GeneratePaper({
 
     const selectedChapterCount = selectedChapterIds.length;
     const canContinueToQuestions = selectedChapterCount > 0;
-    const questionSelectionRows = useMemo(
+    const foldedAlternativeTypeIds = useMemo(
         () =>
-            questionSelection.sections.flatMap((section) =>
-                section.rows
-                    .map((row) => ({
-                        section,
-                        row,
-                        target: rowTarget(row),
-                    }))
-                    .filter((item) => item.target > 0),
+            new Set(
+                questionSelection.sections
+                    .map((section) => section.orQuestionTypeId)
+                    .filter((id): id is number => typeof id === 'number'),
             ),
         [questionSelection.sections],
     );
+    const questionSelectionRows = useMemo(
+        () =>
+            questionSelection.sections
+                .filter(
+                    (section) =>
+                        !foldedAlternativeTypeIds.has(section.questionTypeId),
+                )
+                .flatMap((section) =>
+                    section.rows
+                        .map((row) => ({
+                            section,
+                            row,
+                            target: rowTarget(row),
+                        }))
+                        .filter((item) => item.target > 0),
+                ),
+        [foldedAlternativeTypeIds, questionSelection.sections],
+    );
     const manualPickerRows = useMemo(
         () =>
-            questionSelectionRows.filter(
-                (item) =>
-                    questionSectionSelectionMode(item.section) === 'manual',
-            ),
-        [questionSelectionRows],
+            questionSelectionRows.flatMap((item): ManualPickerRow[] => {
+                if (questionSectionSelectionMode(item.section) !== 'manual') {
+                    return [];
+                }
+
+                const rows: ManualPickerRow[] = [
+                    {
+                        ...item,
+                        side: 'primary',
+                        questionTypeId: item.section.questionTypeId,
+                        selectedQuestionIds: item.row.selectedQuestionIds,
+                        title: englishQuestionTypeTitle(item.section),
+                    },
+                ];
+
+                if (typeof item.section.orQuestionTypeId === 'number') {
+                    const alternative = questionSelection.sections.find(
+                        (section) =>
+                            section.questionTypeId ===
+                            item.section.orQuestionTypeId,
+                    );
+
+                    rows.push({
+                        ...item,
+                        side: 'alternative',
+                        questionTypeId: item.section.orQuestionTypeId,
+                        selectedQuestionIds:
+                            item.row.orSelectedQuestionIds ?? [],
+                        title: alternative
+                            ? englishQuestionTypeTitle(alternative)
+                            : 'OR alternative',
+                    });
+                }
+
+                return rows;
+            }),
+        [questionSelection.sections, questionSelectionRows],
     );
     const activeManualPickerRow = useMemo(
         () =>
@@ -1749,7 +1885,8 @@ export default function GeneratePaper({
                 ? (manualPickerRows.find(
                       (item) =>
                           item.section.id === manualPickerTarget.sectionId &&
-                          item.row.id === manualPickerTarget.rowId,
+                          item.row.id === manualPickerTarget.rowId &&
+                          item.side === manualPickerTarget.side,
                   ) ?? null)
                 : null,
         [manualPickerRows, manualPickerTarget],
@@ -1757,14 +1894,12 @@ export default function GeneratePaper({
     const selectedManualQuestionIds = useMemo(
         () =>
             new Set(
-                manualPickerRows.flatMap(
-                    (item) => item.row.selectedQuestionIds,
-                ),
+                manualPickerRows.flatMap((item) => item.selectedQuestionIds),
             ),
         [manualPickerRows],
     );
     const isManualSelectionComplete = manualPickerRows.every(
-        (item) => item.row.selectedQuestionIds.length === item.target,
+        (item) => item.selectedQuestionIds.length === item.target,
     );
     const isQuestionSelectionReady =
         questionSelectionRows.length > 0 &&
@@ -1778,10 +1913,10 @@ export default function GeneratePaper({
         isQuestionSelectionReady &&
         isManualSelectionComplete;
     const activeManualQuestionTypeId =
-        activeManualPickerRow?.section.questionTypeId ?? null;
+        activeManualPickerRow?.questionTypeId ?? null;
     const activeManualSelectedQuestionIds = useMemo(
-        () => new Set(activeManualPickerRow?.row.selectedQuestionIds ?? []),
-        [activeManualPickerRow?.row.selectedQuestionIds],
+        () => new Set(activeManualPickerRow?.selectedQuestionIds ?? []),
+        [activeManualPickerRow?.selectedQuestionIds],
     );
     const filteredManualQuestions = useMemo(() => {
         const search = manualSearch.trim().toLowerCase();
@@ -2138,22 +2273,32 @@ export default function GeneratePaper({
                     ? response.json()
                     : Promise.reject(response.statusText),
             )
-            .then((data: { sections: QuestionTypeCount[] }) => {
-                setQuestionSelection((current) =>
-                    withTotalMarks({
-                        ...current,
-                        sections: mergeQuestionSections(
-                            data.sections,
-                            current.sections,
-                        ),
-                    }),
-                );
-            })
+            .then(
+                (data: {
+                    sections: QuestionTypeCount[];
+                    pairings?: QuestionTypePairing[];
+                }) => {
+                    const pairings = data.pairings ?? [];
+
+                    setQuestionTypePairings(pairings);
+                    setQuestionSelection((current) =>
+                        withTotalMarks({
+                            ...current,
+                            sections: mergeQuestionSections(
+                                data.sections,
+                                current.sections,
+                                pairings,
+                            ),
+                        }),
+                    );
+                },
+            )
             .catch((error) => {
                 if (error?.name !== 'AbortError') {
                     setQuestionSectionError(
                         'Unable to load question counts. Please try again.',
                     );
+                    setQuestionTypePairings([]);
                     setQuestionSelection((current) =>
                         withTotalMarks({ ...current, sections: [] }),
                     );
@@ -2162,7 +2307,13 @@ export default function GeneratePaper({
             .finally(() => setLoadingQuestionSections(false));
 
         return () => abortController.abort();
-    }, [activeSourceValues, selectedChapterIds, selectedTopicIds, step]);
+    }, [
+        activeSourceValues,
+        chapterMedium,
+        selectedChapterIds,
+        selectedTopicIds,
+        step,
+    ]);
 
     useEffect(() => {
         if (
@@ -2223,9 +2374,32 @@ export default function GeneratePaper({
                         section.availableCount,
                     );
 
+                    const validPairing =
+                        match.orRole === 'primary' &&
+                        typeof match.orPairingId === 'number' &&
+                        typeof match.orQuestionTypeId === 'number' &&
+                        questionTypePairings.some(
+                            (pairing) =>
+                                pairing.id === match.orPairingId &&
+                                ((pairing.questionTypeAId ===
+                                    section.questionTypeId &&
+                                    pairing.questionTypeBId ===
+                                        match.orQuestionTypeId) ||
+                                    (pairing.questionTypeBId ===
+                                        section.questionTypeId &&
+                                        pairing.questionTypeAId ===
+                                            match.orQuestionTypeId)),
+                        );
+
                     return {
                         ...section,
                         columnPerRow: match.columns ?? section.columnPerRow,
+                        orPairingId: validPairing
+                            ? match.orPairingId
+                            : section.orPairingId,
+                        orQuestionTypeId: validPairing
+                            ? match.orQuestionTypeId
+                            : section.orQuestionTypeId,
                         rows,
                     };
                 }),
@@ -2233,7 +2407,11 @@ export default function GeneratePaper({
         );
 
         templateStructureAppliedRef.current = true;
-    }, [pendingTemplate, questionSelection.sections.length]);
+    }, [
+        pendingTemplate,
+        questionSelection.sections.length,
+        questionTypePairings,
+    ]);
 
     useEffect(() => {
         if (
@@ -2321,6 +2499,7 @@ export default function GeneratePaper({
     }, [
         activeManualQuestionTypeId,
         activeSourceValues,
+        chapterMedium,
         manualPickerTarget,
         selectedChapterIds,
         selectedTopicIds,
@@ -2468,6 +2647,7 @@ export default function GeneratePaper({
             sections: [],
             totalMarks: 0,
         });
+        setQuestionTypePairings([]);
         setManualPickerTarget(null);
         setManualQuestions([]);
         setManualQuestionError(null);
@@ -2699,9 +2879,16 @@ export default function GeneratePaper({
         }
     }
 
-    function openManualQuestionPicker(sectionId: string, rowId: string) {
+    function openManualQuestionPicker(
+        sectionId: string,
+        rowId: string,
+        side: ManualPickerSide = 'primary',
+    ) {
         const row = manualPickerRows.find(
-            (item) => item.section.id === sectionId && item.row.id === rowId,
+            (item) =>
+                item.section.id === sectionId &&
+                item.row.id === rowId &&
+                item.side === side,
         );
 
         if (!row) {
@@ -2710,7 +2897,7 @@ export default function GeneratePaper({
 
         setManualSearch('');
         setShowSelectedManualQuestions(false);
-        setManualPickerTarget({ sectionId, rowId });
+        setManualPickerTarget({ sectionId, rowId, side });
     }
 
     function closeManualQuestionPicker() {
@@ -2789,23 +2976,38 @@ export default function GeneratePaper({
         setPaperGenerationError(null);
 
         try {
-            const activeRows = questionSelection.sections.flatMap((section) =>
-                section.rows
-                    .map((row) => ({
-                        section,
-                        row,
-                        target: rowTarget(row),
-                    }))
-                    .filter(
-                        (item) =>
-                            item.target > 0 &&
-                            toNumber(item.row.requiredQuestions) > 0 &&
-                            toNumber(item.row.marksPerQuestion) > 0,
-                    ),
+            const alternativeTypeIds = new Set(
+                questionSelection.sections
+                    .map((section) => section.orQuestionTypeId)
+                    .filter((id): id is number => typeof id === 'number'),
             );
+            const activeRows = questionSelection.sections
+                .filter(
+                    (section) =>
+                        !alternativeTypeIds.has(section.questionTypeId),
+                )
+                .flatMap((section) =>
+                    section.rows
+                        .map((row) => ({
+                            section,
+                            row,
+                            target: rowTarget(row),
+                        }))
+                        .filter(
+                            (item) =>
+                                item.target > 0 &&
+                                toNumber(item.row.requiredQuestions) > 0 &&
+                                toNumber(item.row.marksPerQuestion) > 0,
+                        ),
+                );
             const questionTypeIds = [
                 ...new Set(
-                    activeRows.map((item) => item.section.questionTypeId),
+                    activeRows.flatMap((item) => [
+                        item.section.questionTypeId,
+                        ...(typeof item.section.orQuestionTypeId === 'number'
+                            ? [item.section.orQuestionTypeId]
+                            : []),
+                    ]),
                 ),
             ];
             const poolEntries = await Promise.all(
@@ -2819,11 +3021,30 @@ export default function GeneratePaper({
                 ManualQuestion[]
             >;
             const usedQuestionIds = new Set<number>();
-            const sections = activeRows.map(({ section, row }) => {
-                const pool = pools[section.questionTypeId] ?? [];
+            const sectionsByType = new Map(
+                questionSelection.sections.map((section) => [
+                    section.questionTypeId,
+                    section,
+                ]),
+            );
+            const orLabel =
+                chapterMedium === 'Urdu'
+                    ? '\u06cc\u0627'
+                    : chapterMedium === 'Both'
+                      ? 'OR / \u06cc\u0627'
+                      : 'OR';
+
+            function selectQuestions(
+                questionTypeId: number,
+                manualIds: number[],
+                target: number,
+                title: string,
+                mode: SelectionMode,
+            ): ManualQuestion[] {
+                const pool = pools[questionTypeId] ?? [];
                 const selectedQuestions =
-                    questionSectionSelectionMode(section) === 'manual'
-                        ? row.selectedQuestionIds
+                    mode === 'manual'
+                        ? manualIds
                               .map((id) =>
                                   pool.find((question) => question.id === id),
                               )
@@ -2835,11 +3056,13 @@ export default function GeneratePaper({
                                   (question) =>
                                       !usedQuestionIds.has(question.id),
                               ),
-                          ).slice(0, rowTarget(row));
+                          ).slice(0, target);
 
-                if (selectedQuestions.length < rowTarget(row)) {
+                if (selectedQuestions.length < target) {
                     throw new Error(
-                        `Not enough questions found for ${plainQuestionText(section.title)}.`,
+                        'Not enough questions found for ' +
+                            plainQuestionText(title) +
+                            '.',
                     );
                 }
 
@@ -2847,22 +3070,39 @@ export default function GeneratePaper({
                     usedQuestionIds.add(question.id),
                 );
 
+                return selectedQuestions;
+            }
+
+            function generatedSectionFromSelection(
+                sourceSection: QuestionSelectionSection,
+                row: QuestionSelectionRow,
+                selectedQuestions: ManualQuestion[],
+                id: string,
+                metadata: Pick<
+                    GeneratedPaperSection,
+                    | 'orGroupId'
+                    | 'orPairingId'
+                    | 'orQuestionTypeId'
+                    | 'orRole'
+                    | 'orLabel'
+                >,
+            ): GeneratedPaperSection {
                 return {
-                    id: `${section.id}_${row.id}`,
-                    questionTypeId: section.questionTypeId,
-                    category: section.category,
-                    title: section.heading || section.title,
+                    id,
+                    questionTypeId: sourceSection.questionTypeId,
+                    category: sourceSection.category,
+                    title: sourceSection.heading || sourceSection.title,
                     titleEnglish:
                         chapterMedium !== 'Urdu'
-                            ? section.headingEnglish ||
-                              section.titleEnglish ||
-                              section.title
+                            ? sourceSection.headingEnglish ||
+                              sourceSection.titleEnglish ||
+                              sourceSection.title
                             : null,
                     titleUrdu:
                         chapterMedium !== 'English'
-                            ? section.headingUrdu ||
-                              section.titleUrdu ||
-                              section.title
+                            ? sourceSection.headingUrdu ||
+                              sourceSection.titleUrdu ||
+                              sourceSection.title
                             : null,
                     requiredQuestions: toNumber(row.requiredQuestions),
                     totalQuestions: rowTarget(row),
@@ -2873,10 +3113,90 @@ export default function GeneratePaper({
                             nextPaperQuestionId(),
                         ),
                     ),
-                    columns: clampSectionColumns(section.columnPerRow, 1),
+                    columns: clampSectionColumns(sourceSection.columnPerRow, 1),
+                    ...metadata,
                 };
-            });
+            }
 
+            const sections = activeRows.flatMap(
+                ({ section, row }): GeneratedPaperSection[] => {
+                    const mode = questionSectionSelectionMode(section);
+                    const primaryQuestions = selectQuestions(
+                        section.questionTypeId,
+                        row.selectedQuestionIds,
+                        rowTarget(row),
+                        section.title,
+                        mode,
+                    );
+                    const alternative =
+                        typeof section.orQuestionTypeId === 'number'
+                            ? sectionsByType.get(section.orQuestionTypeId)
+                            : null;
+
+                    if (
+                        !alternative ||
+                        typeof section.orPairingId !== 'number'
+                    ) {
+                        return [
+                            generatedSectionFromSelection(
+                                section,
+                                row,
+                                primaryQuestions,
+                                section.id + '_' + row.id,
+                                {
+                                    orGroupId: null,
+                                    orPairingId: null,
+                                    orQuestionTypeId: null,
+                                    orRole: null,
+                                    orLabel: null,
+                                },
+                            ),
+                        ];
+                    }
+
+                    const groupId = 'or_' + section.id + '_' + row.id;
+                    const alternativeQuestions = selectQuestions(
+                        alternative.questionTypeId,
+                        row.orSelectedQuestionIds ?? [],
+                        rowTarget(row),
+                        alternative.title,
+                        mode,
+                    );
+
+                    return [
+                        generatedSectionFromSelection(
+                            section,
+                            row,
+                            primaryQuestions,
+                            section.id + '_' + row.id,
+                            {
+                                orGroupId: groupId,
+                                orPairingId: section.orPairingId,
+                                orQuestionTypeId: alternative.questionTypeId,
+                                orRole: 'primary',
+                                orLabel,
+                            },
+                        ),
+                        generatedSectionFromSelection(
+                            alternative,
+                            row,
+                            alternativeQuestions,
+                            section.id +
+                                '_' +
+                                row.id +
+                                '_or_' +
+                                alternative.questionTypeId,
+                            {
+                                orGroupId: groupId,
+                                orPairingId: section.orPairingId,
+                                orQuestionTypeId: section.questionTypeId,
+                                orRole: 'alternative',
+                                orLabel,
+                            },
+                        ),
+                    ];
+                },
+            );
             setQuestionPoolsByType(pools);
             setGeneratedPaper({
                 id: `paper_${Date.now()}`,
@@ -3276,6 +3596,9 @@ export default function GeneratePaper({
                 totalQuestions: section.totalQuestions,
                 marksEach: section.marksEach,
                 columns: section.columns ?? null,
+                orPairingId: section.orPairingId ?? null,
+                orQuestionTypeId: section.orQuestionTypeId ?? null,
+                orRole: section.orRole ?? null,
             })),
         };
 
@@ -3580,102 +3903,160 @@ export default function GeneratePaper({
             return;
         }
 
-        const section = generatedPaper.sections.find(
-            (item) => item.id === sectionId,
+        const target = generatedPaper.sections.find(
+            (section) => section.id === sectionId,
         );
 
-        if (!section?.questionTypeId) {
+        if (!target?.questionTypeId) {
             return;
         }
 
-        const candidates = (
-            questionPoolsByType[section.questionTypeId] ?? []
-        ).filter((question) => !generatedSourceQuestionIds.has(question.id));
-        const nextQuestion = shuffledQuestions(candidates)[0];
+        const affectedSections = target.orGroupId
+            ? generatedPaper.sections.filter(
+                  (section) => section.orGroupId === target.orGroupId,
+              )
+            : [target];
+        const reservedQuestionIds = new Set(generatedSourceQuestionIds);
+        const additions = new Map<string, GeneratedPaperQuestion>();
 
-        if (!nextQuestion) {
-            return;
+        for (const section of affectedSections) {
+            if (!section.questionTypeId) {
+                return;
+            }
+
+            const candidates = (
+                questionPoolsByType[section.questionTypeId] ?? []
+            ).filter((question) => !reservedQuestionIds.has(question.id));
+            const nextQuestion = shuffledQuestions(candidates)[0];
+
+            if (!nextQuestion) {
+                toast.error(
+                    target.orGroupId
+                        ? 'Both OR alternatives need an unused question before the choice count can increase.'
+                        : 'No unused questions are available for this section.',
+                );
+
+                return;
+            }
+
+            reservedQuestionIds.add(nextQuestion.id);
+            additions.set(
+                section.id,
+                paperQuestionFromManual(
+                    nextQuestion,
+                    nextPaperQuestionId(),
+                ),
+            );
         }
-
-        const paperQuestion = paperQuestionFromManual(
-            nextQuestion,
-            nextPaperQuestionId(),
-        );
 
         setGeneratedPaper((current) =>
             current
                 ? {
                       ...current,
-                      sections: current.sections.map((item) =>
-                          item.id === sectionId
+                      sections: current.sections.map((section) => {
+                          const addition = additions.get(section.id);
+
+                          return addition
                               ? {
-                                    ...item,
-                                    totalQuestions: item.totalQuestions + 1,
+                                    ...section,
+                                    totalQuestions:
+                                        section.totalQuestions + 1,
                                     questions: [
-                                        ...item.questions,
-                                        paperQuestion,
+                                        ...section.questions,
+                                        addition,
                                     ],
                                 }
-                              : item,
-                      ),
+                              : section;
+                      }),
                   }
                 : current,
         );
     }
 
     function addCustomPaperQuestion(sectionId: string) {
-        const paperQuestion = createCustomPaperQuestion(
-            nextPaperQuestionId('custom_q'),
-        );
+        setGeneratedPaper((current) => {
+            if (!current) {
+                return current;
+            }
 
-        setGeneratedPaper((current) =>
-            current
-                ? {
-                      ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === sectionId
-                              ? {
-                                    ...section,
-                                    totalQuestions: section.totalQuestions + 1,
-                                    questions: [
-                                        ...section.questions,
-                                        paperQuestion,
-                                    ],
-                                }
-                              : section,
-                      ),
-                  }
-                : current,
-        );
+            const target = current.sections.find(
+                (section) => section.id === sectionId,
+            );
+
+            if (!target) {
+                return current;
+            }
+
+            return {
+                ...current,
+                sections: current.sections.map((section) => {
+                    const belongsToTarget =
+                        section.id === target.id ||
+                        (target.orGroupId &&
+                            section.orGroupId === target.orGroupId);
+
+                    return belongsToTarget
+                        ? {
+                              ...section,
+                              totalQuestions: section.totalQuestions + 1,
+                              questions: [
+                                  ...section.questions,
+                                  createCustomPaperQuestion(
+                                      nextPaperQuestionId('custom_q'),
+                                  ),
+                              ],
+                          }
+                        : section;
+                }),
+            };
+        });
     }
 
     function removePaperQuestion(sectionId: string, questionId: string) {
-        setGeneratedPaper((current) =>
-            current
-                ? {
-                      ...current,
-                      sections: current.sections.map((section) => {
-                          if (section.id !== sectionId) {
-                              return section;
-                          }
+        setGeneratedPaper((current) => {
+            if (!current) {
+                return current;
+            }
 
-                          const questions = section.questions.filter(
-                              (question) => question.id !== questionId,
-                          );
+            const target = current.sections.find(
+                (section) => section.id === sectionId,
+            );
+            const questionIndex = target?.questions.findIndex(
+                (question) => question.id === questionId,
+            );
 
-                          return {
-                              ...section,
-                              totalQuestions: questions.length,
-                              requiredQuestions: Math.min(
-                                  section.requiredQuestions,
-                                  questions.length,
-                              ),
-                              questions,
-                          };
-                      }),
-                  }
-                : current,
-        );
+            if (!target || questionIndex === undefined || questionIndex < 0) {
+                return current;
+            }
+
+            return {
+                ...current,
+                sections: current.sections.map((section) => {
+                    const belongsToTarget =
+                        section.id === target.id ||
+                        (target.orGroupId &&
+                            section.orGroupId === target.orGroupId);
+
+                    if (!belongsToTarget) {
+                        return section;
+                    }
+
+                    const questions = section.questions.filter(
+                        (_, index) => index !== questionIndex,
+                    );
+
+                    return {
+                        ...section,
+                        totalQuestions: questions.length,
+                        requiredQuestions: Math.min(
+                            section.requiredQuestions,
+                            questions.length,
+                        ),
+                        questions,
+                    };
+                }),
+            };
+        });
     }
 
     function openPaperSectionEditor(sectionId: string) {
@@ -3699,19 +4080,30 @@ export default function GeneratePaper({
             current
                 ? {
                       ...current,
-                      sections: current.sections.map((section) =>
-                          section.id === activePaperSectionEditorContext.id
-                              ? {
-                                    ...section,
-                                    title: values.title,
-                                    requiredQuestions: Math.min(
-                                        values.requiredQuestions,
-                                        section.questions.length,
-                                    ),
-                                    marksEach: values.marksEach,
-                                }
-                              : section,
-                      ),
+                      sections: current.sections.map((section) => {
+                          const sameOrGroup =
+                              activePaperSectionEditorContext.orGroupId &&
+                              section.orGroupId ===
+                                  activePaperSectionEditorContext.orGroupId;
+                          const isEditedSection =
+                              section.id === activePaperSectionEditorContext.id;
+
+                          if (!isEditedSection && !sameOrGroup) {
+                              return section;
+                          }
+
+                          return {
+                              ...section,
+                              title: isEditedSection
+                                  ? values.title
+                                  : section.title,
+                              requiredQuestions: Math.min(
+                                  values.requiredQuestions,
+                                  section.questions.length,
+                              ),
+                              marksEach: values.marksEach,
+                          };
+                      }),
                   }
                 : current,
         );
@@ -3719,16 +4111,25 @@ export default function GeneratePaper({
     }
 
     function deletePaperSection(sectionId: string) {
-        setGeneratedPaper((current) =>
-            current
-                ? {
-                      ...current,
-                      sections: current.sections.filter(
-                          (section) => section.id !== sectionId,
-                      ),
-                  }
-                : current,
-        );
+        setGeneratedPaper((current) => {
+            if (!current) {
+                return current;
+            }
+
+            const target = current.sections.find(
+                (section) => section.id === sectionId,
+            );
+            const groupId = target?.orGroupId;
+
+            return {
+                ...current,
+                sections: current.sections.filter((section) =>
+                    groupId
+                        ? section.orGroupId !== groupId
+                        : section.id !== sectionId,
+                ),
+            };
+        });
     }
 
     function movePaperSection(sectionId: string, direction: -1 | 1) {
@@ -3737,26 +4138,54 @@ export default function GeneratePaper({
                 return current;
             }
 
-            const currentIndex = current.sections.findIndex(
+            const target = current.sections.find(
                 (section) => section.id === sectionId,
+            );
+
+            if (!target || target.orRole === 'alternative') {
+                return current;
+            }
+
+            const blocks = current.sections.reduce<GeneratedPaperSection[][]>(
+                (groups, section) => {
+                    const groupKey = section.orGroupId ?? section.id;
+                    const lastGroup = groups.at(-1);
+                    const lastKey =
+                        lastGroup?.[0]?.orGroupId ?? lastGroup?.[0]?.id;
+
+                    if (lastGroup && lastKey === groupKey) {
+                        lastGroup.push(section);
+                    } else {
+                        groups.push([section]);
+                    }
+
+                    return groups;
+                },
+                [],
+            );
+            const targetKey = target.orGroupId ?? target.id;
+            const currentIndex = blocks.findIndex(
+                (block) => (block[0]?.orGroupId ?? block[0]?.id) === targetKey,
             );
             const nextIndex = currentIndex + direction;
 
             if (
                 currentIndex === -1 ||
                 nextIndex < 0 ||
-                nextIndex >= current.sections.length
+                nextIndex >= blocks.length
             ) {
                 return current;
             }
 
-            const sections = [...current.sections];
-            const [section] = sections.splice(currentIndex, 1);
-            sections.splice(nextIndex, 0, section);
+            const reordered = [...blocks];
+            [reordered[currentIndex], reordered[nextIndex]] = [
+                reordered[nextIndex],
+                reordered[currentIndex],
+            ];
 
             return {
                 ...current,
-                sections,
+                sections: reordered.flat(),
             };
         });
     }
@@ -3903,6 +4332,7 @@ export default function GeneratePaper({
             section: activeSection,
             row: activeRow,
             target,
+            side,
         } = activeManualPickerRow;
 
         setQuestionSelection((current) => ({
@@ -3916,38 +4346,157 @@ export default function GeneratePaper({
                                   return row;
                               }
 
+                              const selectedIds =
+                                  side === 'alternative'
+                                      ? (row.orSelectedQuestionIds ?? [])
+                                      : row.selectedQuestionIds;
                               const isSelected =
-                                  row.selectedQuestionIds.includes(questionId);
+                                  selectedIds.includes(questionId);
 
                               if (isSelected) {
-                                  return {
-                                      ...row,
-                                      selectedQuestionIds:
-                                          row.selectedQuestionIds.filter(
-                                              (id) => id !== questionId,
-                                          ),
-                                  };
+                                  const nextIds = selectedIds.filter(
+                                      (id) => id !== questionId,
+                                  );
+
+                                  return side === 'alternative'
+                                      ? {
+                                            ...row,
+                                            orSelectedQuestionIds: nextIds,
+                                        }
+                                      : {
+                                            ...row,
+                                            selectedQuestionIds: nextIds,
+                                        };
                               }
 
                               if (
                                   selectedManualQuestionIds.has(questionId) ||
-                                  row.selectedQuestionIds.length >= target
+                                  selectedIds.length >= target
                               ) {
                                   return row;
                               }
 
-                              return {
-                                  ...row,
-                                  selectedQuestionIds: [
-                                      ...row.selectedQuestionIds,
-                                      questionId,
-                                  ],
-                              };
+                              const nextIds = [...selectedIds, questionId];
+
+                              return side === 'alternative'
+                                  ? {
+                                        ...row,
+                                        orSelectedQuestionIds: nextIds,
+                                    }
+                                  : {
+                                        ...row,
+                                        selectedQuestionIds: nextIds,
+                                    };
                           }),
                       }
                     : section,
             ),
         }));
+    }
+
+    function updateOrPairing(sectionId: string, pairingId: number | null) {
+        if (
+            manualPickerTarget?.sectionId === sectionId &&
+            manualPickerTarget.side === 'alternative'
+        ) {
+            closeManualQuestionPicker();
+        }
+
+        setQuestionSelection((current) => {
+            const primary = current.sections.find(
+                (section) => section.id === sectionId,
+            );
+
+            if (!primary) {
+                return current;
+            }
+
+            if (pairingId === null) {
+                return withTotalMarks({
+                    ...current,
+                    sections: current.sections.map((section) =>
+                        section.id === sectionId
+                            ? {
+                                  ...section,
+                                  orPairingId: null,
+                                  orQuestionTypeId: null,
+                                  rows: section.rows.map((row) => ({
+                                      ...row,
+                                      orSelectedQuestionIds: [],
+                                  })),
+                              }
+                            : section,
+                    ),
+                });
+            }
+
+            const pairing = questionTypePairings.find(
+                (candidate) => candidate.id === pairingId,
+            );
+            const counterpartId =
+                pairing?.questionTypeAId === primary.questionTypeId
+                    ? pairing.questionTypeBId
+                    : pairing?.questionTypeBId === primary.questionTypeId
+                      ? pairing.questionTypeAId
+                      : null;
+            const counterpart =
+                typeof counterpartId === 'number'
+                    ? current.sections.find(
+                          (section) => section.questionTypeId === counterpartId,
+                      )
+                    : null;
+
+            if (
+                !pairing ||
+                !counterpart ||
+                primary.category !== 'Subjective Questions' ||
+                counterpart.category !== 'Subjective Questions'
+            ) {
+                return current;
+            }
+
+            const cleared = current.sections.map((section) => {
+                const conflictsWithNewGroup =
+                    section.id === primary.id ||
+                    section.orQuestionTypeId === primary.questionTypeId ||
+                    section.orQuestionTypeId === counterpartId ||
+                    (section.questionTypeId === counterpartId &&
+                        typeof section.orQuestionTypeId === 'number');
+
+                return conflictsWithNewGroup
+                    ? {
+                          ...section,
+                          orPairingId: null,
+                          orQuestionTypeId: null,
+                          rows: section.rows.map((row) => ({
+                              ...row,
+                              orSelectedQuestionIds: [],
+                          })),
+                      }
+                    : section;
+            });
+            const availableCount = Math.min(
+                primary.availableCount,
+                counterpart.availableCount,
+            );
+
+            return withTotalMarks({
+                ...current,
+                sections: cleared.map((section) =>
+                    section.id === primary.id
+                        ? {
+                              ...section,
+                              orPairingId: pairing.id,
+                              orQuestionTypeId: counterpartId,
+                              rows: normalizeSectionRows(
+                                  section.rows,
+                                  availableCount,
+                              ),
+                          }
+                        : section,
+                ),
+            });
+        });
     }
 
     function updateGlobalFilter(key: SourceFilterKey) {
@@ -3962,6 +4511,7 @@ export default function GeneratePaper({
                 rows: section.rows.map((row) => ({
                     ...row,
                     selectedQuestionIds: [],
+                    orSelectedQuestionIds: [],
                 })),
             })),
         }));
@@ -3975,6 +4525,7 @@ export default function GeneratePaper({
                 rows: section.rows.map((row) => ({
                     ...row,
                     selectedQuestionIds: [],
+                    orSelectedQuestionIds: [],
                 })),
             })),
         }));
@@ -4002,12 +4553,34 @@ export default function GeneratePaper({
                                       return row;
                                   }
 
+                                  const alternative =
+                                      typeof section.orQuestionTypeId ===
+                                      'number'
+                                          ? current.sections.find(
+                                                (candidate) =>
+                                                    candidate.questionTypeId ===
+                                                    section.orQuestionTypeId,
+                                            )
+                                          : null;
+                                  const effectiveSection = alternative
+                                      ? {
+                                            ...section,
+                                            availableCount: Math.min(
+                                                section.availableCount,
+                                                alternative.availableCount,
+                                            ),
+                                        }
+                                      : section;
+
                                   return normalizeQuestionRow(
                                       {
                                           ...row,
                                           [field]: value,
                                       },
-                                      availableForQuestionRow(section, rowId),
+                                      availableForQuestionRow(
+                                          effectiveSection,
+                                          rowId,
+                                      ),
                                   );
                               }),
                           }
@@ -4162,7 +4735,15 @@ export default function GeneratePaper({
 
     function renderQuestionCategory(category: SectionCategory) {
         const sections = questionSelection.sections.filter(
-            (section) => section.category === category,
+            (section) =>
+                section.category === category &&
+                !foldedAlternativeTypeIds.has(section.questionTypeId),
+        );
+        const sectionsByType = new Map(
+            questionSelection.sections.map((section) => [
+                section.questionTypeId,
+                section,
+            ]),
         );
 
         if (sections.length === 0) {
@@ -4173,30 +4754,123 @@ export default function GeneratePaper({
             <div className="space-y-2.5">
                 <CategoryDivider title={category} />
                 <div className="space-y-2.5">
-                    {sections.map((section) => (
-                        <QuestionSelectionCard
-                            key={section.id}
-                            section={section}
-                            autoPick={
-                                questionSectionSelectionMode(section) ===
-                                'automatic'
-                            }
-                            onAutoPickChange={handleAutoPickChange}
-                            onChange={updateSectionValue}
-                            onDeleteRow={deleteQuestionRow}
-                            onAddRow={addQuestionRow}
-                            onOpenManualPicker={openManualQuestionPicker}
-                            isDragging={draggedQuestionTypeId === section.id}
-                            isDragTarget={
-                                dragOverQuestionTypeId === section.id &&
-                                draggedQuestionTypeId !== section.id
-                            }
-                            onDragStart={handleQuestionTypeDragStart}
-                            onDragOver={handleQuestionTypeDragOver}
-                            onDrop={handleQuestionTypeDrop}
-                            onDragEnd={handleQuestionTypeDragEnd}
-                        />
-                    ))}
+                    {sections.map((section) => {
+                        const orOptions =
+                            category === 'Subjective Questions'
+                                ? questionTypePairings
+                                      .map((pairing) => {
+                                          const counterpartId =
+                                              pairing.questionTypeAId ===
+                                              section.questionTypeId
+                                                  ? pairing.questionTypeBId
+                                                  : pairing.questionTypeBId ===
+                                                      section.questionTypeId
+                                                    ? pairing.questionTypeAId
+                                                    : null;
+                                          const counterpart =
+                                              typeof counterpartId === 'number'
+                                                  ? sectionsByType.get(
+                                                        counterpartId,
+                                                    )
+                                                  : null;
+                                          const usedByAnotherGroup =
+                                              counterpartId !== null &&
+                                              questionSelection.sections.some(
+                                                  (candidate) =>
+                                                      candidate.id !==
+                                                          section.id &&
+                                                      candidate.orQuestionTypeId ===
+                                                          counterpartId,
+                                              );
+                                          const counterpartIsPrimary =
+                                              counterpart?.id !== section.id &&
+                                              typeof counterpart?.orQuestionTypeId ===
+                                                  'number';
+
+                                          if (
+                                              !counterpart ||
+                                              usedByAnotherGroup ||
+                                              counterpartIsPrimary
+                                          ) {
+                                              return null;
+                                          }
+
+                                          return {
+                                              id: pairing.id,
+                                              label: plainQuestionText(
+                                                  englishQuestionTypeTitle(
+                                                      counterpart,
+                                                  ),
+                                              ),
+                                              searchLabel: plainQuestionText(
+                                                  englishQuestionTypeTitle(
+                                                      counterpart,
+                                                  ),
+                                              ),
+                                              displayLabel: (
+                                                  <RichTextLabel
+                                                      value={englishQuestionTypeTitle(
+                                                          counterpart,
+                                                      )}
+                                                  />
+                                              ),
+                                              hint:
+                                                  String(
+                                                      counterpart.availableCount,
+                                                  ) + ' available',
+                                          } satisfies ComboboxOptionItem;
+                                      })
+                                      .filter(
+                                          (
+                                              option,
+                                          ): option is NonNullable<
+                                              typeof option
+                                          > => option !== null,
+                                      )
+                                : [];
+                        const selectedOrOption =
+                            orOptions.find(
+                                (option) =>
+                                    Number(option.id) === section.orPairingId,
+                            ) ?? null;
+                        const alternativeSection =
+                            typeof section.orQuestionTypeId === 'number'
+                                ? (sectionsByType.get(
+                                      section.orQuestionTypeId,
+                                  ) ?? null)
+                                : null;
+
+                        return (
+                            <QuestionSelectionCard
+                                key={section.id}
+                                section={section}
+                                alternativeSection={alternativeSection}
+                                orOptions={orOptions}
+                                selectedOrOption={selectedOrOption}
+                                autoPick={
+                                    questionSectionSelectionMode(section) ===
+                                    'automatic'
+                                }
+                                onAutoPickChange={handleAutoPickChange}
+                                onOrPairingChange={updateOrPairing}
+                                onChange={updateSectionValue}
+                                onDeleteRow={deleteQuestionRow}
+                                onAddRow={addQuestionRow}
+                                onOpenManualPicker={openManualQuestionPicker}
+                                isDragging={
+                                    draggedQuestionTypeId === section.id
+                                }
+                                isDragTarget={
+                                    dragOverQuestionTypeId === section.id &&
+                                    draggedQuestionTypeId !== section.id
+                                }
+                                onDragStart={handleQuestionTypeDragStart}
+                                onDragOver={handleQuestionTypeDragOver}
+                                onDrop={handleQuestionTypeDrop}
+                                onDragEnd={handleQuestionTypeDragEnd}
+                            />
+                        );
+                    })}
                 </div>
             </div>
         );
@@ -4846,7 +5520,7 @@ function ManualQuestionPickerModal({
     onToggleQuestion: (questionId: number) => void;
     onClose: () => void;
 }) {
-    const activeSelectedCount = activeRow.row.selectedQuestionIds.length;
+    const activeSelectedCount = activeRow.selectedQuestionIds.length;
     const isActiveRowComplete = activeSelectedCount === activeRow.target;
     const isBilingual = medium === 'Both';
     const singleMedium = medium === 'Urdu' ? 'Urdu' : 'English';
@@ -4888,11 +5562,10 @@ function ManualQuestionPickerModal({
                                     Select questions
                                 </h2>
                                 <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                    <RichTextLabel
-                                        value={englishQuestionTypeTitle(
-                                            activeRow.section,
-                                        )}
-                                    />
+                                    {activeRow.side === 'alternative'
+                                        ? 'OR: '
+                                        : ''}
+                                    <RichTextLabel value={activeRow.title} />
                                 </span>
                             </div>
                         </div>
@@ -6122,6 +6795,37 @@ function EmptyQuestionState({
     );
 }
 
+function OrGroupDivider({
+    label,
+    settings,
+}: {
+    label: string;
+    settings: PaperSettings;
+}) {
+    return (
+        <div
+            role="separator"
+            aria-label="OR alternative"
+            className="flex items-center gap-2 py-0.5"
+            style={{
+                color: settings.textColor,
+                fontSize: String(settings.headingSize) + 'px',
+                lineHeight: settings.headingLineHeight,
+            }}
+        >
+            <span
+                className="h-px flex-1"
+                style={{ backgroundColor: settings.textColor }}
+            />
+            <span className="px-1 font-bold">{label}</span>
+            <span
+                className="h-px flex-1"
+                style={{ backgroundColor: settings.textColor }}
+            />
+        </div>
+    );
+}
+
 function GeneratedPaperView({
     paper,
     rawPaper,
@@ -6686,55 +7390,97 @@ function GeneratedPaperView({
                                         section.category,
                                     );
 
+                                    const logicalSections =
+                                        paper.sections.filter(
+                                            (candidate) =>
+                                                candidate.orRole !==
+                                                'alternative',
+                                        );
+                                    const logicalIndex =
+                                        section.orRole === 'alternative'
+                                            ? -1
+                                            : logicalSections.findIndex(
+                                                  (candidate) =>
+                                                      candidate.id ===
+                                                      section.id,
+                                              );
+
                                     return (
-                                        <Template
+                                        <div
                                             key={section.id}
-                                            section={section}
-                                            index={sectionIndex}
-                                            headingNumber={sectionHeadingNumber(
-                                                paper.sections,
-                                                sectionIndex,
+                                            className={
+                                                section.orRole === 'alternative'
+                                                    ? 'flex flex-col gap-[1mm]'
+                                                    : 'contents'
+                                            }
+                                        >
+                                            {section.orRole ===
+                                                'alternative' && (
+                                                <OrGroupDivider
+                                                    label={
+                                                        section.orLabel ?? 'OR'
+                                                    }
+                                                    settings={settings}
+                                                />
                                             )}
-                                            numberingFormat={
-                                                settings.questionNumberingFormat
-                                            }
-                                            canMoveUp={sectionIndex > 0}
-                                            canMoveDown={
-                                                sectionIndex <
-                                                paper.sections.length - 1
-                                            }
-                                            onEditSection={onEditSection}
-                                            onDeleteSection={onDeleteSection}
-                                            onMoveUp={(sectionId) =>
-                                                onMoveSection(sectionId, -1)
-                                            }
-                                            onMoveDown={(sectionId) =>
-                                                onMoveSection(sectionId, 1)
-                                            }
-                                            onShuffleQuestions={
-                                                onShuffleQuestions
-                                            }
-                                            onAddRandomQuestion={
-                                                onAddRandomQuestion
-                                            }
-                                            onAddCustomQuestion={
-                                                onAddCustomQuestion
-                                            }
-                                            onEditQuestion={onEditQuestion}
-                                            onRandomQuestion={onRandomQuestion}
-                                            onPickQuestion={onPickQuestion}
-                                            onRemoveQuestion={onRemoveQuestion}
-                                            onAnswerLinesChange={
-                                                onQuestionAnswerLinesChange
-                                            }
-                                            onAnswerLineSpacingChange={
-                                                onQuestionAnswerLineSpacingChange
-                                            }
-                                            onQuestionImageSizeChange={
-                                                onQuestionImageSizeChange
-                                            }
-                                            onColumnsChange={onColumnsChange}
-                                        />
+                                            <Template
+                                                section={section}
+                                                index={sectionIndex}
+                                                headingNumber={sectionHeadingNumber(
+                                                    paper.sections,
+                                                    sectionIndex,
+                                                )}
+                                                numberingFormat={
+                                                    settings.questionNumberingFormat
+                                                }
+                                                canMoveUp={logicalIndex > 0}
+                                                canMoveDown={
+                                                    logicalIndex >= 0 &&
+                                                    logicalIndex <
+                                                        logicalSections.length -
+                                                            1
+                                                }
+                                                onEditSection={onEditSection}
+                                                onDeleteSection={
+                                                    onDeleteSection
+                                                }
+                                                onMoveUp={(sectionId) =>
+                                                    onMoveSection(sectionId, -1)
+                                                }
+                                                onMoveDown={(sectionId) =>
+                                                    onMoveSection(sectionId, 1)
+                                                }
+                                                onShuffleQuestions={
+                                                    onShuffleQuestions
+                                                }
+                                                onAddRandomQuestion={
+                                                    onAddRandomQuestion
+                                                }
+                                                onAddCustomQuestion={
+                                                    onAddCustomQuestion
+                                                }
+                                                onEditQuestion={onEditQuestion}
+                                                onRandomQuestion={
+                                                    onRandomQuestion
+                                                }
+                                                onPickQuestion={onPickQuestion}
+                                                onRemoveQuestion={
+                                                    onRemoveQuestion
+                                                }
+                                                onAnswerLinesChange={
+                                                    onQuestionAnswerLinesChange
+                                                }
+                                                onAnswerLineSpacingChange={
+                                                    onQuestionAnswerLineSpacingChange
+                                                }
+                                                onQuestionImageSizeChange={
+                                                    onQuestionImageSizeChange
+                                                }
+                                                onColumnsChange={
+                                                    onColumnsChange
+                                                }
+                                            />
+                                        </div>
                                     );
                                 })
                             )}
@@ -6806,43 +7552,64 @@ function GeneratedPaperView({
                                                             );
 
                                                         return (
-                                                            <Template
+                                                            <div
                                                                 key={section.id}
-                                                                section={
-                                                                    section
+                                                                className={
+                                                                    section.orRole ===
+                                                                    'alternative'
+                                                                        ? 'flex flex-col gap-[1mm]'
+                                                                        : 'contents'
                                                                 }
-                                                                index={
-                                                                    sectionIndex
-                                                                }
-                                                                headingNumber={sectionHeadingNumber(
-                                                                    variantPaper.sections,
-                                                                    sectionIndex,
+                                                            >
+                                                                {section.orRole ===
+                                                                    'alternative' && (
+                                                                    <OrGroupDivider
+                                                                        label={
+                                                                            section.orLabel ??
+                                                                            'OR'
+                                                                        }
+                                                                        settings={
+                                                                            settings
+                                                                        }
+                                                                    />
                                                                 )}
-                                                                numberingFormat={
-                                                                    settings.questionNumberingFormat
-                                                                }
-                                                                canMoveUp={
-                                                                    false
-                                                                }
-                                                                canMoveDown={
-                                                                    false
-                                                                }
-                                                                onEditSection={() => {}}
-                                                                onDeleteSection={() => {}}
-                                                                onMoveUp={() => {}}
-                                                                onMoveDown={() => {}}
-                                                                onShuffleQuestions={() => {}}
-                                                                onAddRandomQuestion={() => {}}
-                                                                onAddCustomQuestion={() => {}}
-                                                                onEditQuestion={() => {}}
-                                                                onRandomQuestion={() => {}}
-                                                                onPickQuestion={() => {}}
-                                                                onRemoveQuestion={() => {}}
-                                                                onAnswerLinesChange={() => {}}
-                                                                onAnswerLineSpacingChange={() => {}}
-                                                                onQuestionImageSizeChange={() => {}}
-                                                                onColumnsChange={() => {}}
-                                                            />
+                                                                <Template
+                                                                    section={
+                                                                        section
+                                                                    }
+                                                                    index={
+                                                                        sectionIndex
+                                                                    }
+                                                                    headingNumber={sectionHeadingNumber(
+                                                                        variantPaper.sections,
+                                                                        sectionIndex,
+                                                                    )}
+                                                                    numberingFormat={
+                                                                        settings.questionNumberingFormat
+                                                                    }
+                                                                    canMoveUp={
+                                                                        false
+                                                                    }
+                                                                    canMoveDown={
+                                                                        false
+                                                                    }
+                                                                    onEditSection={() => {}}
+                                                                    onDeleteSection={() => {}}
+                                                                    onMoveUp={() => {}}
+                                                                    onMoveDown={() => {}}
+                                                                    onShuffleQuestions={() => {}}
+                                                                    onAddRandomQuestion={() => {}}
+                                                                    onAddCustomQuestion={() => {}}
+                                                                    onEditQuestion={() => {}}
+                                                                    onRandomQuestion={() => {}}
+                                                                    onPickQuestion={() => {}}
+                                                                    onRemoveQuestion={() => {}}
+                                                                    onAnswerLinesChange={() => {}}
+                                                                    onAnswerLineSpacingChange={() => {}}
+                                                                    onQuestionImageSizeChange={() => {}}
+                                                                    onColumnsChange={() => {}}
+                                                                />
+                                                            </div>
                                                         );
                                                     },
                                                 )
@@ -7398,8 +8165,12 @@ function ChapterCard({
 
 function QuestionSelectionCard({
     section,
+    alternativeSection,
+    orOptions,
+    selectedOrOption,
     autoPick,
     onAutoPickChange,
+    onOrPairingChange,
     onChange,
     onDeleteRow,
     onAddRow,
@@ -7412,8 +8183,12 @@ function QuestionSelectionCard({
     onDragEnd,
 }: {
     section: QuestionSelectionSection;
+    alternativeSection: QuestionSelectionSection | null;
+    orOptions: ComboboxOptionItem[];
+    selectedOrOption: ComboboxOptionItem | null;
     autoPick: boolean;
     onAutoPickChange: (sectionId: string, enabled: boolean) => void;
+    onOrPairingChange: (sectionId: string, pairingId: number | null) => void;
     onChange: (
         sectionId: string,
         rowId: string,
@@ -7422,7 +8197,11 @@ function QuestionSelectionCard({
     ) => void;
     onDeleteRow: (sectionId: string, rowId: string) => void;
     onAddRow: (sectionId: string) => void;
-    onOpenManualPicker: (sectionId: string, rowId: string) => void;
+    onOpenManualPicker: (
+        sectionId: string,
+        rowId: string,
+        side?: ManualPickerSide,
+    ) => void;
     isDragging: boolean;
     isDragTarget: boolean;
     onDragStart: (event: DragEvent<HTMLDivElement>, sectionId: string) => void;
@@ -7438,6 +8217,13 @@ function QuestionSelectionCard({
 }) {
     const canDeleteRow = section.rows.length > 1;
     const typeHeading = englishQuestionTypeTitle(section);
+    const effectiveAvailableCount = alternativeSection
+        ? Math.min(section.availableCount, alternativeSection.availableCount)
+        : section.availableCount;
+    const availabilitySection =
+        effectiveAvailableCount === section.availableCount
+            ? section
+            : { ...section, availableCount: effectiveAvailableCount };
 
     return (
         <div
@@ -7470,7 +8256,8 @@ function QuestionSelectionCard({
                         <RichTextLabel value={typeHeading} />
                     </h4>
                     <span className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
-                        {section.availableCount} available
+                        {effectiveAvailableCount} available
+                        {alternativeSection ? ' per side' : ''}
                     </span>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -7501,6 +8288,54 @@ function QuestionSelectionCard({
                 </div>
             </div>
 
+            {section.category === 'Subjective Questions' &&
+                orOptions.length > 0 && (
+                    <div
+                        className={cn(
+                            'mt-3 grid gap-3 rounded-xl border px-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(15rem,22rem)] sm:items-center',
+                            selectedOrOption
+                                ? 'border-brand-200 bg-brand-50/55 dark:border-brand-500/30 dark:bg-brand-500/[0.08]'
+                                : 'border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/55',
+                        )}
+                    >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                            <div
+                                className={cn(
+                                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                                    selectedOrOption
+                                        ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300'
+                                        : 'bg-white text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-300',
+                                )}
+                            >
+                                <Link2Icon className="size-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                                    {selectedOrOption
+                                        ? 'OR group enabled'
+                                        : 'Offer an OR alternative'}
+                                </p>
+                                <p className="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                                    Both sides use the same choice, required,
+                                    and marks settings.
+                                </p>
+                            </div>
+                        </div>
+                        <FloatingCombobox
+                            label="OR alternative"
+                            leadingIcon={Link2Icon}
+                            options={orOptions}
+                            value={selectedOrOption}
+                            onChange={(option) =>
+                                onOrPairingChange(
+                                    section.id,
+                                    option === null ? null : Number(option.id),
+                                )
+                            }
+                        />
+                    </div>
+                )}
+
             <div className="mt-4 space-y-4">
                 {section.rows.map((row, index) => (
                     <div
@@ -7511,7 +8346,10 @@ function QuestionSelectionCard({
                             label="Choice"
                             value={row.choiceQuestions}
                             placeholder="0"
-                            max={availableForQuestionRow(section, row.id)}
+                            max={availableForQuestionRow(
+                                availabilitySection,
+                                row.id,
+                            )}
                             onChange={(value) =>
                                 onChange(
                                     section.id,
@@ -7572,7 +8410,40 @@ function QuestionSelectionCard({
                                     )}
                                 >
                                     <ListChecksIcon className="size-3.5" />
+                                    {alternativeSection && 'Main '}
                                     {row.selectedQuestionIds.length}/
+                                    {rowTarget(row)} selected
+                                </button>
+                            )}
+                            {!autoPick && alternativeSection && (
+                                <button
+                                    type="button"
+                                    disabled={rowTarget(row) === 0}
+                                    onClick={() =>
+                                        onOpenManualPicker(
+                                            section.id,
+                                            row.id,
+                                            'alternative',
+                                        )
+                                    }
+                                    title={
+                                        rowTarget(row) === 0
+                                            ? 'Enter a total or required count first'
+                                            : 'Select OR questions for row ' +
+                                              (index + 1)
+                                    }
+                                    className={cn(
+                                        'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors',
+                                        (row.orSelectedQuestionIds ?? [])
+                                            .length === rowTarget(row) &&
+                                            rowTarget(row) > 0
+                                            ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-500/30 dark:hover:text-violet-300',
+                                    )}
+                                >
+                                    <Link2Icon className="size-3.5" />
+                                    OR{' '}
+                                    {(row.orSelectedQuestionIds ?? []).length}/
                                     {rowTarget(row)} selected
                                 </button>
                             )}

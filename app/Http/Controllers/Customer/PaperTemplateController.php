@@ -7,6 +7,7 @@ use App\Models\PaperTemplate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -126,9 +127,13 @@ class PaperTemplateController extends Controller
             'structure.sections.*.totalQuestions'    => ['required', 'integer', 'min:0'],
             'structure.sections.*.marksEach'         => ['required', 'integer', 'min:0'],
             'structure.sections.*.columns'           => ['nullable', 'integer', 'min:1', 'max:5'],
+            'structure.sections.*.orPairingId'        => ['nullable', 'integer'],
+            'structure.sections.*.orQuestionTypeId'   => ['nullable', 'integer'],
+            'structure.sections.*.orRole'             => ['nullable', Rule::in(['primary', 'alternative'])],
         ]);
 
         $data['structure']['total_marks'] = collect($data['structure']['sections'])
+            ->reject(fn ($section) => ($section['orRole'] ?? null) === 'alternative')
             ->sum(fn ($section) => (int) $section['requiredQuestions'] * (int) $section['marksEach']);
 
         $template = PaperTemplate::create([
