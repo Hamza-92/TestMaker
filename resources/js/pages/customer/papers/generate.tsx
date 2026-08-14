@@ -75,6 +75,7 @@ import {
     getPageDimensions,
     PAPER_URDU_FONT_METRICS,
     normalizePaperSettings,
+    resolveOrGroupLabel,
 } from './paper-layouts/types';
 import type { PaperHeaderTemplate } from './paper-layouts/types';
 import type {
@@ -680,15 +681,17 @@ function paperQuestionFromManual(
         id,
         sourceQuestionId: question.id,
         optionsOnly: question.optionsOnly,
-        text: question.optionsOnly ? '' : passageQuestions
-            ? passageText
-            : localizedPaperHtml(
-                  question.summaryTextEn,
-                  question.summaryTextUr,
-                  question.medium,
-                  question.summaryText,
-                  question.schemaKey === 'subjective_same_statement',
-              ),
+        text: question.optionsOnly
+            ? ''
+            : passageQuestions
+              ? passageText
+              : localizedPaperHtml(
+                    question.summaryTextEn,
+                    question.summaryTextUr,
+                    question.medium,
+                    question.summaryText,
+                    question.schemaKey === 'subjective_same_statement',
+                ),
         sameStatement: sameStatementFromManual(question),
         source: question.source,
         sourceLabel: question.sourceLabel,
@@ -1709,8 +1712,9 @@ export default function GeneratePaper({
     const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSavedRef = useRef<number | null>(null);
     const isRestoringRef = useRef(false);
-    const [pendingTemplate] =
-        useState<AppliedTemplate | null>(appliedTemplate ?? null);
+    const [pendingTemplate] = useState<AppliedTemplate | null>(
+        appliedTemplate ?? null,
+    );
     const templateStructureAppliedRef = useRef(false);
     const templateSettingsAppliedRef = useRef(false);
     const [isSaveAsTemplateOpen, setIsSaveAsTemplateOpen] = useState(false);
@@ -3942,10 +3946,7 @@ export default function GeneratePaper({
             reservedQuestionIds.add(nextQuestion.id);
             additions.set(
                 section.id,
-                paperQuestionFromManual(
-                    nextQuestion,
-                    nextPaperQuestionId(),
-                ),
+                paperQuestionFromManual(nextQuestion, nextPaperQuestionId()),
             );
         }
 
@@ -3959,12 +3960,8 @@ export default function GeneratePaper({
                           return addition
                               ? {
                                     ...section,
-                                    totalQuestions:
-                                        section.totalQuestions + 1,
-                                    questions: [
-                                        ...section.questions,
-                                        addition,
-                                    ],
+                                    totalQuestions: section.totalQuestions + 1,
+                                    questions: [...section.questions, addition],
                                 }
                               : section;
                       }),
@@ -4814,10 +4811,6 @@ export default function GeneratePaper({
                                                       )}
                                                   />
                                               ),
-                                              hint:
-                                                  String(
-                                                      counterpart.availableCount,
-                                                  ) + ' available',
                                           } satisfies ComboboxOptionItem;
                                       })
                                       .filter(
@@ -6798,30 +6791,79 @@ function EmptyQuestionState({
 function OrGroupDivider({
     label,
     settings,
+    orientation = 'horizontal',
 }: {
     label: string;
     settings: PaperSettings;
+    orientation?: 'horizontal' | 'vertical';
 }) {
+    const showLine = settings.orGroupDividerStyle === 'line';
+    const showBadge = settings.orGroupDividerStyle === 'badge';
+    const marker = (
+        <span
+            className={cn(
+                'shrink-0 font-bold',
+                showBadge && 'rounded-full border px-1.5 py-0.5',
+                !showBadge && 'px-1',
+            )}
+            style={showBadge ? { borderColor: settings.textColor } : undefined}
+        >
+            {label}
+        </span>
+    );
+    const sharedStyle = {
+        color: settings.textColor,
+        fontSize: String(settings.headingSize) + 'px',
+        lineHeight: settings.headingLineHeight,
+    };
+
+    if (orientation === 'vertical') {
+        return (
+            <div
+                role="separator"
+                aria-label="OR alternative"
+                className="flex min-h-[2rem] items-stretch justify-center self-stretch"
+                style={sharedStyle}
+            >
+                <div className="flex flex-col items-center justify-center">
+                    {showLine && (
+                        <span
+                            className="w-px flex-1"
+                            style={{ backgroundColor: settings.textColor }}
+                        />
+                    )}
+                    {marker}
+                    {showLine && (
+                        <span
+                            className="w-px flex-1"
+                            style={{ backgroundColor: settings.textColor }}
+                        />
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             role="separator"
             aria-label="OR alternative"
-            className="flex items-center gap-2 py-0.5"
-            style={{
-                color: settings.textColor,
-                fontSize: String(settings.headingSize) + 'px',
-                lineHeight: settings.headingLineHeight,
-            }}
+            className="flex items-center justify-center gap-2 py-0.5"
+            style={sharedStyle}
         >
-            <span
-                className="h-px flex-1"
-                style={{ backgroundColor: settings.textColor }}
-            />
-            <span className="px-1 font-bold">{label}</span>
-            <span
-                className="h-px flex-1"
-                style={{ backgroundColor: settings.textColor }}
-            />
+            {showLine && (
+                <span
+                    className="h-px flex-1"
+                    style={{ backgroundColor: settings.textColor }}
+                />
+            )}
+            {marker}
+            {showLine && (
+                <span
+                    className="h-px flex-1"
+                    style={{ backgroundColor: settings.textColor }}
+                />
+            )}
         </div>
     );
 }
@@ -7068,6 +7110,149 @@ function GeneratedPaperView({
         settings.watermarkText.trim() !== '';
     const shouldShowLogoWatermark =
         settings.watermarkType === 'logo' && activeWatermarkLogoUrl !== '';
+
+    function renderPaperSection(
+        targetPaper: GeneratedPaper,
+        section: GeneratedPaperSection,
+        sectionIndex: number,
+        interactive: boolean,
+        canMoveUp: boolean,
+        canMoveDown: boolean,
+    ): ReactNode {
+        const Template = pickSectionTemplate(
+            settings.questionLayout,
+            section.category,
+        );
+
+        return (
+            <Template
+                section={section}
+                index={sectionIndex}
+                headingNumber={sectionHeadingNumber(
+                    targetPaper.sections,
+                    sectionIndex,
+                )}
+                numberingFormat={settings.questionNumberingFormat}
+                canMoveUp={interactive && canMoveUp}
+                canMoveDown={interactive && canMoveDown}
+                onEditSection={interactive ? onEditSection : () => {}}
+                onDeleteSection={interactive ? onDeleteSection : () => {}}
+                onMoveUp={
+                    interactive
+                        ? (sectionId) => onMoveSection(sectionId, -1)
+                        : () => {}
+                }
+                onMoveDown={
+                    interactive
+                        ? (sectionId) => onMoveSection(sectionId, 1)
+                        : () => {}
+                }
+                onShuffleQuestions={interactive ? onShuffleQuestions : () => {}}
+                onAddRandomQuestion={
+                    interactive ? onAddRandomQuestion : () => {}
+                }
+                onAddCustomQuestion={
+                    interactive ? onAddCustomQuestion : () => {}
+                }
+                onEditQuestion={interactive ? onEditQuestion : () => {}}
+                onRandomQuestion={interactive ? onRandomQuestion : () => {}}
+                onPickQuestion={interactive ? onPickQuestion : () => {}}
+                onRemoveQuestion={interactive ? onRemoveQuestion : () => {}}
+                onAnswerLinesChange={
+                    interactive ? onQuestionAnswerLinesChange : () => {}
+                }
+                onAnswerLineSpacingChange={
+                    interactive ? onQuestionAnswerLineSpacingChange : () => {}
+                }
+                onQuestionImageSizeChange={
+                    interactive ? onQuestionImageSizeChange : () => {}
+                }
+                onColumnsChange={interactive ? onColumnsChange : () => {}}
+            />
+        );
+    }
+
+    function renderPaperSections(
+        targetPaper: GeneratedPaper,
+        interactive: boolean,
+    ): ReactNode[] {
+        const logicalSections = targetPaper.sections.filter(
+            (section) => section.orRole !== 'alternative',
+        );
+
+        return targetPaper.sections.map((section, sectionIndex) => {
+            if (section.orRole === 'alternative') {
+                return null;
+            }
+
+            const logicalIndex = logicalSections.findIndex(
+                (candidate) => candidate.id === section.id,
+            );
+            const primary = renderPaperSection(
+                targetPaper,
+                section,
+                sectionIndex,
+                interactive,
+                logicalIndex > 0,
+                logicalIndex >= 0 && logicalIndex < logicalSections.length - 1,
+            );
+            const alternativeIndex =
+                section.orRole === 'primary' && section.orGroupId
+                    ? targetPaper.sections.findIndex(
+                          (candidate) =>
+                              candidate.orGroupId === section.orGroupId &&
+                              candidate.orRole === 'alternative',
+                      )
+                    : -1;
+
+            if (alternativeIndex < 0) {
+                return (
+                    <div key={section.id} className="contents">
+                        {primary}
+                    </div>
+                );
+            }
+
+            const alternativeSection = targetPaper.sections[alternativeIndex];
+            const alternative = renderPaperSection(
+                targetPaper,
+                alternativeSection,
+                alternativeIndex,
+                interactive,
+                false,
+                false,
+            );
+            const sideBySide = settings.orGroupLayout === 'side-by-side';
+
+            return (
+                <div
+                    key={section.orGroupId ?? section.id}
+                    data-or-group
+                    data-or-layout={settings.orGroupLayout}
+                    className={cn(
+                        sideBySide ? 'grid items-stretch' : 'flex flex-col',
+                    )}
+                    style={
+                        sideBySide
+                            ? {
+                                  gridTemplateColumns:
+                                      'minmax(0, 1fr) auto minmax(0, 1fr)',
+                                  columnGap: `${settings.orGroupGap}mm`,
+                              }
+                            : { rowGap: `${settings.orGroupGap}mm` }
+                    }
+                >
+                    <div className="min-w-0">{primary}</div>
+                    <OrGroupDivider
+                        label={resolveOrGroupLabel(settings, section.orLabel)}
+                        settings={settings}
+                        orientation={sideBySide ? 'vertical' : 'horizontal'}
+                    />
+                    <div className="min-w-0">{alternative}</div>
+                </div>
+            );
+        });
+    }
 
     function handleBackClick() {
         if (savedPaperId !== null && !isDirty) {
@@ -7384,105 +7569,7 @@ function GeneratedPaperView({
                                     style={{}}
                                 />
                             ) : (
-                                paper.sections.map((section, sectionIndex) => {
-                                    const Template = pickSectionTemplate(
-                                        settings.questionLayout,
-                                        section.category,
-                                    );
-
-                                    const logicalSections =
-                                        paper.sections.filter(
-                                            (candidate) =>
-                                                candidate.orRole !==
-                                                'alternative',
-                                        );
-                                    const logicalIndex =
-                                        section.orRole === 'alternative'
-                                            ? -1
-                                            : logicalSections.findIndex(
-                                                  (candidate) =>
-                                                      candidate.id ===
-                                                      section.id,
-                                              );
-
-                                    return (
-                                        <div
-                                            key={section.id}
-                                            className={
-                                                section.orRole === 'alternative'
-                                                    ? 'flex flex-col gap-[1mm]'
-                                                    : 'contents'
-                                            }
-                                        >
-                                            {section.orRole ===
-                                                'alternative' && (
-                                                <OrGroupDivider
-                                                    label={
-                                                        section.orLabel ?? 'OR'
-                                                    }
-                                                    settings={settings}
-                                                />
-                                            )}
-                                            <Template
-                                                section={section}
-                                                index={sectionIndex}
-                                                headingNumber={sectionHeadingNumber(
-                                                    paper.sections,
-                                                    sectionIndex,
-                                                )}
-                                                numberingFormat={
-                                                    settings.questionNumberingFormat
-                                                }
-                                                canMoveUp={logicalIndex > 0}
-                                                canMoveDown={
-                                                    logicalIndex >= 0 &&
-                                                    logicalIndex <
-                                                        logicalSections.length -
-                                                            1
-                                                }
-                                                onEditSection={onEditSection}
-                                                onDeleteSection={
-                                                    onDeleteSection
-                                                }
-                                                onMoveUp={(sectionId) =>
-                                                    onMoveSection(sectionId, -1)
-                                                }
-                                                onMoveDown={(sectionId) =>
-                                                    onMoveSection(sectionId, 1)
-                                                }
-                                                onShuffleQuestions={
-                                                    onShuffleQuestions
-                                                }
-                                                onAddRandomQuestion={
-                                                    onAddRandomQuestion
-                                                }
-                                                onAddCustomQuestion={
-                                                    onAddCustomQuestion
-                                                }
-                                                onEditQuestion={onEditQuestion}
-                                                onRandomQuestion={
-                                                    onRandomQuestion
-                                                }
-                                                onPickQuestion={onPickQuestion}
-                                                onRemoveQuestion={
-                                                    onRemoveQuestion
-                                                }
-                                                onAnswerLinesChange={
-                                                    onQuestionAnswerLinesChange
-                                                }
-                                                onAnswerLineSpacingChange={
-                                                    onQuestionAnswerLineSpacingChange
-                                                }
-                                                onQuestionImageSizeChange={
-                                                    onQuestionImageSizeChange
-                                                }
-                                                onColumnsChange={
-                                                    onColumnsChange
-                                                }
-                                            />
-                                        </div>
-                                    );
-                                })
+                                renderPaperSections(paper, true)
                             )}
                         </div>
                     </div>
@@ -7543,75 +7630,9 @@ function GeneratedPaperView({
                                                     style={{}}
                                                 />
                                             ) : (
-                                                variantPaper.sections.map(
-                                                    (section, sectionIndex) => {
-                                                        const Template =
-                                                            pickSectionTemplate(
-                                                                settings.questionLayout,
-                                                                section.category,
-                                                            );
-
-                                                        return (
-                                                            <div
-                                                                key={section.id}
-                                                                className={
-                                                                    section.orRole ===
-                                                                    'alternative'
-                                                                        ? 'flex flex-col gap-[1mm]'
-                                                                        : 'contents'
-                                                                }
-                                                            >
-                                                                {section.orRole ===
-                                                                    'alternative' && (
-                                                                    <OrGroupDivider
-                                                                        label={
-                                                                            section.orLabel ??
-                                                                            'OR'
-                                                                        }
-                                                                        settings={
-                                                                            settings
-                                                                        }
-                                                                    />
-                                                                )}
-                                                                <Template
-                                                                    section={
-                                                                        section
-                                                                    }
-                                                                    index={
-                                                                        sectionIndex
-                                                                    }
-                                                                    headingNumber={sectionHeadingNumber(
-                                                                        variantPaper.sections,
-                                                                        sectionIndex,
-                                                                    )}
-                                                                    numberingFormat={
-                                                                        settings.questionNumberingFormat
-                                                                    }
-                                                                    canMoveUp={
-                                                                        false
-                                                                    }
-                                                                    canMoveDown={
-                                                                        false
-                                                                    }
-                                                                    onEditSection={() => {}}
-                                                                    onDeleteSection={() => {}}
-                                                                    onMoveUp={() => {}}
-                                                                    onMoveDown={() => {}}
-                                                                    onShuffleQuestions={() => {}}
-                                                                    onAddRandomQuestion={() => {}}
-                                                                    onAddCustomQuestion={() => {}}
-                                                                    onEditQuestion={() => {}}
-                                                                    onRandomQuestion={() => {}}
-                                                                    onPickQuestion={() => {}}
-                                                                    onRemoveQuestion={() => {}}
-                                                                    onAnswerLinesChange={() => {}}
-                                                                    onAnswerLineSpacingChange={() => {}}
-                                                                    onQuestionImageSizeChange={() => {}}
-                                                                    onColumnsChange={() => {}}
-                                                                />
-                                                            </div>
-                                                        );
-                                                    },
+                                                renderPaperSections(
+                                                    variantPaper,
+                                                    false,
                                                 )
                                             )}
                                         </div>
@@ -8238,7 +8259,7 @@ function QuestionSelectionCard({
                       : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:hover:border-slate-700 dark:hover:shadow-black/20',
             )}
         >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <div
                         draggable
@@ -8260,7 +8281,26 @@ function QuestionSelectionCard({
                         {alternativeSection ? ' per side' : ''}
                     </span>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                    {section.category === 'Subjective Questions' &&
+                        orOptions.length > 0 && (
+                            <FloatingCombobox
+                                label="OR alternative"
+                                hideLabel
+                                leadingIcon={Link2Icon}
+                                className="min-w-[15rem] flex-1 sm:w-64 sm:flex-none"
+                                options={orOptions}
+                                value={selectedOrOption}
+                                onChange={(option) =>
+                                    onOrPairingChange(
+                                        section.id,
+                                        option === null
+                                            ? null
+                                            : Number(option.id),
+                                    )
+                                }
+                            />
+                        )}
                     <AutoPickSwitch
                         enabled={autoPick}
                         onChange={(enabled) =>
@@ -8280,61 +8320,12 @@ function QuestionSelectionCard({
                             plainQuestionText(typeHeading) +
                             ' row'
                         }
-                        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
+                        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
                     >
-                        <PlusIcon className="size-3.5" />
-                        Add row
+                        <PlusIcon className="size-4" />
                     </button>
                 </div>
             </div>
-
-            {section.category === 'Subjective Questions' &&
-                orOptions.length > 0 && (
-                    <div
-                        className={cn(
-                            'mt-3 grid gap-3 rounded-xl border px-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(15rem,22rem)] sm:items-center',
-                            selectedOrOption
-                                ? 'border-brand-200 bg-brand-50/55 dark:border-brand-500/30 dark:bg-brand-500/[0.08]'
-                                : 'border-dashed border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/55',
-                        )}
-                    >
-                        <div className="flex min-w-0 items-center gap-2.5">
-                            <div
-                                className={cn(
-                                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                                    selectedOrOption
-                                        ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300'
-                                        : 'bg-white text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-300',
-                                )}
-                            >
-                                <Link2Icon className="size-4" />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">
-                                    {selectedOrOption
-                                        ? 'OR group enabled'
-                                        : 'Offer an OR alternative'}
-                                </p>
-                                <p className="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
-                                    Both sides use the same choice, required,
-                                    and marks settings.
-                                </p>
-                            </div>
-                        </div>
-                        <FloatingCombobox
-                            label="OR alternative"
-                            leadingIcon={Link2Icon}
-                            options={orOptions}
-                            value={selectedOrOption}
-                            onChange={(option) =>
-                                onOrPairingChange(
-                                    section.id,
-                                    option === null ? null : Number(option.id),
-                                )
-                            }
-                        />
-                    </div>
-                )}
 
             <div className="mt-4 space-y-4">
                 {section.rows.map((row, index) => (

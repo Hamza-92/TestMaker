@@ -12,6 +12,7 @@ import {
     HeadingIcon,
     ImageIcon,
     LayoutPanelTopIcon,
+    Link2Icon,
     ListOrderedIcon,
     MinusIcon,
     PlusIcon,
@@ -32,6 +33,9 @@ import type {
     PaperEnglishFont,
     PaperHeaderTemplate,
     PaperOrientation,
+    PaperOrGroupDividerStyle,
+    PaperOrGroupLabel,
+    PaperOrGroupLayout,
     PaperQuestionLayout,
     PaperQuestionNumberingFormat,
     PaperSettings,
@@ -90,7 +94,8 @@ const URDU_FONT_OPTIONS: Array<FontOption<PaperUrduFont>> = [
     {
         value: 'mehr-nastaliq',
         label: 'Mehr Nastaliq',
-        previewFontFamily: '"Mehr Nastaliq Web", "Arabic Typesetting", "Urdu Typesetting", serif',
+        previewFontFamily:
+            '"Mehr Nastaliq Web", "Arabic Typesetting", "Urdu Typesetting", serif',
     },
 ];
 
@@ -155,16 +160,43 @@ const QUESTION_LAYOUT_OPTIONS = [
     { value: 'inline', label: 'Inline', previewFontFamily: 'inherit' },
 ] as const;
 
+const OR_GROUP_LAYOUT_OPTIONS: Array<FontOption<PaperOrGroupLayout>> = [
+    { value: 'stacked', label: 'Stacked', previewFontFamily: 'inherit' },
+    {
+        value: 'side-by-side',
+        label: 'Side by side',
+        previewFontFamily: 'inherit',
+    },
+];
+
+const OR_GROUP_DIVIDER_OPTIONS: Array<FontOption<PaperOrGroupDividerStyle>> = [
+    { value: 'line', label: 'Line', previewFontFamily: 'inherit' },
+    { value: 'badge', label: 'Badge', previewFontFamily: 'inherit' },
+    { value: 'plain', label: 'Plain text', previewFontFamily: 'inherit' },
+];
+
+const OR_GROUP_LABEL_OPTIONS: Array<FontOption<PaperOrGroupLabel>> = [
+    { value: 'auto', label: 'Auto', previewFontFamily: 'inherit' },
+    { value: 'english', label: 'OR', previewFontFamily: 'inherit' },
+    { value: 'urdu', label: '\u06cc\u0627', previewFontFamily: 'inherit' },
+    {
+        value: 'bilingual',
+        label: 'OR / \u06cc\u0627',
+        previewFontFamily: 'inherit',
+    },
+];
+
 const HEADER_TEMPLATE_OPTIONS: Array<FontOption<PaperHeaderTemplate>> = [
-    { value: 'classic',  label: '1 – Classic',  previewFontFamily: 'inherit' },
-    { value: 'banner',   label: '2 – Banner',   previewFontFamily: 'inherit' },
-    { value: 'formal',   label: '3 – Formal',   previewFontFamily: 'inherit' },
+    { value: 'classic', label: '1 – Classic', previewFontFamily: 'inherit' },
+    { value: 'banner', label: '2 – Banner', previewFontFamily: 'inherit' },
+    { value: 'formal', label: '3 – Formal', previewFontFamily: 'inherit' },
     { value: 'centered', label: '4 – Centered', previewFontFamily: 'inherit' },
-    { value: 'tabular',  label: '5 – Tabular',  previewFontFamily: 'inherit' },
+    { value: 'tabular', label: '5 – Tabular', previewFontFamily: 'inherit' },
 ];
 
 const MARGIN_BOUNDS = { min: 0, max: 50 };
 const SECTION_SPACING_BOUNDS = { min: 0, max: 20 };
+const OR_GROUP_GAP_BOUNDS = { min: 0, max: 10 };
 const HEADER_PADDING_BOUNDS = { min: 0, max: 24 };
 
 const LINE_HEIGHT_BOUNDS = { min: 1, max: 3 };
@@ -597,7 +629,9 @@ export function PaperSettingsDrawer({
                             <FontPicker
                                 value={settings.headerTemplate}
                                 options={HEADER_TEMPLATE_OPTIONS}
-                                onChange={(v) => onChange({ headerTemplate: v })}
+                                onChange={(v) =>
+                                    onChange({ headerTemplate: v })
+                                }
                             />
                         </div>
                         <TypographyControls
@@ -616,14 +650,18 @@ export function PaperSettingsDrawer({
                                 value={settings.headerPaddingX}
                                 min={HEADER_PADDING_BOUNDS.min}
                                 max={HEADER_PADDING_BOUNDS.max}
-                                onChange={(v) => onChange({ headerPaddingX: v })}
+                                onChange={(v) =>
+                                    onChange({ headerPaddingX: v })
+                                }
                             />
                             <LabeledStepper
                                 label="Padding Y (px)"
                                 value={settings.headerPaddingY}
                                 min={HEADER_PADDING_BOUNDS.min}
                                 max={HEADER_PADDING_BOUNDS.max}
-                                onChange={(v) => onChange({ headerPaddingY: v })}
+                                onChange={(v) =>
+                                    onChange({ headerPaddingY: v })
+                                }
                             />
                         </div>
                         <BorderControls
@@ -659,6 +697,63 @@ export function PaperSettingsDrawer({
                                 onChange({ headingBorderStyle: v })
                             }
                         />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="OR Group" icon={Link2Icon}>
+                        <div>
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Print Layout
+                            </p>
+                            <FontPicker
+                                value={settings.orGroupLayout}
+                                options={OR_GROUP_LAYOUT_OPTIONS}
+                                onChange={(value: PaperOrGroupLayout) =>
+                                    onChange({ orGroupLayout: value })
+                                }
+                            />
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div>
+                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    Divider
+                                </p>
+                                <FontPicker
+                                    value={settings.orGroupDividerStyle}
+                                    options={OR_GROUP_DIVIDER_OPTIONS}
+                                    onChange={(
+                                        value: PaperOrGroupDividerStyle,
+                                    ) =>
+                                        onChange({
+                                            orGroupDividerStyle: value,
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    Label
+                                </p>
+                                <FontPicker
+                                    value={settings.orGroupLabel}
+                                    options={OR_GROUP_LABEL_OPTIONS}
+                                    onChange={(value: PaperOrGroupLabel) =>
+                                        onChange({ orGroupLabel: value })
+                                    }
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-3">
+                            <LabeledStepper
+                                label="Spacing (mm)"
+                                value={settings.orGroupGap}
+                                min={OR_GROUP_GAP_BOUNDS.min}
+                                max={OR_GROUP_GAP_BOUNDS.max}
+                                step={0.5}
+                                onChange={(value) =>
+                                    onChange({ orGroupGap: value })
+                                }
+                            />
+                        </div>
                     </CollapsibleSection>
 
                     <CollapsibleSection
@@ -904,7 +999,8 @@ function LabeledStepper({
                     <MinusIcon className="size-3.5" />
                 </StepperButton>
 
-                <input autoComplete="off"
+                <input
+                    autoComplete="off"
                     type="number"
                     inputMode={inputMode}
                     value={value}
@@ -1052,7 +1148,8 @@ function LogoInput({
                         No school logo found
                     </p>
                 )}
-                <input autoComplete="off"
+                <input
+                    autoComplete="off"
                     ref={inputRef}
                     type="file"
                     accept="image/*"
@@ -1105,7 +1202,8 @@ function TextInput({
             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 {label}
             </p>
-            <input autoComplete="off"
+            <input
+                autoComplete="off"
                 type="text"
                 value={value}
                 placeholder={placeholder}
@@ -1219,8 +1317,10 @@ function FontPicker<T extends string>({
                 </div>
 
                 <ComboboxOptions
+                    anchor="bottom start"
+                    portal
                     transition
-                    className="absolute top-full right-0 left-0 z-50 mt-2 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 transition duration-100 ease-out outline-none data-closed:scale-95 data-closed:opacity-0 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40"
+                    className="z-[70] max-h-60 w-[var(--input-width)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 transition duration-100 ease-out outline-none [--anchor-gap:0.5rem] data-closed:scale-95 data-closed:opacity-0 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40"
                 >
                     {filtered.length === 0 && (
                         <div className="flex flex-col items-center gap-1.5 px-3 py-5 text-center">

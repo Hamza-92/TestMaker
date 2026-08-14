@@ -137,6 +137,9 @@ export type PaperQuestionNumberingFormat =
     | 'roman'
     | 'alpha';
 export type PaperQuestionLayout = 'default' | 'stacked' | 'columns' | 'inline';
+export type PaperOrGroupLayout = 'stacked' | 'side-by-side';
+export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
+export type PaperOrGroupLabel = 'auto' | 'english' | 'urdu' | 'bilingual';
 export type PaperWatermarkType = 'text' | 'logo';
 
 export interface PaperSettings {
@@ -203,6 +206,14 @@ export interface PaperSettings {
      * Other values force the same template for all sections.
      */
     questionLayout: PaperQuestionLayout;
+    /** How paired subjective alternatives are arranged on the paper. */
+    orGroupLayout: PaperOrGroupLayout;
+    /** Visual treatment of the OR marker between paired alternatives. */
+    orGroupDividerStyle: PaperOrGroupDividerStyle;
+    /** Language used for the OR marker. 'auto' uses the pairing's saved label. */
+    orGroupLabel: PaperOrGroupLabel;
+    /** Space between the paired alternatives and their divider, in mm. */
+    orGroupGap: number;
     /** Which header layout template to use for the exam paper. */
     headerTemplate: PaperHeaderTemplate;
 }
@@ -250,6 +261,10 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     repeatHeaderOnEachPage: false,
     questionNumberingFormat: 'roman',
     questionLayout: 'default',
+    orGroupLayout: 'stacked',
+    orGroupDividerStyle: 'line',
+    orGroupLabel: 'auto',
+    orGroupGap: 1,
     headerTemplate: 'classic',
 };
 
@@ -274,6 +289,21 @@ const QUESTION_LAYOUT_VALUES = new Set<PaperQuestionLayout>([
     'stacked',
     'columns',
     'inline',
+]);
+const OR_GROUP_LAYOUT_VALUES = new Set<PaperOrGroupLayout>([
+    'stacked',
+    'side-by-side',
+]);
+const OR_GROUP_DIVIDER_STYLE_VALUES = new Set<PaperOrGroupDividerStyle>([
+    'line',
+    'badge',
+    'plain',
+]);
+const OR_GROUP_LABEL_VALUES = new Set<PaperOrGroupLabel>([
+    'auto',
+    'english',
+    'urdu',
+    'bilingual',
 ]);
 const WATERMARK_TYPE_VALUES = new Set<PaperWatermarkType>(['text', 'logo']);
 const HEADER_TEMPLATE_VALUES = new Set<PaperHeaderTemplate>([
@@ -514,12 +544,51 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             QUESTION_LAYOUT_VALUES,
             DEFAULT_PAPER_SETTINGS.questionLayout,
         ),
+        orGroupLayout: pickEnum(
+            source.orGroupLayout,
+            OR_GROUP_LAYOUT_VALUES,
+            DEFAULT_PAPER_SETTINGS.orGroupLayout,
+        ),
+        orGroupDividerStyle: pickEnum(
+            source.orGroupDividerStyle,
+            OR_GROUP_DIVIDER_STYLE_VALUES,
+            DEFAULT_PAPER_SETTINGS.orGroupDividerStyle,
+        ),
+        orGroupLabel: pickEnum(
+            source.orGroupLabel,
+            OR_GROUP_LABEL_VALUES,
+            DEFAULT_PAPER_SETTINGS.orGroupLabel,
+        ),
+        orGroupGap:
+            typeof source.orGroupGap === 'number' &&
+            Number.isFinite(source.orGroupGap)
+                ? Math.min(Math.max(source.orGroupGap, 0), 10)
+                : DEFAULT_PAPER_SETTINGS.orGroupGap,
         headerTemplate: pickEnum(
             source.headerTemplate,
             HEADER_TEMPLATE_VALUES,
             DEFAULT_PAPER_SETTINGS.headerTemplate,
         ),
     };
+}
+
+export function resolveOrGroupLabel(
+    settings: PaperSettings,
+    savedLabel?: string | null,
+): string {
+    if (settings.orGroupLabel === 'english') {
+        return 'OR';
+    }
+
+    if (settings.orGroupLabel === 'urdu') {
+        return '\u06cc\u0627';
+    }
+
+    if (settings.orGroupLabel === 'bilingual') {
+        return 'OR / \u06cc\u0627';
+    }
+
+    return savedLabel?.trim() || 'OR';
 }
 
 export interface GeneratedPaper {

@@ -28,6 +28,8 @@ interface FloatingComboboxProps {
     disabledHint?: string;
     /** Optional icon shown on the left of the input. */
     leadingIcon?: React.ElementType;
+    /** Keep the accessible label while hiding its floating visual treatment. */
+    hideLabel?: boolean;
     className?: string;
 }
 
@@ -46,6 +48,7 @@ export function FloatingCombobox({
     disabled = false,
     disabledHint,
     leadingIcon: LeadingIcon,
+    hideLabel = false,
     className,
 }: FloatingComboboxProps) {
     const [query, setQuery] = useState('');
@@ -106,20 +109,22 @@ export function FloatingCombobox({
 
                     {/* Floating label — bg-inherit so the cutout always matches the field bg,
                         including the disabled slate-50 state. */}
-                    <label
-                        className={cn(
-                            'pointer-events-none absolute z-10 select-none bg-inherit px-1 font-medium transition-all duration-150',
-                            LeadingIcon ? 'left-8' : 'left-3',
-                            // Resting state
-                            isFilled
-                                ? '-top-2 text-[11px] text-slate-500 dark:text-slate-400'
-                                : 'top-1/2 -translate-y-1/2 text-sm text-slate-400 dark:text-slate-500',
-                            // Focused state — always floats up + takes brand color
-                            'group-focus-within/field:-top-2 group-focus-within/field:translate-y-0 group-focus-within/field:text-[11px] group-focus-within/field:text-brand-600 dark:group-focus-within/field:text-brand-400',
-                        )}
-                    >
-                        {label}
-                    </label>
+                    {!hideLabel && (
+                        <label
+                            className={cn(
+                                'pointer-events-none absolute z-10 select-none bg-inherit px-1 font-medium transition-all duration-150',
+                                LeadingIcon ? 'left-8' : 'left-3',
+                                // Resting state
+                                isFilled
+                                    ? '-top-2 text-[11px] text-slate-500 dark:text-slate-400'
+                                    : 'top-1/2 -translate-y-1/2 text-sm text-slate-400 dark:text-slate-500',
+                                // Focused state — always floats up + takes brand color
+                                'group-focus-within/field:-top-2 group-focus-within/field:translate-y-0 group-focus-within/field:text-[11px] group-focus-within/field:text-brand-600 dark:group-focus-within/field:text-brand-400',
+                            )}
+                        >
+                            {label}
+                        </label>
+                    )}
 
                     <ComboboxInput
                         ref={inputRef}

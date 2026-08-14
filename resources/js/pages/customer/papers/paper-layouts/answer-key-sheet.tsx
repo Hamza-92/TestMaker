@@ -2,6 +2,7 @@ import { KeyRoundIcon } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { optionLetter, setLabelFor } from './paper-variant';
 import { QuestionContent } from './questions/question-content';
+import { resolveOrGroupLabel } from './types';
 import type {
     GeneratedPaper,
     GeneratedPaperQuestion,
@@ -119,18 +120,164 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                 )}
             </div>
             <div className="space-y-4">
-                {paper.sections.map((section, sectionIndex) => (
-                    <SectionAnswers
-                        key={section.id}
-                        section={section}
-                        sectionNumber={answerSectionNumber(
-                            paper.sections,
-                            sectionIndex,
-                        )}
-                        settings={settings}
-                    />
-                ))}
+                {paper.sections.map((section, sectionIndex) => {
+                    if (section.orRole === 'alternative') {
+                        return null;
+                    }
+
+                    const alternativeIndex =
+                        section.orRole === 'primary' && section.orGroupId
+                            ? paper.sections.findIndex(
+                                  (candidate) =>
+                                      candidate.orGroupId ===
+                                          section.orGroupId &&
+                                      candidate.orRole === 'alternative',
+                              )
+                            : -1;
+                    const sectionNumber = answerSectionNumber(
+                        paper.sections,
+                        sectionIndex,
+                    );
+
+                    if (alternativeIndex < 0) {
+                        return (
+                            <SectionAnswers
+                                key={section.id}
+                                section={section}
+                                sectionNumber={sectionNumber}
+                                settings={settings}
+                            />
+                        );
+                    }
+
+                    const alternative = paper.sections[alternativeIndex];
+                    const sideBySide =
+                        settings.orGroupLayout === 'side-by-side';
+
+                    return (
+                        <div
+                            key={section.orGroupId ?? section.id}
+                            className={
+                                sideBySide
+                                    ? 'grid items-stretch'
+                                    : 'flex flex-col'
+                            }
+                            style={
+                                sideBySide
+                                    ? {
+                                          gridTemplateColumns:
+                                              'minmax(0, 1fr) auto minmax(0, 1fr)',
+                                          columnGap: `${settings.orGroupGap}mm`,
+                                      }
+                                    : {
+                                          rowGap: `${settings.orGroupGap}mm`,
+                                      }
+                            }
+                        >
+                            <div className="min-w-0">
+                                <SectionAnswers
+                                    section={section}
+                                    sectionNumber={sectionNumber}
+                                    settings={settings}
+                                />
+                            </div>
+                            <AnswerKeyOrDivider
+                                label={resolveOrGroupLabel(
+                                    settings,
+                                    section.orLabel,
+                                )}
+                                settings={settings}
+                                orientation={
+                                    sideBySide ? 'vertical' : 'horizontal'
+                                }
+                            />
+                            <div className="min-w-0">
+                                <SectionAnswers
+                                    section={alternative}
+                                    sectionNumber={sectionNumber}
+                                    settings={settings}
+                                    showOrPrefix={false}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
+        </div>
+    );
+}
+
+function AnswerKeyOrDivider({
+    label,
+    settings,
+    orientation,
+}: {
+    label: string;
+    settings: PaperSettings;
+    orientation: 'horizontal' | 'vertical';
+}) {
+    const showLine = settings.orGroupDividerStyle === 'line';
+    const showBadge = settings.orGroupDividerStyle === 'badge';
+    const marker = (
+        <span
+            className={
+                showBadge
+                    ? 'shrink-0 rounded-full border px-1.5 py-0.5 font-bold'
+                    : 'shrink-0 px-1 font-bold'
+            }
+            style={showBadge ? { borderColor: settings.textColor } : undefined}
+        >
+            {label}
+        </span>
+    );
+
+    if (orientation === 'vertical') {
+        return (
+            <div
+                role="separator"
+                aria-label="OR alternative"
+                className="flex min-h-[2rem] justify-center self-stretch"
+                style={{ color: settings.textColor }}
+            >
+                <div className="flex flex-col items-center">
+                    {showLine && (
+                        <span
+                            className="w-px flex-1"
+                            style={{ backgroundColor: settings.textColor }}
+                        />
+                    )}
+                    {marker}
+                    {showLine && (
+                        <span
+                            className="w-px flex-1"
+                            style={{ backgroundColor: settings.textColor }}
+                        />
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div
+            role="separator"
+            aria-label="OR alternative"
+            className="flex items-center justify-center gap-2"
+            style={{ color: settings.textColor }}
+        >
+            {showLine && (
+                <span
+                    className="h-px flex-1"
+                    style={{ backgroundColor: settings.textColor }}
+                />
+            )}
+            {marker}
+            {showLine && (
+                <span
+                    className="h-px flex-1"
+                    style={{ backgroundColor: settings.textColor }}
+                />
+            )}
         </div>
     );
 }
@@ -139,10 +286,12 @@ function SectionAnswers({
     section,
     sectionNumber,
     settings,
+    showOrPrefix = true,
 }: {
     section: GeneratedPaperSection;
     sectionNumber: number;
     settings: PaperSettings;
+    showOrPrefix?: boolean;
 }) {
     return (
         <div>
@@ -151,7 +300,11 @@ function SectionAnswers({
                 style={{ color: settings.textColor }}
             >
                 {section.orRole === 'alternative' ? (
-                    <span>{section.orLabel ?? 'OR'} ·</span>
+                    showOrPrefix ? (
+                        <span>
+                            {resolveOrGroupLabel(settings, section.orLabel)} ·
+                        </span>
+                    ) : null
                 ) : (
                     <span>Q.{sectionNumber}</span>
                 )}{' '}
