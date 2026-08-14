@@ -261,7 +261,7 @@ export default function QuestionTypePairings({
                 </div>
 
                 <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
-                    <div className="mb-4 flex items-start gap-3">
+                    <div className="mb-4 flex items-center gap-3">
                         <div className="rounded-lg bg-primary/10 p-2 text-primary">
                             <Link2Icon className="size-4" />
                         </div>
@@ -324,15 +324,10 @@ export default function QuestionTypePairings({
                 {!scopeLoading && loadedScopeMatches && (
                     <>
                         <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
-                            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <h2 className="text-sm font-semibold">
-                                        Create an OR pair
-                                    </h2>
-                                </div>
-                                <span className="rounded-full border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
-                                    Bidirectional
-                                </span>
+                            <div className="mb-4">
+                                <h2 className="text-sm font-semibold">
+                                    Create an OR pair
+                                </h2>
                             </div>
 
                             {scopedTypes.length < 2 ? (
@@ -341,7 +336,7 @@ export default function QuestionTypePairings({
                                     questions are required to create a pair.
                                 </div>
                             ) : (
-                                <div className="grid items-end gap-3 lg:grid-cols-[1fr_auto_1fr_auto]">
+                                <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]">
                                     <TypeSelect
                                         label="First question type"
                                         value={firstTypeId}
@@ -427,9 +422,9 @@ export default function QuestionTypePairings({
                                     {scopedPairings.map((pairing) => (
                                         <div
                                             key={pairing.id}
-                                            className="grid gap-4 px-4 py-4 md:grid-cols-[1fr_auto] md:items-center md:px-5"
+                                            className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-5"
                                         >
-                                            <div className="flex min-w-0 items-center gap-3">
+                                            <div className="grid min-w-0 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3">
                                                 <TypeBox
                                                     type={
                                                         pairing.question_type_a
@@ -605,7 +600,7 @@ function TypeBox({
 }) {
     return (
         <div className="min-w-0 flex-1 rounded-lg border bg-muted/20 px-3 py-2">
-            <p className="truncate text-sm font-medium">
+            <p className="break-words text-sm font-medium">
                 {displayName(type.name)}
             </p>
         </div>
