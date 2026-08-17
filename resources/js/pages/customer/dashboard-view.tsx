@@ -249,7 +249,7 @@ function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
                 </div>
                 <Badge>{updates.length}</Badge>
             </div>
-            <div className="max-h-80 overflow-y-auto overscroll-contain">
+            <div className="scrollbar-slim-muted max-h-72 overflow-y-auto overscroll-contain">
                 {updates.map((update) => {
                     const content = (
                         <>
