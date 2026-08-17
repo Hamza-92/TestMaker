@@ -33,6 +33,11 @@ interface Announcement {
     body: string | null;
     type: AnnouncementType;
     placement: 'banner' | 'card' | 'both';
+    banner_style: 'standard' | 'ticker';
+    banner_direction: 'auto' | 'ltr' | 'rtl';
+    banner_font: 'default' | 'urdu';
+    banner_background: string | null;
+    banner_text_color: string | null;
     status: AnnouncementStatus;
     action_label: string | null;
     action_url: string | null;
@@ -51,6 +56,11 @@ interface FormData {
     body: string;
     type: AnnouncementType;
     placement: 'banner' | 'card' | 'both';
+    banner_style: 'standard' | 'ticker';
+    banner_direction: 'auto' | 'ltr' | 'rtl';
+    banner_font: 'default' | 'urdu';
+    banner_background: string;
+    banner_text_color: string;
     status: AnnouncementStatus;
     action_label: string;
     action_url: string;
@@ -86,6 +96,11 @@ export default function AnnouncementForm({ announcement }: Props) {
         body: announcement?.body ?? '',
         type: announcement?.type ?? 'update',
         placement: announcement?.placement ?? 'both',
+        banner_style: announcement?.banner_style ?? 'standard',
+        banner_direction: announcement?.banner_direction ?? 'auto',
+        banner_font: announcement?.banner_font ?? 'default',
+        banner_background: announcement?.banner_background ?? '#eff6ff',
+        banner_text_color: announcement?.banner_text_color ?? '#0f172a',
         status: announcement?.status ?? 'draft',
         action_label: announcement?.action_label ?? '',
         action_url: announcement?.action_url ?? '',
@@ -106,6 +121,17 @@ export default function AnnouncementForm({ announcement }: Props) {
     };
 
     const fieldError = (field: string) => errors[field as keyof typeof errors];
+    const previewStyle = {
+        direction: data.banner_direction === 'rtl' ? 'rtl' : 'ltr',
+        fontFamily:
+            data.banner_font === 'urdu'
+                ? '"Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", serif'
+                : undefined,
+        ...(data.banner_background
+            ? { backgroundColor: data.banner_background }
+            : {}),
+        ...(data.banner_text_color ? { color: data.banner_text_color } : {}),
+    };
 
     return (
         <>
@@ -423,6 +449,132 @@ export default function AnnouncementForm({ announcement }: Props) {
                                 </label>
                             </div>
                         </Card>
+                        <Card className="space-y-5">
+                            <div>
+                                <h2 className="text-sm font-semibold">
+                                    Banner appearance
+                                </h2>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="banner_style">
+                                        Banner style
+                                    </Label>
+                                    <Select
+                                        value={data.banner_style}
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'banner_style',
+                                                value as FormData['banner_style'],
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger id="banner_style">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="standard">
+                                                Standard banner
+                                            </SelectItem>
+                                            <SelectItem value="ticker">
+                                                Looping ticker
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="banner_direction">
+                                        Text direction
+                                    </Label>
+                                    <Select
+                                        value={data.banner_direction}
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'banner_direction',
+                                                value as FormData['banner_direction'],
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger id="banner_direction">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="auto">
+                                                Auto detect
+                                            </SelectItem>
+                                            <SelectItem value="ltr">
+                                                Left to right
+                                            </SelectItem>
+                                            <SelectItem value="rtl">
+                                                Right to left (Urdu)
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5 sm:col-span-2">
+                                    <Label htmlFor="banner_font">
+                                        Banner font
+                                    </Label>
+                                    <Select
+                                        value={data.banner_font}
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'banner_font',
+                                                value as FormData['banner_font'],
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger id="banner_font">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="default">
+                                                Default app font
+                                            </SelectItem>
+                                            <SelectItem value="urdu">
+                                                Urdu Nastaleeq
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="banner_background">
+                                        Background color
+                                    </Label>
+                                    <Input
+                                        id="banner_background"
+                                        type="color"
+                                        value={data.banner_background}
+                                        onChange={(event) =>
+                                            setData(
+                                                'banner_background',
+                                                event.target.value,
+                                            )
+                                        }
+                                        className="h-10 cursor-pointer p-1"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="banner_text_color">
+                                        Text color
+                                    </Label>
+                                    <Input
+                                        id="banner_text_color"
+                                        type="color"
+                                        value={data.banner_text_color}
+                                        onChange={(event) =>
+                                            setData(
+                                                'banner_text_color',
+                                                event.target.value,
+                                            )
+                                        }
+                                        className="h-10 cursor-pointer p-1"
+                                    />
+                                </div>
+                            </div>
+                        </Card>
                         <Card
                             className="overflow-hidden bg-muted/20"
                             padding="none"
@@ -441,12 +593,14 @@ export default function AnnouncementForm({ announcement }: Props) {
                                             ? 'border-rose-200 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/20'
                                             : 'border-primary/20 bg-primary/5',
                                     )}
+                                    style={previewStyle}
+                                    dir={previewStyle.direction}
                                 >
                                     <p className="text-sm font-semibold">
                                         {data.title ||
                                             'Your announcement title'}
                                     </p>
-                                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                                    <p className="mt-1 text-xs leading-relaxed opacity-70">
                                         {data.summary ||
                                             'Your short summary will appear here.'}
                                     </p>

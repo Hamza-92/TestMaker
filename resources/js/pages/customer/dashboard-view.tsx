@@ -92,8 +92,14 @@ interface Announcement {
     summary: string | null;
     body: string | null;
     type: AnnouncementType;
+    banner_style: 'standard' | 'ticker';
+    banner_direction: 'auto' | 'ltr' | 'rtl';
+    banner_font: 'default' | 'urdu';
+    banner_background: string | null;
+    banner_text_color: string | null;
     action_label: string | null;
     action_url: string | null;
+    details_url: string;
     published_at: string | null;
     is_dismissible: boolean;
 }
@@ -130,16 +136,40 @@ function isExternalUrl(value: string) {
     return /^https?:\/\//i.test(value);
 }
 
+function announcementDirection(announcement: Announcement): 'ltr' | 'rtl' {
+    if (announcement.banner_direction !== 'auto') {
+        return announcement.banner_direction;
+    }
+
+    return /[\u0590-\u08ff]/.test(announcement.title) ? 'rtl' : 'ltr';
+}
+
 function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
     const [visible, setVisible] = useState(true);
+    const isTicker = announcement.banner_style === 'ticker';
+    const isUrdu = announcement.banner_font === 'urdu';
+    const direction = announcementDirection(announcement);
+    const fontFamily =
+        announcement.banner_font === 'urdu'
+            ? '"Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", serif'
+            : undefined;
+    const customStyle: CSSProperties = {
+        direction,
+        fontFamily,
+        ...(announcement.banner_background
+            ? { backgroundColor: announcement.banner_background }
+            : {}),
+        ...(announcement.banner_text_color
+            ? { color: announcement.banner_text_color }
+            : {}),
+    };
 
     if (!visible) {
         return null;
     }
 
-    const tone = announcementTone(announcement.type);
     const action =
-        announcement.action_url && announcement.action_label ? (
+        !isTicker && announcement.action_url && announcement.action_label ? (
             isExternalUrl(announcement.action_url) ? (
                 <a
                     href={announcement.action_url}
@@ -176,30 +206,63 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
     return (
         <div
             className={cn(
-                'relative overflow-hidden rounded-xl border p-4 shadow-sm sm:p-5',
-                tone,
+                'relative overflow-hidden rounded-xl border shadow-sm',
+                isTicker ? 'px-4 py-3' : 'p-4 sm:p-5',
+                announcementTone(announcement.type),
             )}
+            style={customStyle}
+            dir={direction}
         >
-            <div className="flex items-start gap-3.5 pr-7">
+            <div
+                className={cn(
+                    'flex items-center gap-3',
+                    isTicker && direction === 'rtl' ? 'pr-3' : 'pr-7',
+                )}
+            >
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/70 shadow-sm dark:bg-slate-900/40">
                     <AnnouncementIcon type={announcement.type} />
                 </div>
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <p className="text-sm font-semibold">
-                            {announcement.title}
-                        </p>
-                        <span className="text-[10px] font-semibold tracking-wide uppercase opacity-60">
-                            {announcement.type}
-                        </span>
+                {isTicker ? (
+                    <div
+                        className="min-w-0 flex-1 overflow-hidden"
+                        aria-live="polite"
+                    >
+                        <div
+                            className={cn(
+                                'announcement-ticker whitespace-nowrap',
+                                direction === 'rtl' &&
+                                    'announcement-ticker-rtl',
+                            )}
+                            dir={direction}
+                        >
+                            <span
+                                className={cn(
+                                    'announcement-ticker-item text-sm font-semibold',
+                                    isUrdu && 'leading-[1.8]',
+                                )}
+                            >
+                                {announcement.title}
+                            </span>
+                        </div>
                     </div>
-                    {(announcement.summary || announcement.body) && (
-                        <p className="mt-1 max-w-3xl text-xs leading-relaxed opacity-75">
-                            {announcement.summary || announcement.body}
-                        </p>
-                    )}
-                    {action && <div className="mt-3">{action}</div>}
-                </div>
+                ) : (
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <p className={cn("text-sm font-semibold", isUrdu && "leading-[1.8]")}>
+                                {announcement.title}
+                            </p>
+                            <span className="text-[10px] font-semibold tracking-wide uppercase opacity-60">
+                                {announcement.type}
+                            </span>
+                        </div>
+                        {(announcement.summary || announcement.body) && (
+                            <p className={cn("mt-1 max-w-3xl text-xs leading-relaxed opacity-75", isUrdu && "leading-[1.8]")}>
+                                {announcement.summary || announcement.body}
+                            </p>
+                        )}
+                        {action && <div className="mt-3">{action}</div>}
+                    </div>
+                )}
             </div>
             {announcement.is_dismissible && (
                 <button
@@ -214,7 +277,6 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
         </div>
     );
 }
-
 function updateIconTone(type: AnnouncementType) {
     return {
         feature:
@@ -247,7 +309,15 @@ function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
                         News and helpful updates
                     </p>
                 </div>
-                <Badge>{updates.length}</Badge>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/announcements"
+                        className="text-[10px] font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                    >
+                        View all
+                    </Link>
+                    <Badge>{updates.length}</Badge>
+                </div>
             </div>
             <div className="scrollbar-slim-muted max-h-72 overflow-y-auto overscroll-contain">
                 {updates.map((update) => {
@@ -266,7 +336,7 @@ function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
                                     <p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
                                         {update.title}
                                     </p>
-                                    {update.action_url && (
+                                    {update.details_url && (
                                         <ArrowUpRightIcon className="mt-0.5 size-3.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 dark:text-slate-500" />
                                     )}
                                 </div>
@@ -282,10 +352,10 @@ function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
                         </>
                     );
 
-                    return update.action_url ? (
+                    return update.details_url ? (
                         <Link
                             key={update.id}
-                            href={update.action_url}
+                            href={update.details_url}
                             className="group flex gap-3.5 px-4 py-3.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
                         >
                             {content}

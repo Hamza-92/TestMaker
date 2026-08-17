@@ -56,6 +56,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('customer/activity', [ActivityController::class, 'index'])
         ->middleware('app.user')
         ->name('customer.activity');
+    Route::get('announcements', [CustomerAnnouncementController::class, 'index'])->middleware('app.user')->name('customer.announcements');
+    Route::get('announcements/{announcement}', [CustomerAnnouncementController::class, 'show'])->middleware('app.user')->name('customer.announcements.show');
     Route::post('announcements/{announcement}/dismiss', [CustomerAnnouncementController::class, 'dismiss'])
         ->middleware('app.user')
         ->name('customer.announcements.dismiss');
