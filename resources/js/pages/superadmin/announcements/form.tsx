@@ -124,7 +124,7 @@ export default function AnnouncementForm({ announcement }: Props) {
 
                 <form
                     onSubmit={submit}
-                    className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]"
+                    className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_28rem]"
                 >
                     <Card className="space-y-5">
                         <div className="flex items-center gap-3">

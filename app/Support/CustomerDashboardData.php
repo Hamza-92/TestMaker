@@ -108,7 +108,6 @@ class CustomerDashboardData
                 fn (Announcement $announcement) => in_array($announcement->placement, ['card', 'both'], true)
                     && ! self::dismissedForSurface($announcement, $user, 'card'),
             )
-            ->take(4)
             ->values();
 
         $present = fn (Announcement $announcement): array => [
