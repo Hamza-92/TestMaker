@@ -2,10 +2,8 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangleIcon,
     CalendarDaysIcon,
-    CheckCircle2Icon,
     Edit3Icon,
     MegaphoneIcon,
-    MoreHorizontalIcon,
     PlusIcon,
     SparklesIcon,
     Trash2Icon,
@@ -147,7 +145,6 @@ export default function AnnouncementsPage({ announcements }: Props) {
             <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
                 <PageHeader
                     title="News & Updates"
-                    meta="Customer-facing product news and important updates"
                     actions={
                         <Button asChild>
                             <Link href="/superadmin/announcements/add">
@@ -163,11 +160,6 @@ export default function AnnouncementsPage({ announcements }: Props) {
                             <h2 className="text-sm font-semibold">
                                 All announcements
                             </h2>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                Published announcements appear on the customer
-                                dashboard according to their placement and
-                                schedule.
-                            </p>
                         </div>
                         <Badge>{announcements.length} total</Badge>
                     </div>
@@ -180,10 +172,7 @@ export default function AnnouncementsPage({ announcements }: Props) {
                             <h3 className="mt-4 text-sm font-semibold">
                                 No announcements yet
                             </h3>
-                            <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-                                Create your first update to keep customers
-                                informed about what is new.
-                            </p>
+
                             <Button
                                 asChild
                                 variant="secondary"
@@ -279,10 +268,6 @@ export default function AnnouncementsPage({ announcements }: Props) {
                                             >
                                                 <Trash2Icon className="size-4 text-destructive" />
                                             </Button>
-                                            <MoreHorizontalIcon
-                                                className="hidden size-4 text-muted-foreground sm:block"
-                                                aria-hidden="true"
-                                            />
                                         </div>
                                     </div>
                                 );
@@ -290,28 +275,6 @@ export default function AnnouncementsPage({ announcements }: Props) {
                         </div>
                     )}
                 </Card>
-
-                <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
-                    <div className="flex gap-2 rounded-xl border bg-muted/20 p-3">
-                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                        <span>
-                            Use Published status to make an update visible.
-                        </span>
-                    </div>
-                    <div className="flex gap-2 rounded-xl border bg-muted/20 p-3">
-                        <CalendarDaysIcon className="mt-0.5 size-4 shrink-0 text-sky-600" />
-                        <span>
-                            Schedule a start and end date for time-sensitive
-                            notices.
-                        </span>
-                    </div>
-                    <div className="flex gap-2 rounded-xl border bg-muted/20 p-3">
-                        <MegaphoneIcon className="mt-0.5 size-4 shrink-0 text-violet-600" />
-                        <span>
-                            Choose banner, updates card, or both placements.
-                        </span>
-                    </div>
-                </div>
             </div>
         </>
     );

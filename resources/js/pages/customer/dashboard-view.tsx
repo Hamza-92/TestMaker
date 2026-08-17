@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangleIcon,
     ArrowRightIcon,
+    ArrowUpRightIcon,
     BookmarkCheckIcon,
     CalendarDaysIcon,
     CheckIcon,
@@ -166,7 +167,7 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
         if (announcement.is_dismissible) {
             router.post(
                 `/announcements/${announcement.id}/dismiss`,
-                {},
+                { surface: 'banner' },
                 { preserveScroll: true, preserveState: true },
             );
         }
@@ -214,6 +215,19 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
     );
 }
 
+function updateIconTone(type: AnnouncementType) {
+    return {
+        feature:
+            'bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300',
+        update: 'bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-300',
+        maintenance:
+            'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300',
+        important:
+            'bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300',
+        event: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300',
+    }[type];
+}
+
 function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
     if (updates.length === 0) {
         return null;
@@ -221,34 +235,47 @@ function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
 
     return (
         <Card padding="none" className="overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3.5">
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Latest Updates
-                </h2>
+            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-800">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-300">
+                    <MegaphoneIcon className="size-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        Latest Updates
+                    </h2>
+                    <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                        News and helpful updates
+                    </p>
+                </div>
                 <Badge>{updates.length}</Badge>
             </div>
-            <div className="divide-y border-t border-slate-100 dark:border-slate-800">
+            <div>
                 {updates.slice(0, 3).map((update) => {
                     const content = (
                         <>
                             <div
                                 className={cn(
-                                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                                    announcementTone(update.type),
+                                    'flex size-9 shrink-0 items-center justify-center rounded-xl',
+                                    updateIconTone(update.type),
                                 )}
                             >
                                 <AnnouncementIcon type={update.type} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="line-clamp-2 text-xs leading-relaxed font-semibold text-slate-700 dark:text-slate-200">
-                                    {update.title}
-                                </p>
+                                <div className="flex items-start gap-2">
+                                    <p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
+                                        {update.title}
+                                    </p>
+                                    {update.action_url && (
+                                        <ArrowUpRightIcon className="mt-0.5 size-3.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 dark:text-slate-500" />
+                                    )}
+                                </div>
                                 {update.summary && (
-                                    <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                    <p className="mt-1 line-clamp-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                                         {update.summary}
                                     </p>
                                 )}
-                                <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                                <p className="mt-1.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
                                     {relativeTime(update.published_at)}
                                 </p>
                             </div>
@@ -259,12 +286,15 @@ function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
                         <Link
                             key={update.id}
                             href={update.action_url}
-                            className="flex gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                            className="group flex gap-3.5 px-4 py-3.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
                         >
                             {content}
                         </Link>
                     ) : (
-                        <div key={update.id} className="flex gap-3 px-4 py-3">
+                        <div
+                            key={update.id}
+                            className="flex gap-3.5 px-4 py-3.5"
+                        >
                             {content}
                         </div>
                     );

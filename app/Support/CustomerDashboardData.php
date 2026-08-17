@@ -6,6 +6,7 @@ use App\Enums\AccountType;
 use App\Enums\AuditEvent;
 use App\Enums\TeacherPermission;
 use App\Models\Announcement;
+use App\Models\AnnouncementDismissal;
 use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\Pattern;
@@ -95,18 +96,18 @@ class CustomerDashboardData
     {
         $visible = Announcement::query()
             ->published()
-            ->where(function (Builder $query) use ($user): void {
-                $query->where('is_dismissible', false)
-                    ->orWhereDoesntHave('dismissedBy', fn (Builder $dismissed) => $dismissed->whereKey($user->id));
-            })
             ->get();
 
-        $banner = (clone $visible)
-            ->first(fn (Announcement $announcement) => in_array($announcement->placement, ['banner', 'both'], true));
+        $banner = $visible->first(
+            fn (Announcement $announcement) => in_array($announcement->placement, ['banner', 'both'], true)
+                && ! self::dismissedForSurface($announcement, $user, 'banner'),
+        );
 
         $updates = $visible
-            ->filter(fn (Announcement $announcement) => in_array($announcement->placement, ['card', 'both'], true))
-            ->reject(fn (Announcement $announcement) => $banner !== null && $announcement->id === $banner->id)
+            ->filter(
+                fn (Announcement $announcement) => in_array($announcement->placement, ['card', 'both'], true)
+                    && ! self::dismissedForSurface($announcement, $user, 'card'),
+            )
             ->take(4)
             ->values();
 
@@ -126,6 +127,16 @@ class CustomerDashboardData
             'banner' => $banner ? $present($banner) : null,
             'updates' => $updates->map($present)->values()->all(),
         ];
+    }
+
+    private static function dismissedForSurface(Announcement $announcement, User $user, string $surface): bool
+    {
+        return $announcement->is_dismissible
+            && AnnouncementDismissal::query()
+                ->where('announcement_id', $announcement->id)
+                ->where('user_id', $user->id)
+                ->where('surface', $surface)
+                ->exists();
     }
     private static function patterns(array $access): Collection
     {

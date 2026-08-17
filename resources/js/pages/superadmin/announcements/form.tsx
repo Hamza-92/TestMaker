@@ -1,8 +1,21 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeftIcon, EyeIcon, MegaphoneIcon, SaveIcon } from 'lucide-react';
+import {
+    ArrowLeftIcon,
+    CalendarClockIcon,
+    EyeIcon,
+    MegaphoneIcon,
+    SaveIcon,
+} from 'lucide-react';
 import { Button, Card, PageHeader } from '@/components/tm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 type AnnouncementType =
@@ -52,6 +65,19 @@ function dateInput(value: string | null) {
     return value ? value.slice(0, 16) : '';
 }
 
+function openDatePicker(id: string) {
+    const input = document.getElementById(id) as
+        | (HTMLInputElement & {
+              showPicker?: () => void;
+          })
+        | null;
+
+    if (input?.showPicker) {
+        input.showPicker();
+    } else {
+        input?.focus();
+    }
+}
 export default function AnnouncementForm({ announcement }: Props) {
     const editing = announcement !== null;
     const { data, setData, post, put, processing, errors } = useForm<FormData>({
@@ -87,7 +113,6 @@ export default function AnnouncementForm({ announcement }: Props) {
             <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
                 <PageHeader
                     title={editing ? 'Edit announcement' : 'New announcement'}
-                    meta="Create a clear, concise customer-facing update"
                     actions={
                         <Button asChild variant="secondary">
                             <Link href="/superadmin/announcements">
@@ -110,10 +135,6 @@ export default function AnnouncementForm({ announcement }: Props) {
                                 <h2 className="text-sm font-semibold">
                                     Announcement content
                                 </h2>
-                                <p className="text-xs text-muted-foreground">
-                                    Keep the title short and put the most useful
-                                    detail in the summary.
-                                </p>
                             </div>
                         </div>
                         <div className="space-y-1.5">
@@ -214,103 +235,154 @@ export default function AnnouncementForm({ announcement }: Props) {
                                 <h2 className="text-sm font-semibold">
                                     Publishing
                                 </h2>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    Control where and when customers see this
-                                    update.
-                                </p>
                             </div>
                             <div className="space-y-1.5">
                                 <Label htmlFor="type">Update type</Label>
-                                <select
-                                    id="type"
+                                <Select
                                     value={data.type}
-                                    onChange={(e) =>
+                                    onValueChange={(value) =>
                                         setData(
                                             'type',
-                                            e.target.value as AnnouncementType,
+                                            value as AnnouncementType,
                                         )
                                     }
-                                    className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
                                 >
-                                    <option value="update">
-                                        Product update
-                                    </option>
-                                    <option value="feature">New feature</option>
-                                    <option value="maintenance">
-                                        Maintenance
-                                    </option>
-                                    <option value="important">
-                                        Important notice
-                                    </option>
-                                    <option value="event">Event</option>
-                                </select>
+                                    <SelectTrigger id="type">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="update">
+                                            Product update
+                                        </SelectItem>
+                                        <SelectItem value="feature">
+                                            New feature
+                                        </SelectItem>
+                                        <SelectItem value="maintenance">
+                                            Maintenance
+                                        </SelectItem>
+                                        <SelectItem value="important">
+                                            Important notice
+                                        </SelectItem>
+                                        <SelectItem value="event">
+                                            Event
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="space-y-1.5">
                                 <Label htmlFor="placement">Placement</Label>
-                                <select
-                                    id="placement"
+                                <Select
                                     value={data.placement}
-                                    onChange={(e) =>
+                                    onValueChange={(value) =>
                                         setData(
                                             'placement',
-                                            e.target
-                                                .value as FormData['placement'],
+                                            value as FormData['placement'],
                                         )
                                     }
-                                    className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
                                 >
-                                    <option value="both">
-                                        Banner + updates card
-                                    </option>
-                                    <option value="banner">
-                                        Dashboard banner only
-                                    </option>
-                                    <option value="card">
-                                        Updates card only
-                                    </option>
-                                </select>
+                                    <SelectTrigger id="placement">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="both">
+                                            Banner + updates card
+                                        </SelectItem>
+                                        <SelectItem value="banner">
+                                            Dashboard banner only
+                                        </SelectItem>
+                                        <SelectItem value="card">
+                                            Updates card only
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="space-y-1.5">
                                 <Label htmlFor="status">Status</Label>
-                                <select
-                                    id="status"
+                                <Select
                                     value={data.status}
-                                    onChange={(e) =>
+                                    onValueChange={(value) =>
                                         setData(
                                             'status',
-                                            e.target
-                                                .value as AnnouncementStatus,
+                                            value as AnnouncementStatus,
                                         )
                                     }
-                                    className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
                                 >
-                                    <option value="draft">Draft</option>
-                                    <option value="published">Published</option>
-                                    <option value="archived">Archived</option>
-                                </select>
+                                    <SelectTrigger id="status">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="draft">
+                                            Draft
+                                        </SelectItem>
+                                        <SelectItem value="published">
+                                            Published
+                                        </SelectItem>
+                                        <SelectItem value="archived">
+                                            Archived
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                                 <div className="space-y-1.5">
                                     <Label htmlFor="starts_at">Starts at</Label>
-                                    <Input
-                                        id="starts_at"
-                                        type="datetime-local"
-                                        value={data.starts_at}
-                                        onChange={(e) =>
-                                            setData('starts_at', e.target.value)
-                                        }
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            id="starts_at"
+                                            type="datetime-local"
+                                            value={data.starts_at}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'starts_at',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            onClick={() =>
+                                                openDatePicker('starts_at')
+                                            }
+                                            className="pr-10 [color-scheme:light] dark:[color-scheme:dark]"
+                                        />
+                                        <button
+                                            type="button"
+                                            aria-label="Open start date picker"
+                                            onClick={() =>
+                                                openDatePicker('starts_at')
+                                            }
+                                            className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                                        >
+                                            <CalendarClockIcon className="size-4" />
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label htmlFor="ends_at">Ends at</Label>
-                                    <Input
-                                        id="ends_at"
-                                        type="datetime-local"
-                                        value={data.ends_at}
-                                        onChange={(e) =>
-                                            setData('ends_at', e.target.value)
-                                        }
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            id="ends_at"
+                                            type="datetime-local"
+                                            value={data.ends_at}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'ends_at',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            onClick={() =>
+                                                openDatePicker('ends_at')
+                                            }
+                                            className="pr-10 [color-scheme:light] dark:[color-scheme:dark]"
+                                        />
+                                        <button
+                                            type="button"
+                                            aria-label="Open end date picker"
+                                            onClick={() =>
+                                                openDatePicker('ends_at')
+                                            }
+                                            className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                                        >
+                                            <CalendarClockIcon className="size-4" />
+                                        </button>
+                                    </div>
                                     {fieldError('ends_at') && (
                                         <p className="text-xs text-destructive">
                                             {fieldError('ends_at')}
@@ -334,9 +406,6 @@ export default function AnnouncementForm({ announcement }: Props) {
                                             )
                                         }
                                     />
-                                    <p className="text-[11px] text-muted-foreground">
-                                        Higher values appear first.
-                                    </p>
                                 </div>
                                 <label className="flex items-center gap-2 pt-6 text-sm">
                                     <input

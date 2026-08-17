@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AnnouncementDismissal extends Model
 {
-    protected $fillable = ['announcement_id', 'user_id'];
+    protected $fillable = ['announcement_id', 'user_id', 'surface'];
 
     public function announcement(): BelongsTo
     {
