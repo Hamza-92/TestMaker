@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Enums\AccountType;
 use App\Enums\AuditEvent;
 use App\Enums\TeacherPermission;
+use App\Models\Announcement;
 use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\Pattern;
@@ -74,6 +75,7 @@ class CustomerDashboardData
                 'drafts' => (clone $papers)->where('is_draft', true)->count(),
                 'total_teachers' => $teacherCount,
             ],
+            'announcements' => self::announcements($user),
             'patterns' => self::patterns($access),
             'activities' => self::activities($user, $paperOwnerIds),
             'subject_usage' => [
@@ -89,6 +91,42 @@ class CustomerDashboardData
         ];
     }
 
+    private static function announcements(User $user): array
+    {
+        $visible = Announcement::query()
+            ->published()
+            ->where(function (Builder $query) use ($user): void {
+                $query->where('is_dismissible', false)
+                    ->orWhereDoesntHave('dismissedBy', fn (Builder $dismissed) => $dismissed->whereKey($user->id));
+            })
+            ->get();
+
+        $banner = (clone $visible)
+            ->first(fn (Announcement $announcement) => in_array($announcement->placement, ['banner', 'both'], true));
+
+        $updates = $visible
+            ->filter(fn (Announcement $announcement) => in_array($announcement->placement, ['card', 'both'], true))
+            ->reject(fn (Announcement $announcement) => $banner !== null && $announcement->id === $banner->id)
+            ->take(4)
+            ->values();
+
+        $present = fn (Announcement $announcement): array => [
+            'id' => $announcement->id,
+            'title' => $announcement->title,
+            'summary' => $announcement->summary,
+            'body' => $announcement->body,
+            'type' => $announcement->type,
+            'action_label' => $announcement->action_label,
+            'action_url' => $announcement->action_url,
+            'published_at' => $announcement->published_at?->toISOString(),
+            'is_dismissible' => $announcement->is_dismissible,
+        ];
+
+        return [
+            'banner' => $banner ? $present($banner) : null,
+            'updates' => $updates->map($present)->values()->all(),
+        ];
+    }
     private static function patterns(array $access): Collection
     {
         $patternIds = $access['ids']['pattern_access'];

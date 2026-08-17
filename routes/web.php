@@ -2,6 +2,7 @@
 
 use App\Enums\UserType;
 use App\Http\Controllers\Customer\ActivityController;
+use App\Http\Controllers\Customer\AnnouncementController as CustomerAnnouncementController;
 use App\Http\Controllers\Customer\GeneratePaperController;
 use App\Http\Controllers\Customer\OnlineTestAttemptController;
 use App\Http\Controllers\Customer\OnlineTestController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
 use App\Http\Controllers\Superadmin\DataTransferController;
+use App\Http\Controllers\Superadmin\AnnouncementController;
 use App\Http\Controllers\Superadmin\PatternController;
 use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
@@ -54,6 +56,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('customer/activity', [ActivityController::class, 'index'])
         ->middleware('app.user')
         ->name('customer.activity');
+    Route::post('announcements/{announcement}/dismiss', [CustomerAnnouncementController::class, 'dismiss'])
+        ->middleware('app.user')
+        ->name('customer.announcements.dismiss');
     Route::get('customer/profile', [ProfileController::class, 'edit'])->middleware('app.user')->name('customer.profile');
     Route::patch('customer/profile', [ProfileController::class, 'update'])->middleware('app.user')->name('customer.profile.update');
 
@@ -245,6 +250,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // â”€â”€â”€ Trial Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/trial-settings', [TrialSettingController::class, 'index'])->name('superadmin.trial-settings')->middleware('permission:trial_settings.edit');
         Route::put('superadmin/trial-settings', [TrialSettingController::class, 'update'])->name('superadmin.trial-settings.update')->middleware('permission:trial_settings.edit');
+
+        // Announcements
+        Route::get('superadmin/announcements', [AnnouncementController::class, 'index'])->name('superadmin.announcements')->middleware('permission:announcements.view');
+        Route::get('superadmin/announcements/add', [AnnouncementController::class, 'create'])->name('superadmin.announcements.add')->middleware('permission:announcements.create');
+        Route::post('superadmin/announcements', [AnnouncementController::class, 'store'])->name('superadmin.announcements.store')->middleware('permission:announcements.create');
+        Route::get('superadmin/announcements/{announcement}/edit', [AnnouncementController::class, 'edit'])->name('superadmin.announcements.edit')->middleware('permission:announcements.edit');
+        Route::put('superadmin/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('superadmin.announcements.update')->middleware('permission:announcements.edit');
+        Route::delete('superadmin/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('superadmin.announcements.destroy')->middleware('permission:announcements.delete');
 
         // â”€â”€â”€ Superadmin Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/users', [SuperadminUserController::class, 'index'])->name('superadmin.users')->middleware('permission:users.view');

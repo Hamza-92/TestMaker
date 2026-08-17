@@ -1,6 +1,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
+    AlertTriangleIcon,
     ArrowRightIcon,
     BookmarkCheckIcon,
     CalendarDaysIcon,
@@ -12,8 +13,12 @@ import {
     FilePlus2Icon,
     FileTextIcon,
     PencilLineIcon,
+    MegaphoneIcon,
     SchoolIcon,
+    SparklesIcon,
     Trash2Icon,
+    WrenchIcon,
+    XIcon,
     UserPlusIcon,
     UsersRoundIcon,
 } from 'lucide-react';
@@ -68,8 +73,206 @@ interface Props {
         can_generate_papers: boolean;
         can_add_teacher: boolean;
     };
+    announcements: {
+        banner: Announcement | null;
+        updates: Announcement[];
+    };
 }
 
+type AnnouncementType =
+    | 'feature'
+    | 'update'
+    | 'maintenance'
+    | 'important'
+    | 'event';
+interface Announcement {
+    id: number;
+    title: string;
+    summary: string | null;
+    body: string | null;
+    type: AnnouncementType;
+    action_label: string | null;
+    action_url: string | null;
+    published_at: string | null;
+    is_dismissible: boolean;
+}
+
+function announcementTone(type: AnnouncementType) {
+    return {
+        feature:
+            'border-violet-200 bg-violet-50/80 text-violet-950 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-100',
+        update: 'border-sky-200 bg-sky-50/80 text-sky-950 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100',
+        maintenance:
+            'border-amber-200 bg-amber-50/80 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100',
+        important:
+            'border-rose-200 bg-rose-50/80 text-rose-950 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100',
+        event: 'border-emerald-200 bg-emerald-50/80 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100',
+    }[type];
+}
+
+function AnnouncementIcon({ type }: { type: AnnouncementType }) {
+    const Icon =
+        type === 'feature'
+            ? SparklesIcon
+            : type === 'maintenance'
+              ? WrenchIcon
+              : type === 'important'
+                ? AlertTriangleIcon
+                : type === 'event'
+                  ? CalendarDaysIcon
+                  : MegaphoneIcon;
+
+    return <Icon className="size-4" />;
+}
+
+function isExternalUrl(value: string) {
+    return /^https?:\/\//i.test(value);
+}
+
+function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
+    const [visible, setVisible] = useState(true);
+
+    if (!visible) {
+        return null;
+    }
+
+    const tone = announcementTone(announcement.type);
+    const action =
+        announcement.action_url && announcement.action_label ? (
+            isExternalUrl(announcement.action_url) ? (
+                <a
+                    href={announcement.action_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold underline underline-offset-4"
+                >
+                    {announcement.action_label}
+                    <ArrowRightIcon className="size-3" />
+                </a>
+            ) : (
+                <Link
+                    href={announcement.action_url}
+                    className="inline-flex items-center gap-1 text-xs font-semibold underline underline-offset-4"
+                >
+                    {announcement.action_label}
+                    <ArrowRightIcon className="size-3" />
+                </Link>
+            )
+        ) : null;
+
+    const dismiss = () => {
+        setVisible(false);
+
+        if (announcement.is_dismissible) {
+            router.post(
+                `/announcements/${announcement.id}/dismiss`,
+                {},
+                { preserveScroll: true, preserveState: true },
+            );
+        }
+    };
+
+    return (
+        <div
+            className={cn(
+                'relative overflow-hidden rounded-xl border p-4 shadow-sm sm:p-5',
+                tone,
+            )}
+        >
+            <div className="flex items-start gap-3.5 pr-7">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/70 shadow-sm dark:bg-slate-900/40">
+                    <AnnouncementIcon type={announcement.type} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="text-sm font-semibold">
+                            {announcement.title}
+                        </p>
+                        <span className="text-[10px] font-semibold tracking-wide uppercase opacity-60">
+                            {announcement.type}
+                        </span>
+                    </div>
+                    {(announcement.summary || announcement.body) && (
+                        <p className="mt-1 max-w-3xl text-xs leading-relaxed opacity-75">
+                            {announcement.summary || announcement.body}
+                        </p>
+                    )}
+                    {action && <div className="mt-3">{action}</div>}
+                </div>
+            </div>
+            {announcement.is_dismissible && (
+                <button
+                    type="button"
+                    onClick={dismiss}
+                    aria-label="Dismiss announcement"
+                    className="absolute top-3 right-3 rounded-lg p-1 opacity-60 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
+                >
+                    <XIcon className="size-4" />
+                </button>
+            )}
+        </div>
+    );
+}
+
+function LatestUpdatesCard({ updates }: { updates: Announcement[] }) {
+    if (updates.length === 0) {
+        return null;
+    }
+
+    return (
+        <Card padding="none" className="overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3.5">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    Latest Updates
+                </h2>
+                <Badge>{updates.length}</Badge>
+            </div>
+            <div className="divide-y border-t border-slate-100 dark:border-slate-800">
+                {updates.slice(0, 3).map((update) => {
+                    const content = (
+                        <>
+                            <div
+                                className={cn(
+                                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                                    announcementTone(update.type),
+                                )}
+                            >
+                                <AnnouncementIcon type={update.type} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="line-clamp-2 text-xs leading-relaxed font-semibold text-slate-700 dark:text-slate-200">
+                                    {update.title}
+                                </p>
+                                {update.summary && (
+                                    <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                        {update.summary}
+                                    </p>
+                                )}
+                                <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                                    {relativeTime(update.published_at)}
+                                </p>
+                            </div>
+                        </>
+                    );
+
+                    return update.action_url ? (
+                        <Link
+                            key={update.id}
+                            href={update.action_url}
+                            className="flex gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                        >
+                            {content}
+                        </Link>
+                    ) : (
+                        <div key={update.id} className="flex gap-3 px-4 py-3">
+                            {content}
+                        </div>
+                    );
+                })}
+            </div>
+        </Card>
+    );
+}
 const PERIOD_LABELS: Record<SubjectPeriod, string> = {
     weekly: 'This week',
     monthly: 'This month',
@@ -394,6 +597,7 @@ export default function CustomerDashboard({
     activities,
     subject_usage: subjectUsage,
     permissions,
+    announcements,
 }: Props) {
     const [period, setPeriod] = useState<SubjectPeriod>('monthly');
     const subjects = subjectUsage[period];
@@ -533,6 +737,12 @@ export default function CustomerDashboard({
                             </div>
                         </Card>
 
+                        {announcements.banner && (
+                            <AnnouncementBanner
+                                announcement={announcements.banner}
+                            />
+                        )}
+
                         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                             {statCards.map(
                                 (
@@ -571,7 +781,7 @@ export default function CustomerDashboard({
                                                 <p className="order-2 mt-3 text-2xl leading-none font-bold tracking-tight text-slate-950 tabular-nums dark:text-white">
                                                     {value.toLocaleString()}
                                                 </p>
-                                                <p className="order-1 break-words pt-0.5 text-xs leading-tight font-semibold text-slate-600 dark:text-slate-300">
+                                                <p className="order-1 pt-0.5 text-xs leading-tight font-semibold break-words text-slate-600 dark:text-slate-300">
                                                     {label}
                                                 </p>
                                             </div>
@@ -674,6 +884,8 @@ export default function CustomerDashboard({
                                 tone="emerald"
                             />
                         )}
+
+                        <LatestUpdatesCard updates={announcements.updates} />
 
                         <Card padding="none" className="overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-3.5">

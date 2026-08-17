@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
     BookOpenIcon,
+    MegaphoneIcon,
     DatabaseIcon,
     HelpCircleIcon,
     LayoutGrid,
@@ -32,24 +33,104 @@ export function AppSidebar() {
 
     const navItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
-        ...(can('customers.view')      ? [{ title: 'Customers',      href: '/superadmin/customers',      icon: Users }] : []),
-        ...(can('patterns.view')       ? [{ title: 'Patterns',       href: '/superadmin/patterns',       icon: TagIcon }] : []),
-        ...(can('classes.view')        ? [{ title: 'Classes',        href: '/superadmin/classes',        icon: SchoolIcon }] : []),
-        ...(can('subjects.view')       ? [{ title: 'Subjects',       href: '/superadmin/subjects',       icon: BookOpenIcon }] : []),
-        ...(can('subjects.create')     ? [{ title: 'Data Transfer',  href: '/superadmin/data-transfer',  icon: DatabaseIcon }] : []),
-        ...(can('questions.view')      ? [{ title: 'Questions',      href: '/superadmin/questions',      icon: HelpCircleIcon }] : []),
-        ...(can('question_types.view') ? [{
-            title: 'Question Types',
-            href: '/superadmin/question-types',
-            icon: ShapesIcon,
-            items: [
-                { title: 'Objective Types',  href: '/superadmin/question-types/objective' },
-                { title: 'Subjective Types', href: '/superadmin/question-types/subjective' },
-                { title: 'OR Pairing Settings', href: '/superadmin/question-type-pairings' },
-            ],
-        }] : []),
-        ...(can('users.view')          ? [{ title: 'Users', href: '/superadmin/users', icon: UserCogIcon }] : []),
-        ...(can('trial_settings.edit') ? [{ title: 'Trial Settings', href: '/superadmin/trial-settings', icon: Settings2Icon }] : []),
+        ...(can('customers.view')
+            ? [
+                  {
+                      title: 'Customers',
+                      href: '/superadmin/customers',
+                      icon: Users,
+                  },
+              ]
+            : []),
+        ...(can('patterns.view')
+            ? [
+                  {
+                      title: 'Patterns',
+                      href: '/superadmin/patterns',
+                      icon: TagIcon,
+                  },
+              ]
+            : []),
+        ...(can('classes.view')
+            ? [
+                  {
+                      title: 'Classes',
+                      href: '/superadmin/classes',
+                      icon: SchoolIcon,
+                  },
+              ]
+            : []),
+        ...(can('subjects.view')
+            ? [
+                  {
+                      title: 'Subjects',
+                      href: '/superadmin/subjects',
+                      icon: BookOpenIcon,
+                  },
+              ]
+            : []),
+        ...(can('subjects.create')
+            ? [
+                  {
+                      title: 'Data Transfer',
+                      href: '/superadmin/data-transfer',
+                      icon: DatabaseIcon,
+                  },
+              ]
+            : []),
+        ...(can('questions.view')
+            ? [
+                  {
+                      title: 'Questions',
+                      href: '/superadmin/questions',
+                      icon: HelpCircleIcon,
+                  },
+              ]
+            : []),
+        ...(can('question_types.view')
+            ? [
+                  {
+                      title: 'Question Types',
+                      href: '/superadmin/question-types',
+                      icon: ShapesIcon,
+                      items: [
+                          {
+                              title: 'Objective Types',
+                              href: '/superadmin/question-types/objective',
+                          },
+                          {
+                              title: 'Subjective Types',
+                              href: '/superadmin/question-types/subjective',
+                          },
+                          {
+                              title: 'OR Pairing Settings',
+                              href: '/superadmin/question-type-pairings',
+                          },
+                      ],
+                  },
+              ]
+            : []),
+        ...(can('users.view')
+            ? [{ title: 'Users', href: '/superadmin/users', icon: UserCogIcon }]
+            : []),
+        ...(can('trial_settings.edit')
+            ? [
+                  {
+                      title: 'Trial Settings',
+                      href: '/superadmin/trial-settings',
+                      icon: Settings2Icon,
+                  },
+              ]
+            : []),
+        ...(can('announcements.view')
+            ? [
+                  {
+                      title: 'News & Updates',
+                      href: '/superadmin/announcements',
+                      icon: MegaphoneIcon,
+                  },
+              ]
+            : []),
     ];
 
     return (

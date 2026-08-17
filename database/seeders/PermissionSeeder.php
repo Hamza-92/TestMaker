@@ -62,6 +62,12 @@ class PermissionSeeder extends Seeder
 
             // Trial Settings
             ['name' => 'trial_settings.edit', 'display_name' => 'Manage Trial Settings', 'group' => 'Trial Settings'],
+
+            // Announcements
+            ['name' => 'announcements.view',   'display_name' => 'View Announcements',   'group' => 'Announcements'],
+            ['name' => 'announcements.create', 'display_name' => 'Create Announcements', 'group' => 'Announcements'],
+            ['name' => 'announcements.edit',   'display_name' => 'Edit Announcements',   'group' => 'Announcements'],
+            ['name' => 'announcements.delete', 'display_name' => 'Delete Announcements', 'group' => 'Announcements'],
         ];
 
         foreach ($permissions as $data) {
