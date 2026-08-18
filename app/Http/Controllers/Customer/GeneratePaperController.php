@@ -8,7 +8,7 @@ use App\Models\ClassSubject;
 use App\Models\PaperTemplate;
 use App\Models\Pattern;
 use App\Models\Question;
-use App\Models\QuestionTypePairing;
+use App\Models\QuestionTypeOrGroup;
 use App\Support\AppUserAccess;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
@@ -253,25 +253,32 @@ class GeneratePaperController extends Controller
             ->pluck('id')
             ->map(fn ($id) => (int) $id);
 
-        $pairings = QuestionTypePairing::query()
+        $groups = QuestionTypeOrGroup::query()
+            ->with('members')
             ->where('pattern_id', (int) $scope->pattern_id)
             ->where('class_id', (int) $scope->class_id)
             ->where('subject_id', (int) $scope->subject_id)
             ->where('is_active', true)
-            ->whereIn('question_type_a_id', $availableSubjectiveTypeIds)
-            ->whereIn('question_type_b_id', $availableSubjectiveTypeIds)
             ->orderBy('id')
-            ->get(['id', 'question_type_a_id', 'question_type_b_id'])
-            ->map(fn (QuestionTypePairing $pairing) => [
-                'id' => $pairing->id,
-                'questionTypeAId' => $pairing->question_type_a_id,
-                'questionTypeBId' => $pairing->question_type_b_id,
+            ->get()
+            ->filter(fn (QuestionTypeOrGroup $group) => $group->members->isNotEmpty()
+                && $group->members->every(
+                    fn ($member) => $availableSubjectiveTypeIds->contains($member->question_type_id),
+                ))
+            ->map(fn (QuestionTypeOrGroup $group) => [
+                'id' => $group->id,
+                'questionTypeIds' => $group->members
+                    ->sortBy('sort_order')
+                    ->pluck('question_type_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
             ])
             ->values();
 
         return response()->json([
             'sections' => $sections,
-            'pairings' => $pairings,
+            'groups' => $groups,
         ]);
     }
 

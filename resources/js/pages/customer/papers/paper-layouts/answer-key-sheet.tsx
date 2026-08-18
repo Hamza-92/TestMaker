@@ -125,21 +125,19 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                         return null;
                     }
 
-                    const alternativeIndex =
+                    const groupSections =
                         section.orRole === 'primary' && section.orGroupId
-                            ? paper.sections.findIndex(
+                            ? paper.sections.filter(
                                   (candidate) =>
-                                      candidate.orGroupId ===
-                                          section.orGroupId &&
-                                      candidate.orRole === 'alternative',
+                                      candidate.orGroupId === section.orGroupId,
                               )
-                            : -1;
+                            : [];
                     const sectionNumber = answerSectionNumber(
                         paper.sections,
                         sectionIndex,
                     );
 
-                    if (alternativeIndex < 0) {
+                    if (groupSections.length < 2) {
                         return (
                             <SectionAnswers
                                 key={section.id}
@@ -150,9 +148,53 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                         );
                     }
 
-                    const alternative = paper.sections[alternativeIndex];
-                    const sideBySide =
-                        settings.orGroupLayout === 'side-by-side';
+                    const sideBySide = settings.orGroupLayout === 'side-by-side';
+                    const label = resolveOrGroupLabel(
+                        settings,
+                        section.orLabel,
+                    );
+                    const groupChildren = groupSections.flatMap(
+                        (groupSection, index) =>
+                            index === groupSections.length - 1
+                                ? [
+                                      <div
+                                          key={`or-member-${index}`}
+                                          className="min-w-0"
+                                      >
+                                          <SectionAnswers
+                                              section={groupSection}
+                                              sectionNumber={sectionNumber}
+                                              settings={settings}
+                                              showOrPrefix={
+                                                  index === 0
+                                              }
+                                          />
+                                      </div>,
+                                  ]
+                                : [
+                                      <div
+                                          key={`or-member-${index}`}
+                                          className="min-w-0"
+                                      >
+                                          <SectionAnswers
+                                              section={groupSection}
+                                              sectionNumber={sectionNumber}
+                                              settings={settings}
+                                              showOrPrefix={index === 0}
+                                          />
+                                      </div>,
+                                      <AnswerKeyOrDivider
+                                          key={`or-divider-${index}`}
+                                          label={label}
+                                          settings={settings}
+                                          orientation={
+                                              sideBySide
+                                                  ? 'vertical'
+                                                  : 'horizontal'
+                                          }
+                                      />,
+                                  ],
+                    );
 
                     return (
                         <div
@@ -165,8 +207,13 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                             style={
                                 sideBySide
                                     ? {
-                                          gridTemplateColumns:
-                                              'minmax(0, 1fr) auto minmax(0, 1fr)',
+                                          gridTemplateColumns: groupSections
+                                              .map((_, index) =>
+                                                  index === groupSections.length - 1
+                                                      ? 'minmax(0, 1fr)'
+                                                      : 'minmax(0, 1fr) auto',
+                                              )
+                                              .join(' '),
                                           columnGap: `${settings.orGroupGap}mm`,
                                       }
                                     : {
@@ -174,31 +221,7 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                                       }
                             }
                         >
-                            <div className="min-w-0">
-                                <SectionAnswers
-                                    section={section}
-                                    sectionNumber={sectionNumber}
-                                    settings={settings}
-                                />
-                            </div>
-                            <AnswerKeyOrDivider
-                                label={resolveOrGroupLabel(
-                                    settings,
-                                    section.orLabel,
-                                )}
-                                settings={settings}
-                                orientation={
-                                    sideBySide ? 'vertical' : 'horizontal'
-                                }
-                            />
-                            <div className="min-w-0">
-                                <SectionAnswers
-                                    section={alternative}
-                                    sectionNumber={sectionNumber}
-                                    settings={settings}
-                                    showOrPrefix={false}
-                                />
-                            </div>
+                            {groupChildren}
                         </div>
                     );
                 })}
@@ -206,7 +229,6 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
         </div>
     );
 }
-
 function AnswerKeyOrDivider({
     label,
     settings,

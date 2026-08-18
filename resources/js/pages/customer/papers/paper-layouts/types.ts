@@ -59,6 +59,8 @@ export interface GeneratedPaperSection {
     orGroupId?: string | null;
     orPairingId?: number | null;
     orQuestionTypeId?: number | null;
+    /** All member question types in this OR group, including this section. */
+    orGroupTypeIds?: number[] | null;
     orRole?: 'primary' | 'alternative' | null;
     orLabel?: string | null;
 }

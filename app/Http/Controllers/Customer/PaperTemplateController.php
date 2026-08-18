@@ -129,6 +129,8 @@ class PaperTemplateController extends Controller
             'structure.sections.*.columns'           => ['nullable', 'integer', 'min:1', 'max:5'],
             'structure.sections.*.orPairingId'        => ['nullable', 'integer'],
             'structure.sections.*.orQuestionTypeId'   => ['nullable', 'integer'],
+            'structure.sections.*.orGroupTypeIds'     => ['nullable', 'array', 'min:2'],
+            'structure.sections.*.orGroupTypeIds.*'   => ['integer', 'distinct'],
             'structure.sections.*.orRole'             => ['nullable', Rule::in(['primary', 'alternative'])],
         ]);
 

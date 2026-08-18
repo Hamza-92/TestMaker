@@ -222,6 +222,7 @@ interface AppliedTemplate {
             columns?: number;
             orPairingId?: number | null;
             orQuestionTypeId?: number | null;
+            orGroupTypeIds?: number[] | null;
             orRole?: 'primary' | 'alternative' | null;
         }>;
         total_marks?: number;
@@ -259,13 +260,21 @@ interface QuestionSelectionRow {
     marksPerQuestion: string;
     choiceQuestions: string;
     selectedQuestionIds: number[];
+    /** Legacy two-way OR selections. Kept for old drafts/templates. */
     orSelectedQuestionIds?: number[];
+    /** Selected question IDs keyed by each alternative question type. */
+    orSelectedQuestionIdsByType?: Record<string, number[]>;
 }
 
 interface QuestionTypePairing {
     id: number;
-    questionTypeAId: number;
-    questionTypeBId: number;
+    questionTypeIds: number[];
+}
+
+interface OrTypeOption {
+    id: number;
+    label: string;
+    disabled?: boolean;
 }
 
 interface QuestionSelectionSection {
@@ -284,10 +293,59 @@ interface QuestionSelectionSection {
     sortOrder?: number | null;
     selectionMode?: SelectionMode;
     orPairingId?: number | null;
+    /** Legacy single alternative type. */
     orQuestionTypeId?: number | null;
+    /** All question types in this OR group, including this section. */
+    orGroupTypeIds?: number[];
+    /** Alternative members for the primary section in this OR group. */
+    orAlternativeQuestionTypeIds?: number[];
     rows: QuestionSelectionRow[];
 }
 
+function orAlternativeTypeIds(
+    section: Pick<
+        QuestionSelectionSection,
+        'questionTypeId' | 'orQuestionTypeId' | 'orAlternativeQuestionTypeIds' | 'orGroupTypeIds'
+    >,
+): number[] {
+    if (Array.isArray(section.orAlternativeQuestionTypeIds)) {
+        return section.orAlternativeQuestionTypeIds.filter(
+            (id) => id !== section.questionTypeId,
+        );
+    }
+
+    if (Array.isArray(section.orGroupTypeIds)) {
+        return section.orGroupTypeIds.filter(
+            (id) => id !== section.questionTypeId,
+        );
+    }
+
+    return typeof section.orQuestionTypeId === 'number'
+        ? [section.orQuestionTypeId]
+        : [];
+}
+
+function orGroupTypeIds(
+    section: Pick<
+        QuestionSelectionSection,
+        'questionTypeId' | 'orQuestionTypeId' | 'orGroupTypeIds'
+    >,
+): number[] {
+    return Array.from(
+        new Set([section.questionTypeId, ...orAlternativeTypeIds(section)]),
+    );
+}
+
+function rowOrSelectedQuestionIds(
+    row: QuestionSelectionRow,
+    typeId: number,
+): number[] {
+    return (
+        row.orSelectedQuestionIdsByType?.[String(typeId)] ??
+        row.orSelectedQuestionIds ??
+        []
+    );
+}
 function englishQuestionTypeTitle(
     section: Pick<QuestionSelectionSection, 'title' | 'titleEnglish'>,
 ): string {
@@ -353,6 +411,7 @@ interface ManualPickerRow {
     row: QuestionSelectionRow;
     target: number;
     side: ManualPickerSide;
+    alternativeTypeId?: number;
     questionTypeId: number;
     selectedQuestionIds: number[];
     title: string;
@@ -362,6 +421,7 @@ interface ManualPickerTarget {
     sectionId: string;
     rowId: string;
     side: ManualPickerSide;
+    alternativeTypeId?: number;
 }
 
 interface PaperQuestionPickerTarget {
@@ -458,6 +518,7 @@ function createQuestionRow(id: string): QuestionSelectionRow {
         choiceQuestions: '',
         selectedQuestionIds: [],
         orSelectedQuestionIds: [],
+        orSelectedQuestionIdsByType: {},
     };
 }
 
@@ -503,6 +564,14 @@ function normalizeQuestionRow(
         orSelectedQuestionIds: (normalized.orSelectedQuestionIds ?? []).slice(
             0,
             rowTarget(normalized),
+        ),
+        orSelectedQuestionIdsByType: Object.fromEntries(
+            Object.entries(normalized.orSelectedQuestionIdsByType ?? {}).map(
+                ([typeId, ids]) => [
+                    typeId,
+                    (ids ?? []).slice(0, rowTarget(normalized)),
+                ],
+            ),
         ),
     };
 }
@@ -921,9 +990,7 @@ function sectionTotal(section: QuestionSelectionSection): number {
 
 function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
     const alternativeTypeIds = new Set(
-        state.sections
-            .map((section) => section.orQuestionTypeId)
-            .filter((id): id is number => typeof id === 'number'),
+        state.sections.flatMap((section) => orAlternativeTypeIds(section)),
     );
 
     return {
@@ -966,27 +1033,24 @@ function mergeQuestionSections(
     const incomingIds = new Set(
         orderedIncoming.map((section) => section.questionTypeId),
     );
-    const pairingById = new Map(
-        pairings.map((pairing) => [pairing.id, pairing]),
-    );
+    const groupById = new Map(pairings.map((group) => [group.id, group]));
 
     const merged = orderedIncoming.map((item) => {
         const current = existingByType.get(item.questionTypeId);
         const sectionId = current?.id ?? `sec_type_${item.questionTypeId}`;
-        const pairing =
+        const group =
             typeof current?.orPairingId === 'number'
-                ? pairingById.get(current.orPairingId)
+                ? groupById.get(current.orPairingId)
                 : null;
-        const counterpartId =
-            pairing?.questionTypeAId === item.questionTypeId
-                ? pairing.questionTypeBId
-                : pairing?.questionTypeBId === item.questionTypeId
-                  ? pairing.questionTypeAId
-                  : null;
-        const keepsPairing =
-            counterpartId !== null &&
-            counterpartId === current?.orQuestionTypeId &&
-            incomingIds.has(counterpartId);
+        const memberIds = group?.questionTypeIds ?? current?.orGroupTypeIds ?? [];
+        const keepsGroup =
+            group !== null &&
+            group !== undefined &&
+            memberIds.includes(item.questionTypeId) &&
+            memberIds.every((id) => incomingIds.has(id));
+        const alternativeIds = keepsGroup
+            ? memberIds.filter((id) => id !== item.questionTypeId)
+            : [];
 
         return {
             id: sectionId,
@@ -1002,8 +1066,10 @@ function mergeQuestionSections(
             columnPerRow: item.columnPerRow,
             sortOrder: item.sortOrder,
             selectionMode: current?.selectionMode ?? 'automatic',
-            orPairingId: keepsPairing ? pairing?.id : null,
-            orQuestionTypeId: keepsPairing ? counterpartId : null,
+            orPairingId: keepsGroup ? group?.id : null,
+            orQuestionTypeId: keepsGroup ? alternativeIds[0] ?? null : null,
+            orGroupTypeIds: keepsGroup ? memberIds : undefined,
+            orAlternativeQuestionTypeIds: keepsGroup ? alternativeIds : undefined,
             rows: normalizeSectionRows(
                 current?.rows ?? [createQuestionRow(`${sectionId}_row_001`)],
                 item.availableCount,
@@ -1016,12 +1082,17 @@ function mergeQuestionSections(
     );
 
     return merged.map((section) => {
-        const alternative =
-            typeof section.orQuestionTypeId === 'number'
-                ? mergedByType.get(section.orQuestionTypeId)
-                : null;
-        const availableCount = alternative
-            ? Math.min(section.availableCount, alternative.availableCount)
+        const memberIds = orGroupTypeIds(section);
+        const groupIsActive =
+            typeof section.orPairingId === 'number' &&
+            memberIds.length > 1 &&
+            memberIds.every((id) => mergedByType.has(id));
+        const availableCount = groupIsActive
+            ? Math.min(
+                  ...memberIds.map(
+                      (id) => mergedByType.get(id)?.availableCount ?? section.availableCount,
+                  ),
+              )
             : section.availableCount;
 
         return {
@@ -1030,7 +1101,6 @@ function mergeQuestionSections(
         };
     });
 }
-
 function TriCheckbox({
     state,
     onChange,
@@ -1819,9 +1889,9 @@ export default function GeneratePaper({
     const foldedAlternativeTypeIds = useMemo(
         () =>
             new Set(
-                questionSelection.sections
-                    .map((section) => section.orQuestionTypeId)
-                    .filter((id): id is number => typeof id === 'number'),
+                questionSelection.sections.flatMap((section) =>
+                    orAlternativeTypeIds(section),
+                ),
             ),
         [questionSelection.sections],
     );
@@ -1860,37 +1930,39 @@ export default function GeneratePaper({
                     },
                 ];
 
-                if (typeof item.section.orQuestionTypeId === 'number') {
-                    const alternative = questionSelection.sections.find(
-                        (section) =>
-                            section.questionTypeId ===
-                            item.section.orQuestionTypeId,
-                    );
+                return rows.concat(
+                    orAlternativeTypeIds(item.section).map((alternativeTypeId) => {
+                        const alternative = questionSelection.sections.find(
+                            (section) => section.questionTypeId === alternativeTypeId,
+                        );
 
-                    rows.push({
-                        ...item,
-                        side: 'alternative',
-                        questionTypeId: item.section.orQuestionTypeId,
-                        selectedQuestionIds:
-                            item.row.orSelectedQuestionIds ?? [],
-                        title: alternative
-                            ? englishQuestionTypeTitle(alternative)
-                            : 'OR alternative',
-                    });
-                }
-
-                return rows;
+                        return {
+                            ...item,
+                            side: 'alternative',
+                            alternativeTypeId,
+                            questionTypeId: alternativeTypeId,
+                            selectedQuestionIds: rowOrSelectedQuestionIds(
+                                item.row,
+                                alternativeTypeId,
+                            ),
+                            title: alternative
+                                ? englishQuestionTypeTitle(alternative)
+                                : 'OR alternative',
+                        };
+                    }),
+                );
             }),
         [questionSelection.sections, questionSelectionRows],
-    );
-    const activeManualPickerRow = useMemo(
+    );    const activeManualPickerRow = useMemo(
         () =>
             manualPickerTarget
                 ? (manualPickerRows.find(
                       (item) =>
                           item.section.id === manualPickerTarget.sectionId &&
                           item.row.id === manualPickerTarget.rowId &&
-                          item.side === manualPickerTarget.side,
+                          item.side === manualPickerTarget.side &&
+                          item.alternativeTypeId ===
+                              manualPickerTarget.alternativeTypeId,
                   ) ?? null)
                 : null,
         [manualPickerRows, manualPickerTarget],
@@ -2280,9 +2352,9 @@ export default function GeneratePaper({
             .then(
                 (data: {
                     sections: QuestionTypeCount[];
-                    pairings?: QuestionTypePairing[];
+                    groups?: QuestionTypePairing[];
                 }) => {
-                    const pairings = data.pairings ?? [];
+                    const pairings = data.groups ?? [];
 
                     setQuestionTypePairings(pairings);
                     setQuestionSelection((current) =>
@@ -2378,23 +2450,36 @@ export default function GeneratePaper({
                         section.availableCount,
                     );
 
+                    const pairing =
+                        typeof match.orPairingId === 'number'
+                            ? questionTypePairings.find(
+                                  (candidate) =>
+                                      candidate.id === match.orPairingId,
+                              )
+                            : undefined;
+                    const savedGroupTypeIds = Array.isArray(
+                        match.orGroupTypeIds,
+                    )
+                        ? match.orGroupTypeIds.filter(
+                              (typeId): typeId is number =>
+                                  Number.isInteger(typeId),
+                          )
+                        : [];
+                    const groupTypeIds =
+                        savedGroupTypeIds.length > 1
+                            ? savedGroupTypeIds
+                            : pairing?.questionTypeIds ?? [];
                     const validPairing =
-                        match.orRole === 'primary' &&
                         typeof match.orPairingId === 'number' &&
-                        typeof match.orQuestionTypeId === 'number' &&
-                        questionTypePairings.some(
-                            (pairing) =>
-                                pairing.id === match.orPairingId &&
-                                ((pairing.questionTypeAId ===
-                                    section.questionTypeId &&
-                                    pairing.questionTypeBId ===
-                                        match.orQuestionTypeId) ||
-                                    (pairing.questionTypeBId ===
-                                        section.questionTypeId &&
-                                        pairing.questionTypeAId ===
-                                            match.orQuestionTypeId)),
-                        );
-
+                        groupTypeIds.length > 1 &&
+                        groupTypeIds.includes(section.questionTypeId) &&
+                        (match.orRole === 'primary' ||
+                            match.orRole === 'alternative');
+                    const alternativeTypeIds = validPairing
+                        ? groupTypeIds.filter(
+                              (typeId) => typeId !== section.questionTypeId,
+                          )
+                        : [];
                     return {
                         ...section,
                         columnPerRow: match.columns ?? section.columnPerRow,
@@ -2402,8 +2487,16 @@ export default function GeneratePaper({
                             ? match.orPairingId
                             : section.orPairingId,
                         orQuestionTypeId: validPairing
-                            ? match.orQuestionTypeId
+                            ? match.orQuestionTypeId ??
+                              alternativeTypeIds[0] ??
+                              null
                             : section.orQuestionTypeId,
+                        orGroupTypeIds: validPairing
+                            ? groupTypeIds
+                            : section.orGroupTypeIds,
+                        orAlternativeQuestionTypeIds: validPairing
+                            ? alternativeTypeIds
+                            : section.orAlternativeQuestionTypeIds,
                         rows,
                     };
                 }),
@@ -2887,12 +2980,14 @@ export default function GeneratePaper({
         sectionId: string,
         rowId: string,
         side: ManualPickerSide = 'primary',
+        alternativeTypeId?: number,
     ) {
         const row = manualPickerRows.find(
             (item) =>
                 item.section.id === sectionId &&
                 item.row.id === rowId &&
-                item.side === side,
+                item.side === side &&
+                item.alternativeTypeId === alternativeTypeId,
         );
 
         if (!row) {
@@ -2901,7 +2996,7 @@ export default function GeneratePaper({
 
         setManualSearch('');
         setShowSelectedManualQuestions(false);
-        setManualPickerTarget({ sectionId, rowId, side });
+        setManualPickerTarget({ sectionId, rowId, side, alternativeTypeId });
     }
 
     function closeManualQuestionPicker() {
@@ -2981,9 +3076,9 @@ export default function GeneratePaper({
 
         try {
             const alternativeTypeIds = new Set(
-                questionSelection.sections
-                    .map((section) => section.orQuestionTypeId)
-                    .filter((id): id is number => typeof id === 'number'),
+                questionSelection.sections.flatMap((section) =>
+                    orAlternativeTypeIds(section),
+                ),
             );
             const activeRows = questionSelection.sections
                 .filter(
@@ -3008,9 +3103,7 @@ export default function GeneratePaper({
                 ...new Set(
                     activeRows.flatMap((item) => [
                         item.section.questionTypeId,
-                        ...(typeof item.section.orQuestionTypeId === 'number'
-                            ? [item.section.orQuestionTypeId]
-                            : []),
+                        ...orAlternativeTypeIds(item.section),
                     ]),
                 ),
             ];
@@ -3087,6 +3180,7 @@ export default function GeneratePaper({
                     | 'orGroupId'
                     | 'orPairingId'
                     | 'orQuestionTypeId'
+                    | 'orGroupTypeIds'
                     | 'orRole'
                     | 'orLabel'
                 >,
@@ -3132,13 +3226,16 @@ export default function GeneratePaper({
                         section.title,
                         mode,
                     );
-                    const alternative =
-                        typeof section.orQuestionTypeId === 'number'
-                            ? sectionsByType.get(section.orQuestionTypeId)
-                            : null;
+                    const alternativeIds = orAlternativeTypeIds(section);
+                    const alternatives = alternativeIds
+                        .map((typeId) => sectionsByType.get(typeId))
+                        .filter(
+                            (candidate): candidate is QuestionSelectionSection =>
+                                candidate !== undefined,
+                        );
 
                     if (
-                        !alternative ||
+                        alternatives.length === 0 ||
                         typeof section.orPairingId !== 'number'
                     ) {
                         return [
@@ -3151,6 +3248,7 @@ export default function GeneratePaper({
                                     orGroupId: null,
                                     orPairingId: null,
                                     orQuestionTypeId: null,
+                                    orGroupTypeIds: null,
                                     orRole: null,
                                     orLabel: null,
                                 },
@@ -3159,12 +3257,39 @@ export default function GeneratePaper({
                     }
 
                     const groupId = 'or_' + section.id + '_' + row.id;
-                    const alternativeQuestions = selectQuestions(
-                        alternative.questionTypeId,
-                        row.orSelectedQuestionIds ?? [],
-                        rowTarget(row),
-                        alternative.title,
-                        mode,
+                    const groupTypeIds = [
+                        section.questionTypeId,
+                        ...alternatives.map((alternative) => alternative.questionTypeId),
+                    ];
+                    const generatedAlternatives = alternatives.map(
+                        (alternative) =>
+                            generatedSectionFromSelection(
+                                alternative,
+                                row,
+                                selectQuestions(
+                                    alternative.questionTypeId,
+                                    rowOrSelectedQuestionIds(
+                                        row,
+                                        alternative.questionTypeId,
+                                    ),
+                                    rowTarget(row),
+                                    alternative.title,
+                                    mode,
+                                ),
+                                section.id +
+                                    '_' +
+                                    row.id +
+                                    '_or_' +
+                                    alternative.questionTypeId,
+                                {
+                                    orGroupId: groupId,
+                                    orPairingId: section.orPairingId,
+                                    orQuestionTypeId: section.questionTypeId,
+                                    orGroupTypeIds: groupTypeIds,
+                                    orRole: 'alternative',
+                                    orLabel,
+                                },
+                            ),
                     );
 
                     return [
@@ -3176,32 +3301,16 @@ export default function GeneratePaper({
                             {
                                 orGroupId: groupId,
                                 orPairingId: section.orPairingId,
-                                orQuestionTypeId: alternative.questionTypeId,
+                                orQuestionTypeId: alternatives[0].questionTypeId,
+                                orGroupTypeIds: groupTypeIds,
                                 orRole: 'primary',
                                 orLabel,
                             },
                         ),
-                        generatedSectionFromSelection(
-                            alternative,
-                            row,
-                            alternativeQuestions,
-                            section.id +
-                                '_' +
-                                row.id +
-                                '_or_' +
-                                alternative.questionTypeId,
-                            {
-                                orGroupId: groupId,
-                                orPairingId: section.orPairingId,
-                                orQuestionTypeId: section.questionTypeId,
-                                orRole: 'alternative',
-                                orLabel,
-                            },
-                        ),
+                        ...generatedAlternatives,
                     ];
                 },
-            );
-            setQuestionPoolsByType(pools);
+            );            setQuestionPoolsByType(pools);
             setGeneratedPaper({
                 id: `paper_${Date.now()}`,
                 header: {
@@ -3602,6 +3711,7 @@ export default function GeneratePaper({
                 columns: section.columns ?? null,
                 orPairingId: section.orPairingId ?? null,
                 orQuestionTypeId: section.orQuestionTypeId ?? null,
+                orGroupTypeIds: section.orGroupTypeIds ?? null,
                 orRole: section.orRole ?? null,
             })),
         };
@@ -4330,6 +4440,7 @@ export default function GeneratePaper({
             row: activeRow,
             target,
             side,
+            alternativeTypeId,
         } = activeManualPickerRow;
 
         setQuestionSelection((current) => ({
@@ -4344,26 +4455,41 @@ export default function GeneratePaper({
                               }
 
                               const selectedIds =
-                                  side === 'alternative'
-                                      ? (row.orSelectedQuestionIds ?? [])
+                                  side === 'alternative' &&
+                                  typeof alternativeTypeId === 'number'
+                                      ? rowOrSelectedQuestionIds(
+                                            row,
+                                            alternativeTypeId,
+                                        )
                                       : row.selectedQuestionIds;
-                              const isSelected =
-                                  selectedIds.includes(questionId);
+                              const isSelected = selectedIds.includes(questionId);
 
                               if (isSelected) {
                                   const nextIds = selectedIds.filter(
                                       (id) => id !== questionId,
                                   );
 
-                                  return side === 'alternative'
-                                      ? {
-                                            ...row,
-                                            orSelectedQuestionIds: nextIds,
-                                        }
-                                      : {
-                                            ...row,
-                                            selectedQuestionIds: nextIds,
-                                        };
+                                  if (
+                                      side === 'alternative' &&
+                                      typeof alternativeTypeId === 'number'
+                                  ) {
+                                      const nextByType = {
+                                          ...(row.orSelectedQuestionIdsByType ?? {}),
+                                          [String(alternativeTypeId)]: nextIds,
+                                      };
+
+                                      return {
+                                          ...row,
+                                          orSelectedQuestionIdsByType: nextByType,
+                                          orSelectedQuestionIds:
+                                              orAlternativeTypeIds(activeSection)[0] ===
+                                              alternativeTypeId
+                                                  ? nextIds
+                                                  : row.orSelectedQuestionIds,
+                                      };
+                                  }
+
+                                  return { ...row, selectedQuestionIds: nextIds };
                               }
 
                               if (
@@ -4375,22 +4501,147 @@ export default function GeneratePaper({
 
                               const nextIds = [...selectedIds, questionId];
 
-                              return side === 'alternative'
-                                  ? {
-                                        ...row,
-                                        orSelectedQuestionIds: nextIds,
-                                    }
-                                  : {
-                                        ...row,
-                                        selectedQuestionIds: nextIds,
-                                    };
+                              if (
+                                  side === 'alternative' &&
+                                  typeof alternativeTypeId === 'number'
+                              ) {
+                                  const nextByType = {
+                                      ...(row.orSelectedQuestionIdsByType ?? {}),
+                                      [String(alternativeTypeId)]: nextIds,
+                                  };
+
+                                  return {
+                                      ...row,
+                                      orSelectedQuestionIdsByType: nextByType,
+                                      orSelectedQuestionIds:
+                                          orAlternativeTypeIds(activeSection)[0] ===
+                                          alternativeTypeId
+                                              ? nextIds
+                                              : row.orSelectedQuestionIds,
+                                  };
+                              }
+
+                              return { ...row, selectedQuestionIds: nextIds };
                           }),
                       }
                     : section,
             ),
         }));
     }
+    function updateOrGroupTypes(sectionId: string, selectedTypeIds: number[]) {
+        const selectedIds = Array.from(new Set(selectedTypeIds));
 
+        if (selectedIds.length < 2) {
+            updateOrPairing(sectionId, null);
+            return;
+        }
+
+        setQuestionSelection((current) => {
+            const primary = current.sections.find(
+                (section) => section.id === sectionId,
+            );
+
+            if (!primary) {
+                return current;
+            }
+
+            const normalizedIds = Array.from(
+                new Set([primary.questionTypeId, ...selectedIds]),
+            );
+            const group = questionTypePairings.find((candidate) =>
+                normalizedIds.every((typeId) =>
+                    candidate.questionTypeIds.includes(typeId),
+                ),
+            );
+
+            if (!group) {
+                return current;
+            }
+
+            const groupMemberIds = new Set(group.questionTypeIds);
+            const groupMembers = current.sections.filter((section) =>
+                groupMemberIds.has(section.questionTypeId),
+            );
+            const currentGroupId = primary.orPairingId;
+            const conflicts = groupMembers.some(
+                (section) =>
+                    section.id !== primary.id &&
+                    typeof section.orPairingId === 'number' &&
+                    section.orPairingId !== currentGroupId,
+            );
+
+            if (
+                groupMembers.length !== group.questionTypeIds.length ||
+                groupMembers.some(
+                    (section) => section.category !== 'Subjective Questions',
+                ) ||
+                conflicts
+            ) {
+                return current;
+            }
+
+            const selectedMemberIds = normalizedIds.filter((typeId) =>
+                groupMemberIds.has(typeId),
+            );
+            const alternativeIds = selectedMemberIds.filter(
+                (typeId) => typeId !== primary.questionTypeId,
+            );
+            const availableCount = Math.min(
+                ...selectedMemberIds.map(
+                    (typeId) =>
+                        current.sections.find(
+                            (section) => section.questionTypeId === typeId,
+                        )?.availableCount ?? 0,
+                ),
+            );
+            const clearGroupState = (section: QuestionSelectionSection) => ({
+                ...section,
+                orPairingId: null,
+                orQuestionTypeId: null,
+                orGroupTypeIds: undefined,
+                orAlternativeQuestionTypeIds: undefined,
+                rows: section.rows.map((row) => ({
+                    ...row,
+                    orSelectedQuestionIds: [],
+                    orSelectedQuestionIdsByType: {},
+                })),
+            });
+            const nextByType = Object.fromEntries(
+                alternativeIds.map((typeId) => [String(typeId), []]),
+            );
+
+            return withTotalMarks({
+                ...current,
+                sections: current.sections
+                    .map((section) =>
+                        groupMemberIds.has(section.questionTypeId) ||
+                        (typeof currentGroupId === 'number' &&
+                            section.orPairingId === currentGroupId)
+                            ? clearGroupState(section)
+                            : section,
+                    )
+                    .map((section) =>
+                        section.id === primary.id
+                            ? {
+                                  ...section,
+                                  orPairingId: group.id,
+                                  orQuestionTypeId: alternativeIds[0] ?? null,
+                                  orGroupTypeIds: selectedMemberIds,
+                                  orAlternativeQuestionTypeIds: alternativeIds,
+                                  rows: normalizeSectionRows(
+                                      section.rows,
+                                      availableCount,
+                                  ).map((row) => ({
+                                      ...row,
+                                      orSelectedQuestionIds: [],
+                                      orSelectedQuestionIdsByType: nextByType,
+                                  })),
+                              }
+                            : section,
+                    ),
+            });
+        });
+    }
     function updateOrPairing(sectionId: string, pairingId: number | null) {
         if (
             manualPickerTarget?.sectionId === sectionId &&
@@ -4408,94 +4659,109 @@ export default function GeneratePaper({
                 return current;
             }
 
+            const currentMemberIds = new Set(orGroupTypeIds(primary));
+            const clearGroupState = (section: QuestionSelectionSection) => ({
+                ...section,
+                orPairingId: null,
+                orQuestionTypeId: null,
+                orGroupTypeIds: undefined,
+                orAlternativeQuestionTypeIds: undefined,
+                rows: section.rows.map((row) => ({
+                    ...row,
+                    orSelectedQuestionIds: [],
+                    orSelectedQuestionIdsByType: {},
+                })),
+            });
+
             if (pairingId === null) {
                 return withTotalMarks({
                     ...current,
                     sections: current.sections.map((section) =>
-                        section.id === sectionId
-                            ? {
-                                  ...section,
-                                  orPairingId: null,
-                                  orQuestionTypeId: null,
-                                  rows: section.rows.map((row) => ({
-                                      ...row,
-                                      orSelectedQuestionIds: [],
-                                  })),
-                              }
+                        section.id === primary.id ||
+                        currentMemberIds.has(section.questionTypeId) ||
+                        section.orPairingId === primary.orPairingId
+                            ? clearGroupState(section)
                             : section,
                     ),
                 });
             }
 
-            const pairing = questionTypePairings.find(
+            const group = questionTypePairings.find(
                 (candidate) => candidate.id === pairingId,
             );
-            const counterpartId =
-                pairing?.questionTypeAId === primary.questionTypeId
-                    ? pairing.questionTypeBId
-                    : pairing?.questionTypeBId === primary.questionTypeId
-                      ? pairing.questionTypeAId
-                      : null;
-            const counterpart =
-                typeof counterpartId === 'number'
-                    ? current.sections.find(
-                          (section) => section.questionTypeId === counterpartId,
-                      )
-                    : null;
+            const memberIds = group?.questionTypeIds ?? [];
+            const members = memberIds.map((id) =>
+                current.sections.find((section) => section.questionTypeId === id),
+            );
 
             if (
-                !pairing ||
-                !counterpart ||
-                primary.category !== 'Subjective Questions' ||
-                counterpart.category !== 'Subjective Questions'
+                !group ||
+                memberIds.length < 2 ||
+                members.some(
+                    (section) =>
+                        !section || section.category !== 'Subjective Questions',
+                )
             ) {
                 return current;
             }
 
-            const cleared = current.sections.map((section) => {
-                const conflictsWithNewGroup =
-                    section.id === primary.id ||
-                    section.orQuestionTypeId === primary.questionTypeId ||
-                    section.orQuestionTypeId === counterpartId ||
-                    (section.questionTypeId === counterpartId &&
-                        typeof section.orQuestionTypeId === 'number');
+            const memberIdSet = new Set(memberIds);
+            const conflicts = current.sections.some(
+                (section) =>
+                    memberIdSet.has(section.questionTypeId) &&
+                    typeof section.orPairingId === 'number' &&
+                    section.orPairingId !== pairingId,
+            );
 
-                return conflictsWithNewGroup
-                    ? {
-                          ...section,
-                          orPairingId: null,
-                          orQuestionTypeId: null,
-                          rows: section.rows.map((row) => ({
-                              ...row,
-                              orSelectedQuestionIds: [],
-                          })),
-                      }
-                    : section;
-            });
+            if (conflicts) {
+                return current;
+            }
+
             const availableCount = Math.min(
-                primary.availableCount,
-                counterpart.availableCount,
+                ...members.map((section) => section?.availableCount ?? 0),
+            );
+            const alternativeIds = memberIds.filter(
+                (id) => id !== primary.questionTypeId,
+            );
+            const nextByType = Object.fromEntries(
+                alternativeIds.map((typeId) => [String(typeId), []]),
             );
 
             return withTotalMarks({
                 ...current,
-                sections: cleared.map((section) =>
+                sections: current.sections.map((section) => {
+                    const isMember = memberIdSet.has(section.questionTypeId);
+                    const isCurrentGroup =
+                        section.orPairingId === primary.orPairingId &&
+                        typeof primary.orPairingId === 'number';
+
+                    if (isMember || isCurrentGroup) {
+                        return clearGroupState(section);
+                    }
+
+                    return section;
+                }).map((section) =>
                     section.id === primary.id
                         ? {
                               ...section,
-                              orPairingId: pairing.id,
-                              orQuestionTypeId: counterpartId,
+                              orPairingId: group.id,
+                              orQuestionTypeId: alternativeIds[0] ?? null,
+                              orGroupTypeIds: memberIds,
+                              orAlternativeQuestionTypeIds: alternativeIds,
                               rows: normalizeSectionRows(
                                   section.rows,
                                   availableCount,
-                              ),
+                              ).map((row) => ({
+                                  ...row,
+                                  orSelectedQuestionIds: [],
+                                  orSelectedQuestionIdsByType: nextByType,
+                              })),
                           }
                         : section,
                 ),
             });
         });
     }
-
     function updateGlobalFilter(key: SourceFilterKey) {
         setQuestionSelection((current) => ({
             ...current,
@@ -4509,6 +4775,7 @@ export default function GeneratePaper({
                     ...row,
                     selectedQuestionIds: [],
                     orSelectedQuestionIds: [],
+                    orSelectedQuestionIdsByType: {},
                 })),
             })),
         }));
@@ -4523,6 +4790,7 @@ export default function GeneratePaper({
                     ...row,
                     selectedQuestionIds: [],
                     orSelectedQuestionIds: [],
+                    orSelectedQuestionIdsByType: {},
                 })),
             })),
         }));
@@ -4752,100 +5020,119 @@ export default function GeneratePaper({
                 <CategoryDivider title={category} />
                 <div className="space-y-2.5">
                     {sections.map((section) => {
-                        const orOptions =
+                        const orTypeOptions: OrTypeOption[] =
                             category === 'Subjective Questions'
-                                ? questionTypePairings
-                                      .map((pairing) => {
-                                          const counterpartId =
-                                              pairing.questionTypeAId ===
-                                              section.questionTypeId
-                                                  ? pairing.questionTypeBId
-                                                  : pairing.questionTypeBId ===
-                                                      section.questionTypeId
-                                                    ? pairing.questionTypeAId
-                                                    : null;
-                                          const counterpart =
-                                              typeof counterpartId === 'number'
-                                                  ? sectionsByType.get(
-                                                        counterpartId,
-                                                    )
-                                                  : null;
-                                          const usedByAnotherGroup =
-                                              counterpartId !== null &&
-                                              questionSelection.sections.some(
-                                                  (candidate) =>
-                                                      candidate.id !==
-                                                          section.id &&
-                                                      candidate.orQuestionTypeId ===
-                                                          counterpartId,
+                                ? (() => {
+                                      const candidateGroups =
+                                          questionTypePairings.filter((group) => {
+                                              if (
+                                                  !group.questionTypeIds.includes(
+                                                      section.questionTypeId,
+                                                  )
+                                              ) {
+                                                  return false;
+                                              }
+
+                                              const members = group.questionTypeIds
+                                                  .map((typeId) =>
+                                                      sectionsByType.get(typeId),
+                                                  )
+                                                  .filter(
+                                                      (
+                                                          candidate,
+                                                      ): candidate is QuestionSelectionSection =>
+                                                          candidate !== undefined,
+                                                  );
+
+                                              return (
+                                                  members.length ===
+                                                      group.questionTypeIds.length &&
+                                                  !members.some(
+                                                      (candidate) =>
+                                                          typeof candidate.orPairingId ===
+                                                              'number' &&
+                                                          candidate.orPairingId !==
+                                                              section.orPairingId,
+                                                  )
                                               );
-                                          const counterpartIsPrimary =
-                                              counterpart?.id !== section.id &&
-                                              typeof counterpart?.orQuestionTypeId ===
-                                                  'number';
+                                          });
+                                      const selectedTypeIds = new Set(
+                                          orGroupTypeIds(section),
+                                      );
+                                      const optionIds = new Set<number>();
 
-                                          if (
-                                              !counterpart ||
-                                              usedByAnotherGroup ||
-                                              counterpartIsPrimary
-                                          ) {
-                                              return null;
-                                          }
+                                      candidateGroups.forEach((group) => {
+                                          group.questionTypeIds.forEach((typeId) => {
+                                              if (typeId !== section.questionTypeId) {
+                                                  optionIds.add(typeId);
+                                              }
+                                          });
+                                      });
 
-                                          return {
-                                              id: pairing.id,
-                                              label: plainQuestionText(
-                                                  englishQuestionTypeTitle(
-                                                      counterpart,
+                                      return Array.from(optionIds)
+                                          .map((typeId) => {
+                                              const member = sectionsByType.get(typeId);
+
+                                              if (!member) {
+                                                  return null;
+                                              }
+
+                                              const canSelect = candidateGroups.some(
+                                                  (group) => {
+                                                      const proposed = new Set([
+                                                          ...selectedTypeIds,
+                                                          typeId,
+                                                      ]);
+
+                                                      return Array.from(proposed).every(
+                                                          (candidateId) =>
+                                                              group.questionTypeIds.includes(
+                                                                  candidateId,
+                                                              ),
+                                                      );
+                                                  },
+                                              );
+
+                                              return {
+                                                  id: typeId,
+                                                  label: plainQuestionText(
+                                                      englishQuestionTypeTitle(member),
                                                   ),
-                                              ),
-                                              searchLabel: plainQuestionText(
-                                                  englishQuestionTypeTitle(
-                                                      counterpart,
-                                                  ),
-                                              ),
-                                              displayLabel: (
-                                                  <RichTextLabel
-                                                      value={englishQuestionTypeTitle(
-                                                          counterpart,
-                                                      )}
-                                                  />
-                                              ),
-                                          } satisfies ComboboxOptionItem;
-                                      })
-                                      .filter(
-                                          (
-                                              option,
-                                          ): option is NonNullable<
-                                              typeof option
-                                          > => option !== null,
-                                      )
+                                                  disabled:
+                                                      !selectedTypeIds.has(typeId) &&
+                                                      !canSelect,
+                                              } satisfies OrTypeOption;
+                                          })
+                                          .filter(
+                                              (
+                                                  option,
+                                              ): option is OrTypeOption =>
+                                                  option !== null,
+                                          )
+                                          .sort((left, right) =>
+                                              left.label.localeCompare(right.label),
+                                          );
+                                  })()
                                 : [];
-                        const selectedOrOption =
-                            orOptions.find(
-                                (option) =>
-                                    Number(option.id) === section.orPairingId,
-                            ) ?? null;
-                        const alternativeSection =
-                            typeof section.orQuestionTypeId === 'number'
-                                ? (sectionsByType.get(
-                                      section.orQuestionTypeId,
-                                  ) ?? null)
-                                : null;
-
+                        const alternativeSections = orAlternativeTypeIds(section)
+                            .map((typeId) => sectionsByType.get(typeId))
+                            .filter(
+                                (candidate): candidate is QuestionSelectionSection =>
+                                    candidate !== undefined,
+                            );
                         return (
                             <QuestionSelectionCard
                                 key={section.id}
                                 section={section}
-                                alternativeSection={alternativeSection}
-                                orOptions={orOptions}
-                                selectedOrOption={selectedOrOption}
+                                alternativeSections={alternativeSections}
+                                orTypeOptions={orTypeOptions}
+                                selectedOrTypeIds={orGroupTypeIds(section)}
                                 autoPick={
                                     questionSectionSelectionMode(section) ===
                                     'automatic'
                                 }
                                 onAutoPickChange={handleAutoPickChange}
-                                onOrPairingChange={updateOrPairing}
+                                onOrGroupTypesChange={updateOrGroupTypes}
                                 onChange={updateSectionValue}
                                 onDeleteRow={deleteQuestionRow}
                                 onAddRow={addQuestionRow}
@@ -7196,16 +7483,15 @@ function GeneratedPaperView({
                 logicalIndex > 0,
                 logicalIndex >= 0 && logicalIndex < logicalSections.length - 1,
             );
-            const alternativeIndex =
+            const groupSections =
                 section.orRole === 'primary' && section.orGroupId
-                    ? targetPaper.sections.findIndex(
+                    ? targetPaper.sections.filter(
                           (candidate) =>
-                              candidate.orGroupId === section.orGroupId &&
-                              candidate.orRole === 'alternative',
+                              candidate.orGroupId === section.orGroupId,
                       )
-                    : -1;
+                    : [];
 
-            if (alternativeIndex < 0) {
+            if (groupSections.length < 2) {
                 return (
                     <div key={section.id} className="contents">
                         {primary}
@@ -7213,16 +7499,50 @@ function GeneratedPaperView({
                 );
             }
 
-            const alternativeSection = targetPaper.sections[alternativeIndex];
-            const alternative = renderPaperSection(
-                targetPaper,
-                alternativeSection,
-                alternativeIndex,
-                interactive,
-                false,
-                false,
+            const renderedGroupSections = groupSections.map((groupSection) =>
+                groupSection.id === section.id
+                    ? primary
+                    : renderPaperSection(
+                          targetPaper,
+                          groupSection,
+                          targetPaper.sections.findIndex(
+                              (candidate) => candidate.id === groupSection.id,
+                          ),
+                          interactive,
+                          false,
+                          false,
+                      ),
             );
+            const label = resolveOrGroupLabel(settings, section.orLabel);
             const sideBySide = settings.orGroupLayout === 'side-by-side';
+            const groupChildren = renderedGroupSections.flatMap(
+                (renderedSection, index) =>
+                    index === renderedGroupSections.length - 1
+                        ? [
+                              <div
+                                  key={`or-member-${index}`}
+                                  className="min-w-0"
+                              >
+                                  {renderedSection}
+                              </div>,
+                          ]
+                        : [
+                              <div
+                                  key={`or-member-${index}`}
+                                  className="min-w-0"
+                              >
+                                  {renderedSection}
+                              </div>,
+                              <OrGroupDivider
+                                  key={`or-divider-${index}`}
+                                  label={label}
+                                  settings={settings}
+                                  orientation={
+                                      sideBySide ? 'vertical' : 'horizontal'
+                                  }
+                              />,
+                          ],
+            );
 
             return (
                 <div
@@ -7235,25 +7555,23 @@ function GeneratedPaperView({
                     style={
                         sideBySide
                             ? {
-                                  gridTemplateColumns:
-                                      'minmax(0, 1fr) auto minmax(0, 1fr)',
+                                  gridTemplateColumns: renderedGroupSections
+                                      .map((_, index) =>
+                                          index === renderedGroupSections.length - 1
+                                              ? 'minmax(0, 1fr)'
+                                              : 'minmax(0, 1fr) auto',
+                                      )
+                                      .join(' '),
                                   columnGap: `${settings.orGroupGap}mm`,
                               }
                             : { rowGap: `${settings.orGroupGap}mm` }
                     }
                 >
-                    <div className="min-w-0">{primary}</div>
-                    <OrGroupDivider
-                        label={resolveOrGroupLabel(settings, section.orLabel)}
-                        settings={settings}
-                        orientation={sideBySide ? 'vertical' : 'horizontal'}
-                    />
-                    <div className="min-w-0">{alternative}</div>
+                    {groupChildren}
                 </div>
             );
         });
     }
-
     function handleBackClick() {
         if (savedPaperId !== null && !isDirty) {
             onGoBack();
@@ -8184,14 +8502,118 @@ function ChapterCard({
     );
 }
 
+function OrTypeMultiSelect({
+    options,
+    selectedTypeIds,
+    onChange,
+}: {
+    options: OrTypeOption[];
+    selectedTypeIds: number[];
+    onChange: (typeIds: number[]) => void;
+}) {
+    const detailsRef = useRef<HTMLDetailsElement>(null);
+    const selected = new Set(selectedTypeIds);
+
+    useEffect(() => {
+        const handleOutsidePointer = (event: PointerEvent) => {
+            const details = detailsRef.current;
+
+            if (
+                details?.open &&
+                event.target instanceof Node &&
+                !details.contains(event.target)
+            ) {
+                details.open = false;
+            }
+        };
+
+        document.addEventListener('pointerdown', handleOutsidePointer);
+
+        return () =>
+            document.removeEventListener('pointerdown', handleOutsidePointer);
+    }, []);
+    const selectedLabels = options
+        .filter((option) => selected.has(option.id))
+        .map((option) => option.label);
+    const buttonLabel =
+        selectedTypeIds.length > 1
+            ? `${selectedTypeIds.length} OR types selected`
+            : 'Select OR types';
+
+    return (
+        <details ref={detailsRef} className="group relative min-w-[15rem] flex-1 sm:w-64 sm:flex-none">
+            <summary
+                className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 group-open:border-brand-500 group-open:ring-2 group-open:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700 dark:group-open:border-brand-400 dark:group-open:ring-brand-400/20 [&::-webkit-details-marker]:hidden"
+                aria-label="Select question types for the OR group"
+                title={selectedLabels.join(' OR ') || 'Select question types for the OR group'}
+            >
+                <Link2Icon className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                <span className="min-w-0 flex-1 truncate text-left">
+                    {buttonLabel}
+                </span>
+                <ChevronDownIcon className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/30">
+
+                <div className="mt-1 max-h-64 overflow-y-auto">
+                    {options.map((option) => {
+                        const checked = selected.has(option.id);
+
+                        return (
+                            <label
+                                key={option.id}
+                                className={cn(
+                                    'flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm transition-colors',
+                                    checked
+                                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                    option.disabled &&
+                                        !checked &&
+                                        'cursor-not-allowed opacity-40',
+                                )}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={option.disabled && !checked}
+                                    onChange={() => {
+                                        if (checked) {
+                                            onChange(
+                                                selectedTypeIds.filter(
+                                                    (typeId) => typeId !== option.id,
+                                                ),
+                                            );
+                                        } else if (!option.disabled) {
+                                            onChange([
+                                                ...selectedTypeIds,
+                                                option.id,
+                                            ]);
+                                        }
+                                    }}
+                                    className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                                />
+                                <span className="min-w-0 flex-1 truncate">
+                                    {option.label}
+                                </span>
+                                {checked && (
+                                    <CheckIcon className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                                )}
+                            </label>
+                        );
+                    })}
+                </div>
+            </div>
+        </details>
+    );
+}
 function QuestionSelectionCard({
     section,
-    alternativeSection,
-    orOptions,
-    selectedOrOption,
+    alternativeSections,
+    orTypeOptions,
+    selectedOrTypeIds,
     autoPick,
     onAutoPickChange,
-    onOrPairingChange,
+    onOrGroupTypesChange,
     onChange,
     onDeleteRow,
     onAddRow,
@@ -8204,12 +8626,12 @@ function QuestionSelectionCard({
     onDragEnd,
 }: {
     section: QuestionSelectionSection;
-    alternativeSection: QuestionSelectionSection | null;
-    orOptions: ComboboxOptionItem[];
-    selectedOrOption: ComboboxOptionItem | null;
+    alternativeSections: QuestionSelectionSection[];
+    orTypeOptions: OrTypeOption[];
+    selectedOrTypeIds: number[];
     autoPick: boolean;
     onAutoPickChange: (sectionId: string, enabled: boolean) => void;
-    onOrPairingChange: (sectionId: string, pairingId: number | null) => void;
+    onOrGroupTypesChange: (sectionId: string, typeIds: number[]) => void;
     onChange: (
         sectionId: string,
         rowId: string,
@@ -8222,6 +8644,7 @@ function QuestionSelectionCard({
         sectionId: string,
         rowId: string,
         side?: ManualPickerSide,
+        alternativeTypeId?: number,
     ) => void;
     isDragging: boolean;
     isDragTarget: boolean;
@@ -8238,8 +8661,12 @@ function QuestionSelectionCard({
 }) {
     const canDeleteRow = section.rows.length > 1;
     const typeHeading = englishQuestionTypeTitle(section);
-    const effectiveAvailableCount = alternativeSection
-        ? Math.min(section.availableCount, alternativeSection.availableCount)
+    const hasAlternatives = alternativeSections.length > 0;
+    const effectiveAvailableCount = hasAlternatives
+        ? Math.min(
+              section.availableCount,
+              ...alternativeSections.map((alternative) => alternative.availableCount),
+          )
         : section.availableCount;
     const availabilitySection =
         effectiveAvailableCount === section.availableCount
@@ -8278,27 +8705,17 @@ function QuestionSelectionCard({
                     </h4>
                     <span className="rounded-full bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
                         {effectiveAvailableCount} available
-                        {alternativeSection ? ' per side' : ''}
+                        {hasAlternatives ? ' per type' : ''}
                     </span>
                 </div>
                 <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
                     {section.category === 'Subjective Questions' &&
-                        orOptions.length > 0 && (
-                            <FloatingCombobox
-                                label="OR alternative"
-                                placeholder="Select OR group"
-                                hideLabel
-                                leadingIcon={Link2Icon}
-                                className="min-w-[15rem] flex-1 sm:w-64 sm:flex-none"
-                                options={orOptions}
-                                value={selectedOrOption}
-                                onChange={(option) =>
-                                    onOrPairingChange(
-                                        section.id,
-                                        option === null
-                                            ? null
-                                            : Number(option.id),
-                                    )
+                        orTypeOptions.length > 0 && (
+                            <OrTypeMultiSelect
+                                options={orTypeOptions}
+                                selectedTypeIds={selectedOrTypeIds}
+                                onChange={(typeIds) =>
+                                    onOrGroupTypesChange(section.id, typeIds)
                                 }
                             />
                         )}
@@ -8402,43 +8819,53 @@ function QuestionSelectionCard({
                                     )}
                                 >
                                     <ListChecksIcon className="size-3.5" />
-                                    {alternativeSection && 'Main '}
+                                    {hasAlternatives && 'Main '}
                                     {row.selectedQuestionIds.length}/
                                     {rowTarget(row)} selected
                                 </button>
                             )}
-                            {!autoPick && alternativeSection && (
-                                <button
-                                    type="button"
-                                    disabled={rowTarget(row) === 0}
-                                    onClick={() =>
-                                        onOpenManualPicker(
-                                            section.id,
-                                            row.id,
-                                            'alternative',
-                                        )
-                                    }
-                                    title={
-                                        rowTarget(row) === 0
-                                            ? 'Enter a total or required count first'
-                                            : 'Select OR questions for row ' +
-                                              (index + 1)
-                                    }
-                                    className={cn(
-                                        'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors',
-                                        (row.orSelectedQuestionIds ?? [])
-                                            .length === rowTarget(row) &&
-                                            rowTarget(row) > 0
-                                            ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-500/30 dark:hover:text-violet-300',
-                                    )}
-                                >
-                                    <Link2Icon className="size-3.5" />
-                                    OR{' '}
-                                    {(row.orSelectedQuestionIds ?? []).length}/
-                                    {rowTarget(row)} selected
-                                </button>
-                            )}
+                            {!autoPick &&
+                                alternativeSections.map((alternative) => {
+                                    const selectedIds = rowOrSelectedQuestionIds(
+                                        row,
+                                        alternative.questionTypeId,
+                                    );
+                                    const alternativeTitle = plainQuestionText(
+                                        englishQuestionTypeTitle(alternative),
+                                    );
+
+                                    return (
+                                        <button
+                                            key={alternative.questionTypeId}
+                                            type="button"
+                                            disabled={rowTarget(row) === 0}
+                                            onClick={() =>
+                                                onOpenManualPicker(
+                                                    section.id,
+                                                    row.id,
+                                                    'alternative',
+                                                    alternative.questionTypeId,
+                                                )
+                                            }
+                                            title={
+                                                rowTarget(row) === 0
+                                                    ? 'Enter a total or required count first'
+                                                    : `Select ${alternativeTitle} questions for row ${index + 1}`
+                                            }
+                                            className={cn(
+                                                'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors',
+                                                selectedIds.length === rowTarget(row) &&
+                                                    rowTarget(row) > 0
+                                                    ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200'
+                                                    : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-500/30 dark:hover:text-violet-300',
+                                            )}
+                                        >
+                                            <Link2Icon className="size-3.5" />
+                                            OR {alternativeTitle}{' '}
+                                            {selectedIds.length}/{rowTarget(row)}
+                                        </button>
+                                    );
+                                })}
                             <span className="inline-flex h-9 min-w-20 items-center justify-center rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
                                 {lineTotal(row)} marks
                             </span>

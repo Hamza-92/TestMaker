@@ -16,10 +16,9 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {
-    FloatingCombobox
-    
+    FloatingCombobox,
+    type ComboboxOptionItem,
 } from '@/components/ui/floating-combobox';
-import type {ComboboxOptionItem} from '@/components/ui/floating-combobox';
 import { Switch } from '@/components/ui/switch';
 import { usePermission } from '@/hooks/use-permission';
 
@@ -45,10 +44,9 @@ interface QuestionTypeOption {
     name: string;
 }
 
-interface Pairing {
+interface OrGroup {
     id: number;
-    question_type_a: Pick<QuestionTypeOption, 'id' | 'name'>;
-    question_type_b: Pick<QuestionTypeOption, 'id' | 'name'>;
+    question_types: QuestionTypeOption[];
     is_active: boolean;
     is_available: boolean;
 }
@@ -59,12 +57,12 @@ export default function QuestionTypePairings({
     scopeCatalog,
     selectedScope,
     questionTypes,
-    pairings,
+    groups,
 }: {
     scopeCatalog: ScopeCatalog;
     selectedScope: SelectedScope | null;
     questionTypes: QuestionTypeOption[];
-    pairings: Pairing[];
+    groups: OrGroup[];
 }) {
     const { can } = usePermission();
     const canEdit = can('question_types.edit');
@@ -77,12 +75,11 @@ export default function QuestionTypePairings({
     const [subjectId, setSubjectId] = useState<number | null>(
         selectedScope?.subject_id ?? null,
     );
-    const [firstTypeId, setFirstTypeId] = useState<number | null>(null);
-    const [secondTypeId, setSecondTypeId] = useState<number | null>(null);
+    const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>([]);
     const [scopeLoading, setScopeLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [busyPairingId, setBusyPairingId] = useState<number | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<Pairing | null>(null);
+    const [busyGroupId, setBusyGroupId] = useState<number | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<OrGroup | null>(null);
     const [errors, setErrors] = useState<FormErrors>({});
 
     const patternOptions = useMemo<ComboboxOptionItem[]>(
@@ -140,11 +137,10 @@ export default function QuestionTypePairings({
         selectedScope.class_id === classId &&
         selectedScope.subject_id === subjectId;
     const scopedTypes = loadedScopeMatches ? questionTypes : [];
-    const scopedPairings = loadedScopeMatches ? pairings : [];
+    const scopedGroups = loadedScopeMatches ? groups : [];
 
-    const clearPairForm = () => {
-        setFirstTypeId(null);
-        setSecondTypeId(null);
+    const clearGroupForm = () => {
+        setSelectedTypeIds([]);
         setErrors({});
     };
 
@@ -152,19 +148,19 @@ export default function QuestionTypePairings({
         setPatternId(value === null ? null : Number(value.id));
         setClassId(null);
         setSubjectId(null);
-        clearPairForm();
+        clearGroupForm();
     };
 
     const selectClass = (value: ComboboxOptionItem | null) => {
         setClassId(value === null ? null : Number(value.id));
         setSubjectId(null);
-        clearPairForm();
+        clearGroupForm();
     };
 
     const selectSubject = (value: ComboboxOptionItem | null) => {
         const nextSubjectId = value === null ? null : Number(value.id);
         setSubjectId(nextSubjectId);
-        clearPairForm();
+        clearGroupForm();
 
         if (patternId === null || classId === null || nextSubjectId === null) {
             return;
@@ -179,7 +175,7 @@ export default function QuestionTypePairings({
                 subject_id: nextSubjectId,
             },
             {
-                only: ['selectedScope', 'questionTypes', 'pairings'],
+                only: ['selectedScope', 'questionTypes', 'groups'],
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
@@ -188,14 +184,13 @@ export default function QuestionTypePairings({
         );
     };
 
-    const createPairing = () => {
+    const createGroup = () => {
         if (
             !canEdit ||
             patternId === null ||
             classId === null ||
             subjectId === null ||
-            firstTypeId === null ||
-            secondTypeId === null
+            selectedTypeIds.length < 2
         ) {
             return;
         }
@@ -208,56 +203,55 @@ export default function QuestionTypePairings({
                 pattern_id: patternId,
                 class_id: classId,
                 subject_id: subjectId,
-                question_type_a_id: firstTypeId,
-                question_type_b_id: secondTypeId,
+                question_type_ids: selectedTypeIds,
             },
             {
                 preserveScroll: true,
                 onError: (nextErrors) => setErrors(nextErrors),
-                onSuccess: clearPairForm,
+                onSuccess: clearGroupForm,
                 onFinish: () => setSubmitting(false),
             },
         );
     };
 
-    const togglePairing = (pairing: Pairing) => {
-        if (!canEdit || busyPairingId !== null) {
+    const toggleGroup = (group: OrGroup) => {
+        if (!canEdit || busyGroupId !== null) {
             return;
         }
 
-        setBusyPairingId(pairing.id);
+        setBusyGroupId(group.id);
         setErrors({});
         router.patch(
-            `/superadmin/question-type-pairings/${pairing.id}`,
-            { is_active: !pairing.is_active },
+            `/superadmin/question-type-pairings/${group.id}`,
+            { is_active: !group.is_active },
             {
                 preserveScroll: true,
                 onError: (nextErrors) => setErrors(nextErrors),
-                onFinish: () => setBusyPairingId(null),
+                onFinish: () => setBusyGroupId(null),
             },
         );
     };
 
-    const removePairing = () => {
+    const removeGroup = () => {
         if (!canEdit || deleteTarget === null) {
             return;
         }
 
-        setBusyPairingId(deleteTarget.id);
+        setBusyGroupId(deleteTarget.id);
         router.delete(`/superadmin/question-type-pairings/${deleteTarget.id}`, {
             preserveScroll: true,
             onSuccess: () => setDeleteTarget(null),
-            onFinish: () => setBusyPairingId(null),
+            onFinish: () => setBusyGroupId(null),
         });
     };
 
     return (
         <>
-            <Head title="OR Pairing Settings" />
+            <Head title="OR Group Settings" />
 
             <div className="space-y-5 p-4 md:p-6">
                 <div>
-                    <h1 className="h1-semibold">OR Pairing Settings</h1>
+                    <h1 className="h1-semibold">OR Group Settings</h1>
                 </div>
 
                 <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
@@ -265,11 +259,7 @@ export default function QuestionTypePairings({
                         <div className="rounded-lg bg-primary/10 p-2 text-primary">
                             <Link2Icon className="size-4" />
                         </div>
-                        <div>
-                            <h2 className="text-sm font-semibold">
-                                Pairing scope
-                            </h2>
-                        </div>
+                        <h2 className="text-sm font-semibold">Group scope</h2>
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-3">
@@ -324,71 +314,105 @@ export default function QuestionTypePairings({
                 {!scopeLoading && loadedScopeMatches && (
                     <>
                         <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
-                            <div className="mb-4">
-                                <h2 className="text-sm font-semibold">
-                                    Create an OR pair
-                                </h2>
+                            <div className="mb-4 flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="text-sm font-semibold">
+                                        Create an OR group
+                                    </h2>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Select two or more subjective types that
+                                        can be offered as alternatives.
+                                    </p>
+                                </div>
+                                <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                                    {selectedTypeIds.length} selected
+                                </span>
                             </div>
 
                             {scopedTypes.length < 2 ? (
                                 <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                                     At least two active subjective types with
-                                    questions are required to create a pair.
+                                    questions are required to create a group.
                                 </div>
                             ) : (
-                                <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]">
-                                    <TypeSelect
-                                        label="First question type"
-                                        value={firstTypeId}
-                                        types={scopedTypes}
-                                        disabled={!canEdit}
-                                        error={errors.question_type_a_id}
-                                        displayName={displayTypeName}
-                                        onChange={(id) => {
-                                            setFirstTypeId(id);
-
-                                            if (id === secondTypeId) {
-                                                setSecondTypeId(null);
-                                            }
-
-                                            setErrors({});
-                                        }}
-                                    />
-                                    <div className="flex h-11 items-center justify-center px-1 text-xs font-bold text-primary">
-                                        OR
+                                <div className="space-y-3">
+                                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                        {selectedTypeIds.map((typeId, index) => (
+                                            <TypeSelect
+                                                key={`${index}-${typeId}`}
+                                                label={`Question type ${index + 1}`}
+                                                value={typeId}
+                                                types={scopedTypes}
+                                                excludeIds={selectedTypeIds.filter(
+                                                    (_, selectedIndex) =>
+                                                        selectedIndex !== index,
+                                                )}
+                                                disabled={!canEdit}
+                                                displayName={displayTypeName}
+                                                onChange={(id) => {
+                                                    if (id === null) {
+                                                        setSelectedTypeIds((current) =>
+                                                            current.filter(
+                                                                (_, selectedIndex) =>
+                                                                    selectedIndex !== index,
+                                                            ),
+                                                        );
+                                                    } else {
+                                                        setSelectedTypeIds((current) =>
+                                                            current.map((currentId, selectedIndex) =>
+                                                                selectedIndex === index
+                                                                    ? id
+                                                                    : currentId,
+                                                            ),
+                                                        );
+                                                    }
+                                                    setErrors({});
+                                                }}
+                                            />
+                                        ))}
                                     </div>
-                                    <TypeSelect
-                                        label="Second question type"
-                                        value={secondTypeId}
-                                        types={scopedTypes.filter(
-                                            (type) => type.id !== firstTypeId,
-                                        )}
-                                        disabled={!canEdit}
-                                        error={errors.question_type_b_id}
-                                        displayName={displayTypeName}
-                                        onChange={(id) => {
-                                            setSecondTypeId(id);
-                                            setErrors({});
-                                        }}
-                                    />
-                                    <Button
-                                        type="button"
-                                        onClick={createPairing}
-                                        className="h-11"
-                                        disabled={
-                                            !canEdit ||
-                                            firstTypeId === null ||
-                                            secondTypeId === null ||
-                                            submitting
-                                        }
-                                    >
-                                        {submitting ? (
-                                            <LoaderCircleIcon className="animate-spin" />
-                                        ) : (
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setSelectedTypeIds((current) => [
+                                                    ...current,
+                                                    0,
+                                                ])
+                                            }
+                                            disabled={
+                                                !canEdit ||
+                                                selectedTypeIds.length >=
+                                                    scopedTypes.length
+                                            }
+                                        >
                                             <PlusIcon />
-                                        )}
-                                        Add pair
-                                    </Button>
+                                            Add another type
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={createGroup}
+                                            disabled={
+                                                !canEdit ||
+                                                selectedTypeIds.length < 2 ||
+                                                selectedTypeIds.some((id) => id < 1) ||
+                                                submitting
+                                            }
+                                        >
+                                            {submitting ? (
+                                                <LoaderCircleIcon className="animate-spin" />
+                                            ) : (
+                                                <Link2Icon />
+                                            )}
+                                            Add OR group
+                                        </Button>
+                                    </div>
+                                    {errors.question_type_ids && (
+                                        <p className="text-xs text-destructive">
+                                            {errors.question_type_ids}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </section>
@@ -396,7 +420,7 @@ export default function QuestionTypePairings({
                         <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
                             <div className="border-b px-4 py-4 md:px-5">
                                 <h2 className="text-sm font-semibold">
-                                    Configured pairs
+                                    Configured OR groups
                                 </h2>
                             </div>
 
@@ -406,76 +430,65 @@ export default function QuestionTypePairings({
                                 </div>
                             )}
 
-                            {scopedPairings.length === 0 ? (
+                            {scopedGroups.length === 0 ? (
                                 <div className="px-5 py-12 text-center">
                                     <ArrowLeftRightIcon className="mx-auto mb-3 size-8 text-muted-foreground/50" />
                                     <p className="text-sm font-medium">
-                                        No OR pairs configured
+                                        No OR groups configured
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Select two eligible types above to
-                                        create one.
+                                        Select at least two eligible types above
+                                        to create one.
                                     </p>
                                 </div>
                             ) : (
                                 <div className="divide-y">
-                                    {scopedPairings.map((pairing) => (
+                                    {scopedGroups.map((group) => (
                                         <div
-                                            key={pairing.id}
+                                            key={group.id}
                                             className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-5"
                                         >
-                                            <div className="grid min-w-0 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3">
-                                                <TypeBox
-                                                    type={
-                                                        pairing.question_type_a
-                                                    }
-                                                    displayName={
-                                                        displayTypeName
-                                                    }
-                                                />
-                                                <div className="flex shrink-0 flex-col items-center text-primary">
-                                                    <span className="text-[10px] font-bold">
-                                                        OR
-                                                    </span>
-                                                    <ArrowLeftRightIcon className="size-4" />
-                                                </div>
-                                                <TypeBox
-                                                    type={
-                                                        pairing.question_type_b
-                                                    }
-                                                    displayName={
-                                                        displayTypeName
-                                                    }
-                                                />
+                                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                                {group.question_types.map((type, index) => (
+                                                    <div
+                                                        key={type.id}
+                                                        className="flex min-w-0 items-center gap-2"
+                                                    >
+                                                        {index > 0 && (
+                                                            <span className="shrink-0 text-xs font-bold text-primary">
+                                                                OR
+                                                            </span>
+                                                        )}
+                                                        <TypeBox
+                                                            type={type}
+                                                            displayName={displayTypeName}
+                                                        />
+                                                    </div>
+                                                ))}
                                             </div>
 
                                             <div className="flex items-center justify-between gap-3 md:justify-end">
-                                                {!pairing.is_available && (
+                                                {!group.is_available && (
                                                     <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200">
                                                         Type unavailable
                                                     </span>
                                                 )}
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs text-muted-foreground">
-                                                        {pairing.is_active
+                                                        {group.is_active
                                                             ? 'Active'
                                                             : 'Inactive'}
                                                     </span>
                                                     <Switch
-                                                        checked={
-                                                            pairing.is_active
-                                                        }
+                                                        checked={group.is_active}
                                                         onCheckedChange={() =>
-                                                            togglePairing(
-                                                                pairing,
-                                                            )
+                                                            toggleGroup(group)
                                                         }
                                                         disabled={
                                                             !canEdit ||
-                                                            busyPairingId !==
-                                                                null ||
-                                                            (!pairing.is_available &&
-                                                                !pairing.is_active)
+                                                            busyGroupId !== null ||
+                                                            (!group.is_available &&
+                                                                !group.is_active)
                                                         }
                                                     />
                                                     {canEdit && (
@@ -485,15 +498,12 @@ export default function QuestionTypePairings({
                                                             size="icon"
                                                             className="text-muted-foreground hover:text-destructive"
                                                             onClick={() =>
-                                                                setDeleteTarget(
-                                                                    pairing,
-                                                                )
+                                                                setDeleteTarget(group)
                                                             }
                                                             disabled={
-                                                                busyPairingId !==
-                                                                null
+                                                                busyGroupId !== null
                                                             }
-                                                            title="Remove pair"
+                                                            title="Remove OR group"
                                                         >
                                                             <Trash2Icon />
                                                         </Button>
@@ -514,12 +524,14 @@ export default function QuestionTypePairings({
                 onOpenChange={(open) => !open && setDeleteTarget(null)}
             >
                 <DialogContent>
-                    <DialogTitle>Remove OR pairing?</DialogTitle>
+                    <DialogTitle>Remove OR group?</DialogTitle>
                     <DialogDescription>
-                        This removes the pairing between{' '}
-                        <strong>{deleteTarget?.question_type_a.name}</strong>{' '}
-                        and{' '}
-                        <strong>{deleteTarget?.question_type_b.name}</strong>{' '}
+                        This removes the OR group containing{' '}
+                        <strong>
+                            {deleteTarget?.question_types
+                                .map((type) => displayTypeName(type.name))
+                                .join(' OR ')}
+                        </strong>{' '}
                         from this scope. It can be created again later.
                     </DialogDescription>
                     <DialogFooter>
@@ -527,20 +539,20 @@ export default function QuestionTypePairings({
                             type="button"
                             variant="outline"
                             onClick={() => setDeleteTarget(null)}
-                            disabled={busyPairingId !== null}
+                            disabled={busyGroupId !== null}
                         >
                             Cancel
                         </Button>
                         <Button
                             type="button"
                             variant="destructive"
-                            onClick={removePairing}
-                            disabled={busyPairingId !== null}
+                            onClick={removeGroup}
+                            disabled={busyGroupId !== null}
                         >
-                            {busyPairingId !== null && (
+                            {busyGroupId !== null && (
                                 <LoaderCircleIcon className="animate-spin" />
                             )}
-                            Remove pair
+                            Remove group
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -553,41 +565,40 @@ function TypeSelect({
     label,
     value,
     types,
+    excludeIds,
     disabled,
-    error,
     displayName,
     onChange,
 }: {
     label: string;
-    value: number | null;
+    value: number;
     types: QuestionTypeOption[];
+    excludeIds: number[];
     disabled: boolean;
-    error?: string;
     displayName: (name: string) => string;
     onChange: (id: number | null) => void;
 }) {
     const options = useMemo<ComboboxOptionItem[]>(
         () =>
-            types.map((type) => ({
-                id: type.id,
-                label: displayName(type.name),
-            })),
-        [displayName, types],
+            types
+                .filter((type) => !excludeIds.includes(type.id))
+                .map((type) => ({
+                    id: type.id,
+                    label: displayName(type.name),
+                })),
+        [displayName, excludeIds, types],
     );
 
     return (
-        <div className="space-y-1.5">
-            <FloatingCombobox
-                label={label}
-                options={options}
-                value={findComboboxOption(options, value)}
-                onChange={(option) =>
-                    onChange(option === null ? null : Number(option.id))
-                }
-                disabled={disabled}
-            />
-            {error && <p className="text-xs text-destructive">{error}</p>}
-        </div>
+        <FloatingCombobox
+            label={label}
+            options={options}
+            value={findComboboxOption(options, value || null)}
+            onChange={(option) =>
+                onChange(option === null ? null : Number(option.id))
+            }
+            disabled={disabled}
+        />
     );
 }
 
@@ -599,7 +610,7 @@ function TypeBox({
     displayName: (name: string) => string;
 }) {
     return (
-        <div className="min-w-0 flex-1 rounded-lg border bg-muted/20 px-3 py-2">
+        <div className="min-w-0 rounded-lg border bg-muted/20 px-3 py-2">
             <p className="break-words text-sm font-medium">
                 {displayName(type.name)}
             </p>
@@ -660,12 +671,13 @@ function questionTypeDisplayName(
 
     return name.slice(0, suffixMatch.index).trim();
 }
+
 QuestionTypePairings.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: '/dashboard' },
         { title: 'Question Types', href: '/superadmin/question-types' },
         {
-            title: 'OR Pairing Settings',
+            title: 'OR Group Settings',
             href: '/superadmin/question-type-pairings',
         },
     ],

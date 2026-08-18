@@ -214,8 +214,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types')->middleware('permission:question_types.view');
         Route::get('superadmin/question-type-pairings', [QuestionTypePairingController::class, 'index'])->name('superadmin.question-type-pairings')->middleware('permission:question_types.view');
         Route::post('superadmin/question-type-pairings', [QuestionTypePairingController::class, 'store'])->name('superadmin.question-type-pairings.store')->middleware('permission:question_types.edit');
-        Route::patch('superadmin/question-type-pairings/{pairing}', [QuestionTypePairingController::class, 'update'])->name('superadmin.question-type-pairings.update')->middleware('permission:question_types.edit');
-        Route::delete('superadmin/question-type-pairings/{pairing}', [QuestionTypePairingController::class, 'destroy'])->name('superadmin.question-type-pairings.destroy')->middleware('permission:question_types.edit');
+        Route::patch('superadmin/question-type-pairings/{group}', [QuestionTypePairingController::class, 'update'])->name('superadmin.question-type-pairings.update')->middleware('permission:question_types.edit');
+        Route::delete('superadmin/question-type-pairings/{group}', [QuestionTypePairingController::class, 'destroy'])->name('superadmin.question-type-pairings.destroy')->middleware('permission:question_types.edit');
         Route::get('superadmin/question-types/add', [QuestionTypeController::class, 'create'])->name('superadmin.question-types.add')->middleware('permission:question_types.create');
         Route::get('superadmin/question-types/objective', [QuestionTypeController::class, 'objectiveIndex'])->name('superadmin.question-types.objective')->middleware('permission:question_types.view');
         Route::get('superadmin/question-types/objective/add', [QuestionTypeController::class, 'createObjective'])->name('superadmin.question-types.objective.add')->middleware('permission:question_types.create');
