@@ -1813,10 +1813,8 @@ function MultipartChoiceControl({
                         <ChevronDownIcon className="size-3.5 shrink-0 text-slate-400 transition-transform group-data-open/choice:rotate-180 dark:text-slate-500" />
                     </ComboboxButton>
                     <ComboboxOptions
-                        anchor="bottom end"
-                        portal
                         transition
-                        className="z-[70] max-h-60 min-w-24 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 transition duration-100 ease-out outline-none [--anchor-gap:0.35rem] data-closed:scale-95 data-closed:opacity-0 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
+                        className="absolute top-full right-0 z-[70] mt-1.5 max-h-60 min-w-24 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 transition duration-100 ease-out outline-none data-closed:scale-95 data-closed:opacity-0 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
                     >
                         <ComboboxOption
                             value="all"
@@ -9553,9 +9551,6 @@ function MultipartSelectionCard({
                         className="grid gap-2.5 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
                     >
                         <div className="min-w-0">
-                            <p className="mb-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                                Question Type
-                            </p>
                             <FloatingCombobox
                                 label="Question Type"
                                 value={
@@ -9566,6 +9561,7 @@ function MultipartSelectionCard({
                                     ) ?? null
                                 }
                                 options={typeOptions}
+                                compact
                                 onChange={(option) =>
                                     updateRow(row.id, {
                                         questionTypeId: option
@@ -9577,7 +9573,7 @@ function MultipartSelectionCard({
                             />
                         </div>
                         <NumberField
-                            label="Marks Each"
+                            label="Marks"
                             value={row.marksPerQuestion}
                             placeholder="0"
                             onChange={(value) =>
@@ -9819,7 +9815,7 @@ function QuestionSelectionCard({
                             }
                         />
                         <NumberField
-                            label="Marks each"
+                            label="Marks"
                             value={row.marksPerQuestion}
                             placeholder="0"
                             disabled={toNumber(row.requiredQuestions) === 0}

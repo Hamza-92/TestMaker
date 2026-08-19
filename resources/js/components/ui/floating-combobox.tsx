@@ -31,6 +31,8 @@ interface FloatingComboboxProps {
     /** Keep the accessible label while hiding its floating visual treatment. */
     hideLabel?: boolean;
     placeholder?: string;
+    /** Use the compact field height for dense card layouts. */
+    compact?: boolean;
     className?: string;
 }
 
@@ -51,6 +53,7 @@ export function FloatingCombobox({
     leadingIcon: LeadingIcon,
     hideLabel = false,
     placeholder,
+    compact = false,
     className,
 }: FloatingComboboxProps) {
     const [query, setQuery] = useState('');
@@ -86,7 +89,8 @@ export function FloatingCombobox({
             >
                 <div
                     className={cn(
-                        'group/field relative flex h-11 items-center rounded-lg border bg-white transition-colors',
+                        'group/field relative flex items-center rounded-lg border bg-white transition-colors',
+                        compact ? 'h-9' : 'h-11',
                         'border-slate-200 hover:border-slate-300',
                         'focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:hover:border-brand-500',
                         'dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700',

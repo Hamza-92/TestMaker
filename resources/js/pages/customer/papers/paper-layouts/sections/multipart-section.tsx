@@ -67,6 +67,7 @@ export function MultipartSection({
         <section data-paper-multipart className="space-y-1">
             {showHeading && (
                 <div
+                    data-paper-heading
                     className={
                         isBilingualHeading
                             ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 border border-black px-2 py-1 text-sm font-bold'
@@ -164,7 +165,8 @@ export function MultipartSection({
                 {multipart.rows.map((row, rowIndex) => (
                     <div
                         key={`multipart-row-${rowIndex}`}
-                        className="break-inside-avoid text-sm leading-6"
+                        data-paper-question
+                        className="break-inside-avoid"
                     >
                         {row.parts.map((part, partIndex) => {
                             const partLabel = `(${String.fromCharCode(97 + partIndex)}`;
