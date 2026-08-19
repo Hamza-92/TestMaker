@@ -4,6 +4,7 @@ import { questionTextToHtml } from './question-html';
 interface BilingualQuestionRowProps {
     value: string;
     indexLabel: string;
+    urduIndexLabel?: string;
     marks: number;
     urduOnly?: boolean;
     hideMarks?: boolean;
@@ -18,6 +19,7 @@ export interface BilingualParts {
 export function BilingualQuestionRow({
     value,
     indexLabel,
+    urduIndexLabel = indexLabel,
     marks,
     urduOnly = false,
     hideMarks = false,
@@ -57,7 +59,9 @@ export function BilingualQuestionRow({
                     className="flex min-w-0 items-baseline text-right"
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
-                    <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
+                    <span className="shrink-0 font-bold">
+                        {urduIndexLabel})
+                    </span>{' '}
                     <QuestionContent
                         value={parts.urdu}
                         inline
@@ -77,7 +81,9 @@ export function BilingualQuestionRow({
                     className="flex min-w-0 items-baseline text-right"
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
-                    <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
+                    <span className="shrink-0 font-bold">
+                        {urduIndexLabel})
+                    </span>{' '}
                     <QuestionContent
                         value={value}
                         inline
@@ -148,7 +154,7 @@ export function BilingualQuestionRow({
                 className="flex min-w-0 items-baseline text-right"
                 style={{ fontFamily: 'var(--paper-urdu-font)' }}
             >
-                <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
+                <span className="shrink-0 font-bold">{urduIndexLabel})</span>{' '}
                 <QuestionContent
                     value={parts.urdu}
                     inline

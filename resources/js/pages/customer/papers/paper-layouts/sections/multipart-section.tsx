@@ -1,3 +1,7 @@
+import {
+    BilingualQuestionRow,
+    splitBilingualParts,
+} from '../questions/bilingual-question-row';
 import { QuestionContent } from '../questions/question-content';
 import type { GeneratedPaperSection } from '../types';
 
@@ -19,26 +23,70 @@ export function MultipartSection({
     }
 
     const headingEnglish =
-        multipart.headingEnglish?.trim() ||
         section.titleEnglish?.trim() ||
-        section.title;
+        (section.titleUrdu
+            ? ''
+            : multipart.headingEnglish?.trim() || section.title.trim());
     const headingUrdu =
-        multipart.headingUrdu?.trim() || section.titleUrdu?.trim() || '';
+        section.titleUrdu?.trim() ||
+        (!section.titleEnglish ? multipart.headingUrdu?.trim() || '' : '');
+    const isBilingualHeading = headingEnglish !== '' && headingUrdu !== '';
+    const isUrduHeading = headingUrdu !== '' && headingEnglish === '';
+    const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
 
     return (
         <section data-paper-multipart className="space-y-1">
             {showHeading && (
-                <div className="flex items-start justify-between gap-3 border border-black px-2 py-1 text-sm font-bold">
-                    <div className="min-w-0" dir="ltr">
-                        <QuestionContent value={headingEnglish} inline />
+                <div
+                    className={
+                        isBilingualHeading
+                            ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 border border-black px-2 py-1 text-sm font-bold'
+                            : 'flex items-start justify-between gap-3 border border-black px-2 py-1 text-sm font-bold'
+                    }
+                >
+                    <div
+                        className={
+                            isUrduHeading
+                                ? 'min-w-0 text-right'
+                                : 'min-w-0 text-left'
+                        }
+                        dir={isUrduHeading ? 'rtl' : 'ltr'}
+                        data-paper-urdu-content={
+                            isUrduHeading ? true : undefined
+                        }
+                        style={
+                            isUrduHeading
+                                ? {
+                                      direction: 'rtl',
+                                      fontFamily: 'var(--paper-urdu-font)',
+                                      textAlign: 'right',
+                                  }
+                                : undefined
+                        }
+                    >
+                        <QuestionContent
+                            value={isUrduHeading ? headingUrdu : headingEnglish}
+                            inline
+                            className={
+                                isUrduHeading
+                                    ? 'text-right align-baseline'
+                                    : 'align-baseline'
+                            }
+                        />
                     </div>
-                    {headingUrdu && (
+                    {isBilingualHeading && <div />}
+                    {isBilingualHeading && (
                         <div
                             className="min-w-0 text-right"
                             dir="rtl"
                             data-paper-urdu-content
+                            style={{ fontFamily: 'var(--paper-urdu-font)' }}
                         >
-                            <QuestionContent value={headingUrdu} inline />
+                            <QuestionContent
+                                value={headingUrdu}
+                                inline
+                                className="text-right align-baseline"
+                            />
                         </div>
                     )}
                 </div>
@@ -47,48 +95,57 @@ export function MultipartSection({
                 {multipart.rows.map((row, rowIndex) => (
                     <div
                         key={`multipart-row-${rowIndex}`}
-                        className="break-inside-avoid text-sm"
+                        className="break-inside-avoid text-sm leading-6"
                     >
                         {row.parts.map((part, partIndex) => {
-                            const partLabel = `(${part.key.toLowerCase()})`;
-                            const questionContent = (
-                                <QuestionContent
-                                    as="span"
-                                    inline
-                                    value={part.question.text || ' '}
+                            const partLabel = `(${String.fromCharCode(97 + partIndex)}`;
+                            const indexLabel =
+                                partIndex === 0 && headingNumber !== null
+                                    ? `Q.${headingNumber}:- ${partLabel}`
+                                    : partLabel;
+
+                            const urduIndexLabel =
+                                partIndex === 0 && headingNumber !== null
+                                    ? `سوال نمبر ${headingNumber}:- ${partLabel}`
+                                    : partLabel;
+
+                            const questionValue = part.question.text || ' ';
+                            const questionRow = (
+                                <BilingualQuestionRow
+                                    value={questionValue}
+                                    indexLabel={indexLabel}
+                                    urduIndexLabel={urduIndexLabel}
+                                    marks={part.marksEach}
+                                    urduOnly={urduOnly}
+                                    sameStatement={part.question.sameStatement}
                                 />
                             );
-
-                            if (partIndex === 0) {
-                                return (
-                                    <div
-                                        key={`${rowIndex}-${part.key}`}
-                                        className="flex break-inside-avoid items-start gap-1"
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            {headingNumber !== null && (
-                                                <span className="font-semibold">
-                                                    Q.{headingNumber}:-{' '}
-                                                </span>
-                                            )}
-                                            <span className="font-semibold">
-                                                {partLabel}{' '}
-                                            </span>
-                                            {questionContent}
-                                        </div>
-                                    </div>
-                                );
-                            }
+                            const hasBilingualContent =
+                                splitBilingualParts(questionValue) !== null;
+                            const partMarks = part.marksEach > 0 && (
+                                <span className="shrink-0 whitespace-nowrap">
+                                    ({part.marksEach})
+                                </span>
+                            );
 
                             return (
                                 <div
                                     key={`${rowIndex}-${part.key}`}
-                                    className="flex break-inside-avoid items-start gap-1"
+                                    className="break-inside-avoid"
                                 >
-                                    <span className="shrink-0 font-semibold">
-                                        {partLabel}
-                                    </span>
-                                    {questionContent}
+                                    {hasBilingualContent ? (
+                                        questionRow
+                                    ) : (
+                                        <div
+                                            className="flex items-start gap-2"
+                                            dir={urduOnly ? 'rtl' : 'ltr'}
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                {questionRow}
+                                            </div>
+                                            {partMarks}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
