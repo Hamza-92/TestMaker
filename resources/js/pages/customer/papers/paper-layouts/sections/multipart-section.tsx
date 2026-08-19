@@ -60,7 +60,7 @@ export function MultipartSection({
             : '';
     const choiceLabelUrdu =
         showChoice && typeof groupChoiceCount === 'number'
-            ? '[کوئی سے بھی ' + groupChoiceCount + ']' + choiceMarksLabel
+            ? '[کوئی سے بھی ' + groupChoiceCount + ']'
             : '';
 
     return (
@@ -104,9 +104,25 @@ export function MultipartSection({
                         />
                         {showChoice && (
                             <span className="ml-1 align-baseline whitespace-nowrap">
-                                {isUrduHeading
-                                    ? choiceLabelUrdu
-                                    : choiceLabelEnglish}
+                                {isUrduHeading ? (
+                                    <>
+                                        {choiceLabelUrdu}
+                                        {choiceMarksLabel !== '' && (
+                                            <span
+                                                dir="ltr"
+                                                className="inline-block"
+                                                style={{
+                                                    direction: 'ltr',
+                                                    unicodeBidi: 'isolate',
+                                                }}
+                                            >
+                                                {choiceMarksLabel}
+                                            </span>
+                                        )}
+                                    </>
+                                ) : (
+                                    choiceLabelEnglish
+                                )}
                             </span>
                         )}
                     </div>
@@ -126,12 +142,24 @@ export function MultipartSection({
                             {showChoice && (
                                 <span className="mr-1 align-baseline whitespace-nowrap">
                                     {choiceLabelUrdu}
+                                    {choiceMarksLabel !== '' && (
+                                        <span
+                                            dir="ltr"
+                                            className="inline-block"
+                                            style={{
+                                                direction: 'ltr',
+                                                unicodeBidi: 'isolate',
+                                            }}
+                                        >
+                                            {choiceMarksLabel}
+                                        </span>
+                                    )}
                                 </span>
                             )}
                         </div>
                     )}
                 </div>
-            )}
+            )}{' '}
             <div className="space-y-0.5 px-2">
                 {multipart.rows.map((row, rowIndex) => (
                     <div
