@@ -35,6 +35,27 @@ export interface GeneratedPaperQuestion {
     answerText?: string | null;
 }
 
+export interface GeneratedMultipartPart {
+    key: string;
+    typeId: number | null;
+    typeTitle: string;
+    typeTitleEnglish?: string | null;
+    typeTitleUrdu?: string | null;
+    marksEach: number;
+    question: GeneratedPaperQuestion;
+}
+
+export interface GeneratedMultipartRow {
+    parts: GeneratedMultipartPart[];
+}
+
+export interface GeneratedMultipartSection {
+    choiceCount: number;
+    marksEach: number;
+    headingEnglish?: string | null;
+    headingUrdu?: string | null;
+    rows: GeneratedMultipartRow[];
+}
 export interface GeneratedPaperSection {
     id: string;
     questionTypeId: number | null;
@@ -63,6 +84,7 @@ export interface GeneratedPaperSection {
     orGroupTypeIds?: number[] | null;
     orRole?: 'primary' | 'alternative' | null;
     orLabel?: string | null;
+    multipart?: GeneratedMultipartSection | null;
 }
 
 export const MIN_SECTION_COLUMNS = 1;

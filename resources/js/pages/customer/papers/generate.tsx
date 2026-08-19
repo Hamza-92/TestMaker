@@ -67,6 +67,7 @@ const QuestionEditModal = lazy(() =>
         default: module.QuestionEditModal,
     })),
 );
+import { MultipartSection } from './paper-layouts/sections/multipart-section';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
 import { pickSectionTemplate } from './paper-layouts/templates';
 import {
@@ -266,6 +267,43 @@ interface QuestionSelectionRow {
     orSelectedQuestionIdsByType?: Record<string, number[]>;
 }
 
+interface MultipartTypeOption {
+    id: number;
+    name: string;
+    nameUrdu?: string | null;
+    headingEnglish?: string | null;
+    headingUrdu?: string | null;
+}
+
+interface MultipartConfig {
+    id: number;
+    maxParts: number;
+    choiceCount: number;
+    headingEnglish?: string | null;
+    headingUrdu?: string | null;
+    partTypes: MultipartTypeOption[];
+}
+
+interface MultipartPartRow {
+    id: string;
+    questionTypeId: number | null;
+    choiceQuestions: string;
+    requiredQuestions: string;
+    marksPerQuestion: string;
+    selectedQuestionIds: number[];
+}
+
+interface MultipartSelectionState {
+    id: string;
+    configId: number;
+    rows: MultipartPartRow[];
+    selectionMode: SelectionMode;
+    /** Compatibility values retained until multipart generation is finalized. */
+    partTypeIds: number[];
+    questionCount: string;
+    choiceCount: string;
+    marksPerPart: string;
+}
 interface QuestionTypePairing {
     id: number;
     questionTypeIds: number[];
@@ -305,7 +343,10 @@ interface QuestionSelectionSection {
 function orAlternativeTypeIds(
     section: Pick<
         QuestionSelectionSection,
-        'questionTypeId' | 'orQuestionTypeId' | 'orAlternativeQuestionTypeIds' | 'orGroupTypeIds'
+        | 'questionTypeId'
+        | 'orQuestionTypeId'
+        | 'orAlternativeQuestionTypeIds'
+        | 'orGroupTypeIds'
     >,
 ): number[] {
     if (Array.isArray(section.orAlternativeQuestionTypeIds)) {
@@ -358,6 +399,7 @@ function questionSectionSelectionMode(
     return section.selectionMode ?? 'automatic';
 }
 interface QuestionSelectionState {
+    multipart?: MultipartSelectionState[];
     globalFilters: Record<SourceFilterKey, boolean>;
     sections: QuestionSelectionSection[];
     totalMarks: number;
@@ -407,6 +449,7 @@ interface ManualQuestion {
 type ManualPickerSide = 'primary' | 'alternative';
 
 interface ManualPickerRow {
+    multipartSelectionId?: string;
     section: QuestionSelectionSection;
     row: QuestionSelectionRow;
     target: number;
@@ -508,6 +551,107 @@ function toNumber(value: string): number {
 
 function onlyDigits(value: string): string {
     return value.replace(/\D/g, '');
+}
+
+function createMultipartPartRow(
+    id: string,
+    questionTypeId: number | null,
+): MultipartPartRow {
+    return {
+        id,
+        questionTypeId,
+        // Every multipart part represents exactly one question.
+        choiceQuestions: '1',
+        requiredQuestions: '1',
+        marksPerQuestion: '',
+        selectedQuestionIds: [],
+    };
+}
+
+function currentMultipartSelection(
+    current: MultipartSelectionState | undefined,
+    config: MultipartConfig,
+    selectionId: string,
+): MultipartSelectionState {
+    const allowed = new Set(config.partTypes.map((type) => type.id));
+    const existingRows =
+        current?.configId === config.id && Array.isArray(current.rows)
+            ? current.rows
+                  .filter(
+                      (row) =>
+                          row.questionTypeId === null ||
+                          allowed.has(row.questionTypeId),
+                  )
+                  .map((row) => ({
+                      ...row,
+                      choiceQuestions: '1',
+                      requiredQuestions: '1',
+                  }))
+            : [];
+    const rows =
+        existingRows.length >= 2
+            ? existingRows.slice(0, config.maxParts)
+            : [1, 2].map((index) =>
+                  createMultipartPartRow(`multipart_part_${index}`, null),
+              );
+    const partTypeIds = rows
+        .map((row) => row.questionTypeId)
+        .filter((id): id is number => typeof id === 'number');
+    const firstConfiguredRow = rows.find((row) => row.questionTypeId !== null);
+
+    return {
+        id: current?.id ?? selectionId,
+        configId: config.id,
+        rows,
+        selectionMode:
+            current?.configId === config.id
+                ? current.selectionMode
+                : 'automatic',
+        partTypeIds,
+        questionCount: '1',
+        choiceCount: '1',
+        marksPerPart: firstConfiguredRow?.marksPerQuestion ?? '',
+    };
+}
+function normalizeQuestionSelection(value: unknown): QuestionSelectionState {
+    const fallback: QuestionSelectionState = {
+        globalFilters: {},
+        sections: [],
+        multipart: undefined,
+        totalMarks: 0,
+    };
+
+    if (!value || typeof value !== 'object') {
+        return fallback;
+    }
+
+    const source = value as Partial<QuestionSelectionState> & {
+        multipart?: MultipartSelectionState | MultipartSelectionState[] | null;
+    };
+    const rawMultipart = source.multipart;
+    const multipart = rawMultipart
+        ? (Array.isArray(rawMultipart) ? rawMultipart : [rawMultipart]).map(
+              (selection, index) => ({
+                  ...selection,
+                  id: selection.id || `multipart_${index + 1}`,
+                  rows: Array.isArray(selection.rows) ? selection.rows : [],
+              }),
+          )
+        : undefined;
+
+    return {
+        globalFilters:
+            source.globalFilters && typeof source.globalFilters === 'object'
+                ? source.globalFilters
+                : {},
+        sections: Array.isArray(source.sections) ? source.sections : [],
+        multipart,
+        totalMarks:
+            typeof source.totalMarks === 'number' &&
+            Number.isFinite(source.totalMarks)
+                ? source.totalMarks
+                : 0,
+    };
 }
 
 function createQuestionRow(id: string): QuestionSelectionRow {
@@ -979,11 +1123,15 @@ function paperTotalMarks(paper: GeneratedPaper): number {
         (sum, section) =>
             section.orRole === 'alternative'
                 ? sum
-                : sum + section.requiredQuestions * section.marksEach,
+                : sum +
+                  (section.multipart
+                      ? section.multipart.rows.length *
+                        section.multipart.choiceCount *
+                        section.multipart.marksEach
+                      : section.requiredQuestions * section.marksEach),
         0,
     );
 }
-
 function sectionTotal(section: QuestionSelectionSection): number {
     return section.rows.reduce((sum, row) => sum + lineTotal(row), 0);
 }
@@ -995,16 +1143,28 @@ function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
 
     return {
         ...state,
-        totalMarks: state.sections.reduce(
-            (sum, section) =>
-                alternativeTypeIds.has(section.questionTypeId)
-                    ? sum
-                    : sum + sectionTotal(section),
-            0,
-        ),
+        totalMarks:
+            state.sections.reduce(
+                (sum, section) =>
+                    alternativeTypeIds.has(section.questionTypeId)
+                        ? sum
+                        : sum + sectionTotal(section),
+                0,
+            ) +
+            (state.multipart
+                ? state.multipart.reduce(
+                      (total, selection) =>
+                          total +
+                          selection.rows.reduce(
+                              (sum, row) =>
+                                  sum + toNumber(row.marksPerQuestion),
+                              0,
+                          ),
+                      0,
+                  )
+                : 0),
     };
 }
-
 function sortIncomingQuestionTypes(
     sections: QuestionTypeCount[],
 ): QuestionTypeCount[] {
@@ -1042,7 +1202,8 @@ function mergeQuestionSections(
             typeof current?.orPairingId === 'number'
                 ? groupById.get(current.orPairingId)
                 : null;
-        const memberIds = group?.questionTypeIds ?? current?.orGroupTypeIds ?? [];
+        const memberIds =
+            group?.questionTypeIds ?? current?.orGroupTypeIds ?? [];
         const keepsGroup =
             group !== null &&
             group !== undefined &&
@@ -1067,9 +1228,11 @@ function mergeQuestionSections(
             sortOrder: item.sortOrder,
             selectionMode: current?.selectionMode ?? 'automatic',
             orPairingId: keepsGroup ? group?.id : null,
-            orQuestionTypeId: keepsGroup ? alternativeIds[0] ?? null : null,
+            orQuestionTypeId: keepsGroup ? (alternativeIds[0] ?? null) : null,
             orGroupTypeIds: keepsGroup ? memberIds : undefined,
-            orAlternativeQuestionTypeIds: keepsGroup ? alternativeIds : undefined,
+            orAlternativeQuestionTypeIds: keepsGroup
+                ? alternativeIds
+                : undefined,
             rows: normalizeSectionRows(
                 current?.rows ?? [createQuestionRow(`${sectionId}_row_001`)],
                 item.availableCount,
@@ -1090,7 +1253,9 @@ function mergeQuestionSections(
         const availableCount = groupIsActive
             ? Math.min(
                   ...memberIds.map(
-                      (id) => mergedByType.get(id)?.availableCount ?? section.availableCount,
+                      (id) =>
+                          mergedByType.get(id)?.availableCount ??
+                          section.availableCount,
                   ),
               )
             : section.availableCount;
@@ -1515,13 +1680,20 @@ function ScopePicker({
         </Card>
     );
 }
-function CategoryDivider({ title }: { title: SectionCategory }) {
+function CategoryDivider({
+    title,
+    action,
+}: {
+    title: string;
+    action?: ReactNode;
+}) {
     return (
         <div className="flex items-center gap-3">
             <h3 className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
                 {title}
             </h3>
             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            {action}
         </div>
     );
 }
@@ -1768,8 +1940,11 @@ export default function GeneratePaper({
         useState<QuestionSelectionState>({
             globalFilters: createGlobalFilters(sourceFilters),
             sections: [],
+            multipart: undefined,
             totalMarks: 0,
         });
+    const [multipartConfig, setMultipartConfig] =
+        useState<MultipartConfig | null>(null);
     const [questionTypePairings, setQuestionTypePairings] = useState<
         QuestionTypePairing[]
     >([]);
@@ -1913,9 +2088,9 @@ export default function GeneratePaper({
                 ),
         [foldedAlternativeTypeIds, questionSelection.sections],
     );
-    const manualPickerRows = useMemo(
-        () =>
-            questionSelectionRows.flatMap((item): ManualPickerRow[] => {
+    const manualPickerRows = useMemo(() => {
+        const standardRows = questionSelectionRows.flatMap(
+            (item): ManualPickerRow[] => {
                 if (questionSectionSelectionMode(item.section) !== 'manual') {
                     return [];
                 }
@@ -1931,29 +2106,95 @@ export default function GeneratePaper({
                 ];
 
                 return rows.concat(
-                    orAlternativeTypeIds(item.section).map((alternativeTypeId) => {
-                        const alternative = questionSelection.sections.find(
-                            (section) => section.questionTypeId === alternativeTypeId,
-                        );
+                    orAlternativeTypeIds(item.section).map(
+                        (alternativeTypeId) => {
+                            const alternative = questionSelection.sections.find(
+                                (section) =>
+                                    section.questionTypeId ===
+                                    alternativeTypeId,
+                            );
 
-                        return {
-                            ...item,
-                            side: 'alternative',
-                            alternativeTypeId,
-                            questionTypeId: alternativeTypeId,
-                            selectedQuestionIds: rowOrSelectedQuestionIds(
-                                item.row,
+                            return {
+                                ...item,
+                                side: 'alternative',
                                 alternativeTypeId,
-                            ),
-                            title: alternative
-                                ? englishQuestionTypeTitle(alternative)
-                                : 'OR alternative',
-                        };
-                    }),
+                                questionTypeId: alternativeTypeId,
+                                selectedQuestionIds: rowOrSelectedQuestionIds(
+                                    item.row,
+                                    alternativeTypeId,
+                                ),
+                                title: alternative
+                                    ? englishQuestionTypeTitle(alternative)
+                                    : 'OR alternative',
+                            };
+                        },
+                    ),
                 );
-            }),
-        [questionSelection.sections, questionSelectionRows],
-    );    const activeManualPickerRow = useMemo(
+            },
+        );
+
+        const multipartSelections = questionSelection.multipart ?? [];
+        const multipartRows = multipartSelections.flatMap(
+            (selection): ManualPickerRow[] => {
+                if (selection.selectionMode !== 'manual') {
+                    return [];
+                }
+
+                return selection.rows.flatMap((part): ManualPickerRow[] => {
+                    if (part.questionTypeId === null || rowTarget(part) === 0) {
+                        return [];
+                    }
+
+                    const type = multipartConfig?.partTypes.find(
+                        (candidate) => candidate.id === part.questionTypeId,
+                    );
+                    const syntheticRow = {
+                        id: part.id,
+                        requiredQuestions: part.requiredQuestions,
+                        marksPerQuestion: part.marksPerQuestion,
+                        choiceQuestions: part.choiceQuestions,
+                        selectedQuestionIds: part.selectedQuestionIds,
+                    } satisfies QuestionSelectionRow;
+                    const syntheticSection = {
+                        id: `multipart_${selection.id}_${part.id}`,
+                        questionTypeId: part.questionTypeId,
+                        category: 'Subjective Questions',
+                        title: type?.name ?? 'Multipart part',
+                        titleEnglish: type?.name ?? 'Multipart part',
+                        titleUrdu: type?.nameUrdu ?? null,
+                        heading: type?.name ?? 'Multipart part',
+                        headingEnglish: type?.name ?? 'Multipart part',
+                        headingUrdu: type?.nameUrdu ?? null,
+                        availableCount: rowTarget(part),
+                        columnPerRow: 1,
+                        selectionMode: 'manual' as SelectionMode,
+                        rows: [syntheticRow],
+                    } satisfies QuestionSelectionSection;
+
+                    return [
+                        {
+                            multipartSelectionId: selection.id,
+                            section: syntheticSection,
+                            row: syntheticRow,
+                            target: rowTarget(part),
+                            side: 'primary',
+                            questionTypeId: part.questionTypeId,
+                            selectedQuestionIds: part.selectedQuestionIds,
+                            title: type?.name ?? 'Multipart part',
+                        },
+                    ];
+                });
+            },
+        );
+
+        return [...standardRows, ...multipartRows];
+    }, [
+        multipartConfig,
+        questionSelection.multipart,
+        questionSelection.sections,
+        questionSelectionRows,
+    ]);
+    const activeManualPickerRow = useMemo(
         () =>
             manualPickerTarget
                 ? (manualPickerRows.find(
@@ -1977,17 +2218,33 @@ export default function GeneratePaper({
     const isManualSelectionComplete = manualPickerRows.every(
         (item) => item.selectedQuestionIds.length === item.target,
     );
-    const isQuestionSelectionReady =
+    const standardSelectionReady =
         questionSelectionRows.length > 0 &&
         questionSelectionRows.every(
             (item) =>
                 toNumber(item.row.requiredQuestions) > 0 &&
                 toNumber(item.row.marksPerQuestion) > 0,
         );
+    const multipartSelections = questionSelection.multipart ?? [];
+    const multipartReady =
+        !multipartConfig ||
+        multipartSelections.every(
+            (selection) =>
+                selection.rows.length >= 2 &&
+                selection.rows.every(
+                    (row) =>
+                        typeof row.questionTypeId === 'number' &&
+                        toNumber(row.marksPerQuestion) > 0,
+                ),
+        );
+    const isQuestionSelectionReady =
+        (standardSelectionReady || multipartSelections.length > 0) &&
+        multipartReady;
     const canGeneratePaper =
         questionSelection.totalMarks > 0 &&
         isQuestionSelectionReady &&
-        isManualSelectionComplete;
+        isManualSelectionComplete &&
+        multipartReady;
     const activeManualQuestionTypeId =
         activeManualPickerRow?.questionTypeId ?? null;
     const activeManualSelectedQuestionIds = useMemo(
@@ -2353,13 +2610,33 @@ export default function GeneratePaper({
                 (data: {
                     sections: QuestionTypeCount[];
                     groups?: QuestionTypePairing[];
+                    multipart?: MultipartConfig | null;
                 }) => {
                     const pairings = data.groups ?? [];
-
                     setQuestionTypePairings(pairings);
+                    setMultipartConfig(data.multipart ?? null);
                     setQuestionSelection((current) =>
                         withTotalMarks({
                             ...current,
+                            multipart: data.multipart
+                                ? current.multipart?.length
+                                    ? current.multipart.map(
+                                          (selection, index) =>
+                                              currentMultipartSelection(
+                                                  selection,
+                                                  data.multipart as MultipartConfig,
+                                                  selection.id ||
+                                                      `multipart_${index + 1}`,
+                                              ),
+                                      )
+                                    : [
+                                          currentMultipartSelection(
+                                              undefined,
+                                              data.multipart,
+                                              'multipart_1',
+                                          ),
+                                      ]
+                                : undefined,
                             sections: mergeQuestionSections(
                                 data.sections,
                                 current.sections,
@@ -2375,6 +2652,7 @@ export default function GeneratePaper({
                         'Unable to load question counts. Please try again.',
                     );
                     setQuestionTypePairings([]);
+                    setMultipartConfig(null);
                     setQuestionSelection((current) =>
                         withTotalMarks({ ...current, sections: [] }),
                     );
@@ -2468,7 +2746,7 @@ export default function GeneratePaper({
                     const groupTypeIds =
                         savedGroupTypeIds.length > 1
                             ? savedGroupTypeIds
-                            : pairing?.questionTypeIds ?? [];
+                            : (pairing?.questionTypeIds ?? []);
                     const validPairing =
                         typeof match.orPairingId === 'number' &&
                         groupTypeIds.length > 1 &&
@@ -2480,6 +2758,7 @@ export default function GeneratePaper({
                               (typeId) => typeId !== section.questionTypeId,
                           )
                         : [];
+
                     return {
                         ...section,
                         columnPerRow: match.columns ?? section.columnPerRow,
@@ -2487,9 +2766,9 @@ export default function GeneratePaper({
                             ? match.orPairingId
                             : section.orPairingId,
                         orQuestionTypeId: validPairing
-                            ? match.orQuestionTypeId ??
+                            ? (match.orQuestionTypeId ??
                               alternativeTypeIds[0] ??
-                              null
+                              null)
                             : section.orQuestionTypeId,
                         orGroupTypeIds: validPairing
                             ? groupTypeIds
@@ -2699,11 +2978,7 @@ export default function GeneratePaper({
         });
         setQuestionPoolsByType(savedPaper.questionPoolsByType ?? {});
         setQuestionSelection(
-            savedPaper.questionSelection ?? {
-                globalFilters: {},
-                sections: [],
-                totalMarks: 0,
-            },
+            normalizeQuestionSelection(savedPaper.questionSelection),
         );
         setSelected(deserializeChapterSelection(savedPaper.chapterSelection));
 
@@ -2742,9 +3017,11 @@ export default function GeneratePaper({
         setQuestionSelection({
             globalFilters: createGlobalFilters(sourceFilters),
             sections: [],
+            multipart: undefined,
             totalMarks: 0,
         });
         setQuestionTypePairings([]);
+        setMultipartConfig(null);
         setManualPickerTarget(null);
         setManualQuestions([]);
         setManualQuestionError(null);
@@ -2976,6 +3253,53 @@ export default function GeneratePaper({
         }
     }
 
+    function handleMultipartAutoPickChange(
+        selectionId: string,
+        enabled: boolean,
+    ) {
+        setQuestionSelection((current) => ({
+            ...current,
+            multipart: current.multipart?.map((selection) =>
+                selection.id === selectionId
+                    ? {
+                          ...selection,
+                          selectionMode: enabled ? 'automatic' : 'manual',
+                      }
+                    : selection,
+            ),
+        }));
+
+        if (
+            enabled &&
+            manualPickerTarget?.sectionId.startsWith(
+                `multipart_${selectionId}_`,
+            )
+        ) {
+            closeManualQuestionPicker();
+        }
+    }
+    function addMultipartCard() {
+        if (!multipartConfig) {
+            return;
+        }
+
+        setQuestionSelection((current) => {
+            const selections = current.multipart ?? [];
+            const selectionId = `multipart_${Date.now()}_${selections.length + 1}`;
+
+            return withTotalMarks({
+                ...current,
+                multipart: [
+                    ...selections,
+                    currentMultipartSelection(
+                        undefined,
+                        multipartConfig,
+                        selectionId,
+                    ),
+                ],
+            });
+        });
+    }
     function openManualQuestionPicker(
         sectionId: string,
         rowId: string,
@@ -3099,13 +3423,23 @@ export default function GeneratePaper({
                                 toNumber(item.row.marksPerQuestion) > 0,
                         ),
                 );
+            const multipartTypeIds = multipartConfig
+                ? [
+                      ...new Set(
+                          (questionSelection.multipart ?? []).flatMap(
+                              (selection) => selection.partTypeIds,
+                          ),
+                      ),
+                  ]
+                : [];
             const questionTypeIds = [
-                ...new Set(
-                    activeRows.flatMap((item) => [
+                ...new Set([
+                    ...activeRows.flatMap((item) => [
                         item.section.questionTypeId,
                         ...orAlternativeTypeIds(item.section),
                     ]),
-                ),
+                    ...multipartTypeIds,
+                ]),
             ];
             const poolEntries = await Promise.all(
                 questionTypeIds.map(async (questionTypeId) => [
@@ -3216,7 +3550,7 @@ export default function GeneratePaper({
                 };
             }
 
-            const sections = activeRows.flatMap(
+            const standardSections = activeRows.flatMap(
                 ({ section, row }): GeneratedPaperSection[] => {
                     const mode = questionSectionSelectionMode(section);
                     const primaryQuestions = selectQuestions(
@@ -3230,7 +3564,9 @@ export default function GeneratePaper({
                     const alternatives = alternativeIds
                         .map((typeId) => sectionsByType.get(typeId))
                         .filter(
-                            (candidate): candidate is QuestionSelectionSection =>
+                            (
+                                candidate,
+                            ): candidate is QuestionSelectionSection =>
                                 candidate !== undefined,
                         );
 
@@ -3259,7 +3595,9 @@ export default function GeneratePaper({
                     const groupId = 'or_' + section.id + '_' + row.id;
                     const groupTypeIds = [
                         section.questionTypeId,
-                        ...alternatives.map((alternative) => alternative.questionTypeId),
+                        ...alternatives.map(
+                            (alternative) => alternative.questionTypeId,
+                        ),
                     ];
                     const generatedAlternatives = alternatives.map(
                         (alternative) =>
@@ -3301,7 +3639,8 @@ export default function GeneratePaper({
                             {
                                 orGroupId: groupId,
                                 orPairingId: section.orPairingId,
-                                orQuestionTypeId: alternatives[0].questionTypeId,
+                                orQuestionTypeId:
+                                    alternatives[0].questionTypeId,
                                 orGroupTypeIds: groupTypeIds,
                                 orRole: 'primary',
                                 orLabel,
@@ -3310,7 +3649,89 @@ export default function GeneratePaper({
                         ...generatedAlternatives,
                     ];
                 },
-            );            setQuestionPoolsByType(pools);
+            );
+            const multipartSelections = multipartConfig
+                ? (questionSelection.multipart ?? [])
+                : [];
+            const multipartSections: GeneratedPaperSection[] = multipartConfig
+                ? multipartSelections.map((selection) => {
+                      const configuredParts = selection.rows.filter(
+                          (part) => typeof part.questionTypeId === 'number',
+                      );
+                      const parts = configuredParts.map((part, partIndex) => {
+                          const type = multipartConfig.partTypes.find(
+                              (item) => item.id === part.questionTypeId,
+                          );
+                          const selectedQuestions = selectQuestions(
+                              part.questionTypeId as number,
+                              part.selectedQuestionIds,
+                              1,
+                              type?.name ?? 'Multipart question type',
+                              selection.selectionMode,
+                          );
+
+                          return {
+                              key: String.fromCharCode(65 + partIndex),
+                              typeId: part.questionTypeId,
+                              typeTitle: type?.name ?? 'Question',
+                              typeTitleEnglish:
+                                  type?.headingEnglish || type?.name,
+                              typeTitleUrdu:
+                                  type?.headingUrdu || type?.nameUrdu,
+                              marksEach: toNumber(part.marksPerQuestion),
+                              question: paperQuestionFromManual(
+                                  selectedQuestions[0],
+                                  nextPaperQuestionId('multipart_q'),
+                              ),
+                          };
+                      });
+                      const marksEach = parts.reduce(
+                          (sum, part) => sum + part.marksEach,
+                          0,
+                      );
+
+                      return {
+                          id: `multipart_${selection.id}`,
+                          questionTypeId: null,
+                          category: 'Subjective Questions',
+                          title:
+                              multipartConfig.headingEnglish ||
+                              'Multipart questions',
+                          titleEnglish:
+                              chapterMedium !== 'Urdu'
+                                  ? multipartConfig.headingEnglish ||
+                                    'Multipart questions'
+                                  : null,
+                          titleUrdu:
+                              chapterMedium !== 'English'
+                                  ? multipartConfig.headingUrdu
+                                  : null,
+                          requiredQuestions: parts.length,
+                          totalQuestions: 1,
+                          marksEach,
+                          questions: [],
+                          columns: 1,
+                          multipart: {
+                              choiceCount: 1,
+                              marksEach,
+                              headingEnglish: multipartConfig.headingEnglish,
+                              headingUrdu: multipartConfig.headingUrdu,
+                              rows: [{ parts }],
+                          },
+                          orGroupId: null,
+                          orPairingId: null,
+                          orQuestionTypeId: null,
+                          orGroupTypeIds: null,
+                          orRole: null,
+                          orLabel: null,
+                      };
+                  })
+                : [];
+            const sections: GeneratedPaperSection[] = [
+                ...standardSections,
+                ...multipartSections,
+            ];
+            setQuestionPoolsByType(pools);
             setGeneratedPaper({
                 id: `paper_${Date.now()}`,
                 header: {
@@ -3418,7 +3839,9 @@ export default function GeneratePaper({
             settings: normalizePaperSettings(draft.paper.settings),
         });
         setQuestionPoolsByType(draft.questionPoolsByType);
-        setQuestionSelection(draft.questionSelection);
+        setQuestionSelection(
+            normalizeQuestionSelection(draft.questionSelection),
+        );
         setSelected(deserializeChapterSelection(draft.chapterSelection));
         setPattern(draft.meta.pattern);
         setKlass(draft.meta.klass);
@@ -4443,6 +4866,48 @@ export default function GeneratePaper({
             alternativeTypeId,
         } = activeManualPickerRow;
 
+        if (
+            activeSection.id.startsWith('multipart_') &&
+            activeManualPickerRow.multipartSelectionId
+        ) {
+            const selectionId = activeManualPickerRow.multipartSelectionId;
+
+            setQuestionSelection((current) =>
+                withTotalMarks({
+                    ...current,
+                    multipart: current.multipart?.map((selection) =>
+                        selection.id === selectionId
+                            ? {
+                                  ...selection,
+                                  rows: selection.rows.map((part) =>
+                                      part.id === activeRow.id
+                                          ? {
+                                                ...part,
+                                                selectedQuestionIds:
+                                                    part.selectedQuestionIds.includes(
+                                                        questionId,
+                                                    )
+                                                        ? part.selectedQuestionIds.filter(
+                                                              (id) =>
+                                                                  id !==
+                                                                  questionId,
+                                                          )
+                                                        : [
+                                                              ...part.selectedQuestionIds,
+                                                              questionId,
+                                                          ],
+                                            }
+                                          : part,
+                                  ),
+                              }
+                            : selection,
+                    ),
+                }),
+            );
+
+            return;
+        }
+
         setQuestionSelection((current) => ({
             ...current,
             sections: current.sections.map((section) =>
@@ -4462,7 +4927,8 @@ export default function GeneratePaper({
                                             alternativeTypeId,
                                         )
                                       : row.selectedQuestionIds;
-                              const isSelected = selectedIds.includes(questionId);
+                              const isSelected =
+                                  selectedIds.includes(questionId);
 
                               if (isSelected) {
                                   const nextIds = selectedIds.filter(
@@ -4474,22 +4940,28 @@ export default function GeneratePaper({
                                       typeof alternativeTypeId === 'number'
                                   ) {
                                       const nextByType = {
-                                          ...(row.orSelectedQuestionIdsByType ?? {}),
+                                          ...(row.orSelectedQuestionIdsByType ??
+                                              {}),
                                           [String(alternativeTypeId)]: nextIds,
                                       };
 
                                       return {
                                           ...row,
-                                          orSelectedQuestionIdsByType: nextByType,
+                                          orSelectedQuestionIdsByType:
+                                              nextByType,
                                           orSelectedQuestionIds:
-                                              orAlternativeTypeIds(activeSection)[0] ===
-                                              alternativeTypeId
+                                              orAlternativeTypeIds(
+                                                  activeSection,
+                                              )[0] === alternativeTypeId
                                                   ? nextIds
                                                   : row.orSelectedQuestionIds,
                                       };
                                   }
 
-                                  return { ...row, selectedQuestionIds: nextIds };
+                                  return {
+                                      ...row,
+                                      selectedQuestionIds: nextIds,
+                                  };
                               }
 
                               if (
@@ -4506,7 +4978,8 @@ export default function GeneratePaper({
                                   typeof alternativeTypeId === 'number'
                               ) {
                                   const nextByType = {
-                                      ...(row.orSelectedQuestionIdsByType ?? {}),
+                                      ...(row.orSelectedQuestionIdsByType ??
+                                          {}),
                                       [String(alternativeTypeId)]: nextIds,
                                   };
 
@@ -4514,8 +4987,9 @@ export default function GeneratePaper({
                                       ...row,
                                       orSelectedQuestionIdsByType: nextByType,
                                       orSelectedQuestionIds:
-                                          orAlternativeTypeIds(activeSection)[0] ===
-                                          alternativeTypeId
+                                          orAlternativeTypeIds(
+                                              activeSection,
+                                          )[0] === alternativeTypeId
                                               ? nextIds
                                               : row.orSelectedQuestionIds,
                                   };
@@ -4533,6 +5007,7 @@ export default function GeneratePaper({
 
         if (selectedIds.length < 2) {
             updateOrPairing(sectionId, null);
+
             return;
         }
 
@@ -4691,7 +5166,9 @@ export default function GeneratePaper({
             );
             const memberIds = group?.questionTypeIds ?? [];
             const members = memberIds.map((id) =>
-                current.sections.find((section) => section.questionTypeId === id),
+                current.sections.find(
+                    (section) => section.questionTypeId === id,
+                ),
             );
 
             if (
@@ -4729,36 +5206,40 @@ export default function GeneratePaper({
 
             return withTotalMarks({
                 ...current,
-                sections: current.sections.map((section) => {
-                    const isMember = memberIdSet.has(section.questionTypeId);
-                    const isCurrentGroup =
-                        section.orPairingId === primary.orPairingId &&
-                        typeof primary.orPairingId === 'number';
+                sections: current.sections
+                    .map((section) => {
+                        const isMember = memberIdSet.has(
+                            section.questionTypeId,
+                        );
+                        const isCurrentGroup =
+                            section.orPairingId === primary.orPairingId &&
+                            typeof primary.orPairingId === 'number';
 
-                    if (isMember || isCurrentGroup) {
-                        return clearGroupState(section);
-                    }
+                        if (isMember || isCurrentGroup) {
+                            return clearGroupState(section);
+                        }
 
-                    return section;
-                }).map((section) =>
-                    section.id === primary.id
-                        ? {
-                              ...section,
-                              orPairingId: group.id,
-                              orQuestionTypeId: alternativeIds[0] ?? null,
-                              orGroupTypeIds: memberIds,
-                              orAlternativeQuestionTypeIds: alternativeIds,
-                              rows: normalizeSectionRows(
-                                  section.rows,
-                                  availableCount,
-                              ).map((row) => ({
-                                  ...row,
-                                  orSelectedQuestionIds: [],
-                                  orSelectedQuestionIdsByType: nextByType,
-                              })),
-                          }
-                        : section,
-                ),
+                        return section;
+                    })
+                    .map((section) =>
+                        section.id === primary.id
+                            ? {
+                                  ...section,
+                                  orPairingId: group.id,
+                                  orQuestionTypeId: alternativeIds[0] ?? null,
+                                  orGroupTypeIds: memberIds,
+                                  orAlternativeQuestionTypeIds: alternativeIds,
+                                  rows: normalizeSectionRows(
+                                      section.rows,
+                                      availableCount,
+                                  ).map((row) => ({
+                                      ...row,
+                                      orSelectedQuestionIds: [],
+                                      orSelectedQuestionIdsByType: nextByType,
+                                  })),
+                              }
+                            : section,
+                    ),
             });
         });
     }
@@ -4778,6 +5259,13 @@ export default function GeneratePaper({
                     orSelectedQuestionIdsByType: {},
                 })),
             })),
+            multipart: current.multipart?.map((selection) => ({
+                ...selection,
+                rows: selection.rows.map((part) => ({
+                    ...part,
+                    selectedQuestionIds: [],
+                })),
+            })),
         }));
     }
 
@@ -4791,6 +5279,13 @@ export default function GeneratePaper({
                     selectedQuestionIds: [],
                     orSelectedQuestionIds: [],
                     orSelectedQuestionIdsByType: {},
+                })),
+            })),
+            multipart: current.multipart?.map((selection) => ({
+                ...selection,
+                rows: selection.rows.map((part) => ({
+                    ...part,
+                    selectedQuestionIds: [],
                 })),
             })),
         }));
@@ -5024,102 +5519,132 @@ export default function GeneratePaper({
                             category === 'Subjective Questions'
                                 ? (() => {
                                       const candidateGroups =
-                                          questionTypePairings.filter((group) => {
-                                              if (
-                                                  !group.questionTypeIds.includes(
-                                                      section.questionTypeId,
-                                                  )
-                                              ) {
-                                                  return false;
-                                              }
+                                          questionTypePairings.filter(
+                                              (group) => {
+                                                  if (
+                                                      !group.questionTypeIds.includes(
+                                                          section.questionTypeId,
+                                                      )
+                                                  ) {
+                                                      return false;
+                                                  }
 
-                                              const members = group.questionTypeIds
-                                                  .map((typeId) =>
-                                                      sectionsByType.get(typeId),
-                                                  )
-                                                  .filter(
-                                                      (
-                                                          candidate,
-                                                      ): candidate is QuestionSelectionSection =>
-                                                          candidate !== undefined,
+                                                  const members =
+                                                      group.questionTypeIds
+                                                          .map((typeId) =>
+                                                              sectionsByType.get(
+                                                                  typeId,
+                                                              ),
+                                                          )
+                                                          .filter(
+                                                              (
+                                                                  candidate,
+                                                              ): candidate is QuestionSelectionSection =>
+                                                                  candidate !==
+                                                                  undefined,
+                                                          );
+
+                                                  return (
+                                                      members.length ===
+                                                          group.questionTypeIds
+                                                              .length &&
+                                                      !members.some(
+                                                          (candidate) =>
+                                                              typeof candidate.orPairingId ===
+                                                                  'number' &&
+                                                              candidate.orPairingId !==
+                                                                  section.orPairingId,
+                                                      )
                                                   );
-
-                                              return (
-                                                  members.length ===
-                                                      group.questionTypeIds.length &&
-                                                  !members.some(
-                                                      (candidate) =>
-                                                          typeof candidate.orPairingId ===
-                                                              'number' &&
-                                                          candidate.orPairingId !==
-                                                              section.orPairingId,
-                                                  )
-                                              );
-                                          });
+                                              },
+                                          );
                                       const selectedTypeIds = new Set(
                                           orGroupTypeIds(section),
                                       );
                                       const optionIds = new Set<number>();
 
                                       candidateGroups.forEach((group) => {
-                                          group.questionTypeIds.forEach((typeId) => {
-                                              if (typeId !== section.questionTypeId) {
-                                                  optionIds.add(typeId);
-                                              }
-                                          });
+                                          group.questionTypeIds.forEach(
+                                              (typeId) => {
+                                                  if (
+                                                      typeId !==
+                                                      section.questionTypeId
+                                                  ) {
+                                                      optionIds.add(typeId);
+                                                  }
+                                              },
+                                          );
                                       });
 
                                       return Array.from(optionIds)
                                           .map((typeId) => {
-                                              const member = sectionsByType.get(typeId);
+                                              const member =
+                                                  sectionsByType.get(typeId);
 
                                               if (!member) {
                                                   return null;
                                               }
 
-                                              const canSelect = candidateGroups.some(
-                                                  (group) => {
-                                                      const proposed = new Set([
-                                                          ...selectedTypeIds,
-                                                          typeId,
-                                                      ]);
+                                              const canSelect =
+                                                  candidateGroups.some(
+                                                      (group) => {
+                                                          const proposed =
+                                                              new Set([
+                                                                  ...selectedTypeIds,
+                                                                  typeId,
+                                                              ]);
 
-                                                      return Array.from(proposed).every(
-                                                          (candidateId) =>
-                                                              group.questionTypeIds.includes(
-                                                                  candidateId,
-                                                              ),
-                                                      );
-                                                  },
-                                              );
+                                                          return Array.from(
+                                                              proposed,
+                                                          ).every(
+                                                              (candidateId) =>
+                                                                  group.questionTypeIds.includes(
+                                                                      candidateId,
+                                                                  ),
+                                                          );
+                                                      },
+                                                  );
 
                                               return {
                                                   id: typeId,
                                                   label: plainQuestionText(
-                                                      englishQuestionTypeTitle(member),
+                                                      englishQuestionTypeTitle(
+                                                          member,
+                                                      ),
                                                   ),
                                                   disabled:
-                                                      !selectedTypeIds.has(typeId) &&
-                                                      !canSelect,
+                                                      !selectedTypeIds.has(
+                                                          typeId,
+                                                      ) && !canSelect,
                                               } satisfies OrTypeOption;
                                           })
                                           .filter(
                                               (
                                                   option,
-                                              ): option is OrTypeOption =>
-                                                  option !== null,
+                                              ): option is {
+                                                  id: number;
+                                                  label: string;
+                                                  disabled: boolean;
+                                              } => option !== null,
                                           )
                                           .sort((left, right) =>
-                                              left.label.localeCompare(right.label),
+                                              left.label.localeCompare(
+                                                  right.label,
+                                              ),
                                           );
                                   })()
                                 : [];
-                        const alternativeSections = orAlternativeTypeIds(section)
+                        const alternativeSections = orAlternativeTypeIds(
+                            section,
+                        )
                             .map((typeId) => sectionsByType.get(typeId))
                             .filter(
-                                (candidate): candidate is QuestionSelectionSection =>
+                                (
+                                    candidate,
+                                ): candidate is QuestionSelectionSection =>
                                     candidate !== undefined,
                             );
+
                         return (
                             <QuestionSelectionCard
                                 key={section.id}
@@ -5640,6 +6165,7 @@ export default function GeneratePaper({
 
                                     {!loadingQuestionSections &&
                                         !questionSectionError &&
+                                        !multipartConfig &&
                                         questionSelection.sections.length ===
                                             0 && (
                                             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70 py-14 text-center dark:border-slate-700 dark:bg-slate-950/40">
@@ -5652,17 +6178,83 @@ export default function GeneratePaper({
                                         )}
 
                                     {!loadingQuestionSections &&
-                                        questionSelection.sections.length >
-                                            0 && (
-                                            <div className="space-y-5 pt-2">
-                                                {renderQuestionCategory(
-                                                    'Objective Questions',
-                                                )}
-                                                {renderQuestionCategory(
-                                                    'Subjective Questions',
-                                                )}
-                                            </div>
+                                        !questionSectionError &&
+                                        renderQuestionCategory(
+                                            'Objective Questions',
                                         )}
+                                    {!loadingQuestionSections &&
+                                        !questionSectionError &&
+                                        renderQuestionCategory(
+                                            'Subjective Questions',
+                                        )}
+
+                                    {!loadingQuestionSections &&
+                                    !questionSectionError &&
+                                    multipartConfig &&
+                                    questionSelection.multipart?.length ? (
+                                        <div className="space-y-2.5">
+                                            <CategoryDivider
+                                                title="Multi Part Questions"
+                                                action={
+                                                    <button
+                                                        type="button"
+                                                        onClick={
+                                                            addMultipartCard
+                                                        }
+                                                        aria-label="Add another multipart card"
+                                                        title="Add another multipart card"
+                                                        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-slate-500/10"
+                                                    >
+                                                        <PlusIcon className="size-3.5" />
+                                                    </button>
+                                                }
+                                            />
+                                            {questionSelection.multipart.map(
+                                                (multipart) => (
+                                                    <MultipartSelectionCard
+                                                        key={multipart.id}
+                                                        config={multipartConfig}
+                                                        value={multipart}
+                                                        onChange={(
+                                                            nextMultipart,
+                                                        ) =>
+                                                            setQuestionSelection(
+                                                                (current) => ({
+                                                                    ...current,
+                                                                    multipart:
+                                                                        current.multipart?.map(
+                                                                            (
+                                                                                selection,
+                                                                            ) =>
+                                                                                selection.id ===
+                                                                                multipart.id
+                                                                                    ? nextMultipart
+                                                                                    : selection,
+                                                                        ),
+                                                                }),
+                                                            )
+                                                        }
+                                                        onAutoPickChange={(
+                                                            enabled,
+                                                        ) =>
+                                                            handleMultipartAutoPickChange(
+                                                                multipart.id,
+                                                                enabled,
+                                                            )
+                                                        }
+                                                        onOpenManualPicker={(
+                                                            rowId,
+                                                        ) =>
+                                                            openManualQuestionPicker(
+                                                                `multipart_${multipart.id}_${rowId}`,
+                                                                rowId,
+                                                            )
+                                                        }
+                                                    />
+                                                ),
+                                            )}
+                                        </div>
+                                    ) : null}
                                 </div>
                             </section>
                         )}
@@ -7406,6 +7998,25 @@ function GeneratedPaperView({
         canMoveUp: boolean,
         canMoveDown: boolean,
     ): ReactNode {
+        if (section.multipart) {
+            const firstMultipartIndex = targetPaper.sections.findIndex(
+                (candidate) =>
+                    candidate.multipart !== null &&
+                    candidate.multipart !== undefined,
+            );
+
+            return (
+                <MultipartSection
+                    section={section}
+                    headingNumber={sectionHeadingNumber(
+                        targetPaper.sections,
+                        sectionIndex,
+                    )}
+                    showHeading={sectionIndex === firstMultipartIndex}
+                />
+            );
+        }
+
         const Template = pickSectionTemplate(
             settings.questionLayout,
             section.category,
@@ -7557,7 +8168,8 @@ function GeneratedPaperView({
                             ? {
                                   gridTemplateColumns: renderedGroupSections
                                       .map((_, index) =>
-                                          index === renderedGroupSections.length - 1
+                                          index ===
+                                          renderedGroupSections.length - 1
                                               ? 'minmax(0, 1fr)'
                                               : 'minmax(0, 1fr) auto',
                                       )
@@ -8541,11 +9153,17 @@ function OrTypeMultiSelect({
             : 'Select OR types';
 
     return (
-        <details ref={detailsRef} className="group relative min-w-[15rem] flex-1 sm:w-64 sm:flex-none">
+        <details
+            ref={detailsRef}
+            className="group relative min-w-[15rem] flex-1 sm:w-64 sm:flex-none"
+        >
             <summary
-                className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 group-open:border-brand-500 group-open:ring-2 group-open:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700 dark:group-open:border-brand-400 dark:group-open:ring-brand-400/20 [&::-webkit-details-marker]:hidden"
+                className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition-colors group-open:border-brand-500 group-open:ring-2 group-open:ring-brand-500/20 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:group-open:border-brand-400 dark:group-open:ring-brand-400/20 dark:hover:border-slate-700 [&::-webkit-details-marker]:hidden"
                 aria-label="Select question types for the OR group"
-                title={selectedLabels.join(' OR ') || 'Select question types for the OR group'}
+                title={
+                    selectedLabels.join(' OR ') ||
+                    'Select question types for the OR group'
+                }
             >
                 <Link2Icon className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
                 <span className="min-w-0 flex-1 truncate text-left">
@@ -8554,7 +9172,6 @@ function OrTypeMultiSelect({
                 <ChevronDownIcon className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
             </summary>
             <div className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/30">
-
                 <div className="mt-1 max-h-64 overflow-y-auto">
                     {options.map((option) => {
                         const checked = selected.has(option.id);
@@ -8580,7 +9197,8 @@ function OrTypeMultiSelect({
                                         if (checked) {
                                             onChange(
                                                 selectedTypeIds.filter(
-                                                    (typeId) => typeId !== option.id,
+                                                    (typeId) =>
+                                                        typeId !== option.id,
                                                 ),
                                             );
                                         } else if (!option.disabled) {
@@ -8604,6 +9222,196 @@ function OrTypeMultiSelect({
                 </div>
             </div>
         </details>
+    );
+}
+function MultipartSelectionCard({
+    config,
+    value,
+    onChange,
+    onAutoPickChange,
+    onOpenManualPicker,
+}: {
+    config: MultipartConfig;
+    value: MultipartSelectionState;
+    onChange: (value: MultipartSelectionState) => void;
+    onAutoPickChange: (enabled: boolean) => void;
+    onOpenManualPicker: (rowId: string) => void;
+}) {
+    const typeOptions = config.partTypes.map((type) => ({
+        id: type.id,
+        label: type.name,
+    }));
+    const canAddPart = value.rows.length < config.maxParts;
+    const canDeletePart = value.rows.length > 2;
+
+    const updateRows = (rows: MultipartPartRow[]) => {
+        const configuredRows = rows.filter(
+            (row) => typeof row.questionTypeId === 'number',
+        );
+        const firstConfiguredRow = configuredRows[0];
+
+        onChange({
+            ...value,
+            rows,
+            partTypeIds: configuredRows.map(
+                (row) => row.questionTypeId as number,
+            ),
+            questionCount: '1',
+            choiceCount: '1',
+            marksPerPart: firstConfiguredRow?.marksPerQuestion ?? '',
+        });
+    };
+
+    const updateRow = (rowId: string, patch: Partial<MultipartPartRow>) => {
+        updateRows(
+            value.rows.map((row) =>
+                row.id === rowId ? { ...row, ...patch } : row,
+            ),
+        );
+    };
+
+    const addPart = () => {
+        if (!canAddPart) {
+            return;
+        }
+
+        const nextIndex = value.rows.length + 1;
+        updateRows([
+            ...value.rows,
+            createMultipartPartRow(`multipart_part_${nextIndex}`, null),
+        ]);
+    };
+
+    const deletePart = (rowId: string) => {
+        if (!canDeletePart) {
+            return;
+        }
+
+        updateRows(value.rows.filter((row) => row.id !== rowId));
+    };
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 transition-colors hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700 dark:hover:shadow-black/20">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-brand-500 dark:bg-slate-800 dark:text-brand-300">
+                        <LayersIcon className="size-4" />
+                    </div>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        Multi Part Questions
+                    </h4>
+                </div>
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                    <AutoPickSwitch
+                        enabled={value.selectionMode === 'automatic'}
+                        onChange={onAutoPickChange}
+                    />
+                    <button
+                        type="button"
+                        onClick={addPart}
+                        disabled={!canAddPart}
+                        aria-label="Add multipart part"
+                        title={
+                            canAddPart ? 'Add part' : 'Maximum parts reached'
+                        }
+                        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
+                    >
+                        <PlusIcon className="size-4" />
+                    </button>
+                </div>
+            </div>
+
+            <div className="mt-4 space-y-4">
+                {value.rows.map((row, index) => (
+                    <div
+                        key={row.id}
+                        className="grid gap-2.5 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
+                    >
+                        <div className="min-w-0">
+                            <p className="mb-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                Question Type
+                            </p>
+                            <FloatingCombobox
+                                label="Question Type"
+                                value={
+                                    typeOptions.find(
+                                        (option) =>
+                                            Number(option.id) ===
+                                            row.questionTypeId,
+                                    ) ?? null
+                                }
+                                options={typeOptions}
+                                onChange={(option) =>
+                                    updateRow(row.id, {
+                                        questionTypeId: option
+                                            ? Number(option.id)
+                                            : null,
+                                    })
+                                }
+                                placeholder="Select type"
+                            />
+                        </div>
+                        <NumberField
+                            label="Marks Each"
+                            value={row.marksPerQuestion}
+                            placeholder="0"
+                            onChange={(value) =>
+                                updateRow(row.id, { marksPerQuestion: value })
+                            }
+                        />
+                        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                            {value.selectionMode === 'manual' && (
+                                <button
+                                    type="button"
+                                    disabled={row.questionTypeId === null}
+                                    onClick={() => onOpenManualPicker(row.id)}
+                                    title={
+                                        rowTarget(row) === 0
+                                            ? 'Select a question manually'
+                                            : 'Select questions manually'
+                                    }
+                                    className={cn(
+                                        'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors',
+                                        row.selectedQuestionIds.length ===
+                                            rowTarget(row) && rowTarget(row) > 0
+                                            ? 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+                                    )}
+                                >
+                                    <ListChecksIcon className="size-3.5" />
+                                    {row.selectedQuestionIds.length}/
+                                    {rowTarget(row)} selected
+                                </button>
+                            )}
+                            <span className="inline-flex h-9 min-w-20 items-center justify-center rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+                                {lineTotal({
+                                    id: row.id,
+                                    requiredQuestions: row.requiredQuestions,
+                                    marksPerQuestion: row.marksPerQuestion,
+                                    choiceQuestions: row.choiceQuestions,
+                                    selectedQuestionIds: [],
+                                })}{' '}
+                                marks
+                            </span>
+                            <button
+                                type="button"
+                                disabled={!canDeletePart}
+                                onClick={() => deletePart(row.id)}
+                                aria-label={`Delete multipart part ${index + 1}`}
+                                title={
+                                    canDeletePart
+                                        ? 'Delete part'
+                                        : 'At least two parts are required'
+                                }
+                                className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10"
+                            >
+                                <Trash2Icon className="size-4" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 function QuestionSelectionCard({
@@ -8665,7 +9473,9 @@ function QuestionSelectionCard({
     const effectiveAvailableCount = hasAlternatives
         ? Math.min(
               section.availableCount,
-              ...alternativeSections.map((alternative) => alternative.availableCount),
+              ...alternativeSections.map(
+                  (alternative) => alternative.availableCount,
+              ),
           )
         : section.availableCount;
     const availabilitySection =
@@ -8826,10 +9636,11 @@ function QuestionSelectionCard({
                             )}
                             {!autoPick &&
                                 alternativeSections.map((alternative) => {
-                                    const selectedIds = rowOrSelectedQuestionIds(
-                                        row,
-                                        alternative.questionTypeId,
-                                    );
+                                    const selectedIds =
+                                        rowOrSelectedQuestionIds(
+                                            row,
+                                            alternative.questionTypeId,
+                                        );
                                     const alternativeTitle = plainQuestionText(
                                         englishQuestionTypeTitle(alternative),
                                     );
@@ -8854,7 +9665,8 @@ function QuestionSelectionCard({
                                             }
                                             className={cn(
                                                 'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap transition-colors',
-                                                selectedIds.length === rowTarget(row) &&
+                                                selectedIds.length ===
+                                                    rowTarget(row) &&
                                                     rowTarget(row) > 0
                                                     ? 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200'
                                                     : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-500/30 dark:hover:text-violet-300',
@@ -8862,7 +9674,8 @@ function QuestionSelectionCard({
                                         >
                                             <Link2Icon className="size-3.5" />
                                             OR {alternativeTitle}{' '}
-                                            {selectedIds.length}/{rowTarget(row)}
+                                            {selectedIds.length}/
+                                            {rowTarget(row)}
                                         </button>
                                     );
                                 })}

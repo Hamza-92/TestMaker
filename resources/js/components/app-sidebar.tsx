@@ -106,6 +106,10 @@ export function AppSidebar() {
                               title: 'OR Pairing Settings',
                               href: '/superadmin/question-type-pairings',
                           },
+                          {
+                              title: 'Multipart Settings',
+                              href: '/superadmin/multipart-question-settings',
+                          },
                       ],
                   },
               ]

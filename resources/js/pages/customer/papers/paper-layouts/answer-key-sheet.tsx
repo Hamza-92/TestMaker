@@ -137,6 +137,17 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                         sectionIndex,
                     );
 
+                    if (section.multipart) {
+                        return (
+                            <MultipartAnswers
+                                key={section.id}
+                                section={section}
+                                sectionNumber={sectionNumber}
+                                settings={settings}
+                            />
+                        );
+                    }
+
                     if (groupSections.length < 2) {
                         return (
                             <SectionAnswers
@@ -148,7 +159,8 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                         );
                     }
 
-                    const sideBySide = settings.orGroupLayout === 'side-by-side';
+                    const sideBySide =
+                        settings.orGroupLayout === 'side-by-side';
                     const label = resolveOrGroupLabel(
                         settings,
                         section.orLabel,
@@ -165,9 +177,7 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                                               section={groupSection}
                                               sectionNumber={sectionNumber}
                                               settings={settings}
-                                              showOrPrefix={
-                                                  index === 0
-                                              }
+                                              showOrPrefix={index === 0}
                                           />
                                       </div>,
                                   ]
@@ -209,7 +219,8 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                                     ? {
                                           gridTemplateColumns: groupSections
                                               .map((_, index) =>
-                                                  index === groupSections.length - 1
+                                                  index ===
+                                                  groupSections.length - 1
                                                       ? 'minmax(0, 1fr)'
                                                       : 'minmax(0, 1fr) auto',
                                               )
@@ -348,6 +359,60 @@ function SectionAnswers({
                             value={answerForQuestion(question)}
                             className="flex-1 break-words"
                         />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function MultipartAnswers({
+    section,
+    sectionNumber,
+    settings,
+}: {
+    section: GeneratedPaperSection;
+    sectionNumber: number;
+    settings: PaperSettings;
+}) {
+    const multipart = section.multipart;
+
+    if (!multipart) {
+        return null;
+    }
+
+    return (
+        <div>
+            <p
+                className="mb-1.5 text-sm font-semibold"
+                style={{ color: settings.textColor }}
+            >
+                <span>Q.{sectionNumber}</span>{' '}
+                <QuestionContent as="span" inline value={section.title} />
+            </p>
+            <div className="space-y-1">
+                {multipart.rows.map((row, rowIndex) => (
+                    <div
+                        key={`multipart-answer-${rowIndex}`}
+                        className="text-sm"
+                        style={{ color: settings.textColor }}
+                    >
+                        <span className="mr-2 font-medium">
+                            {sectionNumber}.{rowIndex + 1}
+                        </span>
+                        {row.parts.map((part) => (
+                            <span
+                                key={`${rowIndex}-${part.key}`}
+                                className="mr-4 inline-flex gap-1"
+                            >
+                                <span className="font-medium">{part.key})</span>
+                                <QuestionContent
+                                    as="span"
+                                    inline
+                                    value={answerForQuestion(part.question)}
+                                />
+                            </span>
+                        ))}
                     </div>
                 ))}
             </div>

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\PaperTemplate;
+use App\Models\MultipartQuestionSetting;
 use App\Models\Pattern;
 use App\Models\Question;
+use App\Models\QuestionType;
 use App\Models\QuestionTypeOrGroup;
 use App\Support\AppUserAccess;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
@@ -279,7 +281,51 @@ class GeneratePaperController extends Controller
         return response()->json([
             'sections' => $sections,
             'groups' => $groups,
+            'multipart' => $this->multipartSetting($scope, $availableSubjectiveTypeIds),
         ]);
+    }
+
+    private function multipartSetting(object $scope, $availableSubjectiveTypeIds): ?array
+    {
+        $setting = MultipartQuestionSetting::query()
+            ->where('pattern_id', (int) $scope->pattern_id)
+            ->where('class_id', (int) $scope->class_id)
+            ->where('subject_id', (int) $scope->subject_id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($setting === null) {
+            return null;
+        }
+
+        $typeIds = collect($setting->part_type_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $availableSubjectiveTypeIds->contains($id))
+            ->values();
+
+        if ($typeIds->count() < 2) {
+            return null;
+        }
+
+        $types = QuestionType::query()
+            ->whereIn('id', $typeIds)
+            ->get(['id', 'name', 'name_ur', 'heading_en', 'heading_ur'])
+            ->keyBy('id');
+
+        return [
+            'id' => $setting->id,
+            'maxParts' => min(5, max(2, (int) $setting->max_parts)),
+            'choiceCount' => min($typeIds->count(), max(1, (int) $setting->choice_count)),
+            'headingEnglish' => $setting->heading_en,
+            'headingUrdu' => $setting->heading_ur,
+            'partTypes' => $typeIds->map(fn (int $id) => [
+                'id' => $id,
+                'name' => $types->get($id)?->name,
+                'nameUrdu' => $types->get($id)?->name_ur,
+                'headingEnglish' => $types->get($id)?->heading_en,
+                'headingUrdu' => $types->get($id)?->heading_ur,
+            ])->filter(fn ($type) => $type['name'] !== null)->values()->all(),
+        ];
     }
 
     public function questions(Request $request): JsonResponse

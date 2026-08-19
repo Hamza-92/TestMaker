@@ -23,6 +23,7 @@ use App\Http\Controllers\Superadmin\PatternController;
 use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\QuestionTypePairingController;
+use App\Http\Controllers\Superadmin\MultipartQuestionSettingController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\SuperadminUserController;
 use App\Http\Controllers\Superadmin\TopicController;
@@ -216,6 +217,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('superadmin/question-type-pairings', [QuestionTypePairingController::class, 'store'])->name('superadmin.question-type-pairings.store')->middleware('permission:question_types.edit');
         Route::patch('superadmin/question-type-pairings/{group}', [QuestionTypePairingController::class, 'update'])->name('superadmin.question-type-pairings.update')->middleware('permission:question_types.edit');
         Route::delete('superadmin/question-type-pairings/{group}', [QuestionTypePairingController::class, 'destroy'])->name('superadmin.question-type-pairings.destroy')->middleware('permission:question_types.edit');
+        Route::get('superadmin/multipart-question-settings', [MultipartQuestionSettingController::class, 'index'])->name('superadmin.multipart-question-settings')->middleware('permission:question_types.view');
+        Route::post('superadmin/multipart-question-settings', [MultipartQuestionSettingController::class, 'store'])->name('superadmin.multipart-question-settings.store')->middleware('permission:question_types.edit');
+        Route::patch('superadmin/multipart-question-settings/{setting}', [MultipartQuestionSettingController::class, 'update'])->name('superadmin.multipart-question-settings.update')->middleware('permission:question_types.edit');
+        Route::delete('superadmin/multipart-question-settings/{setting}', [MultipartQuestionSettingController::class, 'destroy'])->name('superadmin.multipart-question-settings.destroy')->middleware('permission:question_types.edit');
         Route::get('superadmin/question-types/add', [QuestionTypeController::class, 'create'])->name('superadmin.question-types.add')->middleware('permission:question_types.create');
         Route::get('superadmin/question-types/objective', [QuestionTypeController::class, 'objectiveIndex'])->name('superadmin.question-types.objective')->middleware('permission:question_types.view');
         Route::get('superadmin/question-types/objective/add', [QuestionTypeController::class, 'createObjective'])->name('superadmin.question-types.objective.add')->middleware('permission:question_types.create');

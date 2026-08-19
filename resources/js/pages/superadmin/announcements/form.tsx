@@ -6,6 +6,7 @@ import {
     MegaphoneIcon,
     SaveIcon,
 } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -121,7 +122,7 @@ export default function AnnouncementForm({ announcement }: Props) {
     };
 
     const fieldError = (field: string) => errors[field as keyof typeof errors];
-    const previewStyle = {
+    const previewStyle: CSSProperties = {
         direction: data.banner_direction === 'rtl' ? 'rtl' : 'ltr',
         fontFamily:
             data.banner_font === 'urdu'
