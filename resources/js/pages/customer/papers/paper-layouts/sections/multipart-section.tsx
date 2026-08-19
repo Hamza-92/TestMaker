@@ -33,6 +33,35 @@ export function MultipartSection({
     const isBilingualHeading = headingEnglish !== '' && headingUrdu !== '';
     const isUrduHeading = headingUrdu !== '' && headingEnglish === '';
     const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
+    const groupChoiceCount = multipart.groupChoiceCount;
+    const groupQuestionCount =
+        multipart.groupQuestionCount ?? multipart.rows.length;
+    const showChoice =
+        typeof groupChoiceCount === 'number' &&
+        groupChoiceCount > 0 &&
+        groupChoiceCount <= groupQuestionCount;
+    const choiceMarks =
+        showChoice && typeof groupChoiceCount === 'number'
+            ? groupChoiceCount * multipart.marksEach
+            : null;
+    const choiceMarksLabel =
+        choiceMarks === null || typeof groupChoiceCount !== 'number'
+            ? ''
+            : ' (' +
+              multipart.marksEach +
+              ' x ' +
+              groupChoiceCount +
+              ' = ' +
+              choiceMarks +
+              ')';
+    const choiceLabelEnglish =
+        showChoice && typeof groupChoiceCount === 'number'
+            ? '[Any ' + groupChoiceCount + ']' + choiceMarksLabel
+            : '';
+    const choiceLabelUrdu =
+        showChoice && typeof groupChoiceCount === 'number'
+            ? '[کوئی سے بھی ' + groupChoiceCount + ']' + choiceMarksLabel
+            : '';
 
     return (
         <section data-paper-multipart className="space-y-1">
@@ -73,6 +102,13 @@ export function MultipartSection({
                                     : 'align-baseline'
                             }
                         />
+                        {showChoice && (
+                            <span className="ml-1 align-baseline whitespace-nowrap">
+                                {isUrduHeading
+                                    ? choiceLabelUrdu
+                                    : choiceLabelEnglish}
+                            </span>
+                        )}
                     </div>
                     {isBilingualHeading && <div />}
                     {isBilingualHeading && (
@@ -87,6 +123,11 @@ export function MultipartSection({
                                 inline
                                 className="text-right align-baseline"
                             />
+                            {showChoice && (
+                                <span className="mr-1 align-baseline whitespace-nowrap">
+                                    {choiceLabelUrdu}
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>

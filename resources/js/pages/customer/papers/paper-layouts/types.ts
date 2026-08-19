@@ -52,6 +52,10 @@ export interface GeneratedMultipartRow {
 export interface GeneratedMultipartSection {
     choiceCount: number;
     marksEach: number;
+    /** Shared multipart group metadata. Older papers may not have these fields. */
+    groupId?: string | null;
+    groupChoiceCount?: number | null;
+    groupQuestionCount?: number | null;
     headingEnglish?: string | null;
     headingUrdu?: string | null;
     rows: GeneratedMultipartRow[];

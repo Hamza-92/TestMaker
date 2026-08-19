@@ -1,3 +1,10 @@
+import {
+    Combobox,
+    ComboboxButton,
+    ComboboxOption,
+    ComboboxOptions,
+} from '@headlessui/react';
+
 import { Head, usePage } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
@@ -400,6 +407,7 @@ function questionSectionSelectionMode(
 }
 interface QuestionSelectionState {
     multipart?: MultipartSelectionState[];
+    multipartChoiceCount?: number | null;
     globalFilters: Record<SourceFilterKey, boolean>;
     sections: QuestionSelectionSection[];
     totalMarks: number;
@@ -618,6 +626,7 @@ function normalizeQuestionSelection(value: unknown): QuestionSelectionState {
         globalFilters: {},
         sections: [],
         multipart: undefined,
+        multipartChoiceCount: null,
         totalMarks: 0,
     };
 
@@ -646,6 +655,11 @@ function normalizeQuestionSelection(value: unknown): QuestionSelectionState {
                 : {},
         sections: Array.isArray(source.sections) ? source.sections : [],
         multipart,
+        multipartChoiceCount:
+            typeof source.multipartChoiceCount === 'number' &&
+            Number.isFinite(source.multipartChoiceCount)
+                ? Math.max(1, Math.floor(source.multipartChoiceCount))
+                : null,
         totalMarks:
             typeof source.totalMarks === 'number' &&
             Number.isFinite(source.totalMarks)
@@ -1118,20 +1132,103 @@ function paperOptionsFromContent(
         .filter((option): option is PaperQuestionOption => option !== null);
 }
 
-function paperTotalMarks(paper: GeneratedPaper): number {
-    return paper.sections.reduce(
-        (sum, section) =>
-            section.orRole === 'alternative'
-                ? sum
-                : sum +
-                  (section.multipart
-                      ? section.multipart.rows.length *
-                        section.multipart.choiceCount *
-                        section.multipart.marksEach
-                      : section.requiredQuestions * section.marksEach),
+function multipartSelectionMarks(selection: MultipartSelectionState): number {
+    return selection.rows.reduce(
+        (sum, row) => sum + toNumber(row.marksPerQuestion),
         0,
     );
 }
+
+function multipartChoiceMarks(state: QuestionSelectionState): number {
+    const selections = state.multipart ?? [];
+    const marks = selections.map(multipartSelectionMarks);
+
+    if (marks.length === 0) {
+        return 0;
+    }
+
+    const choiceCount = state.multipartChoiceCount;
+    const requiredCount =
+        typeof choiceCount === 'number'
+            ? Math.max(1, Math.min(choiceCount, marks.length))
+            : marks.length;
+    const allMarksMatch = marks.every((value) => value === marks[0]);
+
+    return requiredCount < marks.length && allMarksMatch
+        ? requiredCount * marks[0]
+        : marks.reduce((sum, value) => sum + value, 0);
+}
+
+function multipartChoiceMarksMismatch(state: QuestionSelectionState): boolean {
+    const selections = state.multipart ?? [];
+    const choiceCount = state.multipartChoiceCount;
+
+    if (
+        typeof choiceCount !== 'number' ||
+        choiceCount >= selections.length ||
+        selections.length === 0
+    ) {
+        return false;
+    }
+
+    const marks = selections.map(multipartSelectionMarks);
+
+    return (
+        marks.every((value) => value > 0) &&
+        marks.some((value) => value !== marks[0])
+    );
+}
+
+function paperTotalMarks(paper: GeneratedPaper): number {
+    const countedMultipartGroups = new Set<string>();
+
+    return paper.sections.reduce((sum, section) => {
+        if (section.orRole === 'alternative') {
+            return sum;
+        }
+
+        if (!section.multipart) {
+            return sum + section.requiredQuestions * section.marksEach;
+        }
+
+        const groupId = section.multipart.groupId;
+
+        if (!groupId) {
+            return (
+                sum +
+                section.multipart.rows.length *
+                    section.multipart.choiceCount *
+                    section.multipart.marksEach
+            );
+        }
+
+        if (countedMultipartGroups.has(groupId)) {
+            return sum;
+        }
+
+        countedMultipartGroups.add(groupId);
+        const groupSections = paper.sections.filter(
+            (candidate) => candidate.multipart?.groupId === groupId,
+        );
+        const marks = groupSections.map(
+            (candidate) => candidate.multipart?.marksEach ?? 0,
+        );
+        const allMarksMatch = marks.every((value) => value === marks[0]);
+        const choiceCount = groupSections[0]?.multipart?.groupChoiceCount;
+
+        if (
+            typeof choiceCount === 'number' &&
+            choiceCount > 0 &&
+            choiceCount < marks.length &&
+            allMarksMatch
+        ) {
+            return sum + choiceCount * marks[0];
+        }
+
+        return sum + marks.reduce((total, value) => total + value, 0);
+    }, 0);
+}
+
 function sectionTotal(section: QuestionSelectionSection): number {
     return section.rows.reduce((sum, row) => sum + lineTotal(row), 0);
 }
@@ -1150,19 +1247,7 @@ function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
                         ? sum
                         : sum + sectionTotal(section),
                 0,
-            ) +
-            (state.multipart
-                ? state.multipart.reduce(
-                      (total, selection) =>
-                          total +
-                          selection.rows.reduce(
-                              (sum, row) =>
-                                  sum + toNumber(row.marksPerQuestion),
-                              0,
-                          ),
-                      0,
-                  )
-                : 0),
+            ) + multipartChoiceMarks(state),
     };
 }
 function sortIncomingQuestionTypes(
@@ -1698,6 +1783,99 @@ function CategoryDivider({
     );
 }
 
+function MultipartChoiceControl({
+    value,
+    count,
+    onChange,
+}: {
+    value: number | null;
+    count: number;
+    onChange: (value: string) => void;
+}) {
+    const selectedValue = value === null ? 'all' : String(value);
+    const selectedLabel = value === null ? 'All' : 'Any ' + value;
+
+    return (
+        <label className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-medium">Choice</span>
+            <Combobox
+                value={selectedValue}
+                onChange={(next: string | null) =>
+                    onChange(next === null || next === 'all' ? '' : next)
+                }
+            >
+                <div className="relative">
+                    <ComboboxButton
+                        aria-label="Multipart question choice"
+                        className="group/choice flex h-7 min-w-20 cursor-pointer items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 transition-colors outline-none hover:border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:focus:border-brand-400 dark:focus:ring-brand-400/20"
+                    >
+                        <span>{selectedLabel}</span>
+                        <ChevronDownIcon className="size-3.5 shrink-0 text-slate-400 transition-transform group-data-open/choice:rotate-180 dark:text-slate-500" />
+                    </ComboboxButton>
+                    <ComboboxOptions
+                        anchor="bottom end"
+                        portal
+                        transition
+                        className="z-[70] max-h-60 min-w-24 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 transition duration-100 ease-out outline-none [--anchor-gap:0.35rem] data-closed:scale-95 data-closed:opacity-0 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
+                    >
+                        <ComboboxOption
+                            value="all"
+                            className={({ focus, selected }) =>
+                                cn(
+                                    'flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                                    focus
+                                        ? 'bg-brand-50 text-brand-900 dark:bg-brand-500/10 dark:text-brand-100'
+                                        : 'text-slate-700 dark:text-slate-300',
+                                    selected &&
+                                        'font-semibold text-brand-800 dark:text-brand-200',
+                                )
+                            }
+                        >
+                            {({ selected }) => (
+                                <>
+                                    <span>All</span>
+                                    {selected && (
+                                        <CheckIcon className="size-3.5 text-brand-600 dark:text-brand-400" />
+                                    )}
+                                </>
+                            )}
+                        </ComboboxOption>
+                        {Array.from({ length: count }, (_, index) => {
+                            const choice = index + 1;
+
+                            return (
+                                <ComboboxOption
+                                    key={choice}
+                                    value={String(choice)}
+                                    className={({ focus, selected }) =>
+                                        cn(
+                                            'flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                                            focus
+                                                ? 'bg-brand-50 text-brand-900 dark:bg-brand-500/10 dark:text-brand-100'
+                                                : 'text-slate-700 dark:text-slate-300',
+                                            selected &&
+                                                'font-semibold text-brand-800 dark:text-brand-200',
+                                        )
+                                    }
+                                >
+                                    {({ selected }) => (
+                                        <>
+                                            <span>Any {choice}</span>
+                                            {selected && (
+                                                <CheckIcon className="size-3.5 text-brand-600 dark:text-brand-400" />
+                                            )}
+                                        </>
+                                    )}
+                                </ComboboxOption>
+                            );
+                        })}
+                    </ComboboxOptions>
+                </div>
+            </Combobox>
+        </label>
+    );
+}
+
 function NumberField({
     value,
     label,
@@ -1941,6 +2119,7 @@ export default function GeneratePaper({
             globalFilters: createGlobalFilters(sourceFilters),
             sections: [],
             multipart: undefined,
+            multipartChoiceCount: null,
             totalMarks: 0,
         });
     const [multipartConfig, setMultipartConfig] =
@@ -2237,6 +2416,8 @@ export default function GeneratePaper({
                         toNumber(row.marksPerQuestion) > 0,
                 ),
         );
+    const multipartChoiceHasMismatch =
+        multipartChoiceMarksMismatch(questionSelection);
     const isQuestionSelectionReady =
         (standardSelectionReady || multipartSelections.length > 0) &&
         multipartReady;
@@ -2244,7 +2425,8 @@ export default function GeneratePaper({
         questionSelection.totalMarks > 0 &&
         isQuestionSelectionReady &&
         isManualSelectionComplete &&
-        multipartReady;
+        multipartReady &&
+        !multipartChoiceHasMismatch;
     const activeManualQuestionTypeId =
         activeManualPickerRow?.questionTypeId ?? null;
     const activeManualSelectedQuestionIds = useMemo(
@@ -3018,6 +3200,7 @@ export default function GeneratePaper({
             globalFilters: createGlobalFilters(sourceFilters),
             sections: [],
             multipart: undefined,
+            multipartChoiceCount: null,
             totalMarks: 0,
         });
         setQuestionTypePairings([]);
@@ -3299,6 +3482,15 @@ export default function GeneratePaper({
                 ],
             });
         });
+    }
+    function handleMultipartChoiceChange(value: string) {
+        setQuestionSelection((current) =>
+            withTotalMarks({
+                ...current,
+                multipartChoiceCount:
+                    value === '' ? null : Math.max(1, Number(value)),
+            }),
+        );
     }
     function openManualQuestionPicker(
         sectionId: string,
@@ -3714,6 +3906,13 @@ export default function GeneratePaper({
                           multipart: {
                               choiceCount: 1,
                               marksEach,
+                              groupId: 'multipart_group',
+                              groupChoiceCount:
+                                  typeof questionSelection.multipartChoiceCount ===
+                                  'number'
+                                      ? questionSelection.multipartChoiceCount
+                                      : null,
+                              groupQuestionCount: multipartSelections.length,
                               headingEnglish: multipartConfig.headingEnglish,
                               headingUrdu: multipartConfig.headingUrdu,
                               rows: [{ parts }],
@@ -6196,19 +6395,42 @@ export default function GeneratePaper({
                                             <CategoryDivider
                                                 title="Multi Part Questions"
                                                 action={
-                                                    <button
-                                                        type="button"
-                                                        onClick={
-                                                            addMultipartCard
-                                                        }
-                                                        aria-label="Add another multipart card"
-                                                        title="Add another multipart card"
-                                                        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-slate-500/10"
-                                                    >
-                                                        <PlusIcon className="size-3.5" />
-                                                    </button>
+                                                    <div className="flex items-center gap-2">
+                                                        <MultipartChoiceControl
+                                                            value={
+                                                                questionSelection.multipartChoiceCount ??
+                                                                null
+                                                            }
+                                                            count={
+                                                                questionSelection
+                                                                    .multipart
+                                                                    .length
+                                                            }
+                                                            onChange={
+                                                                handleMultipartChoiceChange
+                                                            }
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={
+                                                                addMultipartCard
+                                                            }
+                                                            aria-label="Add another multipart card"
+                                                            title="Add another multipart card"
+                                                            className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-slate-500/10"
+                                                        >
+                                                            <PlusIcon className="size-3.5" />
+                                                        </button>
+                                                    </div>
                                                 }
                                             />
+                                            {multipartChoiceHasMismatch && (
+                                                <p className="-mt-1 text-xs text-rose-600 dark:text-rose-400">
+                                                    Multipart questions must
+                                                    have the same total marks
+                                                    when a choice is selected.
+                                                </p>
+                                            )}
                                             {questionSelection.multipart.map(
                                                 (multipart) => (
                                                     <MultipartSelectionCard
@@ -6219,19 +6441,22 @@ export default function GeneratePaper({
                                                             nextMultipart,
                                                         ) =>
                                                             setQuestionSelection(
-                                                                (current) => ({
-                                                                    ...current,
-                                                                    multipart:
-                                                                        current.multipart?.map(
-                                                                            (
-                                                                                selection,
-                                                                            ) =>
-                                                                                selection.id ===
-                                                                                multipart.id
-                                                                                    ? nextMultipart
-                                                                                    : selection,
-                                                                        ),
-                                                                }),
+                                                                (current) =>
+                                                                    withTotalMarks(
+                                                                        {
+                                                                            ...current,
+                                                                            multipart:
+                                                                                current.multipart?.map(
+                                                                                    (
+                                                                                        selection,
+                                                                                    ) =>
+                                                                                        selection.id ===
+                                                                                        multipart.id
+                                                                                            ? nextMultipart
+                                                                                            : selection,
+                                                                                ),
+                                                                        },
+                                                                    ),
                                                             )
                                                         }
                                                         onAutoPickChange={(
