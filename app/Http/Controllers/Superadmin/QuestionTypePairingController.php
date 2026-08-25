@@ -110,6 +110,76 @@ class QuestionTypePairingController extends Controller
 
     public function update(Request $request, QuestionTypeOrGroup $group)
     {
+        if ($request->has('question_type_ids')) {
+            $validated = $request->validate([
+                'question_type_ids' => ['required', 'array', 'min:2'],
+                'question_type_ids.*' => ['required', 'integer', 'distinct', 'exists:question_types,id'],
+            ]);
+            $typeIds = array_values(array_unique(array_map('intval', $validated['question_type_ids'])));
+
+            if (count($typeIds) < 2) {
+                throw ValidationException::withMessages([
+                    'question_type_ids' => 'Choose at least two different subjective question types.',
+                ]);
+            }
+
+            $this->validateScope($group->pattern_id, $group->class_id, $group->subject_id);
+            $availableIds = $this->scopedQuestionTypeQuery(
+                $group->pattern_id,
+                $group->class_id,
+                $group->subject_id,
+            )->pluck('id')->map(fn ($id) => (int) $id);
+            $unavailableId = collect($typeIds)->first(fn (int $id) => ! $availableIds->contains($id));
+
+            if ($unavailableId !== null) {
+                throw ValidationException::withMessages([
+                    'question_type_ids' => 'Every selected question type must be available in the selected scope.',
+                ]);
+            }
+
+            $signatureIds = $typeIds;
+            sort($signatureIds);
+            $signature = implode(':', $signatureIds);
+            $duplicateExists = QuestionTypeOrGroup::query()
+                ->where('pattern_id', $group->pattern_id)
+                ->where('class_id', $group->class_id)
+                ->where('subject_id', $group->subject_id)
+                ->where('type_signature', $signature)
+                ->whereKeyNot($group->id)
+                ->exists();
+
+            if ($duplicateExists) {
+                throw ValidationException::withMessages([
+                    'question_type_ids' => 'This OR group already exists in the selected scope.',
+                ]);
+            }
+
+            $oldValues = $this->auditValues($group);
+
+            DB::transaction(function () use ($group, $signature, $typeIds): void {
+                $group->update(['type_signature' => $signature]);
+                $group->members()->delete();
+                $group->members()->createMany(array_map(
+                    fn (int $typeId, int $index) => [
+                        'question_type_id' => $typeId,
+                        'sort_order' => $index,
+                    ],
+                    $typeIds,
+                    array_keys($typeIds),
+                ));
+            });
+
+            AuditLog::record(
+                model: $group,
+                event: AuditEvent::Updated,
+                oldValues: $oldValues,
+                newValues: $this->auditValues($group),
+                notes: 'Question type OR group members updated.',
+            );
+
+            return back()->with('success', 'OR group updated successfully.');
+        }
+
         $validated = $request->validate([
             'is_active' => ['required', 'boolean'],
         ]);

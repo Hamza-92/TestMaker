@@ -3,6 +3,7 @@ import {
     ArrowLeftRightIcon,
     Link2Icon,
     LoaderCircleIcon,
+    PencilIcon,
     PlusIcon,
     Trash2Icon,
 } from 'lucide-react';
@@ -15,10 +16,8 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {
-    FloatingCombobox,
-    type ComboboxOptionItem,
-} from '@/components/ui/floating-combobox';
+import { FloatingCombobox } from '@/components/ui/floating-combobox';
+import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { Switch } from '@/components/ui/switch';
 import { usePermission } from '@/hooks/use-permission';
 
@@ -75,9 +74,10 @@ export default function QuestionTypePairings({
     const [subjectId, setSubjectId] = useState<number | null>(
         selectedScope?.subject_id ?? null,
     );
-    const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>([]);
+    const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>([0, 0]);
     const [scopeLoading, setScopeLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
     const [busyGroupId, setBusyGroupId] = useState<number | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<OrGroup | null>(null);
     const [errors, setErrors] = useState<FormErrors>({});
@@ -138,9 +138,13 @@ export default function QuestionTypePairings({
         selectedScope.subject_id === subjectId;
     const scopedTypes = loadedScopeMatches ? questionTypes : [];
     const scopedGroups = loadedScopeMatches ? groups : [];
+    const chosenTypeIds = selectedTypeIds.filter(
+        (id, index, ids) => id > 0 && ids.indexOf(id) === index,
+    );
 
     const clearGroupForm = () => {
-        setSelectedTypeIds([]);
+        setSelectedTypeIds([0, 0]);
+        setEditingGroupId(null);
         setErrors({});
     };
 
@@ -190,20 +194,24 @@ export default function QuestionTypePairings({
             patternId === null ||
             classId === null ||
             subjectId === null ||
-            selectedTypeIds.length < 2
+            chosenTypeIds.length < 2
         ) {
             return;
         }
 
         setSubmitting(true);
         setErrors({});
-        router.post(
-            '/superadmin/question-type-pairings',
+        const url = editingGroupId
+            ? `/superadmin/question-type-pairings/${editingGroupId}`
+            : '/superadmin/question-type-pairings';
+
+        router[editingGroupId ? 'patch' : 'post'](
+            url,
             {
                 pattern_id: patternId,
                 class_id: classId,
                 subject_id: subjectId,
-                question_type_ids: selectedTypeIds,
+                question_type_ids: chosenTypeIds,
             },
             {
                 preserveScroll: true,
@@ -212,6 +220,12 @@ export default function QuestionTypePairings({
                 onFinish: () => setSubmitting(false),
             },
         );
+    };
+
+    const editGroup = (group: OrGroup) => {
+        setEditingGroupId(group.id);
+        setSelectedTypeIds(group.question_types.map((type) => type.id));
+        setErrors({});
     };
 
     const toggleGroup = (group: OrGroup) => {
@@ -317,7 +331,9 @@ export default function QuestionTypePairings({
                             <div className="mb-4 flex items-start justify-between gap-3">
                                 <div>
                                     <h2 className="text-sm font-semibold">
-                                        Create an OR group
+                                        {editingGroupId
+                                            ? 'Edit OR group'
+                                            : 'Create an OR group'}
                                     </h2>
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         Select two or more subjective types that
@@ -325,7 +341,7 @@ export default function QuestionTypePairings({
                                     </p>
                                 </div>
                                 <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                                    {selectedTypeIds.length} selected
+                                    {chosenTypeIds.length} selected
                                 </span>
                             </div>
 
@@ -337,49 +353,54 @@ export default function QuestionTypePairings({
                             ) : (
                                 <div className="space-y-3">
                                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                        {selectedTypeIds.map((typeId, index) => (
-                                            <TypeSelect
-                                                key={`${index}-${typeId}`}
-                                                label={`Question type ${index + 1}`}
-                                                value={typeId}
-                                                types={scopedTypes}
-                                                excludeIds={selectedTypeIds.filter(
-                                                    (_, selectedIndex) =>
-                                                        selectedIndex !== index,
-                                                )}
-                                                disabled={!canEdit}
-                                                displayName={displayTypeName}
-                                                onChange={(id) => {
-                                                    if (id === null) {
-                                                        setSelectedTypeIds((current) =>
-                                                            current.filter(
-                                                                (_, selectedIndex) =>
-                                                                    selectedIndex !== index,
-                                                            ),
-                                                        );
-                                                    } else {
-                                                        setSelectedTypeIds((current) =>
-                                                            current.map((currentId, selectedIndex) =>
-                                                                selectedIndex === index
-                                                                    ? id
-                                                                    : currentId,
-                                                            ),
-                                                        );
+                                        {selectedTypeIds.map(
+                                            (typeId, index) => (
+                                                <TypeSelect
+                                                    key={index}
+                                                    label={`Question type ${index + 1}`}
+                                                    value={typeId}
+                                                    types={scopedTypes}
+                                                    excludeIds={selectedTypeIds.filter(
+                                                        (_, selectedIndex) =>
+                                                            selectedIndex !==
+                                                            index,
+                                                    )}
+                                                    disabled={!canEdit}
+                                                    displayName={
+                                                        displayTypeName
                                                     }
-                                                    setErrors({});
-                                                }}
-                                            />
-                                        ))}
+                                                    onChange={(id) => {
+                                                        setSelectedTypeIds(
+                                                            (current) =>
+                                                                current.map(
+                                                                    (
+                                                                        currentId,
+                                                                        selectedIndex,
+                                                                    ) =>
+                                                                        selectedIndex ===
+                                                                        index
+                                                                            ? (id ??
+                                                                              0)
+                                                                            : currentId,
+                                                                ),
+                                                        );
+                                                        setErrors({});
+                                                    }}
+                                                />
+                                            ),
+                                        )}
                                     </div>
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <Button
                                             type="button"
                                             variant="outline"
                                             onClick={() =>
-                                                setSelectedTypeIds((current) => [
-                                                    ...current,
-                                                    0,
-                                                ])
+                                                setSelectedTypeIds(
+                                                    (current) => [
+                                                        ...current,
+                                                        0,
+                                                    ],
+                                                )
                                             }
                                             disabled={
                                                 !canEdit ||
@@ -390,23 +411,38 @@ export default function QuestionTypePairings({
                                             <PlusIcon />
                                             Add another type
                                         </Button>
-                                        <Button
-                                            type="button"
-                                            onClick={createGroup}
-                                            disabled={
-                                                !canEdit ||
-                                                selectedTypeIds.length < 2 ||
-                                                selectedTypeIds.some((id) => id < 1) ||
-                                                submitting
-                                            }
-                                        >
-                                            {submitting ? (
-                                                <LoaderCircleIcon className="animate-spin" />
-                                            ) : (
-                                                <Link2Icon />
+                                        <div className="flex items-center gap-2">
+                                            {editingGroupId && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={clearGroupForm}
+                                                    disabled={submitting}
+                                                >
+                                                    Cancel
+                                                </Button>
                                             )}
-                                            Add OR group
-                                        </Button>
+                                            <Button
+                                                type="button"
+                                                onClick={createGroup}
+                                                disabled={
+                                                    !canEdit ||
+                                                    chosenTypeIds.length < 2 ||
+                                                    submitting
+                                                }
+                                            >
+                                                {submitting ? (
+                                                    <LoaderCircleIcon className="animate-spin" />
+                                                ) : editingGroupId ? (
+                                                    <PencilIcon />
+                                                ) : (
+                                                    <Link2Icon />
+                                                )}
+                                                {editingGroupId
+                                                    ? 'Update OR group'
+                                                    : 'Add OR group'}
+                                            </Button>
+                                        </div>
                                     </div>
                                     {errors.question_type_ids && (
                                         <p className="text-xs text-destructive">
@@ -449,22 +485,26 @@ export default function QuestionTypePairings({
                                             className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-5"
                                         >
                                             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                                {group.question_types.map((type, index) => (
-                                                    <div
-                                                        key={type.id}
-                                                        className="flex min-w-0 items-center gap-2"
-                                                    >
-                                                        {index > 0 && (
-                                                            <span className="shrink-0 text-xs font-bold text-primary">
-                                                                OR
-                                                            </span>
-                                                        )}
-                                                        <TypeBox
-                                                            type={type}
-                                                            displayName={displayTypeName}
-                                                        />
-                                                    </div>
-                                                ))}
+                                                {group.question_types.map(
+                                                    (type, index) => (
+                                                        <div
+                                                            key={type.id}
+                                                            className="flex min-w-0 items-center gap-2"
+                                                        >
+                                                            {index > 0 && (
+                                                                <span className="shrink-0 text-xs font-bold text-primary">
+                                                                    OR
+                                                                </span>
+                                                            )}
+                                                            <TypeBox
+                                                                type={type}
+                                                                displayName={
+                                                                    displayTypeName
+                                                                }
+                                                            />
+                                                        </div>
+                                                    ),
+                                                )}
                                             </div>
 
                                             <div className="flex items-center justify-between gap-3 md:justify-end">
@@ -474,19 +514,41 @@ export default function QuestionTypePairings({
                                                     </span>
                                                 )}
                                                 <div className="flex items-center gap-2">
+                                                    {canEdit && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-muted-foreground hover:text-primary"
+                                                            onClick={() =>
+                                                                editGroup(group)
+                                                            }
+                                                            disabled={
+                                                                busyGroupId !==
+                                                                    null ||
+                                                                submitting
+                                                            }
+                                                            title="Edit OR group"
+                                                        >
+                                                            <PencilIcon />
+                                                        </Button>
+                                                    )}
                                                     <span className="text-xs text-muted-foreground">
                                                         {group.is_active
                                                             ? 'Active'
                                                             : 'Inactive'}
                                                     </span>
                                                     <Switch
-                                                        checked={group.is_active}
+                                                        checked={
+                                                            group.is_active
+                                                        }
                                                         onCheckedChange={() =>
                                                             toggleGroup(group)
                                                         }
                                                         disabled={
                                                             !canEdit ||
-                                                            busyGroupId !== null ||
+                                                            busyGroupId !==
+                                                                null ||
                                                             (!group.is_available &&
                                                                 !group.is_active)
                                                         }
@@ -498,10 +560,13 @@ export default function QuestionTypePairings({
                                                             size="icon"
                                                             className="text-muted-foreground hover:text-destructive"
                                                             onClick={() =>
-                                                                setDeleteTarget(group)
+                                                                setDeleteTarget(
+                                                                    group,
+                                                                )
                                                             }
                                                             disabled={
-                                                                busyGroupId !== null
+                                                                busyGroupId !==
+                                                                null
                                                             }
                                                             title="Remove OR group"
                                                         >
@@ -611,7 +676,7 @@ function TypeBox({
 }) {
     return (
         <div className="min-w-0 rounded-lg border bg-muted/20 px-3 py-2">
-            <p className="break-words text-sm font-medium">
+            <p className="text-sm font-medium break-words">
                 {displayName(type.name)}
             </p>
         </div>
