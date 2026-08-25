@@ -99,9 +99,9 @@ export default function MultipartQuestionSettings({
     );
     const loaded = Boolean(
         selectedScope &&
-            selectedScope.pattern_id === patternId &&
-            selectedScope.class_id === classId &&
-            selectedScope.subject_id === subjectId,
+        selectedScope.pattern_id === patternId &&
+        selectedScope.class_id === classId &&
+        selectedScope.subject_id === subjectId,
     );
 
     const resetForm = () => {
@@ -129,7 +129,11 @@ export default function MultipartQuestionSettings({
                     class_id: nextClassId,
                     subject_id: nextSubjectId,
                 },
-                { preserveState: true, preserveScroll: true },
+                {
+                    preserveState: false,
+                    preserveScroll: true,
+                    replace: true,
+                },
             );
         }
     };
@@ -186,7 +190,7 @@ export default function MultipartQuestionSettings({
                 <div className="grid gap-3 md:grid-cols-3">
                     <FloatingCombobox
                         label="Pattern"
-value={findOption(patternOptions, patternId)}
+                        value={findOption(patternOptions, patternId)}
                         options={patternOptions}
                         onChange={(value) =>
                             selectScope(
@@ -199,7 +203,7 @@ value={findOption(patternOptions, patternId)}
                     />
                     <FloatingCombobox
                         label="Class"
-value={findOption(classOptions, classId)}
+                        value={findOption(classOptions, classId)}
                         options={classOptions}
                         onChange={(value) =>
                             selectScope(
@@ -213,7 +217,7 @@ value={findOption(classOptions, classId)}
                     />
                     <FloatingCombobox
                         label="Subject"
-value={findOption(subjectOptions, subjectId)}
+                        value={findOption(subjectOptions, subjectId)}
                         options={subjectOptions}
                         onChange={(value) =>
                             selectScope(
@@ -229,12 +233,15 @@ value={findOption(subjectOptions, subjectId)}
             </div>
 
             {loaded && (
-                <div key={`${patternId}-${classId}-${subjectId}-${setting?.id ?? 'new'}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div
+                    key={`${patternId}-${classId}-${subjectId}-${setting?.id ?? 'new'}`}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                >
                     <div className="grid gap-4 md:grid-cols-2">
                         <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                             English Heading
                             <input
-                                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-slate-700"
+                                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-transparent px-3 py-2.5 text-sm transition outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-slate-700"
                                 value={headingEn}
                                 onChange={(event) =>
                                     setHeadingEn(event.target.value)
@@ -245,7 +252,7 @@ value={findOption(subjectOptions, subjectId)}
                         <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                             Urdu Heading
                             <input
-                                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-slate-700"
+                                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-transparent px-3 py-2.5 text-sm transition outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 dark:border-slate-700"
                                 dir="rtl"
                                 value={headingUr}
                                 onChange={(event) =>
@@ -290,7 +297,8 @@ value={findOption(subjectOptions, subjectId)}
                                             setSelectedTypeIds((current) =>
                                                 checked
                                                     ? current.filter(
-                                                          (id) => id !== type.id,
+                                                          (id) =>
+                                                              id !== type.id,
                                                       )
                                                     : [...current, type.id],
                                             )
@@ -304,7 +312,12 @@ value={findOption(subjectOptions, subjectId)}
                     </div>
 
                     <div className="mt-6 flex justify-end">
-                        <Button onClick={save} disabled={!canEdit || saving || selectedTypeIds.length < 2}>
+                        <Button
+                            onClick={save}
+                            disabled={
+                                !canEdit || saving || selectedTypeIds.length < 2
+                            }
+                        >
                             <SaveIcon className="mr-2 size-4" />
                             {saving ? 'Saving…' : 'Save'}
                         </Button>
