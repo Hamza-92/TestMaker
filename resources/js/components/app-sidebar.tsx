@@ -107,6 +107,10 @@ export function AppSidebar() {
                               href: '/superadmin/question-type-pairings',
                           },
                           {
+                              title: 'Paper Sections',
+                              href: '/superadmin/paper-question-sections',
+                          },
+                          {
                               title: 'Multipart Settings',
                               href: '/superadmin/multipart-question-settings',
                           },
