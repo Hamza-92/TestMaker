@@ -78,6 +78,7 @@ export default function QuestionTypePairings({
     const [scopeLoading, setScopeLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+    const [groupFormOpen, setGroupFormOpen] = useState(false);
     const [busyGroupId, setBusyGroupId] = useState<number | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<OrGroup | null>(null);
     const [errors, setErrors] = useState<FormErrors>({});
@@ -145,7 +146,15 @@ export default function QuestionTypePairings({
     const clearGroupForm = () => {
         setSelectedTypeIds([0, 0]);
         setEditingGroupId(null);
+        setGroupFormOpen(false);
         setErrors({});
+    };
+
+    const openCreateGroup = () => {
+        setSelectedTypeIds([0, 0]);
+        setEditingGroupId(null);
+        setErrors({});
+        setGroupFormOpen(true);
     };
 
     const selectPattern = (value: ComboboxOptionItem | null) => {
@@ -226,6 +235,7 @@ export default function QuestionTypePairings({
         setEditingGroupId(group.id);
         setSelectedTypeIds(group.question_types.map((type) => type.id));
         setErrors({});
+        setGroupFormOpen(true);
     };
 
     const toggleGroup = (group: OrGroup) => {
@@ -327,137 +337,22 @@ export default function QuestionTypePairings({
 
                 {!scopeLoading && loadedScopeMatches && (
                     <>
-                        <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
-                            <div className="mb-4 flex items-start justify-between gap-3">
-                                <div>
-                                    <h2 className="text-sm font-semibold">
-                                        {editingGroupId
-                                            ? 'Edit OR group'
-                                            : 'Create an OR group'}
-                                    </h2>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Select two or more subjective types that
-                                        can be offered as alternatives.
-                                    </p>
-                                </div>
-                                <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                                    {chosenTypeIds.length} selected
-                                </span>
-                            </div>
-
-                            {scopedTypes.length < 2 ? (
-                                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                                    At least two active subjective types with
-                                    questions are required to create a group.
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                        {selectedTypeIds.map(
-                                            (typeId, index) => (
-                                                <TypeSelect
-                                                    key={index}
-                                                    label={`Question type ${index + 1}`}
-                                                    value={typeId}
-                                                    types={scopedTypes}
-                                                    excludeIds={selectedTypeIds.filter(
-                                                        (_, selectedIndex) =>
-                                                            selectedIndex !==
-                                                            index,
-                                                    )}
-                                                    disabled={!canEdit}
-                                                    displayName={
-                                                        displayTypeName
-                                                    }
-                                                    onChange={(id) => {
-                                                        setSelectedTypeIds(
-                                                            (current) =>
-                                                                current.map(
-                                                                    (
-                                                                        currentId,
-                                                                        selectedIndex,
-                                                                    ) =>
-                                                                        selectedIndex ===
-                                                                        index
-                                                                            ? (id ??
-                                                                              0)
-                                                                            : currentId,
-                                                                ),
-                                                        );
-                                                        setErrors({});
-                                                    }}
-                                                />
-                                            ),
-                                        )}
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setSelectedTypeIds(
-                                                    (current) => [
-                                                        ...current,
-                                                        0,
-                                                    ],
-                                                )
-                                            }
-                                            disabled={
-                                                !canEdit ||
-                                                selectedTypeIds.length >=
-                                                    scopedTypes.length
-                                            }
-                                        >
-                                            <PlusIcon />
-                                            Add another type
-                                        </Button>
-                                        <div className="flex items-center gap-2">
-                                            {editingGroupId && (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={clearGroupForm}
-                                                    disabled={submitting}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            )}
-                                            <Button
-                                                type="button"
-                                                onClick={createGroup}
-                                                disabled={
-                                                    !canEdit ||
-                                                    chosenTypeIds.length < 2 ||
-                                                    submitting
-                                                }
-                                            >
-                                                {submitting ? (
-                                                    <LoaderCircleIcon className="animate-spin" />
-                                                ) : editingGroupId ? (
-                                                    <PencilIcon />
-                                                ) : (
-                                                    <Link2Icon />
-                                                )}
-                                                {editingGroupId
-                                                    ? 'Update OR group'
-                                                    : 'Add OR group'}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {errors.question_type_ids && (
-                                        <p className="text-xs text-destructive">
-                                            {errors.question_type_ids}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </section>
-
                         <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
-                            <div className="border-b px-4 py-4 md:px-5">
+                            <div className="flex items-center justify-between gap-3 border-b px-4 py-4 md:px-5">
                                 <h2 className="text-sm font-semibold">
                                     Configured OR groups
                                 </h2>
+                                {canEdit && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={openCreateGroup}
+                                        disabled={scopedTypes.length < 2}
+                                    >
+                                        <PlusIcon />
+                                        Create OR group
+                                    </Button>
+                                )}
                             </div>
 
                             {errors.is_active && (
@@ -473,8 +368,8 @@ export default function QuestionTypePairings({
                                         No OR groups configured
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Select at least two eligible types above
-                                        to create one.
+                                        Use the Create OR group button to add
+                                        one.
                                     </p>
                                 </div>
                             ) : (
@@ -583,6 +478,116 @@ export default function QuestionTypePairings({
                     </>
                 )}
             </div>
+
+            <Dialog
+                open={groupFormOpen}
+                onOpenChange={(open) => {
+                    if (!open && !submitting) {
+                        clearGroupForm();
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogTitle>
+                        {editingGroupId ? 'Edit OR group' : 'Create OR group'}
+                    </DialogTitle>
+
+                    {scopedTypes.length < 2 ? (
+                        <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                            At least two active subjective types with questions
+                            are required to create a group.
+                        </div>
+                    ) : (
+                        <div className="space-y-4 py-2">
+                            <div className="grid gap-3 md:grid-cols-2">
+                                {selectedTypeIds.map((typeId, index) => (
+                                    <TypeSelect
+                                        key={index}
+                                        label={`Question type ${index + 1}`}
+                                        value={typeId}
+                                        types={scopedTypes}
+                                        excludeIds={selectedTypeIds.filter(
+                                            (_, selectedIndex) =>
+                                                selectedIndex !== index,
+                                        )}
+                                        disabled={!canEdit || submitting}
+                                        displayName={displayTypeName}
+                                        onChange={(id) => {
+                                            setSelectedTypeIds((current) =>
+                                                current.map(
+                                                    (
+                                                        currentId,
+                                                        selectedIndex,
+                                                    ) =>
+                                                        selectedIndex === index
+                                                            ? (id ?? 0)
+                                                            : currentId,
+                                                ),
+                                            );
+                                            setErrors({});
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setSelectedTypeIds((current) => [
+                                        ...current,
+                                        0,
+                                    ])
+                                }
+                                disabled={
+                                    !canEdit ||
+                                    submitting ||
+                                    selectedTypeIds.length >= scopedTypes.length
+                                }
+                            >
+                                <PlusIcon />
+                                Add another type
+                            </Button>
+                            {errors.question_type_ids && (
+                                <p className="text-xs text-destructive">
+                                    {errors.question_type_ids}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={clearGroupForm}
+                            disabled={submitting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={createGroup}
+                            disabled={
+                                !canEdit ||
+                                chosenTypeIds.length < 2 ||
+                                submitting
+                            }
+                        >
+                            {submitting ? (
+                                <LoaderCircleIcon className="animate-spin" />
+                            ) : editingGroupId ? (
+                                <PencilIcon />
+                            ) : (
+                                <Link2Icon />
+                            )}
+                            {editingGroupId
+                                ? 'Update OR group'
+                                : 'Create OR group'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog
                 open={deleteTarget !== null}
