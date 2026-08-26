@@ -1773,12 +1773,15 @@ function CategoryDivider({
     action?: ReactNode;
 }) {
     return (
-        <div className="flex items-center gap-3">
-            <h3 className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+            <div className="h-px bg-slate-200 dark:bg-slate-800" />
+            <h3 className="text-center text-sm font-bold tracking-wide text-slate-700 uppercase dark:text-slate-200">
                 {title}
             </h3>
-            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            {action}
+            <div className="flex min-w-0 items-center gap-3">
+                <div className="h-px min-w-0 flex-1 bg-slate-200 dark:bg-slate-800" />
+                {action}
+            </div>
         </div>
     );
 }
