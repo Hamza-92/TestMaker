@@ -89,6 +89,19 @@ export interface GeneratedPaperSection {
     orRole?: 'primary' | 'alternative' | null;
     orLabel?: string | null;
     multipart?: GeneratedMultipartSection | null;
+    /** Stable grouping key used only to place the visible Section A/B/C heading. */
+    paperSectionKey?: string | null;
+}
+
+export interface GeneratedPaperSectionGroup {
+    id: number;
+    questionTypeIds: number[];
+}
+
+export interface GeneratedPaperSectioning {
+    active: boolean;
+    groups: GeneratedPaperSectionGroup[];
+    medium?: 'English' | 'Urdu' | 'Both';
 }
 
 export const MIN_SECTION_COLUMNS = 1;
@@ -195,6 +208,15 @@ export interface PaperSettings {
     /** Bottom border under each section heading row (the "Q.1 Title (5x1=5)" rule). */
     headingBorderWidth: number;
     headingBorderStyle: PaperBorderStyle;
+    /** Whether active, configured paper-section headings are visible. */
+    showSections: boolean;
+    /** Wrap the complete localized section heading in round brackets. */
+    sectionHeadingBrackets: boolean;
+    sectionHeadingSize: number;
+    sectionHeadingLineHeight: number;
+    /** Border around a Section A/B/C heading. Zero means no border. */
+    sectionHeadingBorderWidth: number;
+    sectionHeadingBorderStyle: PaperBorderStyle;
     /** Divider between question rows inside a section. */
     questionBorderWidth: number;
     questionBorderStyle: PaperBorderStyle;
@@ -269,6 +291,12 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     headerBorderStyle: 'solid',
     headingBorderWidth: 1,
     headingBorderStyle: 'solid',
+    showSections: true,
+    sectionHeadingBrackets: true,
+    sectionHeadingSize: 14,
+    sectionHeadingLineHeight: 1,
+    sectionHeadingBorderWidth: 0,
+    sectionHeadingBorderStyle: 'solid',
     questionBorderWidth: 1,
     questionBorderStyle: 'solid',
     paperSize: 'A4',
@@ -483,6 +511,30 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             source.headingBorderStyle,
             DEFAULT_PAPER_SETTINGS.headingBorderStyle,
         ),
+        showSections:
+            typeof source.showSections === 'boolean'
+                ? source.showSections
+                : DEFAULT_PAPER_SETTINGS.showSections,
+        sectionHeadingBrackets:
+            typeof source.sectionHeadingBrackets === 'boolean'
+                ? source.sectionHeadingBrackets
+                : DEFAULT_PAPER_SETTINGS.sectionHeadingBrackets,
+        sectionHeadingSize:
+            typeof source.sectionHeadingSize === 'number'
+                ? source.sectionHeadingSize
+                : DEFAULT_PAPER_SETTINGS.sectionHeadingSize,
+        sectionHeadingLineHeight:
+            typeof source.sectionHeadingLineHeight === 'number'
+                ? source.sectionHeadingLineHeight
+                : DEFAULT_PAPER_SETTINGS.sectionHeadingLineHeight,
+        sectionHeadingBorderWidth:
+            typeof source.sectionHeadingBorderWidth === 'number'
+                ? source.sectionHeadingBorderWidth
+                : DEFAULT_PAPER_SETTINGS.sectionHeadingBorderWidth,
+        sectionHeadingBorderStyle: pickBorderStyle(
+            source.sectionHeadingBorderStyle,
+            DEFAULT_PAPER_SETTINGS.sectionHeadingBorderStyle,
+        ),
         questionBorderWidth:
             typeof source.questionBorderWidth === 'number'
                 ? source.questionBorderWidth
@@ -625,6 +677,8 @@ export interface GeneratedPaper {
     sections: GeneratedPaperSection[];
     /** Optional — older papers won't have this. Restore code should fall back to DEFAULT_PAPER_SETTINGS. */
     settings?: PaperSettings;
+    /** Snapshot of the active superadmin grouping used when this paper was generated. */
+    sectioning?: GeneratedPaperSectioning;
 }
 
 const ROMAN_NUMERALS = [

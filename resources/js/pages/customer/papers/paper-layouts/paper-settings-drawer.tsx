@@ -12,6 +12,7 @@ import {
     HeadingIcon,
     ImageIcon,
     LayoutPanelTopIcon,
+    Rows3Icon,
     Link2Icon,
     ListOrderedIcon,
     MinusIcon,
@@ -48,6 +49,7 @@ import { DEFAULT_PAPER_SETTINGS } from './types';
 interface PaperSettingsDrawerProps {
     open: boolean;
     settings: PaperSettings;
+    sectioningAvailable?: boolean;
     defaultWatermarkLogoUrl?: string;
     onChange: (patch: Partial<PaperSettings>) => void;
     onClose: () => void;
@@ -225,6 +227,7 @@ function readStoredDrawerWidth(): number {
 export function PaperSettingsDrawer({
     open,
     settings,
+    sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
     onChange,
     onClose,
@@ -697,6 +700,64 @@ export function PaperSettingsDrawer({
                                 onChange({ headingBorderStyle: v })
                             }
                         />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection
+                        title="Section Heading"
+                        icon={Rows3Icon}
+                    >
+                        <div className="grid grid-cols-2 gap-2">
+                            <CheckboxField
+                                label="Sections"
+                                checked={
+                                    sectioningAvailable && settings.showSections
+                                }
+                                disabled={!sectioningAvailable}
+                                onChange={(checked) =>
+                                    onChange({ showSections: checked })
+                                }
+                            />
+                            <CheckboxField
+                                label="Brackets"
+                                checked={settings.sectionHeadingBrackets}
+                                disabled={!sectioningAvailable}
+                                onChange={(checked) =>
+                                    onChange({
+                                        sectionHeadingBrackets: checked,
+                                    })
+                                }
+                            />
+                        </div>
+                        <div className="mt-3">
+                            <TypographyControls
+                                size={settings.sectionHeadingSize}
+                                sizeMin={SIZE_BOUNDS.heading.min}
+                                sizeMax={SIZE_BOUNDS.heading.max}
+                                lineHeight={settings.sectionHeadingLineHeight}
+                                onSizeChange={(value) =>
+                                    onChange({ sectionHeadingSize: value })
+                                }
+                                onLineHeightChange={(value) =>
+                                    onChange({
+                                        sectionHeadingLineHeight: value,
+                                    })
+                                }
+                            />
+                            <BorderControls
+                                width={settings.sectionHeadingBorderWidth}
+                                style={settings.sectionHeadingBorderStyle}
+                                onWidthChange={(value) =>
+                                    onChange({
+                                        sectionHeadingBorderWidth: value,
+                                    })
+                                }
+                                onStyleChange={(value) =>
+                                    onChange({
+                                        sectionHeadingBorderStyle: value,
+                                    })
+                                }
+                            />
+                        </div>
                     </CollapsibleSection>
 
                     <CollapsibleSection title="OR Group" icon={Link2Icon}>
@@ -1217,10 +1278,12 @@ function TextInput({
 function CheckboxField({
     label,
     checked,
+    disabled = false,
     onChange,
 }: {
     label: string;
     checked: boolean;
+    disabled?: boolean;
     onChange: (next: boolean) => void;
 }) {
     return (
@@ -1228,9 +1291,11 @@ function CheckboxField({
             type="button"
             role="checkbox"
             aria-checked={checked}
+            disabled={disabled}
             onClick={() => onChange(!checked)}
             className={cn(
                 'flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-2.5 text-[13px] font-medium transition-colors',
+                disabled && 'cursor-not-allowed opacity-60',
                 checked
                     ? 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70',

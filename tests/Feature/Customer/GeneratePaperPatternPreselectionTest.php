@@ -4,12 +4,14 @@ use App\Enums\AccountType;
 use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\Chapter;
+use App\Models\PaperQuestionSection;
+use App\Models\PaperQuestionSectionScope;
 use App\Models\PaperTemplate;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\QuestionTypeOrder;
-use App\Models\QuestionTypePairing;
+use App\Models\QuestionTypeOrGroup;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\TrialSetting;
@@ -138,13 +140,36 @@ test('paper generator returns question types in the saved pattern class subject 
         'sort_order' => 2,
     ]);
 
-    $pairing = QuestionTypePairing::create([
+    PaperQuestionSectionScope::create([
         'pattern_id' => $pattern->id,
         'class_id' => $class->id,
         'subject_id' => $subject->id,
-        'question_type_a_id' => min($first->id, $second->id),
-        'question_type_b_id' => max($first->id, $second->id),
         'is_active' => true,
+        'updated_by' => null,
+    ]);
+    $paperSection = PaperQuestionSection::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'sort_order' => 2,
+        'created_by' => null,
+    ]);
+    $paperSection->members()->createMany([
+        ['question_type_id' => $first->id, 'sort_order' => 0],
+        ['question_type_id' => $second->id, 'sort_order' => 1],
+    ]);
+
+    $pairing = QuestionTypeOrGroup::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'type_signature' => implode(':', [$first->id, $second->id]),
+        'is_active' => true,
+        'created_by' => null,
+    ]);
+    $pairing->members()->createMany([
+        ['question_type_id' => $first->id, 'sort_order' => 0],
+        ['question_type_id' => $second->id, 'sort_order' => 1],
     ]);
 
     $this->actingAs($customer)
@@ -157,12 +182,19 @@ test('paper generator returns question types in the saved pattern class subject 
         ->assertJsonPath('sections.0.sortOrder', 1)
         ->assertJsonPath('sections.1.questionTypeId', $first->id)
         ->assertJsonPath('sections.1.sortOrder', 2)
-        ->assertJsonCount(1, 'pairings')
-        ->assertJsonPath('pairings.0.id', $pairing->id)
-        ->assertJsonPath('pairings.0.questionTypeAId', min($first->id, $second->id))
-        ->assertJsonPath('pairings.0.questionTypeBId', max($first->id, $second->id));
+        ->assertJsonCount(1, 'groups')
+        ->assertJsonPath('groups.0.id', $pairing->id)
+        ->assertJsonPath('groups.0.questionTypeIds', [$first->id, $second->id])
+        ->assertJsonPath('paperSectioning.active', true)
+        ->assertJsonCount(1, 'paperSectioning.groups')
+        ->assertJsonPath('paperSectioning.groups.0.id', $paperSection->id)
+        ->assertJsonPath('paperSectioning.groups.0.questionTypeIds', [
+            $first->id,
+            $second->id,
+        ]);
 
     $pairing->update(['is_active' => false]);
+    PaperQuestionSectionScope::query()->update(['is_active' => false]);
 
     $this->actingAs($customer)
         ->getJson(route('customer.papers.generate.question-types', [
@@ -170,7 +202,9 @@ test('paper generator returns question types in the saved pattern class subject 
             'sources' => [Question::SOURCE_EXERCISE],
         ]))
         ->assertOk()
-        ->assertJsonCount(0, 'pairings');
+        ->assertJsonCount(0, 'groups')
+        ->assertJsonPath('paperSectioning.active', false)
+        ->assertJsonCount(0, 'paperSectioning.groups');
 });
 
 test('paper templates preserve OR metadata without double counting alternative marks', function () {

@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
-use App\Models\PaperTemplate;
 use App\Models\MultipartQuestionSetting;
+use App\Models\PaperQuestionSection;
+use App\Models\PaperQuestionSectionScope;
+use App\Models\PaperTemplate;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
@@ -191,7 +193,12 @@ class GeneratePaperController extends Controller
         $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
 
         if ($sources->isEmpty()) {
-            return response()->json(['sections' => [], 'pairings' => []]);
+            return response()->json([
+                'sections' => [],
+                'groups' => [],
+                'multipart' => null,
+                'paperSectioning' => $this->paperSectioning($scope),
+            ]);
         }
 
         $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
@@ -282,7 +289,42 @@ class GeneratePaperController extends Controller
             'sections' => $sections,
             'groups' => $groups,
             'multipart' => $this->multipartSetting($scope, $availableSubjectiveTypeIds),
+            'paperSectioning' => $this->paperSectioning($scope),
         ]);
+    }
+
+    private function paperSectioning(object $scope): array
+    {
+        $active = PaperQuestionSectionScope::query()
+            ->where('pattern_id', (int) $scope->pattern_id)
+            ->where('class_id', (int) $scope->class_id)
+            ->where('subject_id', (int) $scope->subject_id)
+            ->where('is_active', true)
+            ->exists();
+
+        if (! $active) {
+            return ['active' => false, 'groups' => []];
+        }
+
+        $groups = PaperQuestionSection::query()
+            ->with('members:id,section_id,question_type_id,sort_order')
+            ->where('pattern_id', (int) $scope->pattern_id)
+            ->where('class_id', (int) $scope->class_id)
+            ->where('subject_id', (int) $scope->subject_id)
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (PaperQuestionSection $section) => [
+                'id' => $section->id,
+                'questionTypeIds' => $section->members
+                    ->pluck('question_type_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+
+        return ['active' => true, 'groups' => $groups];
     }
 
     private function multipartSetting(object $scope, $availableSubjectiveTypeIds): ?array

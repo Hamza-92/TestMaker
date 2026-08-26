@@ -91,6 +91,7 @@ import type {
     GeneratedPaperHeader,
     GeneratedPaperQuestion,
     GeneratedPaperSection,
+    GeneratedPaperSectioning,
     PaperImageSize,
     PaperQuestionOption,
     PaperSettings,
@@ -290,6 +291,16 @@ interface MultipartConfig {
     headingUrdu?: string | null;
     partTypes: MultipartTypeOption[];
 }
+
+type PaperSectioningConfig = Pick<
+    GeneratedPaperSectioning,
+    'active' | 'groups'
+>;
+
+const INACTIVE_PAPER_SECTIONING: PaperSectioningConfig = {
+    active: false,
+    groups: [],
+};
 
 interface MultipartPartRow {
     id: string;
@@ -1266,6 +1277,108 @@ function sortIncomingQuestionTypes(
         );
     });
 }
+
+const OBJECTIVE_PAPER_SECTION_KEY = 'objective';
+const FALLBACK_PAPER_SECTION_KEY = 'fallback';
+
+function configuredPaperSectionKey(
+    questionTypeId: number,
+    sectioning: Pick<GeneratedPaperSectioning, 'groups'> | undefined,
+): string {
+    const group = sectioning?.groups.find((candidate) =>
+        candidate.questionTypeIds.includes(questionTypeId),
+    );
+
+    return group ? `configured:${group.id}` : FALLBACK_PAPER_SECTION_KEY;
+}
+
+function paperSectionKeyForType(
+    questionTypeId: number,
+    category: SectionCategory,
+    sectioning: Pick<GeneratedPaperSectioning, 'groups'> | undefined,
+): string {
+    return category === 'Objective Questions'
+        ? OBJECTIVE_PAPER_SECTION_KEY
+        : configuredPaperSectionKey(questionTypeId, sectioning);
+}
+
+function paperSectionKeyForBlock(
+    block: GeneratedPaperSection[],
+    sectioning: Pick<GeneratedPaperSectioning, 'groups'>,
+): string {
+    const primary =
+        block.find((section) => section.orRole === 'primary') ?? block[0];
+
+    if (!primary || primary.category === 'Objective Questions') {
+        return OBJECTIVE_PAPER_SECTION_KEY;
+    }
+
+    if (primary.multipart) {
+        const typeIds = primary.multipart.rows.flatMap((row) =>
+            row.parts
+                .map((part) => part.typeId)
+                .filter((id): id is number => typeof id === 'number'),
+        );
+        const keys = new Set(
+            typeIds.map((id) => configuredPaperSectionKey(id, sectioning)),
+        );
+
+        return keys.size === 1
+            ? ([...keys][0] ?? FALLBACK_PAPER_SECTION_KEY)
+            : FALLBACK_PAPER_SECTION_KEY;
+    }
+
+    return typeof primary.questionTypeId === 'number'
+        ? configuredPaperSectionKey(primary.questionTypeId, sectioning)
+        : FALLBACK_PAPER_SECTION_KEY;
+}
+
+function organizeGeneratedPaperSections(
+    sections: GeneratedPaperSection[],
+    sectioning: PaperSectioningConfig,
+): GeneratedPaperSection[] {
+    if (!sectioning.active) {
+        return sections;
+    }
+
+    const blocks = sections.reduce<GeneratedPaperSection[][]>(
+        (groups, section) => {
+            const blockKey = section.orGroupId ?? section.id;
+            const previous = groups.at(-1);
+            const previousKey = previous?.[0]?.orGroupId ?? previous?.[0]?.id;
+
+            if (previous && previousKey === blockKey) {
+                previous.push(section);
+            } else {
+                groups.push([section]);
+            }
+
+            return groups;
+        },
+        [],
+    );
+    const buckets = new Map<string, GeneratedPaperSection[][]>();
+
+    for (const block of blocks) {
+        const key = paperSectionKeyForBlock(block, sectioning);
+        const bucket = buckets.get(key) ?? [];
+        bucket.push(
+            block.map((section) => ({ ...section, paperSectionKey: key })),
+        );
+        buckets.set(key, bucket);
+    }
+
+    const orderedKeys = [
+        OBJECTIVE_PAPER_SECTION_KEY,
+        ...sectioning.groups.map((group) => `configured:${group.id}`),
+        FALLBACK_PAPER_SECTION_KEY,
+    ];
+
+    return orderedKeys.flatMap((key) =>
+        (buckets.get(key) ?? []).flatMap((block) => block),
+    );
+}
+
 function mergeQuestionSections(
     incoming: QuestionTypeCount[],
     existing: QuestionSelectionSection[],
@@ -2125,6 +2238,8 @@ export default function GeneratePaper({
         });
     const [multipartConfig, setMultipartConfig] =
         useState<MultipartConfig | null>(null);
+    const [paperSectioning, setPaperSectioning] =
+        useState<PaperSectioningConfig>(INACTIVE_PAPER_SECTIONING);
     const [questionTypePairings, setQuestionTypePairings] = useState<
         QuestionTypePairing[]
     >([]);
@@ -2159,6 +2274,10 @@ export default function GeneratePaper({
     const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [savePaperError, setSavePaperError] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
+
+    useEffect(() => {
+        setPaperSectioning(INACTIVE_PAPER_SECTIONING);
+    }, [pattern?.id, klass?.id, subject?.id]);
 
     const patternOptions = useMemo<ComboboxOptionItem[]>(
         () =>
@@ -2794,10 +2913,14 @@ export default function GeneratePaper({
                     sections: QuestionTypeCount[];
                     groups?: QuestionTypePairing[];
                     multipart?: MultipartConfig | null;
+                    paperSectioning?: PaperSectioningConfig;
                 }) => {
                     const pairings = data.groups ?? [];
                     setQuestionTypePairings(pairings);
                     setMultipartConfig(data.multipart ?? null);
+                    setPaperSectioning(
+                        data.paperSectioning ?? INACTIVE_PAPER_SECTIONING,
+                    );
                     setQuestionSelection((current) =>
                         withTotalMarks({
                             ...current,
@@ -2836,6 +2959,7 @@ export default function GeneratePaper({
                     );
                     setQuestionTypePairings([]);
                     setMultipartConfig(null);
+                    setPaperSectioning(INACTIVE_PAPER_SECTIONING);
                     setQuestionSelection((current) =>
                         withTotalMarks({ ...current, sections: [] }),
                     );
@@ -3927,10 +4051,10 @@ export default function GeneratePaper({
                       };
                   })
                 : [];
-            const sections: GeneratedPaperSection[] = [
-                ...standardSections,
-                ...multipartSections,
-            ];
+            const sections = organizeGeneratedPaperSections(
+                [...standardSections, ...multipartSections],
+                paperSectioning,
+            );
             setQuestionPoolsByType(pools);
             setGeneratedPaper({
                 id: `paper_${Date.now()}`,
@@ -3952,6 +4076,10 @@ export default function GeneratePaper({
                     rollNo: '',
                 },
                 sections,
+                sectioning: {
+                    ...paperSectioning,
+                    medium: chapterMedium,
+                },
                 settings: { ...DEFAULT_PAPER_SETTINGS },
             });
             setPaperQuestionPickerTarget(null);
@@ -5042,14 +5170,27 @@ export default function GeneratePaper({
             columns: clampSectionColumns(questionType.columnPerRow, 1),
         };
 
-        setGeneratedPaper((current) =>
-            current
+        setGeneratedPaper((current) => {
+            if (!current) {
+                return current;
+            }
+
+            const sectionWithGrouping = current.sectioning?.active
                 ? {
-                      ...current,
-                      sections: [...current.sections, newSection],
+                      ...newSection,
+                      paperSectionKey: paperSectionKeyForType(
+                          values.questionTypeId,
+                          questionType.category,
+                          current.sectioning,
+                      ),
                   }
-                : current,
-        );
+                : newSection;
+
+            return {
+                ...current,
+                sections: [...current.sections, sectionWithGrouping],
+            };
+        });
         closeAddPaperSectionModal();
     }
 
@@ -7973,6 +8114,110 @@ function OrGroupDivider({
     );
 }
 
+const URDU_SECTION_IDENTIFIERS = [
+    'الف',
+    'ب',
+    'ج',
+    'د',
+    'ہ',
+    'و',
+    'ز',
+    'ح',
+    'ط',
+    'ی',
+    'ک',
+    'ل',
+    'م',
+    'ن',
+    'س',
+    'ع',
+    'ف',
+    'ص',
+    'ق',
+    'ر',
+    'ش',
+    'ت',
+    'ث',
+    'خ',
+    'ذ',
+    'ض',
+    'ظ',
+    'غ',
+] as const;
+
+function englishSectionIdentifier(index: number): string {
+    let value = Math.max(0, index);
+    let label = '';
+
+    do {
+        label = String.fromCharCode(65 + (value % 26)) + label;
+        value = Math.floor(value / 26) - 1;
+    } while (value >= 0);
+
+    return label;
+}
+
+function urduSectionIdentifier(index: number): string {
+    return URDU_SECTION_IDENTIFIERS[index] ?? englishSectionIdentifier(index);
+}
+
+function PaperSectionHeading({
+    index,
+    medium,
+    settings,
+}: {
+    index: number;
+    medium: 'English' | 'Urdu' | 'Both';
+    settings: PaperSettings;
+}) {
+    const english = `Section ${englishSectionIdentifier(index)}`;
+    const urdu = `حصہ ${urduSectionIdentifier(index)}`;
+    const openingBracket = settings.sectionHeadingBrackets ? '(' : '';
+    const closingBracket = settings.sectionHeadingBrackets ? ')' : '';
+
+    return (
+        <div
+            data-paper-section-heading
+            className="break-after-avoid text-center font-bold"
+            style={{
+                color: settings.textColor,
+                fontSize: `${settings.sectionHeadingSize}px`,
+                lineHeight: settings.sectionHeadingLineHeight,
+                borderColor: settings.textColor,
+                borderStyle: settings.sectionHeadingBorderStyle,
+                borderWidth: settings.sectionHeadingBorderWidth,
+                padding: '2px 6px',
+            }}
+        >
+            {openingBracket}
+            {medium === 'Urdu' ? (
+                <span
+                    dir="rtl"
+                    data-paper-urdu-content
+                    style={{ fontFamily: 'var(--paper-urdu-font)' }}
+                >
+                    {urdu}
+                </span>
+            ) : medium === 'Both' ? (
+                <>
+                    <span dir="ltr">{english}</span>
+                    <span aria-hidden="true"> / </span>
+                    <span
+                        dir="rtl"
+                        data-paper-urdu-content
+                        style={{ fontFamily: 'var(--paper-urdu-font)' }}
+                    >
+                        {urdu}
+                    </span>
+                </>
+            ) : (
+                english
+            )}
+            {closingBracket}
+        </div>
+    );
+}
+
 function GeneratedPaperView({
     paper,
     rawPaper,
@@ -8303,6 +8548,22 @@ function GeneratedPaperView({
         const logicalSections = targetPaper.sections.filter(
             (section) => section.orRole !== 'alternative',
         );
+        const subjectiveHeadingIndexByKey = new Map<string, number>();
+
+        for (const logicalSection of logicalSections) {
+            const key = logicalSection.paperSectionKey;
+
+            if (
+                key &&
+                key !== OBJECTIVE_PAPER_SECTION_KEY &&
+                !subjectiveHeadingIndexByKey.has(key)
+            ) {
+                subjectiveHeadingIndexByKey.set(
+                    key,
+                    subjectiveHeadingIndexByKey.size + 1,
+                );
+            }
+        }
 
         return targetPaper.sections.map((section, sectionIndex) => {
             if (section.orRole === 'alternative') {
@@ -8312,6 +8573,29 @@ function GeneratedPaperView({
             const logicalIndex = logicalSections.findIndex(
                 (candidate) => candidate.id === section.id,
             );
+            const previousLogicalSection = logicalSections[logicalIndex - 1];
+            const showPaperSectionHeading = Boolean(
+                targetPaper.sectioning?.active &&
+                settings.showSections &&
+                section.paperSectionKey &&
+                section.paperSectionKey !==
+                    previousLogicalSection?.paperSectionKey,
+            );
+            const paperSectionHeadingIndex =
+                section.paperSectionKey === OBJECTIVE_PAPER_SECTION_KEY
+                    ? 0
+                    : subjectiveHeadingIndexByKey.get(
+                          section.paperSectionKey ?? '',
+                      );
+            const paperSectionHeading =
+                showPaperSectionHeading &&
+                paperSectionHeadingIndex !== undefined ? (
+                    <PaperSectionHeading
+                        index={paperSectionHeadingIndex}
+                        medium={targetPaper.sectioning?.medium ?? 'English'}
+                        settings={settings}
+                    />
+                ) : null;
             const primary = renderPaperSection(
                 targetPaper,
                 section,
@@ -8331,6 +8615,7 @@ function GeneratedPaperView({
             if (groupSections.length < 2) {
                 return (
                     <div key={section.id} className="contents">
+                        {paperSectionHeading}
                         {primary}
                     </div>
                 );
@@ -8382,30 +8667,32 @@ function GeneratedPaperView({
             );
 
             return (
-                <div
-                    key={section.orGroupId ?? section.id}
-                    data-or-group
-                    data-or-layout={settings.orGroupLayout}
-                    className={cn(
-                        sideBySide ? 'grid items-stretch' : 'flex flex-col',
-                    )}
-                    style={
-                        sideBySide
-                            ? {
-                                  gridTemplateColumns: renderedGroupSections
-                                      .map((_, index) =>
-                                          index ===
-                                          renderedGroupSections.length - 1
-                                              ? 'minmax(0, 1fr)'
-                                              : 'minmax(0, 1fr) auto',
-                                      )
-                                      .join(' '),
-                                  columnGap: `${settings.orGroupGap}mm`,
-                              }
-                            : { rowGap: `${settings.orGroupGap}mm` }
-                    }
-                >
-                    {groupChildren}
+                <div key={section.orGroupId ?? section.id} className="contents">
+                    {paperSectionHeading}
+                    <div
+                        data-or-group
+                        data-or-layout={settings.orGroupLayout}
+                        className={cn(
+                            sideBySide ? 'grid items-stretch' : 'flex flex-col',
+                        )}
+                        style={
+                            sideBySide
+                                ? {
+                                      gridTemplateColumns: renderedGroupSections
+                                          .map((_, index) =>
+                                              index ===
+                                              renderedGroupSections.length - 1
+                                                  ? 'minmax(0, 1fr)'
+                                                  : 'minmax(0, 1fr) auto',
+                                          )
+                                          .join(' '),
+                                      columnGap: `${settings.orGroupGap}mm`,
+                                  }
+                                : { rowGap: `${settings.orGroupGap}mm` }
+                        }
+                    >
+                        {groupChildren}
+                    </div>
                 </div>
             );
         });
@@ -8854,6 +9141,7 @@ function GeneratedPaperView({
             <PaperSettingsDrawer
                 open={isSettingsDrawerOpen}
                 settings={settings}
+                sectioningAvailable={Boolean(rawPaper.sectioning?.active)}
                 defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                 onChange={onSettingsChange}
                 onClose={() => setIsSettingsDrawerOpen(false)}
