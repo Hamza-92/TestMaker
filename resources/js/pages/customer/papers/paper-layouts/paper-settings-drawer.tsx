@@ -64,6 +64,12 @@ interface FontOption<T extends string> {
 
 const ENGLISH_FONT_OPTIONS: Array<FontOption<PaperEnglishFont>> = [
     {
+        value: 'jameel-noori',
+        label: 'Jameel Noori',
+        previewFontFamily:
+            '"Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif',
+    },
+    {
         value: 'sans',
         label: 'Sans-serif',
         previewFontFamily: '"Montserrat", system-ui, sans-serif',

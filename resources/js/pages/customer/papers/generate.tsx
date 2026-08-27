@@ -89,6 +89,7 @@ import type { PaperHeaderTemplate } from './paper-layouts/types';
 import type {
     GeneratedPaper,
     GeneratedPaperHeader,
+    GeneratedMultipartPart,
     GeneratedPaperQuestion,
     GeneratedPaperSection,
     GeneratedPaperSectioning,
@@ -511,7 +512,10 @@ interface PaperQuestionPoolFilters {
     sources: string[];
 }
 
-interface AddPaperSectionValues {
+type AddPaperSectionKind = 'standard' | 'or' | 'multipart';
+
+interface AddPaperStandardSectionValues {
+    kind: 'standard';
     questionTypeId: number;
     requiredQuestions: number;
     totalQuestions: number;
@@ -519,6 +523,41 @@ interface AddPaperSectionValues {
     selectedQuestions: ManualQuestion[];
     poolQuestions: ManualQuestion[];
 }
+
+interface AddPaperOrSectionValues {
+    kind: 'or';
+    pairingId: number;
+    requiredQuestions: number;
+    totalQuestions: number;
+    marksEach: number;
+    members: Array<{
+        questionTypeId: number;
+        selectedQuestions: ManualQuestion[];
+        poolQuestions: ManualQuestion[];
+    }>;
+}
+
+interface AddPaperMultipartPartValues {
+    questionTypeId: number;
+    marksEach: number;
+    selectedQuestion: ManualQuestion;
+    poolQuestions: ManualQuestion[];
+}
+
+interface AddPaperMultipartCardValues {
+    parts: AddPaperMultipartPartValues[];
+}
+
+interface AddPaperMultipartSectionValues {
+    kind: 'multipart';
+    choiceCount: number | null;
+    cards: AddPaperMultipartCardValues[];
+}
+
+type AddPaperSectionValues =
+    | AddPaperStandardSectionValues
+    | AddPaperOrSectionValues
+    | AddPaperMultipartSectionValues;
 
 const CHAPTER_ONLY_SELECTION = -1;
 /**
@@ -5232,6 +5271,303 @@ export default function GeneratePaper({
     }
 
     async function addPaperSection(values: AddPaperSectionValues) {
+        if (values.kind === 'or') {
+            const pairing = questionTypePairings.find(
+                (candidate) => candidate.id === values.pairingId,
+            );
+            const memberSections = pairing?.questionTypeIds
+                .map((questionTypeId) =>
+                    questionSelection.sections.find(
+                        (section) => section.questionTypeId === questionTypeId,
+                    ),
+                )
+                .filter(
+                    (section): section is QuestionSelectionSection =>
+                        section !== undefined,
+                );
+
+            if (
+                !pairing ||
+                !memberSections ||
+                memberSections.length !== pairing.questionTypeIds.length ||
+                memberSections.length < 2
+            ) {
+                throw new Error('Select an available OR group first.');
+            }
+
+            const totalQuestions = Math.max(1, values.totalQuestions);
+            const requiredQuestions = Math.min(
+                Math.max(1, values.requiredQuestions),
+                totalQuestions,
+            );
+            const marksEach = Math.max(0, values.marksEach);
+            const reservedQuestionIds = new Set(generatedSourceQuestionIds);
+            const pools: Record<number, ManualQuestion[]> = {};
+            const selectedByType = new Map<number, ManualQuestion[]>();
+
+            for (const member of memberSections) {
+                const submittedMember = values.members.find(
+                    (candidate) =>
+                        candidate.questionTypeId === member.questionTypeId,
+                );
+                const selectedQuestions = (
+                    submittedMember?.selectedQuestions ?? []
+                )
+                    .filter((question) => !reservedQuestionIds.has(question.id))
+                    .slice(0, totalQuestions);
+
+                if (selectedQuestions.length < totalQuestions) {
+                    throw new Error(
+                        `Select ${totalQuestions} unused questions for ${plainQuestionText(member.title)}.`,
+                    );
+                }
+
+                selectedQuestions.forEach((question) =>
+                    reservedQuestionIds.add(question.id),
+                );
+                pools[member.questionTypeId] =
+                    submittedMember?.poolQuestions ?? [];
+                selectedByType.set(member.questionTypeId, selectedQuestions);
+            }
+
+            const groupId = nextPaperSectionId('paper_or_group');
+            const groupTypeIds = memberSections.map(
+                (section) => section.questionTypeId,
+            );
+            const orLabel =
+                chapterMedium === 'Urdu'
+                    ? '\u06cc\u0627'
+                    : chapterMedium === 'Both'
+                      ? 'OR / \u06cc\u0627'
+                      : 'OR';
+            const primary = memberSections[0];
+            const newSections = memberSections.map(
+                (member, memberIndex): GeneratedPaperSection => ({
+                    id: nextPaperSectionId('paper_sec'),
+                    questionTypeId: member.questionTypeId,
+                    category: member.category,
+                    title: member.heading || member.title,
+                    titleEnglish:
+                        chapterMedium !== 'Urdu'
+                            ? member.headingEnglish ||
+                              member.titleEnglish ||
+                              member.title
+                            : null,
+                    titleUrdu:
+                        chapterMedium !== 'English'
+                            ? member.headingUrdu ||
+                              member.titleUrdu ||
+                              member.title
+                            : null,
+                    questionTextRtl: member.questionTextRtl,
+                    requiredQuestions,
+                    totalQuestions,
+                    marksEach,
+                    questions: (
+                        selectedByType.get(member.questionTypeId) ?? []
+                    ).map((question) =>
+                        paperQuestionFromManual(
+                            question,
+                            nextPaperQuestionId(),
+                        ),
+                    ),
+                    columns: clampSectionColumns(member.columnPerRow, 1),
+                    orGroupId: groupId,
+                    orPairingId: pairing.id,
+                    orQuestionTypeId:
+                        memberIndex === 0
+                            ? (memberSections[1]?.questionTypeId ?? null)
+                            : primary.questionTypeId,
+                    orGroupTypeIds: groupTypeIds,
+                    orRole: memberIndex === 0 ? 'primary' : 'alternative',
+                    orLabel,
+                }),
+            );
+
+            setQuestionPoolsByType((current) => ({ ...current, ...pools }));
+            setGeneratedPaper((current) => {
+                if (!current) {
+                    return current;
+                }
+
+                const paperSectionKey = current.sectioning?.active
+                    ? paperSectionKeyForType(
+                          primary.questionTypeId,
+                          primary.category,
+                          current.sectioning,
+                      )
+                    : undefined;
+
+                return {
+                    ...current,
+                    sections: [
+                        ...current.sections,
+                        ...newSections.map((section) => ({
+                            ...section,
+                            ...(paperSectionKey ? { paperSectionKey } : {}),
+                        })),
+                    ],
+                };
+            });
+            closeAddPaperSectionModal();
+
+            return;
+        }
+
+        if (values.kind === 'multipart') {
+            if (!multipartConfig || values.cards.length === 0) {
+                throw new Error(
+                    'Configure at least one multipart question first.',
+                );
+            }
+
+            const pools: Record<number, ManualQuestion[]> = {};
+            const reservedQuestionIds = new Set(generatedSourceQuestionIds);
+            const groupId = nextPaperSectionId('multipart_group');
+            const groupQuestionCount = values.cards.length;
+            const groupChoiceCount =
+                typeof values.choiceCount === 'number'
+                    ? Math.min(
+                          Math.max(1, values.choiceCount),
+                          groupQuestionCount,
+                      )
+                    : null;
+            const newSections: GeneratedPaperSection[] = [];
+
+            for (const [cardIndex, card] of values.cards.entries()) {
+                if (card.parts.length < 2) {
+                    throw new Error(
+                        `Multipart question ${cardIndex + 1} needs at least two parts.`,
+                    );
+                }
+
+                const parts: GeneratedMultipartPart[] = [];
+
+                for (const [partIndex, part] of card.parts.entries()) {
+                    const type = multipartConfig.partTypes.find(
+                        (candidate) => candidate.id === part.questionTypeId,
+                    );
+
+                    if (!type) {
+                        throw new Error(
+                            `Select a question type for multipart ${cardIndex + 1}, part ${String.fromCharCode(65 + partIndex)}.`,
+                        );
+                    }
+
+                    if (reservedQuestionIds.has(part.selectedQuestion.id)) {
+                        throw new Error(
+                            `Select an unused question for multipart ${cardIndex + 1}, part ${String.fromCharCode(65 + partIndex)}.`,
+                        );
+                    }
+
+                    reservedQuestionIds.add(part.selectedQuestion.id);
+                    pools[part.questionTypeId] = Array.from(
+                        new Map(
+                            [
+                                ...(pools[part.questionTypeId] ?? []),
+                                ...part.poolQuestions,
+                            ].map((question) => [question.id, question]),
+                        ).values(),
+                    );
+                    parts.push({
+                        key: String.fromCharCode(65 + partIndex),
+                        typeId: part.questionTypeId,
+                        typeTitle: type.name,
+                        typeTitleEnglish: type.headingEnglish || type.name,
+                        typeTitleUrdu: type.headingUrdu || type.nameUrdu,
+                        questionTextRtl: type.questionTextRtl,
+                        marksEach: Math.max(0, part.marksEach),
+                        question: paperQuestionFromManual(
+                            part.selectedQuestion,
+                            nextPaperQuestionId('multipart_q'),
+                        ),
+                    });
+                }
+
+                const marksEach = parts.reduce(
+                    (total, part) => total + part.marksEach,
+                    0,
+                );
+
+                newSections.push({
+                    id: nextPaperSectionId('multipart'),
+                    questionTypeId: null,
+                    category: 'Subjective Questions',
+                    title:
+                        multipartConfig.headingEnglish || 'Multipart questions',
+                    titleEnglish:
+                        chapterMedium !== 'Urdu'
+                            ? multipartConfig.headingEnglish ||
+                              'Multipart questions'
+                            : null,
+                    titleUrdu:
+                        chapterMedium !== 'English'
+                            ? multipartConfig.headingUrdu
+                            : null,
+                    requiredQuestions: parts.length,
+                    totalQuestions: 1,
+                    marksEach,
+                    questions: [],
+                    columns: 1,
+                    multipart: {
+                        choiceCount: 1,
+                        marksEach,
+                        groupId,
+                        groupChoiceCount,
+                        groupQuestionCount,
+                        headingEnglish: multipartConfig.headingEnglish,
+                        headingUrdu: multipartConfig.headingUrdu,
+                        rows: [{ parts }],
+                    },
+                    orGroupId: null,
+                    orPairingId: null,
+                    orQuestionTypeId: null,
+                    orGroupTypeIds: null,
+                    orRole: null,
+                    orLabel: null,
+                });
+            }
+
+            if (
+                typeof groupChoiceCount === 'number' &&
+                groupChoiceCount < groupQuestionCount &&
+                newSections.some(
+                    (section) =>
+                        section.multipart?.marksEach !==
+                        newSections[0]?.multipart?.marksEach,
+                )
+            ) {
+                throw new Error(
+                    'Multipart questions must have the same total marks when a choice is selected.',
+                );
+            }
+
+            setQuestionPoolsByType((current) => ({ ...current, ...pools }));
+            setGeneratedPaper((current) => {
+                if (!current) {
+                    return current;
+                }
+
+                const paperSectionKey = current.sectioning?.active
+                    ? paperSectionKeyForBlock(newSections, current.sectioning)
+                    : undefined;
+
+                return {
+                    ...current,
+                    sections: [
+                        ...current.sections,
+                        ...newSections.map((section) => ({
+                            ...section,
+                            ...(paperSectionKey ? { paperSectionKey } : {}),
+                        })),
+                    ],
+                };
+            });
+            closeAddPaperSectionModal();
+
+            return;
+        }
+
         const questionType = questionSelection.sections.find(
             (section) => section.questionTypeId === values.questionTypeId,
         );
@@ -6307,7 +6643,10 @@ export default function GeneratePaper({
 
                     {isAddSectionModalOpen && (
                         <AddPaperSectionModal
+                            medium={chapterMedium}
                             questionTypes={questionSelection.sections}
+                            pairings={questionTypePairings}
+                            multipartConfig={multipartConfig}
                             chapters={chapters ?? []}
                             sourceOptions={sourceFilters}
                             initialChapterIds={selectedChapterIds}
@@ -6897,6 +7236,7 @@ function ManualQuestionPickerModal({
     return (
         <div
             role="presentation"
+            onMouseDown={(event) => event.stopPropagation()}
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 sm:p-6"
         >
             <section
@@ -7142,7 +7482,10 @@ function ManualQuestionPickerModal({
 type AddSectionTab = 'show' | 'picked' | 'chapters';
 
 function AddPaperSectionModal({
+    medium,
     questionTypes,
+    pairings,
+    multipartConfig,
     chapters,
     sourceOptions,
     initialChapterIds,
@@ -7153,7 +7496,10 @@ function AddPaperSectionModal({
     onClose,
     onSubmit,
 }: {
+    medium: ContentMedium;
     questionTypes: QuestionSelectionSection[];
+    pairings: QuestionTypePairing[];
+    multipartConfig: MultipartConfig | null;
     chapters: Chapter[];
     sourceOptions: SourceOption[];
     initialChapterIds: number[];
@@ -7167,15 +7513,15 @@ function AddPaperSectionModal({
     onClose: () => void;
     onSubmit: (values: AddPaperSectionValues) => Promise<void>;
 }) {
-    const [questionTypeId, setQuestionTypeId] = useState(
-        questionTypes[0] ? String(questionTypes[0].questionTypeId) : '',
+    const [sectionKind, setSectionKind] =
+        useState<AddPaperSectionKind>('standard');
+    const [questionTypeId, setQuestionTypeId] = useState('');
+    const [selectedSources, setSelectedSources] = useState<Set<string>>(
+        () => new Set(initialSources),
     );
-    const [sourceValue, setSourceValue] = useState(
-        initialSources.length === 1 ? initialSources[0] : '__all__',
-    );
-    const [totalQuestions, setTotalQuestions] = useState('1');
-    const [requiredQuestions, setRequiredQuestions] = useState('1');
-    const [marksEach, setMarksEach] = useState('1');
+    const [totalQuestions, setTotalQuestions] = useState('');
+    const [requiredQuestions, setRequiredQuestions] = useState('');
+    const [marksEach, setMarksEach] = useState('');
     const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>(
         [],
     );
@@ -7212,29 +7558,12 @@ function AddPaperSectionModal({
     const availableSources = sourceOptions.length
         ? sourceOptions
         : fallbackSourceOptions;
-    const sourceComboboxOptions = useMemo<ComboboxOptionItem[]>(
-        () => [
-            { id: '__all__', label: 'All sources' },
-            ...availableSources.map((source) => ({
-                id: source.value,
-                label: source.label,
-            })),
-        ],
-        [availableSources],
-    );
     const selectedTypeOption = useMemo(
         () =>
             typeOptions.find(
                 (option) => String(option.id) === questionTypeId,
             ) ?? null,
         [questionTypeId, typeOptions],
-    );
-    const selectedSourceOption = useMemo(
-        () =>
-            sourceComboboxOptions.find(
-                (option) => String(option.id) === sourceValue,
-            ) ?? null,
-        [sourceComboboxOptions, sourceValue],
     );
     const selectedType = useMemo(
         () =>
@@ -7243,12 +7572,9 @@ function AddPaperSectionModal({
             ) ?? null,
         [questionTypeId, questionTypes],
     );
-    const selectedSources =
-        sourceValue === ''
-            ? []
-            : sourceValue === '__all__'
-              ? availableSources.map((source) => source.value)
-              : [sourceValue];
+    const selectedSourceValues = availableSources
+        .filter((source) => selectedSources.has(source.value))
+        .map((source) => source.value);
     const modalChapterIds = useMemo(
         () =>
             chapters
@@ -7271,7 +7597,7 @@ function AddPaperSectionModal({
             ),
         [chapters, localTopicIds],
     );
-    const filterSignature = `${questionTypeId}|${sourceValue}|${modalChapterIds.join(',')}|${modalTopicIds.join(',')}`;
+    const filterSignature = `${questionTypeId}|${selectedSourceValues.join(',')}|${modalChapterIds.join(',')}|${modalTopicIds.join(',')}`;
     const unusedQuestions = useMemo(
         () =>
             resultQuestions.filter(
@@ -7309,7 +7635,7 @@ function AddPaperSectionModal({
     const marksNumber = toNumber(marksEach);
     const canSearch =
         selectedType !== null &&
-        selectedSources.length > 0 &&
+        selectedSourceValues.length > 0 &&
         modalChapterIds.length > 0 &&
         !loadingQuestions;
     const canSubmit =
@@ -7463,7 +7789,7 @@ function AddPaperSectionModal({
                 {
                     chapterIds: modalChapterIds,
                     topicIds: modalTopicIds,
-                    sources: selectedSources,
+                    sources: selectedSourceValues,
                 },
             );
 
@@ -7525,6 +7851,7 @@ function AddPaperSectionModal({
 
         try {
             await onSubmit({
+                kind: 'standard',
                 questionTypeId: selectedType.questionTypeId,
                 requiredQuestions: requiredNumber,
                 totalQuestions: totalNumber,
@@ -7541,6 +7868,47 @@ function AddPaperSectionModal({
         } finally {
             setSubmitting(false);
         }
+    }
+
+    if (sectionKind === 'multipart' && multipartConfig) {
+        return (
+            <AddMultipartPaperSectionModal
+                medium={medium}
+                onKindChange={setSectionKind}
+                questionTypes={questionTypes}
+                pairings={pairings}
+                multipartConfig={multipartConfig}
+                sourceOptions={sourceOptions}
+                initialChapterIds={initialChapterIds}
+                initialTopicIds={initialTopicIds}
+                initialSources={initialSources}
+                usedQuestionIds={usedQuestionIds}
+                onSearchQuestions={onSearchQuestions}
+                onClose={onClose}
+                onSubmit={onSubmit}
+            />
+        );
+    }
+
+    if (sectionKind === 'or') {
+        return (
+            <AddSpecialPaperSectionModal
+                kind={sectionKind}
+                onKindChange={setSectionKind}
+                questionTypes={questionTypes}
+                pairings={pairings}
+                multipartConfig={multipartConfig}
+                chapters={chapters}
+                sourceOptions={sourceOptions}
+                initialChapterIds={initialChapterIds}
+                initialTopicIds={initialTopicIds}
+                initialSources={initialSources}
+                usedQuestionIds={usedQuestionIds}
+                onSearchQuestions={onSearchQuestions}
+                onClose={onClose}
+                onSubmit={onSubmit}
+            />
+        );
     }
 
     return (
@@ -7576,7 +7944,29 @@ function AddPaperSectionModal({
                         </button>
                     </div>
 
-                    <div className="grid gap-3 xl:grid-cols-[1.55fr_1.25fr_.75fr_.75fr_.75fr_auto]">
+                    <AddPaperSectionKindTabs
+                        value={sectionKind}
+                        onChange={setSectionKind}
+                        hasOrGroups={pairings.some(
+                            (pairing) =>
+                                pairing.questionTypeIds.length >= 2 &&
+                                pairing.questionTypeIds.every(
+                                    (questionTypeId) =>
+                                        questionTypes.some(
+                                            (section) =>
+                                                section.questionTypeId ===
+                                                questionTypeId,
+                                        ),
+                                ),
+                        )}
+                        hasMultipart={
+                            multipartConfig !== null &&
+                            multipartConfig.maxParts >= 2 &&
+                            multipartConfig.partTypes.length > 0
+                        }
+                    />
+
+                    <div className="mt-4 grid gap-3 xl:grid-cols-[1.55fr_1.25fr_.75fr_.75fr_.75fr_auto]">
                         <FloatingCombobox
                             label="Type"
                             leadingIcon={FileTextIcon}
@@ -7591,16 +7981,10 @@ function AddPaperSectionModal({
                             disabledHint="No question types available"
                         />
 
-                        <FloatingCombobox
-                            label="Source"
-                            leadingIcon={LayersIcon}
-                            options={sourceComboboxOptions}
-                            value={selectedSourceOption}
-                            onChange={(option) =>
-                                setSourceValue(
-                                    option ? String(option.id) : '__all__',
-                                )
-                            }
+                        <SourceMultiSelect
+                            options={availableSources}
+                            selectedValues={selectedSources}
+                            onChange={setSelectedSources}
                         />
 
                         <FloatingField label="Choice">
@@ -7762,6 +8146,1814 @@ function AddPaperSectionModal({
                     </div>
                 </div>
             </section>
+        </div>
+    );
+}
+
+function AddMultipartPaperSectionModal({
+    medium,
+    onKindChange,
+    questionTypes,
+    pairings,
+    multipartConfig,
+    sourceOptions,
+    initialChapterIds,
+    initialTopicIds,
+    initialSources,
+    usedQuestionIds,
+    onSearchQuestions,
+    onClose,
+    onSubmit,
+}: {
+    medium: ContentMedium;
+    onKindChange: (kind: AddPaperSectionKind) => void;
+    questionTypes: QuestionSelectionSection[];
+    pairings: QuestionTypePairing[];
+    multipartConfig: MultipartConfig;
+    sourceOptions: SourceOption[];
+    initialChapterIds: number[];
+    initialTopicIds: number[];
+    initialSources: string[];
+    usedQuestionIds: Set<number>;
+    onSearchQuestions: (
+        questionTypeId: number,
+        filters: PaperQuestionPoolFilters,
+    ) => Promise<ManualQuestion[]>;
+    onClose: () => void;
+    onSubmit: (values: AddPaperSectionValues) => Promise<void>;
+}) {
+    const availableSources = sourceOptions.length
+        ? sourceOptions
+        : fallbackSourceOptions;
+    const cardSequence = useRef(1);
+    const [selectedSources, setSelectedSources] = useState<Set<string>>(
+        () => new Set(initialSources),
+    );
+    const [selections, setSelections] = useState<MultipartSelectionState[]>(
+        () => [
+            currentMultipartSelection(
+                undefined,
+                multipartConfig,
+                'add_multipart_1',
+            ),
+        ],
+    );
+    const [choiceCount, setChoiceCount] = useState<number | null>(null);
+    const [manualTarget, setManualTarget] = useState<{
+        selectionId: string;
+        rowId: string;
+    } | null>(null);
+    const [questionPools, setQuestionPools] = useState<
+        Record<string, ManualQuestion[]>
+    >({});
+    const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [questionLoadError, setQuestionLoadError] = useState<string | null>(
+        null,
+    );
+    const [manualSearch, setManualSearch] = useState('');
+    const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const selectedSourceValues = availableSources
+        .filter((source) => selectedSources.has(source.value))
+        .map((source) => source.value);
+    const validPairingCount = pairings.filter(
+        (pairing) =>
+            pairing.questionTypeIds.length >= 2 &&
+            pairing.questionTypeIds.every((questionTypeId) =>
+                questionTypes.some(
+                    (section) => section.questionTypeId === questionTypeId,
+                ),
+            ),
+    ).length;
+    const configuredSelections = selections.filter(multipartSelectionHasInput);
+    const hasIncompleteCard = configuredSelections.some(
+        (selection) =>
+            selection.rows.length < 2 ||
+            selection.rows.some(
+                (row) =>
+                    row.questionTypeId === null ||
+                    toNumber(row.marksPerQuestion) <= 0,
+            ),
+    );
+    const hasIncompleteManualSelection = configuredSelections.some(
+        (selection) =>
+            selection.selectionMode === 'manual' &&
+            selection.rows.some((row) => row.selectedQuestionIds.length !== 1),
+    );
+    const configuredMarks = configuredSelections.map((selection) =>
+        selection.rows.reduce(
+            (total, row) => total + toNumber(row.marksPerQuestion),
+            0,
+        ),
+    );
+    const hasChoiceMarksMismatch =
+        typeof choiceCount === 'number' &&
+        choiceCount < configuredSelections.length &&
+        configuredMarks.some((marks) => marks !== configuredMarks[0]);
+    const canSubmit =
+        configuredSelections.length > 0 &&
+        selectedSourceValues.length > 0 &&
+        initialChapterIds.length > 0 &&
+        !hasIncompleteCard &&
+        !hasIncompleteManualSelection &&
+        !hasChoiceMarksMismatch &&
+        !submitting;
+    const manualSelection = manualTarget
+        ? selections.find(
+              (selection) => selection.id === manualTarget.selectionId,
+          )
+        : undefined;
+    const manualRow = manualTarget
+        ? manualSelection?.rows.find((row) => row.id === manualTarget.rowId)
+        : undefined;
+    const manualType = multipartConfig.partTypes.find(
+        (type) => type.id === manualRow?.questionTypeId,
+    );
+    const manualTargetKey = manualTarget
+        ? `${manualTarget.selectionId}_${manualTarget.rowId}`
+        : '';
+    const activePool = useMemo(
+        () => questionPools[manualTargetKey] ?? [],
+        [manualTargetKey, questionPools],
+    );
+    const allSelectedQuestionIds = useMemo(
+        () =>
+            new Set([
+                ...usedQuestionIds,
+                ...selections.flatMap((selection) =>
+                    selection.rows.flatMap((row) => row.selectedQuestionIds),
+                ),
+            ]),
+        [selections, usedQuestionIds],
+    );
+    const activeSelectedQuestionIds = useMemo(
+        () => new Set(manualRow?.selectedQuestionIds ?? []),
+        [manualRow?.selectedQuestionIds],
+    );
+    const filteredManualQuestions = useMemo(() => {
+        const search = manualSearch.trim().toLowerCase();
+        const chapterNumbers = parseChapterNumbers(manualRow?.chapterNumbers);
+
+        return activePool.filter((question) => {
+            if (!questionMatchesChapterNumbers(question, chapterNumbers)) {
+                return false;
+            }
+
+            if (
+                showSelectedOnly &&
+                !activeSelectedQuestionIds.has(question.id)
+            ) {
+                return false;
+            }
+
+            if (search === '') {
+                return true;
+            }
+
+            return [
+                question.summaryText,
+                question.summaryTextEn,
+                question.summaryTextUr,
+                question.chapter.name,
+                question.topic?.name,
+                question.sourceLabel,
+                question.source,
+            ].some((value) =>
+                plainQuestionText(value ?? '')
+                    .toLowerCase()
+                    .includes(search),
+            );
+        });
+    }, [
+        activePool,
+        activeSelectedQuestionIds,
+        manualRow?.chapterNumbers,
+        manualSearch,
+        showSelectedOnly,
+    ]);
+    const activeManualPickerRow = useMemo<ManualPickerRow | null>(() => {
+        if (!manualTarget || !manualSelection || !manualRow || !manualType) {
+            return null;
+        }
+
+        const cardIndex = selections.findIndex(
+            (selection) => selection.id === manualSelection.id,
+        );
+        const partIndex = manualSelection.rows.findIndex(
+            (row) => row.id === manualRow.id,
+        );
+        const section: QuestionSelectionSection = {
+            id: `add_${manualSelection.id}`,
+            questionTypeId: manualType.id,
+            category: 'Subjective Questions',
+            title: manualType.name,
+            titleEnglish: manualType.name,
+            titleUrdu: manualType.nameUrdu,
+            questionTextRtl: manualType.questionTextRtl,
+            availableCount: activePool.length,
+            columnPerRow: 1,
+            rows: [manualRow],
+        };
+
+        return {
+            multipartSelectionId: manualSelection.id,
+            multipartChapterNumbers: manualRow.chapterNumbers,
+            section,
+            row: manualRow,
+            target: 1,
+            side: 'primary',
+            questionTypeId: manualType.id,
+            selectedQuestionIds: manualRow.selectedQuestionIds,
+            title: `Multipart ${cardIndex + 1}, Part ${String.fromCharCode(65 + partIndex)}: ${plainQuestionText(manualType.name)}`,
+        };
+    }, [
+        activePool.length,
+        manualRow,
+        manualSelection,
+        manualTarget,
+        manualType,
+        selections,
+    ]);
+
+    function updateSelection(
+        selectionId: string,
+        nextSelection: MultipartSelectionState,
+    ) {
+        setSelections((current) =>
+            current.map((selection) =>
+                selection.id === selectionId ? nextSelection : selection,
+            ),
+        );
+        setSubmitError(null);
+    }
+
+    function addCard() {
+        cardSequence.current += 1;
+        const selectionId = `add_multipart_${Date.now()}_${cardSequence.current}`;
+
+        setSelections((current) => [
+            ...current,
+            currentMultipartSelection(undefined, multipartConfig, selectionId),
+        ]);
+        setSubmitError(null);
+    }
+
+    function changeSources(nextSources: Set<string>) {
+        setSelectedSources(nextSources);
+        setSelections((current) =>
+            current.map((selection) => ({
+                ...selection,
+                rows: selection.rows.map((row) => ({
+                    ...row,
+                    selectedQuestionIds: [],
+                })),
+            })),
+        );
+        setQuestionPools({});
+        closeManualPicker();
+        setSubmitError(null);
+    }
+
+    function changeAutoPick(selectionId: string, enabled: boolean) {
+        setSelections((current) =>
+            current.map((selection) =>
+                selection.id === selectionId
+                    ? {
+                          ...selection,
+                          selectionMode: enabled ? 'automatic' : 'manual',
+                      }
+                    : selection,
+            ),
+        );
+
+        if (enabled && manualTarget?.selectionId === selectionId) {
+            closeManualPicker();
+        }
+    }
+
+    async function openManualPicker(selectionId: string, rowId: string) {
+        const selection = selections.find(
+            (candidate) => candidate.id === selectionId,
+        );
+        const row = selection?.rows.find((candidate) => candidate.id === rowId);
+
+        if (!selection || row?.questionTypeId === null || !row) {
+            return;
+        }
+
+        const targetKey = `${selectionId}_${rowId}`;
+        setManualTarget({ selectionId, rowId });
+        setManualSearch('');
+        setShowSelectedOnly(false);
+        setLoadingQuestions(true);
+        setQuestionLoadError(null);
+
+        try {
+            const questions = await onSearchQuestions(row.questionTypeId, {
+                chapterIds: initialChapterIds,
+                topicIds: initialTopicIds,
+                sources: selectedSourceValues,
+            });
+            setQuestionPools((current) => ({
+                ...current,
+                [targetKey]: questions,
+            }));
+        } catch (error) {
+            setQuestionLoadError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to load questions.',
+            );
+        } finally {
+            setLoadingQuestions(false);
+        }
+    }
+
+    function closeManualPicker() {
+        setManualTarget(null);
+        setManualSearch('');
+        setShowSelectedOnly(false);
+        setQuestionLoadError(null);
+    }
+
+    function toggleManualQuestion(questionId: number) {
+        if (!manualTarget || !manualRow) {
+            return;
+        }
+
+        const alreadySelected =
+            manualRow.selectedQuestionIds.includes(questionId);
+
+        if (!alreadySelected && allSelectedQuestionIds.has(questionId)) {
+            return;
+        }
+
+        setSelections((current) =>
+            current.map((selection) =>
+                selection.id !== manualTarget.selectionId
+                    ? selection
+                    : {
+                          ...selection,
+                          rows: selection.rows.map((row) =>
+                              row.id === manualTarget.rowId
+                                  ? {
+                                        ...row,
+                                        selectedQuestionIds: alreadySelected
+                                            ? []
+                                            : [questionId],
+                                    }
+                                  : row,
+                          ),
+                      },
+            ),
+        );
+        setSubmitError(null);
+    }
+
+    async function handleSubmit() {
+        if (!canSubmit) {
+            return;
+        }
+
+        setSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            const reserved = new Set(usedQuestionIds);
+            const nextPools = { ...questionPools };
+            const cards: AddPaperMultipartCardValues[] = [];
+
+            for (const selection of configuredSelections) {
+                const parts: AddPaperMultipartPartValues[] = [];
+
+                for (const [partIndex, row] of selection.rows.entries()) {
+                    if (row.questionTypeId === null) {
+                        throw new Error(
+                            `Select a question type for part ${String.fromCharCode(65 + partIndex)}.`,
+                        );
+                    }
+
+                    const targetKey = `${selection.id}_${row.id}`;
+                    let pool = nextPools[targetKey] ?? [];
+
+                    if (selection.selectionMode === 'automatic') {
+                        pool = await onSearchQuestions(row.questionTypeId, {
+                            chapterIds: initialChapterIds,
+                            topicIds: initialTopicIds,
+                            sources: selectedSourceValues,
+                        });
+                        nextPools[targetKey] = pool;
+                    }
+
+                    const chapterNumbers = parseChapterNumbers(
+                        row.chapterNumbers,
+                    );
+                    const available = pool.filter(
+                        (question) =>
+                            questionMatchesChapterNumbers(
+                                question,
+                                chapterNumbers,
+                            ) && !reserved.has(question.id),
+                    );
+                    const selectedQuestion =
+                        selection.selectionMode === 'manual'
+                            ? pool.find(
+                                  (question) =>
+                                      question.id ===
+                                          row.selectedQuestionIds[0] &&
+                                      questionMatchesChapterNumbers(
+                                          question,
+                                          chapterNumbers,
+                                      ) &&
+                                      !reserved.has(question.id),
+                              )
+                            : shuffledQuestions(available)[0];
+
+                    if (!selectedQuestion) {
+                        throw new Error(
+                            `No unused question is available for multipart ${cards.length + 1}, part ${String.fromCharCode(65 + partIndex)}.`,
+                        );
+                    }
+
+                    reserved.add(selectedQuestion.id);
+                    parts.push({
+                        questionTypeId: row.questionTypeId,
+                        marksEach: toNumber(row.marksPerQuestion),
+                        selectedQuestion,
+                        poolQuestions: pool,
+                    });
+                }
+
+                cards.push({ parts });
+            }
+
+            setQuestionPools(nextPools);
+            await onSubmit({
+                kind: 'multipart',
+                choiceCount:
+                    typeof choiceCount === 'number'
+                        ? Math.min(choiceCount, cards.length)
+                        : null,
+                cards,
+            });
+        } catch (error) {
+            setSubmitError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to add multipart questions.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div
+            role="presentation"
+            onMouseDown={onClose}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3"
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-multipart-paper-section-title"
+                onMouseDown={(event) => event.stopPropagation()}
+                className="flex h-[min(46rem,calc(100vh-1.5rem))] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+                <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h2
+                            id="add-multipart-paper-section-title"
+                            className="text-base font-semibold text-slate-900 dark:text-slate-100"
+                        >
+                            Add section
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close add section"
+                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        >
+                            <XIcon className="size-4" />
+                        </button>
+                    </div>
+
+                    <AddPaperSectionKindTabs
+                        value="multipart"
+                        onChange={onKindChange}
+                        hasOrGroups={validPairingCount > 0}
+                        hasMultipart
+                    />
+
+                    <div className="mt-4">
+                        <SourceMultiSelect
+                            options={availableSources}
+                            selectedValues={selectedSources}
+                            onChange={changeSources}
+                        />
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 p-4 dark:bg-slate-950/30">
+                    <div className="space-y-3">
+                        <CategoryDivider
+                            title="Multipart questions"
+                            action={
+                                <div className="flex items-center gap-2">
+                                    <MultipartChoiceControl
+                                        value={choiceCount}
+                                        count={selections.length}
+                                        onChange={(value) =>
+                                            setChoiceCount(
+                                                value === ''
+                                                    ? null
+                                                    : Math.max(
+                                                          1,
+                                                          Number(value),
+                                                      ),
+                                            )
+                                        }
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addCard}
+                                        aria-label="Add another multipart card"
+                                        title="Add another multipart card"
+                                        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
+                                    >
+                                        <PlusIcon className="size-3.5" />
+                                    </button>
+                                </div>
+                            }
+                        />
+
+                        {hasChoiceMarksMismatch && (
+                            <p className="text-xs text-rose-600 dark:text-rose-400">
+                                Multipart questions must have the same total
+                                marks when a choice is selected.
+                            </p>
+                        )}
+
+                        {selections.map((selection, index) => (
+                            <MultipartSelectionCard
+                                key={selection.id}
+                                title={`Multipart question ${index + 1}`}
+                                config={multipartConfig}
+                                value={selection}
+                                onChange={(nextSelection) =>
+                                    updateSelection(selection.id, nextSelection)
+                                }
+                                onAutoPickChange={(enabled) =>
+                                    changeAutoPick(selection.id, enabled)
+                                }
+                                onOpenManualPicker={(rowId) =>
+                                    void openManualPicker(selection.id, rowId)
+                                }
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm font-medium text-red-600 dark:text-red-300">
+                        {submitError}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            Close
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!canSubmit}
+                            onClick={() => void handleSubmit()}
+                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:bg-brand-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                        >
+                            {submitting && (
+                                <Loader2Icon className="size-4 animate-spin" />
+                            )}
+                            Add to paper
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            {activeManualPickerRow && (
+                <ManualQuestionPickerModal
+                    activeRow={activeManualPickerRow}
+                    medium={medium}
+                    questions={filteredManualQuestions}
+                    loading={loadingQuestions}
+                    error={questionLoadError}
+                    search={manualSearch}
+                    showSelectedOnly={showSelectedOnly}
+                    selectedQuestionIds={activeSelectedQuestionIds}
+                    allSelectedQuestionIds={allSelectedQuestionIds}
+                    onSearchChange={setManualSearch}
+                    onSelectedOnlyChange={() =>
+                        setShowSelectedOnly((current) => !current)
+                    }
+                    onToggleQuestion={toggleManualQuestion}
+                    onClose={closeManualPicker}
+                />
+            )}
+        </div>
+    );
+}
+
+interface AddMultipartDraftPart {
+    id: string;
+    questionTypeId: string;
+    marksEach: string;
+    selectedQuestionIds: number[];
+}
+
+function AddSpecialPaperSectionModal({
+    kind,
+    onKindChange,
+    questionTypes,
+    pairings,
+    multipartConfig,
+    chapters,
+    sourceOptions,
+    initialChapterIds,
+    initialTopicIds,
+    initialSources,
+    usedQuestionIds,
+    onSearchQuestions,
+    onClose,
+    onSubmit,
+}: {
+    kind: Exclude<AddPaperSectionKind, 'standard'>;
+    onKindChange: (kind: AddPaperSectionKind) => void;
+    questionTypes: QuestionSelectionSection[];
+    pairings: QuestionTypePairing[];
+    multipartConfig: MultipartConfig | null;
+    chapters: Chapter[];
+    sourceOptions: SourceOption[];
+    initialChapterIds: number[];
+    initialTopicIds: number[];
+    initialSources: string[];
+    usedQuestionIds: Set<number>;
+    onSearchQuestions: (
+        questionTypeId: number,
+        filters: PaperQuestionPoolFilters,
+    ) => Promise<ManualQuestion[]>;
+    onClose: () => void;
+    onSubmit: (values: AddPaperSectionValues) => Promise<void>;
+}) {
+    const availableSources = sourceOptions.length
+        ? sourceOptions
+        : fallbackSourceOptions;
+    const [selectedSources, setSelectedSources] = useState<Set<string>>(
+        () => new Set(initialSources),
+    );
+    const [totalQuestions, setTotalQuestions] = useState('');
+    const [requiredQuestions, setRequiredQuestions] = useState('');
+    const [marksEach, setMarksEach] = useState('');
+    const [localChapterIds, setLocalChapterIds] = useState<Set<number>>(
+        () => new Set(initialChapterIds),
+    );
+    const [localTopicIds, setLocalTopicIds] = useState<Set<number>>(
+        () => new Set(initialTopicIds),
+    );
+    const validPairings = useMemo(
+        () =>
+            pairings.filter(
+                (pairing) =>
+                    pairing.questionTypeIds.length >= 2 &&
+                    pairing.questionTypeIds.every((questionTypeId) =>
+                        questionTypes.some(
+                            (section) =>
+                                section.questionTypeId === questionTypeId,
+                        ),
+                    ),
+            ),
+        [pairings, questionTypes],
+    );
+    const [pairingId, setPairingId] = useState('');
+    const [parts, setParts] = useState<AddMultipartDraftPart[]>(() =>
+        Array.from({ length: 2 }, (_, index) => ({
+            id: `add_multipart_part_${index + 1}`,
+            questionTypeId: '',
+            marksEach: '',
+            selectedQuestionIds: [],
+        })),
+    );
+    const [activeTargetKey, setActiveTargetKey] = useState('');
+    const [activeTab, setActiveTab] = useState<AddSectionTab>('show');
+    const [resultQuestionsByTarget, setResultQuestionsByTarget] = useState<
+        Record<string, ManualQuestion[]>
+    >({});
+    const [searchedTargets, setSearchedTargets] = useState<Set<string>>(
+        () => new Set(),
+    );
+    const [orSelectedQuestionIds, setOrSelectedQuestionIds] = useState<
+        Record<string, number[]>
+    >({});
+    const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [questionLoadError, setQuestionLoadError] = useState<string | null>(
+        null,
+    );
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const selectedSourceValues = availableSources
+        .filter((source) => selectedSources.has(source.value))
+        .map((source) => source.value);
+    const modalChapterIds = useMemo(
+        () =>
+            chapters
+                .filter((chapter) =>
+                    chapter.topics.length === 0
+                        ? localChapterIds.has(chapter.id)
+                        : chapter.topics.some((topic) =>
+                              localTopicIds.has(topic.id),
+                          ),
+                )
+                .map((chapter) => chapter.id),
+        [chapters, localChapterIds, localTopicIds],
+    );
+    const modalTopicIds = useMemo(
+        () =>
+            chapters.flatMap((chapter) =>
+                chapter.topics
+                    .filter((topic) => localTopicIds.has(topic.id))
+                    .map((topic) => topic.id),
+            ),
+        [chapters, localTopicIds],
+    );
+    const selectedPairing = validPairings.find(
+        (pairing) => String(pairing.id) === pairingId,
+    );
+    const pairedSections = (selectedPairing?.questionTypeIds ?? [])
+        .map((questionTypeId) =>
+            questionTypes.find(
+                (section) => section.questionTypeId === questionTypeId,
+            ),
+        )
+        .filter(
+            (section): section is QuestionSelectionSection =>
+                section !== undefined,
+        );
+    const pairingOptions = useMemo<ComboboxOptionItem[]>(
+        () =>
+            validPairings.map((pairing) => ({
+                id: pairing.id,
+                label: pairing.questionTypeIds
+                    .map((questionTypeId) =>
+                        plainQuestionText(
+                            questionTypes.find(
+                                (section) =>
+                                    section.questionTypeId === questionTypeId,
+                            )?.title ?? 'Question type',
+                        ),
+                    )
+                    .join(' OR '),
+            })),
+        [questionTypes, validPairings],
+    );
+    const selectedPairingOption =
+        pairingOptions.find((option) => String(option.id) === pairingId) ??
+        null;
+    const multipartTypeOptions = useMemo<ComboboxOptionItem[]>(
+        () =>
+            (multipartConfig?.partTypes ?? []).map((type) => ({
+                id: type.id,
+                label: type.name,
+                searchLabel: plainQuestionText(type.name),
+                displayLabel: (
+                    <QuestionContent as="span" inline value={type.name} />
+                ),
+            })),
+        [multipartConfig],
+    );
+    const totalNumber = toNumber(totalQuestions);
+    const requiredNumber = Math.min(toNumber(requiredQuestions), totalNumber);
+    const activePart = parts.find((part) => part.id === activeTargetKey);
+    const activeOrTypeId = activeTargetKey.startsWith('or_')
+        ? toNumber(activeTargetKey.slice(3))
+        : 0;
+    const activeQuestionTypeId =
+        kind === 'or'
+            ? activeOrTypeId || null
+            : activePart && toNumber(activePart.questionTypeId) > 0
+              ? toNumber(activePart.questionTypeId)
+              : null;
+    const activeSelectedQuestionIds =
+        kind === 'or'
+            ? (orSelectedQuestionIds[String(activeQuestionTypeId)] ?? [])
+            : (activePart?.selectedQuestionIds ?? []);
+    const activeTargetLimit = kind === 'or' ? totalNumber : 1;
+    const resultQuestions = resultQuestionsByTarget[activeTargetKey] ?? [];
+    const selectedElsewhereIds = new Set(
+        kind === 'or'
+            ? Object.entries(orSelectedQuestionIds)
+                  .filter(([typeId]) => typeId !== String(activeQuestionTypeId))
+                  .flatMap(([, ids]) => ids)
+            : parts
+                  .filter((part) => part.id !== activeTargetKey)
+                  .flatMap((part) => part.selectedQuestionIds),
+    );
+    const filteredQuestions = resultQuestions.filter(
+        (question) =>
+            !usedQuestionIds.has(question.id) &&
+            !selectedElsewhereIds.has(question.id),
+    );
+    const selectedQuestions = activeSelectedQuestionIds
+        .map((id) => resultQuestions.find((question) => question.id === id))
+        .filter(
+            (question): question is ManualQuestion => question !== undefined,
+        );
+    const questionsByChapter = useMemo(() => {
+        const groups = new Map<string, ManualQuestion[]>();
+
+        filteredQuestions.forEach((question) => {
+            const label = manualQuestionChapterLabel(question);
+            groups.set(label, [...(groups.get(label) ?? []), question]);
+        });
+
+        return [...groups.entries()];
+    }, [filteredQuestions]);
+    const hasScope =
+        selectedSourceValues.length > 0 && modalChapterIds.length > 0;
+    const canSearch =
+        activeQuestionTypeId !== null && hasScope && !loadingQuestions;
+    const multipartReady =
+        multipartConfig !== null &&
+        parts.length >= 2 &&
+        parts.every(
+            (part) =>
+                toNumber(part.questionTypeId) > 0 &&
+                toNumber(part.marksEach) > 0 &&
+                part.selectedQuestionIds.length === 1,
+        );
+    const orReady =
+        selectedPairing !== undefined &&
+        totalNumber > 0 &&
+        requiredNumber > 0 &&
+        toNumber(marksEach) > 0 &&
+        pairedSections.every(
+            (section) =>
+                (orSelectedQuestionIds[String(section.questionTypeId)] ?? [])
+                    .length === totalNumber,
+        );
+    const canSubmit =
+        !submitting && hasScope && (kind === 'or' ? orReady : multipartReady);
+    const filterSignature = `${selectedSourceValues.join(',')}|${modalChapterIds.join(',')}|${modalTopicIds.join(',')}`;
+
+    useEffect(() => {
+        function closeOnEscape(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        }
+
+        window.addEventListener('keydown', closeOnEscape);
+
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [onClose]);
+
+    useEffect(() => {
+        setResultQuestionsByTarget({});
+        setSearchedTargets(new Set());
+        setOrSelectedQuestionIds({});
+        setParts((current) =>
+            current.map((part) => ({
+                ...part,
+                selectedQuestionIds: [],
+            })),
+        );
+        setQuestionLoadError(null);
+        setSubmitError(null);
+    }, [filterSignature]);
+
+    useEffect(() => {
+        if (kind === 'or') {
+            const firstTypeId = pairedSections[0]?.questionTypeId;
+            setActiveTargetKey(firstTypeId ? `or_${firstTypeId}` : '');
+            setOrSelectedQuestionIds({});
+            setResultQuestionsByTarget({});
+            setSearchedTargets(new Set());
+        } else if (!parts.some((part) => part.id === activeTargetKey)) {
+            setActiveTargetKey(parts[0]?.id ?? '');
+        }
+        // pairedSections is intentionally represented by the selected pairing id.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [kind, pairingId]);
+
+    useEffect(() => {
+        setOrSelectedQuestionIds((current) =>
+            Object.fromEntries(
+                Object.entries(current).map(([typeId, ids]) => [
+                    typeId,
+                    ids.slice(0, totalNumber),
+                ]),
+            ),
+        );
+        setRequiredQuestions((current) => {
+            if (current === '' || totalNumber <= 0) {
+                return '';
+            }
+
+            return String(Math.min(toNumber(current), totalNumber));
+        });
+    }, [totalNumber]);
+
+    function toggleChapter(chapter: Chapter) {
+        if (chapter.topics.length === 0) {
+            setLocalChapterIds((current) => {
+                const next = new Set(current);
+
+                if (next.has(chapter.id)) {
+                    next.delete(chapter.id);
+                } else {
+                    next.add(chapter.id);
+                }
+
+                return next;
+            });
+
+            return;
+        }
+
+        const topicIds = chapter.topics.map((topic) => topic.id);
+        const allSelected = topicIds.every((id) => localTopicIds.has(id));
+
+        setLocalTopicIds((current) => {
+            const next = new Set(current);
+            topicIds.forEach((id) =>
+                allSelected ? next.delete(id) : next.add(id),
+            );
+
+            return next;
+        });
+    }
+
+    function toggleTopic(topicId: number) {
+        setLocalTopicIds((current) => {
+            const next = new Set(current);
+
+            if (next.has(topicId)) {
+                next.delete(topicId);
+            } else {
+                next.add(topicId);
+            }
+
+            return next;
+        });
+    }
+
+    function updatePart(id: string, patch: Partial<AddMultipartDraftPart>) {
+        setParts((current) =>
+            current.map((part) =>
+                part.id === id ? { ...part, ...patch } : part,
+            ),
+        );
+    }
+
+    function addPart() {
+        if (!multipartConfig || parts.length >= 10) {
+            return;
+        }
+
+        const nextIndex = parts.length;
+        const id = `add_multipart_part_${Date.now()}_${nextIndex + 1}`;
+
+        setParts((current) => [
+            ...current,
+            {
+                id,
+                questionTypeId: '',
+                marksEach: '',
+                selectedQuestionIds: [],
+            },
+        ]);
+        setActiveTargetKey(id);
+    }
+
+    function clearTargetResults(targetKey: string) {
+        setResultQuestionsByTarget((current) => {
+            const next = { ...current };
+            delete next[targetKey];
+
+            return next;
+        });
+        setSearchedTargets((current) => {
+            const next = new Set(current);
+            next.delete(targetKey);
+
+            return next;
+        });
+    }
+
+    function setTargetSelection(targetKey: string, ids: number[]) {
+        if (kind === 'or') {
+            const typeId = targetKey.startsWith('or_')
+                ? targetKey.slice(3)
+                : '';
+            setOrSelectedQuestionIds((current) => ({
+                ...current,
+                [typeId]: ids,
+            }));
+
+            return;
+        }
+
+        setParts((current) =>
+            current.map((part) =>
+                part.id === targetKey
+                    ? { ...part, selectedQuestionIds: ids }
+                    : part,
+            ),
+        );
+    }
+
+    function toggleQuestion(questionId: number) {
+        const current = activeSelectedQuestionIds;
+
+        if (current.includes(questionId)) {
+            setTargetSelection(
+                activeTargetKey,
+                current.filter((id) => id !== questionId),
+            );
+
+            return;
+        }
+
+        if (current.length < activeTargetLimit) {
+            setTargetSelection(activeTargetKey, [...current, questionId]);
+        }
+    }
+
+    async function searchQuestions() {
+        if (!canSearch || activeQuestionTypeId === null || !activeTargetKey) {
+            return [] as ManualQuestion[];
+        }
+
+        setLoadingQuestions(true);
+        setQuestionLoadError(null);
+        setSubmitError(null);
+
+        try {
+            const questions = await onSearchQuestions(activeQuestionTypeId, {
+                chapterIds: modalChapterIds,
+                topicIds: modalTopicIds,
+                sources: selectedSourceValues,
+            });
+            setResultQuestionsByTarget((current) => ({
+                ...current,
+                [activeTargetKey]: questions,
+            }));
+            setSearchedTargets((current) =>
+                new Set(current).add(activeTargetKey),
+            );
+            setTargetSelection(activeTargetKey, []);
+            setActiveTab('show');
+
+            return questions;
+        } catch (error) {
+            setQuestionLoadError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to load questions.',
+            );
+
+            return [];
+        } finally {
+            setLoadingQuestions(false);
+        }
+    }
+
+    async function selectRandomQuestions() {
+        if (!hasScope) {
+            return;
+        }
+
+        const targets =
+            kind === 'or'
+                ? pairedSections.map((section) => ({
+                      key: `or_${section.questionTypeId}`,
+                      questionTypeId: section.questionTypeId,
+                      count: totalNumber,
+                      label: plainQuestionText(section.title),
+                  }))
+                : parts
+                      .filter((part) => toNumber(part.questionTypeId) > 0)
+                      .map((part, index) => ({
+                          key: part.id,
+                          questionTypeId: toNumber(part.questionTypeId),
+                          count: 1,
+                          label: `multipart part ${String.fromCharCode(65 + index)}`,
+                      }));
+
+        if (
+            targets.length === 0 ||
+            targets.some((target) => target.count <= 0)
+        ) {
+            setSubmitError('Complete the section fields first.');
+
+            return;
+        }
+
+        setLoadingQuestions(true);
+        setQuestionLoadError(null);
+        setSubmitError(null);
+
+        try {
+            const reserved = new Set(usedQuestionIds);
+            const nextResults = { ...resultQuestionsByTarget };
+            const nextOrSelections = { ...orSelectedQuestionIds };
+            const nextPartSelections = new Map<string, number[]>();
+
+            for (const target of targets) {
+                const questions = await onSearchQuestions(
+                    target.questionTypeId,
+                    {
+                        chapterIds: modalChapterIds,
+                        topicIds: modalTopicIds,
+                        sources: selectedSourceValues,
+                    },
+                );
+                const picked = shuffledQuestions(
+                    questions.filter((question) => !reserved.has(question.id)),
+                ).slice(0, target.count);
+
+                if (picked.length < target.count) {
+                    throw new Error(
+                        `Not enough unused questions found for ${target.label}.`,
+                    );
+                }
+
+                picked.forEach((question) => reserved.add(question.id));
+                nextResults[target.key] = questions;
+
+                if (kind === 'or') {
+                    nextOrSelections[String(target.questionTypeId)] =
+                        picked.map((question) => question.id);
+                } else {
+                    nextPartSelections.set(
+                        target.key,
+                        picked.map((question) => question.id),
+                    );
+                }
+            }
+
+            setResultQuestionsByTarget(nextResults);
+            setSearchedTargets(
+                new Set([
+                    ...searchedTargets,
+                    ...targets.map((target) => target.key),
+                ]),
+            );
+
+            if (kind === 'or') {
+                setOrSelectedQuestionIds(nextOrSelections);
+            } else {
+                setParts((current) =>
+                    current.map((part) => ({
+                        ...part,
+                        selectedQuestionIds:
+                            nextPartSelections.get(part.id) ??
+                            part.selectedQuestionIds,
+                    })),
+                );
+            }
+
+            setActiveTab('picked');
+        } catch (error) {
+            setSubmitError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to select questions.',
+            );
+        } finally {
+            setLoadingQuestions(false);
+        }
+    }
+
+    async function handleSubmit() {
+        if (!canSubmit) {
+            return;
+        }
+
+        setSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            if (kind === 'or' && selectedPairing) {
+                await onSubmit({
+                    kind: 'or',
+                    pairingId: selectedPairing.id,
+                    totalQuestions: totalNumber,
+                    requiredQuestions: requiredNumber,
+                    marksEach: toNumber(marksEach),
+                    members: pairedSections.map((section) => {
+                        const pool =
+                            resultQuestionsByTarget[
+                                `or_${section.questionTypeId}`
+                            ] ?? [];
+                        const selectedIds =
+                            orSelectedQuestionIds[
+                                String(section.questionTypeId)
+                            ] ?? [];
+
+                        return {
+                            questionTypeId: section.questionTypeId,
+                            poolQuestions: pool,
+                            selectedQuestions: selectedIds
+                                .map((id) =>
+                                    pool.find((question) => question.id === id),
+                                )
+                                .filter(
+                                    (question): question is ManualQuestion =>
+                                        question !== undefined,
+                                ),
+                        };
+                    }),
+                });
+            } else if (kind === 'multipart') {
+                await onSubmit({
+                    kind: 'multipart',
+                    choiceCount: null,
+                    cards: [
+                        {
+                            parts: parts.map((part) => {
+                                const pool =
+                                    resultQuestionsByTarget[part.id] ?? [];
+                                const selectedQuestion = pool.find(
+                                    (question) =>
+                                        question.id ===
+                                        part.selectedQuestionIds[0],
+                                );
+
+                                if (!selectedQuestion) {
+                                    throw new Error(
+                                        'Select one question for every multipart part.',
+                                    );
+                                }
+
+                                return {
+                                    questionTypeId: toNumber(
+                                        part.questionTypeId,
+                                    ),
+                                    marksEach: toNumber(part.marksEach),
+                                    selectedQuestion,
+                                    poolQuestions: pool,
+                                };
+                            }),
+                        },
+                    ],
+                });
+            }
+        } catch (error) {
+            setSubmitError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to add this paper section.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div
+            role="presentation"
+            onMouseDown={onClose}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3"
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-special-paper-section-title"
+                onMouseDown={(event) => event.stopPropagation()}
+                className="flex h-[min(46rem,calc(100vh-1.5rem))] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+                <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h2
+                            id="add-special-paper-section-title"
+                            className="text-base font-semibold text-slate-900 dark:text-slate-100"
+                        >
+                            Add section
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close add section"
+                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        >
+                            <XIcon className="size-4" />
+                        </button>
+                    </div>
+
+                    <AddPaperSectionKindTabs
+                        value={kind}
+                        onChange={onKindChange}
+                        hasOrGroups={validPairings.length > 0}
+                        hasMultipart={
+                            multipartConfig !== null &&
+                            multipartConfig.maxParts >= 2 &&
+                            multipartConfig.partTypes.length > 0
+                        }
+                    />
+
+                    <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)_.65fr_.65fr_.65fr_auto]">
+                        {kind === 'or' && (
+                            <>
+                                <FloatingCombobox
+                                    label="OR group"
+                                    leadingIcon={Link2Icon}
+                                    options={pairingOptions}
+                                    value={selectedPairingOption}
+                                    onChange={(option) =>
+                                        setPairingId(
+                                            option ? String(option.id) : '',
+                                        )
+                                    }
+                                    disabled={pairingOptions.length === 0}
+                                    disabledHint="No OR groups available"
+                                />
+                                <SourceMultiSelect
+                                    options={availableSources}
+                                    selectedValues={selectedSources}
+                                    onChange={setSelectedSources}
+                                />
+                                <FloatingField label="Choice">
+                                    <input
+                                        autoComplete="off"
+                                        type="number"
+                                        min={1}
+                                        value={totalQuestions}
+                                        onChange={(event) => {
+                                            const value = onlyDigits(
+                                                event.target.value,
+                                            );
+                                            setTotalQuestions(value);
+                                        }}
+                                        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                                    />
+                                </FloatingField>
+                                <FloatingField label="Required">
+                                    <input
+                                        autoComplete="off"
+                                        type="number"
+                                        min={1}
+                                        max={totalNumber}
+                                        value={requiredQuestions}
+                                        onChange={(event) => {
+                                            const value = onlyDigits(
+                                                event.target.value,
+                                            );
+                                            setRequiredQuestions(
+                                                value === ''
+                                                    ? ''
+                                                    : String(
+                                                          Math.min(
+                                                              Math.max(
+                                                                  1,
+                                                                  toNumber(
+                                                                      value,
+                                                                  ),
+                                                              ),
+                                                              totalNumber,
+                                                          ),
+                                                      ),
+                                            );
+                                        }}
+                                        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                                    />
+                                </FloatingField>
+                                <FloatingField label="Marks">
+                                    <input
+                                        autoComplete="off"
+                                        type="number"
+                                        min={1}
+                                        value={marksEach}
+                                        onChange={(event) =>
+                                            setMarksEach(
+                                                onlyDigits(event.target.value),
+                                            )
+                                        }
+                                        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                                    />
+                                </FloatingField>
+                            </>
+                        )}
+
+                        {kind === 'multipart' && (
+                            <div className="lg:col-span-5">
+                                <SourceMultiSelect
+                                    options={availableSources}
+                                    selectedValues={selectedSources}
+                                    onChange={setSelectedSources}
+                                />
+                            </div>
+                        )}
+
+                        <button
+                            type="button"
+                            disabled={!canSearch}
+                            onClick={searchQuestions}
+                            className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:bg-brand-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                        >
+                            {loadingQuestions ? (
+                                <Loader2Icon className="size-4 animate-spin" />
+                            ) : (
+                                <SearchIcon className="size-4" />
+                            )}
+                            Search
+                        </button>
+                    </div>
+
+                    {kind === 'multipart' && (
+                        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    Multipart parts
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={addPart}
+                                    disabled={
+                                        !multipartConfig || parts.length >= 10
+                                    }
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200"
+                                >
+                                    <PlusIcon className="size-3.5" />
+                                    Add part
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                {parts.map((part, index) => (
+                                    <div
+                                        key={part.id}
+                                        className="grid gap-3 border-t border-slate-100 pt-3 first:border-0 first:pt-0 md:grid-cols-[auto_minmax(0,1.5fr)_minmax(0,.7fr)_auto_auto] md:items-end dark:border-slate-800"
+                                    >
+                                        <span className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                            {String.fromCharCode(65 + index)}
+                                        </span>
+                                        <FloatingCombobox
+                                            label="Question type"
+                                            options={multipartTypeOptions}
+                                            value={
+                                                multipartTypeOptions.find(
+                                                    (option) =>
+                                                        String(option.id) ===
+                                                        part.questionTypeId,
+                                                ) ?? null
+                                            }
+                                            onChange={(option) => {
+                                                updatePart(part.id, {
+                                                    questionTypeId: option
+                                                        ? String(option.id)
+                                                        : '',
+                                                    selectedQuestionIds: [],
+                                                });
+                                                clearTargetResults(part.id);
+                                                setActiveTargetKey(part.id);
+                                            }}
+                                        />
+                                        <NumberField
+                                            label="Marks"
+                                            value={part.marksEach}
+                                            placeholder="0"
+                                            onChange={(value) =>
+                                                updatePart(part.id, {
+                                                    marksEach: value,
+                                                })
+                                            }
+                                        />
+                                        <button
+                                            type="button"
+                                            disabled={
+                                                toNumber(
+                                                    part.questionTypeId,
+                                                ) === 0
+                                            }
+                                            onClick={() => {
+                                                setActiveTargetKey(part.id);
+                                                setActiveTab('show');
+                                            }}
+                                            className={cn(
+                                                'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40',
+                                                part.selectedQuestionIds
+                                                    .length === 1
+                                                    ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
+                                                    : 'border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+                                            )}
+                                        >
+                                            <ListChecksIcon className="size-3.5" />
+                                            {part.selectedQuestionIds.length}/1
+                                            selected
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={parts.length <= 2}
+                                            onClick={() =>
+                                                setParts((current) => {
+                                                    const next = current.filter(
+                                                        (candidate) =>
+                                                            candidate.id !==
+                                                            part.id,
+                                                    );
+                                                    setActiveTargetKey(
+                                                        next[0]?.id ?? '',
+                                                    );
+
+                                                    return next;
+                                                })
+                                            }
+                                            aria-label={`Delete multipart part ${index + 1}`}
+                                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900"
+                                        >
+                                            <Trash2Icon className="size-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {kind === 'or' && pairedSections.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {pairedSections.map((section, index) => {
+                                const targetKey = `or_${section.questionTypeId}`;
+                                const selectedCount =
+                                    orSelectedQuestionIds[
+                                        String(section.questionTypeId)
+                                    ]?.length ?? 0;
+
+                                return (
+                                    <button
+                                        key={section.questionTypeId}
+                                        type="button"
+                                        onClick={() =>
+                                            setActiveTargetKey(targetKey)
+                                        }
+                                        className={cn(
+                                            'inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold',
+                                            activeTargetKey === targetKey
+                                                ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-500 dark:bg-brand-500'
+                                                : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+                                        )}
+                                    >
+                                        {index === 0 ? 'Main' : 'OR'}:{' '}
+                                        {plainQuestionText(section.title)}
+                                        <span>
+                                            {selectedCount}/{totalNumber || 0}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <AddSectionTabButton
+                            active={activeTab === 'show'}
+                            onClick={() => setActiveTab('show')}
+                        >
+                            Questions{' '}
+                            {searchedTargets.has(activeTargetKey)
+                                ? filteredQuestions.length
+                                : 0}
+                        </AddSectionTabButton>
+                        <AddSectionTabButton
+                            active={activeTab === 'picked'}
+                            onClick={() => setActiveTab('picked')}
+                        >
+                            Picked Q.{activeSelectedQuestionIds.length}
+                        </AddSectionTabButton>
+                        <AddSectionTabButton
+                            active={activeTab === 'chapters'}
+                            onClick={() => setActiveTab('chapters')}
+                        >
+                            Chapters &amp; topics
+                        </AddSectionTabButton>
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 p-4 dark:bg-slate-950/30">
+                    {activeTab === 'show' && (
+                        <QuestionResultPanel
+                            hasSearched={searchedTargets.has(activeTargetKey)}
+                            loading={loadingQuestions}
+                            error={questionLoadError}
+                            groups={questionsByChapter}
+                            selectedQuestionIds={activeSelectedQuestionIds}
+                            selectedLimit={activeTargetLimit}
+                            onToggleQuestion={toggleQuestion}
+                        />
+                    )}
+
+                    {activeTab === 'picked' && (
+                        <QuestionPickedPanel
+                            questions={selectedQuestions}
+                            selectedLimit={activeTargetLimit}
+                            onToggleQuestion={toggleQuestion}
+                        />
+                    )}
+
+                    {activeTab === 'chapters' && (
+                        <ChapterTopicFilterPanel
+                            chapters={chapters}
+                            localChapterIds={localChapterIds}
+                            localTopicIds={localTopicIds}
+                            onToggleChapter={toggleChapter}
+                            onToggleTopic={toggleTopic}
+                        />
+                    )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm font-medium text-red-600 dark:text-red-300">
+                        {submitError}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            Close
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!hasScope || loadingQuestions}
+                            onClick={selectRandomQuestions}
+                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200"
+                        >
+                            <SparklesIcon className="size-4" />
+                            Select randomly
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!canSubmit}
+                            onClick={handleSubmit}
+                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:bg-brand-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                        >
+                            {submitting && (
+                                <Loader2Icon className="size-4 animate-spin" />
+                            )}
+                            Add to paper
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
+}
+
+function SourceMultiSelect({
+    options,
+    selectedValues,
+    onChange,
+}: {
+    options: SourceOption[];
+    selectedValues: Set<string>;
+    onChange: (values: Set<string>) => void;
+}) {
+    const selectedOptions = options.filter((option) =>
+        selectedValues.has(option.value),
+    );
+    const allSelected =
+        options.length > 0 && selectedOptions.length === options.length;
+    const label =
+        selectedOptions.length === 0
+            ? 'Select sources'
+            : allSelected
+              ? 'All sources'
+              : selectedOptions.length === 1
+                ? selectedOptions[0].label
+                : `${selectedOptions.length} sources`;
+
+    function toggle(value: string) {
+        const next = new Set(selectedValues);
+
+        if (next.has(value)) {
+            next.delete(value);
+        } else {
+            next.add(value);
+        }
+
+        onChange(next);
+    }
+
+    return (
+        <details className="group/source relative min-w-0">
+            <summary className="relative flex h-12 cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors group-open/source:border-brand-500 group-open/source:ring-4 group-open/source:ring-brand-500/15 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 [&::-webkit-details-marker]:hidden">
+                <span className="pointer-events-none absolute -top-2 left-3 z-10 bg-white px-1 text-[11px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                    Sources
+                </span>
+                <LayersIcon className="size-4 shrink-0 text-slate-400" />
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                <ChevronDownIcon className="size-4 shrink-0 text-slate-400 transition-transform group-open/source:rotate-180" />
+            </summary>
+            <div className="absolute top-full left-0 z-40 mt-1.5 w-full min-w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900">
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
+                    <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={() =>
+                            onChange(
+                                allSelected
+                                    ? new Set()
+                                    : new Set(
+                                          options.map((option) => option.value),
+                                      ),
+                            )
+                        }
+                        className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                    />
+                    All sources
+                </label>
+                <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                {options.map((option) => (
+                    <label
+                        key={option.value}
+                        className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                        <input
+                            type="checkbox"
+                            checked={selectedValues.has(option.value)}
+                            onChange={() => toggle(option.value)}
+                            className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                            {option.label}
+                        </span>
+                    </label>
+                ))}
+            </div>
+        </details>
+    );
+}
+
+function AddPaperSectionKindTabs({
+    value,
+    onChange,
+    hasOrGroups,
+    hasMultipart,
+}: {
+    value: AddPaperSectionKind;
+    onChange: (kind: AddPaperSectionKind) => void;
+    hasOrGroups: boolean;
+    hasMultipart: boolean;
+}) {
+    const options: Array<{
+        value: AddPaperSectionKind;
+        label: string;
+        icon: LucideIcon;
+        disabled: boolean;
+    }> = [
+        {
+            value: 'standard',
+            label: 'Single type',
+            icon: FileTextIcon,
+            disabled: false,
+        },
+        {
+            value: 'or',
+            label: 'OR group',
+            icon: Link2Icon,
+            disabled: !hasOrGroups,
+        },
+        {
+            value: 'multipart',
+            label: 'Multipart',
+            icon: LayersIcon,
+            disabled: !hasMultipart,
+        },
+    ];
+
+    return (
+        <div className="grid grid-cols-3 gap-2">
+            {options.map((option) => {
+                const Icon = option.icon;
+
+                return (
+                    <button
+                        key={option.value}
+                        type="button"
+                        disabled={option.disabled}
+                        onClick={() => onChange(option.value)}
+                        className={cn(
+                            'inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                            value === option.value
+                                ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-500 dark:bg-brand-500'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+                        )}
+                    >
+                        <Icon className="size-4" />
+                        {option.label}
+                    </button>
+                );
+            })}
         </div>
     );
 }
@@ -8479,6 +10671,8 @@ function GeneratedPaperView({
     // Compose a per-character font-family cascade — Latin glyphs get the
     // English font, Urdu glyphs fall through to the Urdu font automatically.
     const englishStack: Record<string, string> = {
+        'jameel-noori':
+            '"Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif',
         sans: '"Montserrat", system-ui, -apple-system, sans-serif',
         serif: 'Cambria, Georgia, "Times New Roman", serif',
         mono: 'ui-monospace, "Cascadia Code", Consolas, "Liberation Mono", monospace',
@@ -9873,12 +12067,14 @@ function OrTypeMultiSelect({
     );
 }
 function MultipartSelectionCard({
+    title = 'Multi Part Questions',
     config,
     value,
     onChange,
     onAutoPickChange,
     onOpenManualPicker,
 }: {
+    title?: string;
     config: MultipartConfig;
     value: MultipartSelectionState;
     onChange: (value: MultipartSelectionState) => void;
@@ -9946,7 +12142,7 @@ function MultipartSelectionCard({
                         <LayersIcon className="size-4" />
                     </div>
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        Multi Part Questions
+                        {title}
                     </h4>
                 </div>
                 <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
