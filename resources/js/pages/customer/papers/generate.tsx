@@ -305,6 +305,7 @@ const INACTIVE_PAPER_SECTIONING: PaperSectioningConfig = {
 interface MultipartPartRow {
     id: string;
     questionTypeId: number | null;
+    chapterNumbers: string;
     choiceQuestions: string;
     requiredQuestions: string;
     marksPerQuestion: string;
@@ -469,6 +470,7 @@ type ManualPickerSide = 'primary' | 'alternative';
 
 interface ManualPickerRow {
     multipartSelectionId?: string;
+    multipartChapterNumbers?: string;
     section: QuestionSelectionSection;
     row: QuestionSelectionRow;
     target: number;
@@ -572,6 +574,51 @@ function onlyDigits(value: string): string {
     return value.replace(/\D/g, '');
 }
 
+function onlyChapterNumbers(value: string): string {
+    return value.replace(/[^\d,\s]/g, '');
+}
+
+function parseChapterNumbers(value: string | undefined): number[] {
+    if (!value) {
+        return [];
+    }
+
+    return Array.from(
+        new Set(
+            value
+                .split(',')
+                .map((part) => Number(part.trim()))
+                .filter(
+                    (chapterNumber) =>
+                        Number.isInteger(chapterNumber) && chapterNumber > 0,
+                ),
+        ),
+    );
+}
+
+function multipartSelectionHasInput(
+    selection: MultipartSelectionState,
+): boolean {
+    return selection.rows.some(
+        (row) =>
+            parseChapterNumbers(row.chapterNumbers).length > 0 ||
+            typeof row.questionTypeId === 'number' ||
+            toNumber(row.marksPerQuestion) > 0 ||
+            row.selectedQuestionIds.length > 0,
+    );
+}
+
+function questionMatchesChapterNumbers(
+    question: ManualQuestion,
+    chapterNumbers: number[],
+): boolean {
+    return (
+        chapterNumbers.length === 0 ||
+        (question.chapter.chapterNumber !== null &&
+            chapterNumbers.includes(question.chapter.chapterNumber))
+    );
+}
+
 function createMultipartPartRow(
     id: string,
     questionTypeId: number | null,
@@ -579,6 +626,7 @@ function createMultipartPartRow(
     return {
         id,
         questionTypeId,
+        chapterNumbers: '',
         // Every multipart part represents exactly one question.
         choiceQuestions: '1',
         requiredQuestions: '1',
@@ -603,6 +651,10 @@ function currentMultipartSelection(
                   )
                   .map((row) => ({
                       ...row,
+                      chapterNumbers:
+                          typeof row.chapterNumbers === 'string'
+                              ? row.chapterNumbers
+                              : '',
                       choiceQuestions: '1',
                       requiredQuestions: '1',
                   }))
@@ -654,7 +706,15 @@ function normalizeQuestionSelection(value: unknown): QuestionSelectionState {
               (selection, index) => ({
                   ...selection,
                   id: selection.id || `multipart_${index + 1}`,
-                  rows: Array.isArray(selection.rows) ? selection.rows : [],
+                  rows: Array.isArray(selection.rows)
+                      ? selection.rows.map((row) => ({
+                            ...row,
+                            chapterNumbers:
+                                typeof row.chapterNumbers === 'string'
+                                    ? row.chapterNumbers
+                                    : '',
+                        }))
+                      : [],
               }),
           )
         : undefined;
@@ -1151,7 +1211,9 @@ function multipartSelectionMarks(selection: MultipartSelectionState): number {
 }
 
 function multipartChoiceMarks(state: QuestionSelectionState): number {
-    const selections = state.multipart ?? [];
+    const selections = (state.multipart ?? []).filter(
+        multipartSelectionHasInput,
+    );
     const marks = selections.map(multipartSelectionMarks);
 
     if (marks.length === 0) {
@@ -1171,7 +1233,9 @@ function multipartChoiceMarks(state: QuestionSelectionState): number {
 }
 
 function multipartChoiceMarksMismatch(state: QuestionSelectionState): boolean {
-    const selections = state.multipart ?? [];
+    const selections = (state.multipart ?? []).filter(
+        multipartSelectionHasInput,
+    );
     const choiceCount = state.multipartChoiceCount;
 
     if (
@@ -2026,6 +2090,33 @@ function NumberField({
     );
 }
 
+function ChapterNumbersField({
+    value,
+    onChange,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <label className="block min-w-0">
+            <span className="mb-1 block text-[10px] font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
+                Chapter Numbers
+            </span>
+            <input
+                autoComplete="off"
+                type="text"
+                inputMode="numeric"
+                value={value}
+                placeholder="e.g. 1, 3, 5"
+                onChange={(event) =>
+                    onChange(onlyChapterNumbers(event.target.value))
+                }
+                className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-400 dark:focus:ring-brand-400/20"
+            />
+        </label>
+    );
+}
+
 function draftTimeAgo(timestamp: number): string {
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
@@ -2473,6 +2564,7 @@ export default function GeneratePaper({
                     return [
                         {
                             multipartSelectionId: selection.id,
+                            multipartChapterNumbers: part.chapterNumbers,
                             section: syntheticSection,
                             row: syntheticRow,
                             target: rowTarget(part),
@@ -2525,9 +2617,12 @@ export default function GeneratePaper({
                 toNumber(item.row.marksPerQuestion) > 0,
         );
     const multipartSelections = questionSelection.multipart ?? [];
+    const configuredMultipartSelections = multipartSelections.filter(
+        multipartSelectionHasInput,
+    );
     const multipartReady =
         !multipartConfig ||
-        multipartSelections.every(
+        configuredMultipartSelections.every(
             (selection) =>
                 selection.rows.length >= 2 &&
                 selection.rows.every(
@@ -2539,7 +2634,7 @@ export default function GeneratePaper({
     const multipartChoiceHasMismatch =
         multipartChoiceMarksMismatch(questionSelection);
     const isQuestionSelectionReady =
-        (standardSelectionReady || multipartSelections.length > 0) &&
+        (standardSelectionReady || configuredMultipartSelections.length > 0) &&
         multipartReady;
     const canGeneratePaper =
         questionSelection.totalMarks > 0 &&
@@ -2555,6 +2650,9 @@ export default function GeneratePaper({
     );
     const filteredManualQuestions = useMemo(() => {
         const search = manualSearch.trim().toLowerCase();
+        const chapterNumbers = parseChapterNumbers(
+            activeManualPickerRow?.multipartChapterNumbers,
+        );
 
         return manualQuestions.filter((question) => {
             const matchesSelected =
@@ -2579,9 +2677,14 @@ export default function GeneratePaper({
                           .includes(search)
                     : false);
 
-            return matchesSelected && matchesSearch;
+            return (
+                questionMatchesChapterNumbers(question, chapterNumbers) &&
+                matchesSelected &&
+                matchesSearch
+            );
         });
     }, [
+        activeManualPickerRow?.multipartChapterNumbers,
         activeManualSelectedQuestionIds,
         manualQuestions,
         manualSearch,
@@ -3743,9 +3846,9 @@ export default function GeneratePaper({
             const multipartTypeIds = multipartConfig
                 ? [
                       ...new Set(
-                          (questionSelection.multipart ?? []).flatMap(
-                              (selection) => selection.partTypeIds,
-                          ),
+                          (questionSelection.multipart ?? [])
+                              .filter(multipartSelectionHasInput)
+                              .flatMap((selection) => selection.partTypeIds),
                       ),
                   ]
                 : [];
@@ -3788,8 +3891,12 @@ export default function GeneratePaper({
                 target: number,
                 title: string,
                 mode: SelectionMode,
+                chapterNumberInput?: string,
             ): ManualQuestion[] {
-                const pool = pools[questionTypeId] ?? [];
+                const chapterNumbers = parseChapterNumbers(chapterNumberInput);
+                const pool = (pools[questionTypeId] ?? []).filter((question) =>
+                    questionMatchesChapterNumbers(question, chapterNumbers),
+                );
                 const selectedQuestions =
                     mode === 'manual'
                         ? manualIds
@@ -3968,7 +4075,9 @@ export default function GeneratePaper({
                 },
             );
             const multipartSelections = multipartConfig
-                ? (questionSelection.multipart ?? [])
+                ? (questionSelection.multipart ?? []).filter(
+                      multipartSelectionHasInput,
+                  )
                 : [];
             const multipartSections: GeneratedPaperSection[] = multipartConfig
                 ? multipartSelections.map((selection) => {
@@ -3985,6 +4094,7 @@ export default function GeneratePaper({
                               1,
                               type?.name ?? 'Multipart question type',
                               selection.selectionMode,
+                              part.chapterNumbers,
                           );
 
                           return {
@@ -9855,7 +9965,7 @@ function MultipartSelectionCard({
                 {value.rows.map((row, index) => (
                     <div
                         key={row.id}
-                        className="grid gap-2.5 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
+                        className="grid gap-2.5 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
                     >
                         <div className="min-w-0">
                             <FloatingCombobox
@@ -9874,11 +9984,21 @@ function MultipartSelectionCard({
                                         questionTypeId: option
                                             ? Number(option.id)
                                             : null,
+                                        selectedQuestionIds: [],
                                     })
                                 }
                                 placeholder="Select type"
                             />
                         </div>
+                        <ChapterNumbersField
+                            value={row.chapterNumbers}
+                            onChange={(chapterNumbers) =>
+                                updateRow(row.id, {
+                                    chapterNumbers,
+                                    selectedQuestionIds: [],
+                                })
+                            }
+                        />
                         <NumberField
                             label="Marks"
                             value={row.marksPerQuestion}
