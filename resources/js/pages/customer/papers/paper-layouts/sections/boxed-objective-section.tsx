@@ -96,6 +96,7 @@ export function BoxedObjectiveSection({
                 >1 arrange the boxed rows into a grid instead of one long stack. */}
             <div
                 data-paper-question-group="stacked"
+                dir={section.questionTextRtl ? 'rtl' : undefined}
                 className={columns > 1 ? 'grid gap-x-6' : undefined}
                 style={
                     columns > 1
@@ -195,6 +196,7 @@ function ObjectiveQuestionRow({
                         urduOnly={Boolean(
                             section.titleUrdu && !section.titleEnglish,
                         )}
+                        forceRtl={section.questionTextRtl}
                         hideMarks={section.category === 'Objective Questions'}
                         sameStatement={question.sameStatement}
                     />
@@ -238,6 +240,7 @@ function ObjectiveQuestionRow({
                 <div data-paper-question-divider="t" className="px-2 py-1">
                     <PassageQuestionContent
                         questions={question.passageQuestions}
+                        rtl={section.questionTextRtl}
                     />
                 </div>
             )}

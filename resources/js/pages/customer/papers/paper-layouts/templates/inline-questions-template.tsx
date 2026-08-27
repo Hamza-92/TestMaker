@@ -37,6 +37,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     // saved before per-block columns existed.
     const columns = clampSectionColumns(section.columns, 1);
     const isUrduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
+    const isRtl = isUrduOnly || section.questionTextRtl === true;
 
     return (
         <section className="paper-section text-black">
@@ -55,6 +56,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                 Columns >1 flow this into CSS newspaper-style columns. */}
             <div
                 data-paper-question-group="inline"
+                dir={isRtl ? 'rtl' : undefined}
                 className="px-3 py-2 leading-7"
                 style={
                     columns > 1
@@ -75,15 +77,13 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                             key={question.id}
                             data-paper-question
                             className="mr-4 inline align-baseline"
-                            dir={isUrduOnly ? 'rtl' : undefined}
-                            data-paper-urdu-content={
-                                isUrduOnly ? true : undefined
-                            }
+                            dir={isRtl ? 'rtl' : undefined}
+                            data-paper-urdu-content={isRtl ? true : undefined}
                             style={{
                                 ...(columns > 1
                                     ? { breakInside: 'avoid' }
                                     : {}),
-                                ...(isUrduOnly
+                                ...(isRtl
                                     ? { fontFamily: 'var(--paper-urdu-font)' }
                                     : {}),
                             }}
@@ -139,6 +139,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                 <PassageQuestionContent
                                     questions={question.passageQuestions}
                                     inline
+                                    rtl={section.questionTextRtl}
                                 />
                             )}
                         </span>

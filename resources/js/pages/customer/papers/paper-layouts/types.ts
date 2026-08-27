@@ -41,6 +41,8 @@ export interface GeneratedMultipartPart {
     typeTitle: string;
     typeTitleEnglish?: string | null;
     typeTitleUrdu?: string | null;
+    /** Render this part's question content right-to-left regardless of paper medium. */
+    questionTextRtl?: boolean;
     marksEach: number;
     question: GeneratedPaperQuestion;
 }
@@ -68,6 +70,8 @@ export interface GeneratedPaperSection {
     /** Separate labels used when both paper mediums are rendered. */
     titleEnglish?: string | null;
     titleUrdu?: string | null;
+    /** Render this type's question content right-to-left regardless of paper medium. */
+    questionTextRtl?: boolean;
     requiredQuestions: number;
     totalQuestions: number;
     marksEach: number;

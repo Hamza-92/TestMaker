@@ -140,6 +140,7 @@ it('creates a question type and normalizes dependent fields', function () {
             'have_answer' => true,
             'is_single' => false,
             'is_objective' => false,
+            'question_text_rtl' => true,
             'schema_key' => 'subjective_standard',
             'status' => true,
         ]);
@@ -154,6 +155,7 @@ it('creates a question type and normalizes dependent fields', function () {
         ->and($questionType->statement_label)->toBe('Prompt')
         ->and($questionType->description_label)->toBe('Guidance')
         ->and($questionType->objective_type_id)->toBeNull()
+        ->and($questionType->question_text_rtl)->toBeTrue()
         ->and($questionType->column_per_row)->toBe(1);
 });
 
@@ -183,6 +185,7 @@ it('updates a question type', function () {
             'have_answer' => false,
             'is_single' => true,
             'is_objective' => true,
+            'question_text_rtl' => true,
             'schema_key' => 'objective_passage_mcq',
             'status' => false,
         ]);
@@ -198,6 +201,7 @@ it('updates a question type', function () {
         ->and($questionType->description_label)->toBeNull()
         ->and($questionType->is_single)->toBeTrue()
         ->and($questionType->is_objective)->toBeTrue()
+        ->and($questionType->question_text_rtl)->toBeTrue()
         ->and($questionType->objective_type_id)->toBeNull()
         ->and($questionType->status)->toBe(0);
 });

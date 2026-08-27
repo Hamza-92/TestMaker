@@ -188,11 +188,14 @@ export function MultipartSection({
                                     urduIndexLabel={urduIndexLabel}
                                     marks={part.marksEach}
                                     urduOnly={urduOnly}
+                                    forceRtl={part.questionTextRtl}
                                     sameStatement={part.question.sameStatement}
                                 />
                             );
                             const hasBilingualContent =
                                 splitBilingualParts(questionValue) !== null;
+                            const partIsRtl =
+                                urduOnly || part.questionTextRtl === true;
                             const partMarks = part.marksEach > 0 && (
                                 <span className="shrink-0 whitespace-nowrap">
                                     ({part.marksEach})
@@ -209,7 +212,7 @@ export function MultipartSection({
                                     ) : (
                                         <div
                                             className="flex items-start gap-2"
-                                            dir={urduOnly ? 'rtl' : 'ltr'}
+                                            dir={partIsRtl ? 'rtl' : 'ltr'}
                                         >
                                             <div className="min-w-0 flex-1">
                                                 {questionRow}

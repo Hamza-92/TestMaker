@@ -210,7 +210,7 @@ class GeneratePaperController extends Controller
                     ->where('question_type_orders.subject_id', $scope->subject_id);
             })
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.options_only', 'question_types.column_per_row', 'question_type_orders.sort_order')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.options_only', 'question_types.question_text_rtl', 'question_types.column_per_row', 'question_type_orders.sort_order')
             ->orderByDesc('question_types.is_objective')
             ->orderByRaw('question_type_orders.sort_order IS NULL')
             ->orderBy('question_type_orders.sort_order')
@@ -223,6 +223,7 @@ class GeneratePaperController extends Controller
                 'question_types.heading_ur',
                 'question_types.is_objective',
                 'question_types.options_only',
+                'question_types.question_text_rtl',
                 'question_types.column_per_row',
                 DB::raw('question_type_orders.sort_order as sort_order'),
                 DB::raw('COUNT(questions.id) as available_count'),
@@ -255,6 +256,7 @@ class GeneratePaperController extends Controller
             'headingUrdu' => $this->visibleQuestionTypeLabel($row->heading_ur ?: $row->name_ur),
             'availableCount' => (int) $row->available_count,
             'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
+            'questionTextRtl' => (bool) $row->question_text_rtl,
         ]);
 
         $availableSubjectiveTypeIds = $rows
@@ -351,7 +353,7 @@ class GeneratePaperController extends Controller
 
         $types = QuestionType::query()
             ->whereIn('id', $typeIds)
-            ->get(['id', 'name', 'name_ur', 'heading_en', 'heading_ur'])
+            ->get(['id', 'name', 'name_ur', 'heading_en', 'heading_ur', 'question_text_rtl'])
             ->keyBy('id');
 
         return [
@@ -366,6 +368,7 @@ class GeneratePaperController extends Controller
                 'nameUrdu' => $types->get($id)?->name_ur,
                 'headingEnglish' => $types->get($id)?->heading_en,
                 'headingUrdu' => $types->get($id)?->heading_ur,
+                'questionTextRtl' => (bool) $types->get($id)?->question_text_rtl,
             ])->filter(fn ($type) => $type['name'] !== null)->values()->all(),
         ];
     }

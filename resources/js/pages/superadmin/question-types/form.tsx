@@ -45,6 +45,7 @@ export interface QuestionTypeFormData {
     is_single: boolean;
     is_objective: boolean;
     options_only: boolean;
+    question_text_rtl: boolean;
     schema_key: string;
     status: string;
     [key: string]: boolean | string;
@@ -134,7 +135,9 @@ function KindCard({
                 <span
                     className={cn(
                         'inline-flex size-10 items-center justify-center rounded-xl',
-                        active ? 'bg-primary text-primary-foreground' : 'bg-muted',
+                        active
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted',
                     )}
                 >
                     {icon}
@@ -173,7 +176,8 @@ export function QuestionTypeForm({
 }: QuestionTypeFormProps) {
     const filteredSchemas = questionSchemas.filter(
         (schema) =>
-            schema.kind === (form.data.is_objective ? 'objective' : 'subjective'),
+            schema.kind ===
+            (form.data.is_objective ? 'objective' : 'subjective'),
     );
     const selectedSchema =
         filteredSchemas.find((schema) => schema.key === form.data.schema_key) ??
@@ -182,26 +186,17 @@ export function QuestionTypeForm({
 
     const schemaFields = (
         <>
-            <Field
-                label="Schema"
-                required
-                error={form.errors.schema_key}
-            >
+            <Field label="Schema" required error={form.errors.schema_key}>
                 <Select
                     value={form.data.schema_key}
-                    onValueChange={(value) =>
-                        form.setData('schema_key', value)
-                    }
+                    onValueChange={(value) => form.setData('schema_key', value)}
                 >
                     <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select schema" />
                     </SelectTrigger>
                     <SelectContent>
                         {filteredSchemas.map((schema) => (
-                            <SelectItem
-                                key={schema.key}
-                                value={schema.key}
-                            >
+                            <SelectItem key={schema.key} value={schema.key}>
                                 {schema.label}
                             </SelectItem>
                         ))}
@@ -210,7 +205,7 @@ export function QuestionTypeForm({
             </Field>
 
             {selectedSchema ? (
-                <div className="grid gap-3 md:grid-cols-2 md:col-span-2">
+                <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
                     {selectedSchema.settings.supports_answer_toggle ? (
                         <SwitchRow
                             checked={form.data.have_answer}
@@ -227,12 +222,21 @@ export function QuestionTypeForm({
                             label="Options only"
                             onCheckedChange={(checked) => {
                                 form.setData('options_only', checked);
+
                                 if (checked) {
                                     form.setData('is_single', true);
                                 }
                             }}
                         />
                     ) : null}
+
+                    <SwitchRow
+                        checked={form.data.question_text_rtl}
+                        label="Print questions right-to-left"
+                        onCheckedChange={(checked) =>
+                            form.setData('question_text_rtl', checked)
+                        }
+                    />
                 </div>
             ) : null}
         </>
@@ -258,7 +262,11 @@ export function QuestionTypeForm({
                     title="Details"
                 >
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Type Name" required error={form.errors.name}>
+                        <Field
+                            label="Type Name"
+                            required
+                            error={form.errors.name}
+                        >
                             <Input
                                 value={form.data.name}
                                 onChange={(event) =>
@@ -267,7 +275,10 @@ export function QuestionTypeForm({
                             />
                         </Field>
 
-                        <Field label="Type Name (Urdu)" error={form.errors.name_ur}>
+                        <Field
+                            label="Type Name (Urdu)"
+                            error={form.errors.name_ur}
+                        >
                             <Input
                                 dir="rtl"
                                 value={form.data.name_ur}
@@ -285,7 +296,10 @@ export function QuestionTypeForm({
                             <Input
                                 value={form.data.heading_en}
                                 onChange={(event) =>
-                                    form.setData('heading_en', event.target.value)
+                                    form.setData(
+                                        'heading_en',
+                                        event.target.value,
+                                    )
                                 }
                             />
                         </Field>
@@ -298,7 +312,10 @@ export function QuestionTypeForm({
                                 dir="rtl"
                                 value={form.data.heading_ur}
                                 onChange={(event) =>
-                                    form.setData('heading_ur', event.target.value)
+                                    form.setData(
+                                        'heading_ur',
+                                        event.target.value,
+                                    )
                                 }
                             />
                         </Field>
@@ -340,7 +357,8 @@ export function QuestionTypeForm({
                                 icon={<FileTextIcon className="size-4" />}
                                 onClick={() => {
                                     const firstSchema = questionSchemas.find(
-                                        (schema) => schema.kind === 'subjective',
+                                        (schema) =>
+                                            schema.kind === 'subjective',
                                     );
                                     form.setData({
                                         ...form.data,

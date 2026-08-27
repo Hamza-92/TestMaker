@@ -4,6 +4,7 @@ use App\Enums\AccountType;
 use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\Chapter;
+use App\Models\MultipartQuestionSetting;
 use App\Models\PaperQuestionSection;
 use App\Models\PaperQuestionSectionScope;
 use App\Models\PaperTemplate;
@@ -96,7 +97,7 @@ test('paper generator returns question types in the saved pattern class subject 
         'status' => 1,
     ]);
 
-    $makeType = function (string $name): QuestionType {
+    $makeType = function (string $name, bool $questionTextRtl = false): QuestionType {
         return QuestionType::create([
             'name' => $name,
             'heading_en' => $name,
@@ -106,6 +107,7 @@ test('paper generator returns question types in the saved pattern class subject 
             'have_answer' => true,
             'is_single' => true,
             'is_objective' => false,
+            'question_text_rtl' => $questionTextRtl,
             'schema_key' => 'subjective_standard',
             'column_per_row' => 1,
             'status' => 1,
@@ -113,7 +115,7 @@ test('paper generator returns question types in the saved pattern class subject 
     };
 
     $first = $makeType('Generator First');
-    $second = $makeType('Generator Second');
+    $second = $makeType('Generator Second', true);
 
     foreach ([$first, $second] as $questionType) {
         Question::create([
@@ -172,6 +174,17 @@ test('paper generator returns question types in the saved pattern class subject 
         ['question_type_id' => $second->id, 'sort_order' => 1],
     ]);
 
+    MultipartQuestionSetting::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'is_active' => true,
+        'max_parts' => 2,
+        'choice_count' => 1,
+        'heading_en' => 'Multipart Questions',
+        'part_type_ids' => [$first->id, $second->id],
+    ]);
+
     $this->actingAs($customer)
         ->getJson(route('customer.papers.generate.question-types', [
             'chapter_ids' => [$chapter->id],
@@ -179,12 +192,16 @@ test('paper generator returns question types in the saved pattern class subject 
         ]))
         ->assertOk()
         ->assertJsonPath('sections.0.questionTypeId', $second->id)
+        ->assertJsonPath('sections.0.questionTextRtl', true)
         ->assertJsonPath('sections.0.sortOrder', 1)
         ->assertJsonPath('sections.1.questionTypeId', $first->id)
+        ->assertJsonPath('sections.1.questionTextRtl', false)
         ->assertJsonPath('sections.1.sortOrder', 2)
         ->assertJsonCount(1, 'groups')
         ->assertJsonPath('groups.0.id', $pairing->id)
         ->assertJsonPath('groups.0.questionTypeIds', [$first->id, $second->id])
+        ->assertJsonPath('multipart.partTypes.0.questionTextRtl', false)
+        ->assertJsonPath('multipart.partTypes.1.questionTextRtl', true)
         ->assertJsonPath('paperSectioning.active', true)
         ->assertJsonCount(1, 'paperSectioning.groups')
         ->assertJsonPath('paperSectioning.groups.0.id', $paperSection->id)

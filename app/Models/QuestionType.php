@@ -25,6 +25,7 @@ class QuestionType extends Model
         'is_single',
         'is_objective',
         'options_only',
+        'question_text_rtl',
         'schema_key',
         'objective_type_id',
         'column_per_row',
@@ -42,6 +43,7 @@ class QuestionType extends Model
             'is_single' => 'boolean',
             'is_objective' => 'boolean',
             'options_only' => 'boolean',
+            'question_text_rtl' => 'boolean',
             'column_per_row' => 'integer',
             'status' => 'integer',
         ];

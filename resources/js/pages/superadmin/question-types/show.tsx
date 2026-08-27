@@ -31,6 +31,7 @@ interface QuestionTypeData {
     have_answer: boolean;
     is_single: boolean;
     is_objective: boolean;
+    question_text_rtl: boolean;
     schema_key: string;
     schema: {
         key: string;
@@ -49,30 +50,79 @@ interface QuestionTypeData {
     audit_logs: AuditLogEntry[];
 }
 
-const AUDIT_STYLE: Record<string, { dotClass: string; badgeClass: string; label: string }> = {
-    created:  { dotClass: 'bg-emerald-500', badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Created'  },
-    updated:  { dotClass: 'bg-blue-500',    badgeClass: 'border-blue-200 bg-blue-50 text-blue-700',         label: 'Updated'  },
-    deleted:  { dotClass: 'bg-red-500',     badgeClass: 'border-red-200 bg-red-50 text-red-700',           label: 'Deleted'  },
-    restored: { dotClass: 'bg-violet-500',  badgeClass: 'border-violet-200 bg-violet-50 text-violet-700',  label: 'Restored' },
+const AUDIT_STYLE: Record<
+    string,
+    { dotClass: string; badgeClass: string; label: string }
+> = {
+    created: {
+        dotClass: 'bg-emerald-500',
+        badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        label: 'Created',
+    },
+    updated: {
+        dotClass: 'bg-blue-500',
+        badgeClass: 'border-blue-200 bg-blue-50 text-blue-700',
+        label: 'Updated',
+    },
+    deleted: {
+        dotClass: 'bg-red-500',
+        badgeClass: 'border-red-200 bg-red-50 text-red-700',
+        label: 'Deleted',
+    },
+    restored: {
+        dotClass: 'bg-violet-500',
+        badgeClass: 'border-violet-200 bg-violet-50 text-violet-700',
+        label: 'Restored',
+    },
 };
 
 function fmt(d: string | null) {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!d) {
+        return '—';
+    }
+
+    return new Date(d).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
 }
 
 function fmtDt(d: string | null) {
-    if (!d) return '—';
-    return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    if (!d) {
+        return '—';
+    }
+
+    return new Date(d).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
 }
 
 function changesSummary(log: AuditLogEntry): string | null {
     const keys = Object.keys(log.new_values);
-    if (keys.length === 0) return null;
+
+    if (keys.length === 0) {
+        return null;
+    }
+
     return keys.map((k) => k.replace(/_/g, ' ')).join(', ') + ' changed';
 }
 
-function SectionShell({ icon, title, meta, children }: { icon: ReactNode; title: string; meta?: string; children: ReactNode }) {
+function SectionShell({
+    icon,
+    title,
+    meta,
+    children,
+}: {
+    icon: ReactNode;
+    title: string;
+    meta?: string;
+    children: ReactNode;
+}) {
     return (
         <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
             <div className="flex items-center gap-3 border-b px-5 py-4 sm:px-6">
@@ -80,8 +130,12 @@ function SectionShell({ icon, title, meta, children }: { icon: ReactNode; title:
                     {icon}
                 </div>
                 <div>
-                    <h2 className="text-sm font-semibold tracking-wide">{title}</h2>
-                    {meta && <p className="text-xs text-muted-foreground">{meta}</p>}
+                    <h2 className="text-sm font-semibold tracking-wide">
+                        {title}
+                    </h2>
+                    {meta && (
+                        <p className="text-xs text-muted-foreground">{meta}</p>
+                    )}
                 </div>
             </div>
             {children}
@@ -92,7 +146,9 @@ function SectionShell({ icon, title, meta, children }: { icon: ReactNode; title:
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="flex items-start gap-3 py-3">
-            <p className="w-32 shrink-0 text-xs font-medium text-muted-foreground">{label}</p>
+            <p className="w-32 shrink-0 text-xs font-medium text-muted-foreground">
+                {label}
+            </p>
             <div className="min-w-0 flex-1 text-sm">{children}</div>
         </div>
     );
@@ -106,7 +162,8 @@ export default function ShowQuestionType({
     backHref?: string;
 }) {
     const answerMode =
-        questionType.is_objective && questionType.schema.settings.supports_single_toggle
+        questionType.is_objective &&
+        questionType.schema.settings.supports_single_toggle
             ? questionType.is_single
                 ? 'Single correct'
                 : 'Multiple correct'
@@ -127,9 +184,16 @@ export default function ShowQuestionType({
                             <ArrowLeftIcon className="size-4" />
                         </Link>
                         <div>
-                            <h1 className="text-2xl font-semibold tracking-tight">{questionType.name}</h1>
+                            <h1 className="text-2xl font-semibold tracking-tight">
+                                {questionType.name}
+                            </h1>
                             {questionType.name_ur && (
-                                <p className="text-sm text-muted-foreground" dir="rtl">{questionType.name_ur}</p>
+                                <p
+                                    className="text-sm text-muted-foreground"
+                                    dir="rtl"
+                                >
+                                    {questionType.name_ur}
+                                </p>
                             )}
                         </div>
                     </div>
@@ -143,37 +207,65 @@ export default function ShowQuestionType({
 
                 {/* Body */}
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,0.9fr)]">
-
                     {/* Details */}
-                    <SectionShell icon={<FileQuestionIcon className="size-4" />} title="Details">
+                    <SectionShell
+                        icon={<FileQuestionIcon className="size-4" />}
+                        title="Details"
+                    >
                         <div className="divide-y px-5 sm:px-6">
                             <InfoRow label="Heading (EN)">
-                                <span className="font-medium">{questionType.heading_en}</span>
+                                <span className="font-medium">
+                                    {questionType.heading_en}
+                                </span>
                             </InfoRow>
 
                             {questionType.heading_ur && (
                                 <InfoRow label="Heading (UR)">
-                                    <span className="font-medium" dir="rtl">{questionType.heading_ur}</span>
+                                    <span className="font-medium" dir="rtl">
+                                        {questionType.heading_ur}
+                                    </span>
                                 </InfoRow>
                             )}
 
                             <InfoRow label="Kind">
                                 {questionType.is_objective ? (
-                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">Objective</Badge>
+                                    <Badge
+                                        variant="outline"
+                                        className="border-blue-200 bg-blue-50 text-blue-700"
+                                    >
+                                        Objective
+                                    </Badge>
                                 ) : (
-                                    <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">Subjective</Badge>
+                                    <Badge
+                                        variant="outline"
+                                        className="border-violet-200 bg-violet-50 text-violet-700"
+                                    >
+                                        Subjective
+                                    </Badge>
                                 )}
                             </InfoRow>
 
                             <InfoRow label="Schema">
                                 <span>{questionType.schema.label}</span>
                                 {questionType.schema.description && (
-                                    <p className="mt-0.5 text-xs text-muted-foreground">{questionType.schema.description}</p>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {questionType.schema.description}
+                                    </p>
                                 )}
                             </InfoRow>
 
                             <InfoRow label="Has Answer">
-                                <span>{questionType.have_answer ? 'Yes' : 'No'}</span>
+                                <span>
+                                    {questionType.have_answer ? 'Yes' : 'No'}
+                                </span>
+                            </InfoRow>
+
+                            <InfoRow label="Question Direction">
+                                <span>
+                                    {questionType.question_text_rtl
+                                        ? 'Right to left'
+                                        : 'Left to right'}
+                                </span>
                             </InfoRow>
 
                             {answerMode && (
@@ -182,29 +274,47 @@ export default function ShowQuestionType({
                                 </InfoRow>
                             )}
 
-                            {(questionType.description_en || questionType.description_ur) && (
+                            {(questionType.description_en ||
+                                questionType.description_ur) && (
                                 <InfoRow label="Description">
                                     {questionType.description_en && (
-                                        <p className="whitespace-pre-wrap">{questionType.description_en}</p>
+                                        <p className="whitespace-pre-wrap">
+                                            {questionType.description_en}
+                                        </p>
                                     )}
                                     {questionType.description_ur && (
-                                        <p className="mt-1 whitespace-pre-wrap" dir="rtl">{questionType.description_ur}</p>
+                                        <p
+                                            className="mt-1 whitespace-pre-wrap"
+                                            dir="rtl"
+                                        >
+                                            {questionType.description_ur}
+                                        </p>
                                     )}
                                 </InfoRow>
                             )}
 
                             <InfoRow label="Questions">
-                                <span className="font-medium tabular-nums">{questionType.questions_count.toLocaleString()}</span>
+                                <span className="font-medium tabular-nums">
+                                    {questionType.questions_count.toLocaleString()}
+                                </span>
                             </InfoRow>
 
                             <InfoRow label="Status">
                                 {questionType.status === 1 ? (
-                                    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 font-medium text-emerald-700">
-                                        <span className="mr-1.5 inline-block size-1.5 rounded-full bg-emerald-500" />Active
+                                    <Badge
+                                        variant="outline"
+                                        className="border-emerald-200 bg-emerald-50 font-medium text-emerald-700"
+                                    >
+                                        <span className="mr-1.5 inline-block size-1.5 rounded-full bg-emerald-500" />
+                                        Active
                                     </Badge>
                                 ) : (
-                                    <Badge variant="outline" className="border-gray-200 bg-gray-50 font-medium text-gray-600">
-                                        <span className="mr-1.5 inline-block size-1.5 rounded-full bg-gray-400" />Inactive
+                                    <Badge
+                                        variant="outline"
+                                        className="border-gray-200 bg-gray-50 font-medium text-gray-600"
+                                    >
+                                        <span className="mr-1.5 inline-block size-1.5 rounded-full bg-gray-400" />
+                                        Inactive
                                     </Badge>
                                 )}
                             </InfoRow>
@@ -237,7 +347,8 @@ export default function ShowQuestionType({
                                     const key = (log.event ?? '').toLowerCase();
                                     const cfg = AUDIT_STYLE[key] ?? {
                                         dotClass: 'bg-gray-400',
-                                        badgeClass: 'border-gray-200 bg-gray-50 text-gray-600',
+                                        badgeClass:
+                                            'border-gray-200 bg-gray-50 text-gray-600',
                                         label: log.event ?? 'Event',
                                     };
                                     const changes = changesSummary(log);
@@ -249,17 +360,32 @@ export default function ShowQuestionType({
                                         >
                                             <div className="flex min-w-0 items-start gap-3">
                                                 <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                                                    <span className={cn('size-2 rounded-full', cfg.dotClass)} />
+                                                    <span
+                                                        className={cn(
+                                                            'size-2 rounded-full',
+                                                            cfg.dotClass,
+                                                        )}
+                                                    />
                                                 </div>
                                                 <div className="min-w-0">
                                                     <div className="flex flex-wrap items-center gap-2">
-                                                        <Badge variant="outline" className={cn('font-medium', cfg.badgeClass)}>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn(
+                                                                'font-medium',
+                                                                cfg.badgeClass,
+                                                            )}
+                                                        >
                                                             {cfg.label}
                                                         </Badge>
-                                                        <p className="text-sm text-slate-700">{log.changed_by}</p>
+                                                        <p className="text-sm text-slate-700">
+                                                            {log.changed_by}
+                                                        </p>
                                                     </div>
                                                     {changes && (
-                                                        <p className="mt-0.5 text-xs text-muted-foreground">{changes}</p>
+                                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                                            {changes}
+                                                        </p>
                                                     )}
                                                 </div>
                                             </div>

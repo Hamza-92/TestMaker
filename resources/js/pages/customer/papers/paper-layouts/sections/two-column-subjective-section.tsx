@@ -93,6 +93,7 @@ export function TwoColumnSubjectiveSection({
                 only applies to the "stacked" group variant). */}
             <div
                 data-paper-question-group="grid"
+                dir={section.questionTextRtl ? 'rtl' : undefined}
                 className="grid gap-0 px-2 py-1"
                 style={{
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
@@ -184,6 +185,7 @@ function SubjectiveQuestionItem({
                 )}
                 marks={section.marksEach}
                 urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
+                forceRtl={section.questionTextRtl}
                 sameStatement={question.sameStatement}
             />
             {(question.imageUrl ||
@@ -226,6 +228,7 @@ function SubjectiveQuestionItem({
                     {question.passageQuestions && (
                         <PassageQuestionContent
                             questions={question.passageQuestions}
+                            rtl={section.questionTextRtl}
                         />
                     )}
                     {question.answerLines > 0 && (

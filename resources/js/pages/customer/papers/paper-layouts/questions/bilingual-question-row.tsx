@@ -7,6 +7,7 @@ interface BilingualQuestionRowProps {
     urduIndexLabel?: string;
     marks: number;
     urduOnly?: boolean;
+    forceRtl?: boolean;
     hideMarks?: boolean;
     sameStatement?: string | null;
 }
@@ -22,6 +23,7 @@ export function BilingualQuestionRow({
     urduIndexLabel = indexLabel,
     marks,
     urduOnly = false,
+    forceRtl = false,
     hideMarks = false,
     sameStatement = null,
 }: BilingualQuestionRowProps) {
@@ -73,7 +75,7 @@ export function BilingualQuestionRow({
     }
 
     if (!parts) {
-        if (urduOnly) {
+        if (urduOnly || forceRtl) {
             return (
                 <div
                     dir="rtl"

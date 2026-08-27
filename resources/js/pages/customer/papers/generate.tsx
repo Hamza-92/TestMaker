@@ -281,6 +281,7 @@ interface MultipartTypeOption {
     nameUrdu?: string | null;
     headingEnglish?: string | null;
     headingUrdu?: string | null;
+    questionTextRtl: boolean;
 }
 
 interface MultipartConfig {
@@ -344,6 +345,7 @@ interface QuestionSelectionSection {
     heading?: string;
     headingEnglish?: string | null;
     headingUrdu?: string | null;
+    questionTextRtl: boolean;
     availableCount: number;
     /** Default column count (1–5) for this question type, from the DB. */
     columnPerRow: number;
@@ -435,6 +437,7 @@ interface QuestionTypeCount {
     heading?: string;
     headingEnglish?: string | null;
     headingUrdu?: string | null;
+    questionTextRtl: boolean;
     availableCount: number;
     columnPerRow: number;
     sortOrder?: number | null;
@@ -1485,6 +1488,7 @@ function mergeQuestionSections(
             heading: item.heading || item.title,
             headingEnglish: item.headingEnglish,
             headingUrdu: item.headingUrdu,
+            questionTextRtl: item.questionTextRtl,
             availableCount: item.availableCount,
             columnPerRow: item.columnPerRow,
             sortOrder: item.sortOrder,
@@ -2555,6 +2559,7 @@ export default function GeneratePaper({
                         heading: type?.name ?? 'Multipart part',
                         headingEnglish: type?.name ?? 'Multipart part',
                         headingUrdu: type?.nameUrdu ?? null,
+                        questionTextRtl: type?.questionTextRtl ?? false,
                         availableCount: rowTarget(part),
                         columnPerRow: 1,
                         selectionMode: 'manual' as SelectionMode,
@@ -3960,6 +3965,7 @@ export default function GeneratePaper({
                               sourceSection.titleUrdu ||
                               sourceSection.title
                             : null,
+                    questionTextRtl: sourceSection.questionTextRtl,
                     requiredQuestions: toNumber(row.requiredQuestions),
                     totalQuestions: rowTarget(row),
                     marksEach: toNumber(row.marksPerQuestion),
@@ -4105,6 +4111,7 @@ export default function GeneratePaper({
                                   type?.headingEnglish || type?.name,
                               typeTitleUrdu:
                                   type?.headingUrdu || type?.nameUrdu,
+                              questionTextRtl: type?.questionTextRtl ?? false,
                               marksEach: toNumber(part.marksPerQuestion),
                               question: paperQuestionFromManual(
                                   selectedQuestions[0],
@@ -5271,6 +5278,7 @@ export default function GeneratePaper({
                       questionType.titleUrdu ||
                       questionType.title
                     : null,
+            questionTextRtl: questionType.questionTextRtl,
             requiredQuestions,
             totalQuestions,
             marksEach,
