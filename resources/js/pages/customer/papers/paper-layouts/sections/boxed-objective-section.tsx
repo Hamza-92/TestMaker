@@ -197,7 +197,7 @@ function ObjectiveQuestionRow({
                             section.titleUrdu && !section.titleEnglish,
                         )}
                         forceRtl={section.questionTextRtl}
-                        hideMarks={section.category === 'Objective Questions'}
+                        hideMarks
                         sameStatement={question.sameStatement}
                     />
                 </div>
