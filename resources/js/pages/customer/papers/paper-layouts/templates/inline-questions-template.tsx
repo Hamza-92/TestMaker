@@ -18,6 +18,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     section,
     index,
     headingNumber,
+    questionNumberOffset,
     numberingFormat,
     canMoveUp,
     canMoveDown,
@@ -63,7 +64,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
             >
                 {section.questions.map((question, qIndex) => {
                     const label = formatQuestionLabel(
-                        qIndex,
+                        qIndex + questionNumberOffset,
                         numberingFormat,
                         fallbackFormat,
                     );

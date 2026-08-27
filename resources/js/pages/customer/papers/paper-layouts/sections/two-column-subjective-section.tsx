@@ -14,6 +14,7 @@ interface TwoColumnSubjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
     headingNumber: number | null;
+    questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;
     canMoveUp: boolean;
     canMoveDown: boolean;
@@ -50,6 +51,7 @@ export function TwoColumnSubjectiveSection({
     section,
     index,
     headingNumber,
+    questionNumberOffset,
     numberingFormat,
     canMoveUp,
     canMoveDown,
@@ -100,7 +102,7 @@ export function TwoColumnSubjectiveSection({
                     <SubjectiveQuestionItem
                         key={question.id}
                         question={question}
-                        index={questionIndex}
+                        index={questionIndex + questionNumberOffset}
                         numberingFormat={numberingFormat}
                         section={section}
                         onEditQuestion={onEditQuestion}

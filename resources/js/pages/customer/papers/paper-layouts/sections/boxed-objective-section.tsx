@@ -15,6 +15,7 @@ interface BoxedObjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
     headingNumber: number | null;
+    questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;
     canMoveUp: boolean;
     canMoveDown: boolean;
@@ -53,6 +54,7 @@ export function BoxedObjectiveSection({
     section,
     index,
     headingNumber,
+    questionNumberOffset,
     numberingFormat,
     canMoveUp,
     canMoveDown,
@@ -107,7 +109,7 @@ export function BoxedObjectiveSection({
                     <ObjectiveQuestionRow
                         key={question.id}
                         question={question}
-                        index={questionIndex}
+                        index={questionIndex + questionNumberOffset}
                         numberingFormat={numberingFormat}
                         section={section}
                         onEditQuestion={onEditQuestion}
@@ -245,11 +247,20 @@ function ObjectiveQuestionRow({
                     data-paper-question-divider="t"
                     dir={urduOnly ? 'rtl' : undefined}
                     data-paper-urdu-content={urduOnly ? true : undefined}
-                    className={question.optionsOnly ? 'flex w-full items-start text-sm' : undefined}
+                    className={
+                        question.optionsOnly
+                            ? 'flex w-full items-start text-sm'
+                            : undefined
+                    }
                 >
                     {question.optionsOnly ? (
                         <span className="w-7 shrink-0 px-2 py-1 font-bold">
-                            {formatQuestionLabel(index, numberingFormat, 'numeric')})
+                            {formatQuestionLabel(
+                                index,
+                                numberingFormat,
+                                'numeric',
+                            )}
+                            )
                         </span>
                     ) : null}
                     <div

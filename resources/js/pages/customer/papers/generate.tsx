@@ -8492,6 +8492,21 @@ function GeneratedPaperView({
             settings.questionLayout,
             section.category,
         );
+        const questionNumberOffset =
+            section.category === 'Objective Questions'
+                ? targetPaper.sections
+                      .slice(0, sectionIndex)
+                      .filter(
+                          (candidate) =>
+                              candidate.category === 'Objective Questions' &&
+                              candidate.orRole !== 'alternative',
+                      )
+                      .reduce(
+                          (total, candidate) =>
+                              total + candidate.questions.length,
+                          0,
+                      )
+                : 0;
 
         return (
             <Template
@@ -8501,6 +8516,7 @@ function GeneratedPaperView({
                     targetPaper.sections,
                     sectionIndex,
                 )}
+                questionNumberOffset={questionNumberOffset}
                 numberingFormat={settings.questionNumberingFormat}
                 canMoveUp={interactive && canMoveUp}
                 canMoveDown={interactive && canMoveDown}
