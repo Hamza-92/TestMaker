@@ -7892,13 +7892,16 @@ function AddPaperSectionModal({
 
     if (sectionKind === 'or') {
         return (
-            <AddSpecialPaperSectionModal
-                kind={sectionKind}
+            <AddOrPaperSectionModal
+                medium={medium}
                 onKindChange={setSectionKind}
                 questionTypes={questionTypes}
                 pairings={pairings}
-                multipartConfig={multipartConfig}
-                chapters={chapters}
+                hasMultipart={
+                    multipartConfig !== null &&
+                    multipartConfig.maxParts >= 2 &&
+                    multipartConfig.partTypes.length > 0
+                }
                 sourceOptions={sourceOptions}
                 initialChapterIds={initialChapterIds}
                 initialTopicIds={initialTopicIds}
@@ -8765,6 +8768,760 @@ function AddMultipartPaperSectionModal({
     );
 }
 
+function AddOrPaperSectionModal({
+    medium,
+    onKindChange,
+    questionTypes,
+    pairings,
+    hasMultipart,
+    sourceOptions,
+    initialChapterIds,
+    initialTopicIds,
+    initialSources,
+    usedQuestionIds,
+    onSearchQuestions,
+    onClose,
+    onSubmit,
+}: {
+    medium: ContentMedium;
+    onKindChange: (kind: AddPaperSectionKind) => void;
+    questionTypes: QuestionSelectionSection[];
+    pairings: QuestionTypePairing[];
+    hasMultipart: boolean;
+    sourceOptions: SourceOption[];
+    initialChapterIds: number[];
+    initialTopicIds: number[];
+    initialSources: string[];
+    usedQuestionIds: Set<number>;
+    onSearchQuestions: (
+        questionTypeId: number,
+        filters: PaperQuestionPoolFilters,
+    ) => Promise<ManualQuestion[]>;
+    onClose: () => void;
+    onSubmit: (values: AddPaperSectionValues) => Promise<void>;
+}) {
+    const availableSources = sourceOptions.length
+        ? sourceOptions
+        : fallbackSourceOptions;
+    const validPairings = useMemo(
+        () =>
+            pairings.filter(
+                (pairing) =>
+                    pairing.questionTypeIds.length >= 2 &&
+                    pairing.questionTypeIds.every((questionTypeId) =>
+                        questionTypes.some(
+                            (section) =>
+                                section.questionTypeId === questionTypeId,
+                        ),
+                    ),
+            ),
+        [pairings, questionTypes],
+    );
+    const pairingOptions = useMemo<ComboboxOptionItem[]>(
+        () =>
+            validPairings.map((pairing) => ({
+                id: pairing.id,
+                label: pairing.questionTypeIds
+                    .map((questionTypeId) =>
+                        plainQuestionText(
+                            questionTypes.find(
+                                (section) =>
+                                    section.questionTypeId === questionTypeId,
+                            )?.title ?? 'Question type',
+                        ),
+                    )
+                    .join(' OR '),
+            })),
+        [questionTypes, validPairings],
+    );
+    const [pairingId, setPairingId] = useState('');
+    const [selectedSources, setSelectedSources] = useState<Set<string>>(
+        () => new Set(initialSources),
+    );
+    const [totalQuestions, setTotalQuestions] = useState('');
+    const [requiredQuestions, setRequiredQuestions] = useState('');
+    const [marksEach, setMarksEach] = useState('');
+    const [selectionMode, setSelectionMode] =
+        useState<SelectionMode>('automatic');
+    const [selectedQuestionIds, setSelectedQuestionIds] = useState<
+        Record<string, number[]>
+    >({});
+    const [questionPools, setQuestionPools] = useState<
+        Record<string, ManualQuestion[]>
+    >({});
+    const [manualTypeId, setManualTypeId] = useState<number | null>(null);
+    const [manualSearch, setManualSearch] = useState('');
+    const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+    const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [questionLoadError, setQuestionLoadError] = useState<string | null>(
+        null,
+    );
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const selectedPairing = validPairings.find(
+        (pairing) => String(pairing.id) === pairingId,
+    );
+    const selectedPairingOption =
+        pairingOptions.find((option) => String(option.id) === pairingId) ??
+        null;
+    const pairedSections = (selectedPairing?.questionTypeIds ?? [])
+        .map((questionTypeId) =>
+            questionTypes.find(
+                (section) => section.questionTypeId === questionTypeId,
+            ),
+        )
+        .filter(
+            (section): section is QuestionSelectionSection =>
+                section !== undefined,
+        );
+    const selectedSourceValues = availableSources
+        .filter((source) => selectedSources.has(source.value))
+        .map((source) => source.value);
+    const totalNumber = toNumber(totalQuestions);
+    const requiredNumber = Math.min(toNumber(requiredQuestions), totalNumber);
+    const marksNumber = toNumber(marksEach);
+    const availableLimit =
+        pairedSections.length > 0
+            ? Math.min(
+                  ...pairedSections.map((section) => section.availableCount),
+              )
+            : 0;
+    const hasScope =
+        selectedSourceValues.length > 0 && initialChapterIds.length > 0;
+    const manualSelectionComplete = pairedSections.every(
+        (section) =>
+            (selectedQuestionIds[String(section.questionTypeId)] ?? [])
+                .length === totalNumber,
+    );
+    const canSubmit =
+        !submitting &&
+        selectedPairing !== undefined &&
+        pairedSections.length >= 2 &&
+        totalNumber > 0 &&
+        totalNumber <= availableLimit &&
+        requiredNumber > 0 &&
+        marksNumber > 0 &&
+        hasScope &&
+        (selectionMode === 'automatic' || manualSelectionComplete);
+    const activeSection = pairedSections.find(
+        (section) => section.questionTypeId === manualTypeId,
+    );
+    const activePool = useMemo(
+        () => (manualTypeId ? (questionPools[String(manualTypeId)] ?? []) : []),
+        [manualTypeId, questionPools],
+    );
+    const activeSelection = useMemo(
+        () =>
+            new Set(
+                manualTypeId
+                    ? (selectedQuestionIds[String(manualTypeId)] ?? [])
+                    : [],
+            ),
+        [manualTypeId, selectedQuestionIds],
+    );
+    const allSelectedIds = useMemo(
+        () =>
+            new Set([
+                ...usedQuestionIds,
+                ...Object.values(selectedQuestionIds).flat(),
+            ]),
+        [selectedQuestionIds, usedQuestionIds],
+    );
+    const filteredManualQuestions = useMemo(() => {
+        const search = manualSearch.trim().toLowerCase();
+
+        return activePool.filter((question) => {
+            if (showSelectedOnly && !activeSelection.has(question.id)) {
+                return false;
+            }
+
+            if (search === '') {
+                return true;
+            }
+
+            return [
+                question.summaryText,
+                question.summaryTextEn,
+                question.summaryTextUr,
+                question.chapter.name,
+                question.topic?.name,
+                question.sourceLabel,
+                question.source,
+            ].some((value) =>
+                plainQuestionText(value ?? '')
+                    .toLowerCase()
+                    .includes(search),
+            );
+        });
+    }, [activePool, activeSelection, manualSearch, showSelectedOnly]);
+    const activeManualPickerRow = useMemo<ManualPickerRow | null>(() => {
+        if (!activeSection || totalNumber <= 0) {
+            return null;
+        }
+
+        const optionIndex = pairedSections.findIndex(
+            (section) =>
+                section.questionTypeId === activeSection.questionTypeId,
+        );
+        const ids =
+            selectedQuestionIds[String(activeSection.questionTypeId)] ?? [];
+        const row: QuestionSelectionRow = {
+            id: `add_or_${activeSection.questionTypeId}`,
+            requiredQuestions: String(requiredNumber),
+            marksPerQuestion: String(marksNumber),
+            choiceQuestions: String(totalNumber),
+            selectedQuestionIds: ids,
+        };
+
+        return {
+            section: activeSection,
+            row,
+            target: totalNumber,
+            side: optionIndex === 0 ? 'primary' : 'alternative',
+            alternativeTypeId:
+                optionIndex === 0 ? undefined : activeSection.questionTypeId,
+            questionTypeId: activeSection.questionTypeId,
+            selectedQuestionIds: ids,
+            title: `Option ${String.fromCharCode(65 + optionIndex)}: ${plainQuestionText(activeSection.title)}`,
+        };
+    }, [
+        activeSection,
+        marksNumber,
+        pairedSections,
+        requiredNumber,
+        selectedQuestionIds,
+        totalNumber,
+    ]);
+
+    useEffect(() => {
+        setSelectedQuestionIds((current) =>
+            Object.fromEntries(
+                Object.entries(current).map(([typeId, ids]) => [
+                    typeId,
+                    ids.slice(0, totalNumber),
+                ]),
+            ),
+        );
+        setRequiredQuestions((current) => {
+            if (current === '' || totalNumber <= 0) {
+                return '';
+            }
+
+            return String(Math.min(toNumber(current), totalNumber));
+        });
+    }, [totalNumber]);
+
+    function resetSelections() {
+        setSelectedQuestionIds({});
+        setQuestionPools({});
+        closeManualPicker();
+        setSubmitError(null);
+    }
+
+    function changePairing(option: ComboboxOptionItem | null) {
+        setPairingId(option ? String(option.id) : '');
+        setTotalQuestions('');
+        setRequiredQuestions('');
+        setMarksEach('');
+        resetSelections();
+    }
+
+    function changeSources(nextSources: Set<string>) {
+        setSelectedSources(nextSources);
+        resetSelections();
+    }
+
+    function updateTotalQuestions(value: string) {
+        const digits = onlyDigits(value);
+        const nextValue =
+            digits === ''
+                ? ''
+                : String(
+                      Math.min(
+                          Math.max(1, Number(digits)),
+                          Math.max(1, availableLimit),
+                      ),
+                  );
+
+        setTotalQuestions(nextValue);
+        setRequiredQuestions((current) =>
+            current === ''
+                ? ''
+                : String(
+                      Math.min(
+                          Math.max(1, toNumber(current)),
+                          toNumber(nextValue),
+                      ),
+                  ),
+        );
+        setSubmitError(null);
+    }
+
+    function updateRequiredQuestions(value: string) {
+        const digits = onlyDigits(value);
+
+        setRequiredQuestions(
+            digits === ''
+                ? ''
+                : String(
+                      Math.min(
+                          Math.max(1, Number(digits)),
+                          Math.max(1, totalNumber),
+                      ),
+                  ),
+        );
+        setSubmitError(null);
+    }
+
+    function changeSelectionMode(enabled: boolean) {
+        setSelectionMode(enabled ? 'automatic' : 'manual');
+        closeManualPicker();
+        setSubmitError(null);
+    }
+
+    async function openManualPicker(questionTypeId: number) {
+        if (totalNumber <= 0 || !hasScope) {
+            setSubmitError(
+                'Set the questions shown and keep at least one source selected first.',
+            );
+
+            return;
+        }
+
+        setManualTypeId(questionTypeId);
+        setManualSearch('');
+        setShowSelectedOnly(false);
+        setLoadingQuestions(true);
+        setQuestionLoadError(null);
+        setSubmitError(null);
+
+        try {
+            const questions = await onSearchQuestions(questionTypeId, {
+                chapterIds: initialChapterIds,
+                topicIds: initialTopicIds,
+                sources: selectedSourceValues,
+            });
+            setQuestionPools((current) => ({
+                ...current,
+                [String(questionTypeId)]: questions,
+            }));
+        } catch (error) {
+            setQuestionLoadError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to load questions.',
+            );
+        } finally {
+            setLoadingQuestions(false);
+        }
+    }
+
+    function closeManualPicker() {
+        setManualTypeId(null);
+        setManualSearch('');
+        setShowSelectedOnly(false);
+        setQuestionLoadError(null);
+    }
+
+    function toggleManualQuestion(questionId: number) {
+        if (!manualTypeId) {
+            return;
+        }
+
+        const key = String(manualTypeId);
+        const current = selectedQuestionIds[key] ?? [];
+
+        if (current.includes(questionId)) {
+            setSelectedQuestionIds((selections) => ({
+                ...selections,
+                [key]: current.filter((id) => id !== questionId),
+            }));
+
+            return;
+        }
+
+        if (current.length >= totalNumber || allSelectedIds.has(questionId)) {
+            return;
+        }
+
+        setSelectedQuestionIds((selections) => ({
+            ...selections,
+            [key]: [...current, questionId],
+        }));
+        setSubmitError(null);
+    }
+
+    async function handleSubmit() {
+        if (!canSubmit || !selectedPairing) {
+            return;
+        }
+
+        setSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            const reserved = new Set(usedQuestionIds);
+            const members: AddPaperOrSectionValues['members'] = [];
+
+            for (const section of pairedSections) {
+                let pool = questionPools[String(section.questionTypeId)] ?? [];
+
+                if (selectionMode === 'automatic') {
+                    pool = await onSearchQuestions(section.questionTypeId, {
+                        chapterIds: initialChapterIds,
+                        topicIds: initialTopicIds,
+                        sources: selectedSourceValues,
+                    });
+                }
+
+                const manuallySelected =
+                    selectedQuestionIds[String(section.questionTypeId)] ?? [];
+                const selected =
+                    selectionMode === 'automatic'
+                        ? shuffledQuestions(
+                              pool.filter(
+                                  (question) => !reserved.has(question.id),
+                              ),
+                          ).slice(0, totalNumber)
+                        : manuallySelected
+                              .map((id) =>
+                                  pool.find((question) => question.id === id),
+                              )
+                              .filter(
+                                  (question): question is ManualQuestion =>
+                                      question !== undefined &&
+                                      !reserved.has(question.id),
+                              );
+
+                if (selected.length < totalNumber) {
+                    throw new Error(
+                        `Not enough unused questions are available for ${plainQuestionText(section.title)}.`,
+                    );
+                }
+
+                selected.forEach((question) => reserved.add(question.id));
+                members.push({
+                    questionTypeId: section.questionTypeId,
+                    selectedQuestions: selected,
+                    poolQuestions: pool,
+                });
+            }
+
+            await onSubmit({
+                kind: 'or',
+                pairingId: selectedPairing.id,
+                totalQuestions: totalNumber,
+                requiredQuestions: requiredNumber,
+                marksEach: marksNumber,
+                members,
+            });
+        } catch (error) {
+            setSubmitError(
+                error instanceof Error
+                    ? error.message
+                    : 'Unable to add this OR group.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div
+            role="presentation"
+            onMouseDown={onClose}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3"
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-or-paper-section-title"
+                onMouseDown={(event) => event.stopPropagation()}
+                className="flex h-[min(46rem,calc(100vh-1.5rem))] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+                <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h2
+                            id="add-or-paper-section-title"
+                            className="text-base font-semibold text-slate-900 dark:text-slate-100"
+                        >
+                            Add section
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label="Close add section"
+                            className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        >
+                            <XIcon className="size-4" />
+                        </button>
+                    </div>
+
+                    <AddPaperSectionKindTabs
+                        value="or"
+                        onChange={onKindChange}
+                        hasOrGroups={validPairings.length > 0}
+                        hasMultipart={hasMultipart}
+                    />
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 p-4 dark:bg-slate-950/30">
+                    <div className="space-y-4">
+                        <div className="space-y-4">
+                            <FloatingCombobox
+                                label="OR group"
+                                leadingIcon={Link2Icon}
+                                options={pairingOptions}
+                                value={selectedPairingOption}
+                                onChange={changePairing}
+                                disabled={pairingOptions.length === 0}
+                                disabledHint="No OR groups available"
+                            />
+
+                            {selectedPairing && (
+                                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_.7fr_.7fr_.7fr]">
+                                    <SourceMultiSelect
+                                        options={availableSources}
+                                        selectedValues={selectedSources}
+                                        onChange={changeSources}
+                                    />
+                                    <FloatingField label="Choice">
+                                        <input
+                                            autoComplete="off"
+                                            type="number"
+                                            min={1}
+                                            max={availableLimit || undefined}
+                                            value={totalQuestions}
+                                            onChange={(event) =>
+                                                updateTotalQuestions(
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                                        />
+                                    </FloatingField>
+                                    <FloatingField label="Required">
+                                        <input
+                                            autoComplete="off"
+                                            type="number"
+                                            min={1}
+                                            max={totalNumber || undefined}
+                                            value={requiredQuestions}
+                                            onChange={(event) =>
+                                                updateRequiredQuestions(
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                                        />
+                                    </FloatingField>
+                                    <FloatingField label="Marks each">
+                                        <input
+                                            autoComplete="off"
+                                            type="number"
+                                            min={1}
+                                            value={marksEach}
+                                            onChange={(event) => {
+                                                setMarksEach(
+                                                    onlyDigits(
+                                                        event.target.value,
+                                                    ),
+                                                );
+                                                setSubmitError(null);
+                                            }}
+                                            className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                                        />
+                                    </FloatingField>
+                                </div>
+                            )}
+                        </div>
+
+                        {selectedPairing && (
+                            <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                            Question selection
+                                        </h3>
+                                        {selectionMode === 'manual' && (
+                                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                                Select the required questions
+                                                separately for every option
+                                                below.
+                                            </p>
+                                        )}
+                                    </div>
+                                    <AutoPickSwitch
+                                        enabled={selectionMode === 'automatic'}
+                                        onChange={changeSelectionMode}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    {pairedSections.map((section, index) => {
+                                        const ids =
+                                            selectedQuestionIds[
+                                                String(section.questionTypeId)
+                                            ] ?? [];
+                                        const complete =
+                                            totalNumber > 0 &&
+                                            ids.length === totalNumber;
+
+                                        return (
+                                            <div
+                                                key={section.questionTypeId}
+                                                className="contents"
+                                            >
+                                                {index > 0 && (
+                                                    <div className="flex items-center gap-3 py-1">
+                                                        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                                                        <span className="inline-flex size-8 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white dark:bg-slate-100 dark:text-slate-900">
+                                                            OR
+                                                        </span>
+                                                        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className={cn(
+                                                        'flex flex-col gap-3 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between',
+                                                        complete
+                                                            ? 'border-brand-200 bg-brand-50/45 dark:border-brand-500/30 dark:bg-brand-500/10'
+                                                            : 'border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-950/40',
+                                                    )}
+                                                >
+                                                    <div className="flex min-w-0 items-center gap-3">
+                                                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-bold text-brand-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-brand-300 dark:ring-slate-700">
+                                                            {String.fromCharCode(
+                                                                65 + index,
+                                                            )}
+                                                        </span>
+                                                        <div className="min-w-0">
+                                                            <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                                                                Option{' '}
+                                                                {String.fromCharCode(
+                                                                    65 + index,
+                                                                )}
+                                                            </p>
+                                                            <h4 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                                <QuestionContent
+                                                                    as="span"
+                                                                    inline
+                                                                    value={
+                                                                        section.title
+                                                                    }
+                                                                />
+                                                            </h4>
+                                                        </div>
+                                                    </div>
+                                                    {selectionMode ===
+                                                    'automatic' ? (
+                                                        <span className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-white px-3 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
+                                                            <SparklesIcon className="size-3.5 text-brand-600 dark:text-brand-300" />
+                                                            Auto pick
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            disabled={
+                                                                totalNumber <=
+                                                                    0 ||
+                                                                !hasScope
+                                                            }
+                                                            onClick={() =>
+                                                                void openManualPicker(
+                                                                    section.questionTypeId,
+                                                                )
+                                                            }
+                                                            className={cn(
+                                                                'inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                                                                complete
+                                                                    ? 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
+                                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+                                                            )}
+                                                        >
+                                                            {complete ? (
+                                                                <CheckIcon className="size-3.5" />
+                                                            ) : (
+                                                                <ListChecksIcon className="size-3.5" />
+                                                            )}
+                                                            {complete
+                                                                ? 'Selection complete'
+                                                                : `Select questions (${ids.length}/${totalNumber || 0})`}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        )}
+
+                        {!selectedPairing && validPairings.length > 0 && (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center dark:border-slate-700 dark:bg-slate-900">
+                                <Link2Icon className="mx-auto mb-3 size-6 text-slate-400" />
+                                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    Select an OR group to continue
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    Its paired question types and shared
+                                    settings will appear here.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm font-medium text-red-600 dark:text-red-300">
+                        {submitError}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            Close
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!canSubmit}
+                            onClick={() => void handleSubmit()}
+                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:bg-brand-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                        >
+                            {submitting && (
+                                <Loader2Icon className="size-4 animate-spin" />
+                            )}
+                            Add OR group
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            {activeManualPickerRow && (
+                <ManualQuestionPickerModal
+                    activeRow={activeManualPickerRow}
+                    medium={medium}
+                    questions={filteredManualQuestions}
+                    loading={loadingQuestions}
+                    error={questionLoadError}
+                    search={manualSearch}
+                    showSelectedOnly={showSelectedOnly}
+                    selectedQuestionIds={activeSelection}
+                    allSelectedQuestionIds={allSelectedIds}
+                    onSearchChange={setManualSearch}
+                    onSelectedOnlyChange={() =>
+                        setShowSelectedOnly((current) => !current)
+                    }
+                    onToggleQuestion={toggleManualQuestion}
+                    onClose={closeManualPicker}
+                />
+            )}
+        </div>
+    );
+}
+
 interface AddMultipartDraftPart {
     id: string;
     questionTypeId: string;
@@ -8772,6 +9529,9 @@ interface AddMultipartDraftPart {
     selectedQuestionIds: number[];
 }
 
+// Retained temporarily for backward-compatible draft shapes; new OR and
+// multipart additions use the focused modal components above.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AddSpecialPaperSectionModal({
     kind,
     onKindChange,
