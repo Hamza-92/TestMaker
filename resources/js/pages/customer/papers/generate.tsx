@@ -333,6 +333,7 @@ interface QuestionTypePairing {
 interface OrTypeOption {
     id: number;
     label: string;
+    questionTypeIds: number[];
     disabled?: boolean;
 }
 
@@ -5818,10 +5819,12 @@ export default function GeneratePaper({
             const normalizedIds = Array.from(
                 new Set([primary.questionTypeId, ...selectedIds]),
             );
-            const group = questionTypePairings.find((candidate) =>
-                normalizedIds.every((typeId) =>
-                    candidate.questionTypeIds.includes(typeId),
-                ),
+            const group = questionTypePairings.find(
+                (candidate) =>
+                    candidate.questionTypeIds.length === normalizedIds.length &&
+                    normalizedIds.every((typeId) =>
+                        candidate.questionTypeIds.includes(typeId),
+                    ),
             );
 
             if (!group) {
@@ -6353,75 +6356,30 @@ export default function GeneratePaper({
                                                   );
                                               },
                                           );
-                                      const selectedTypeIds = new Set(
-                                          orGroupTypeIds(section),
-                                      );
-                                      const optionIds = new Set<number>();
 
-                                      candidateGroups.forEach((group) => {
-                                          group.questionTypeIds.forEach(
-                                              (typeId) => {
-                                                  if (
-                                                      typeId !==
-                                                      section.questionTypeId
-                                                  ) {
-                                                      optionIds.add(typeId);
-                                                  }
-                                              },
-                                          );
-                                      });
-
-                                      return Array.from(optionIds)
-                                          .map((typeId) => {
-                                              const member =
-                                                  sectionsByType.get(typeId);
-
-                                              if (!member) {
-                                                  return null;
-                                              }
-
-                                              const canSelect =
-                                                  candidateGroups.some(
-                                                      (group) => {
-                                                          const proposed =
-                                                              new Set([
-                                                                  ...selectedTypeIds,
+                                      return candidateGroups
+                                          .map((group) => ({
+                                              id: group.id,
+                                              questionTypeIds:
+                                                  group.questionTypeIds,
+                                              label: group.questionTypeIds
+                                                  .filter(
+                                                      (typeId) =>
+                                                          typeId !==
+                                                          section.questionTypeId,
+                                                  )
+                                                  .map((typeId) =>
+                                                      plainQuestionText(
+                                                          englishQuestionTypeTitle(
+                                                              sectionsByType.get(
                                                                   typeId,
-                                                              ]);
-
-                                                          return Array.from(
-                                                              proposed,
-                                                          ).every(
-                                                              (candidateId) =>
-                                                                  group.questionTypeIds.includes(
-                                                                      candidateId,
-                                                                  ),
-                                                          );
-                                                      },
-                                                  );
-
-                                              return {
-                                                  id: typeId,
-                                                  label: plainQuestionText(
-                                                      englishQuestionTypeTitle(
-                                                          member,
+                                                              ) as QuestionSelectionSection,
+                                                          ),
                                                       ),
-                                                  ),
-                                                  disabled:
-                                                      !selectedTypeIds.has(
-                                                          typeId,
-                                                      ) && !canSelect,
-                                              } satisfies OrTypeOption;
-                                          })
-                                          .filter(
-                                              (
-                                                  option,
-                                              ): option is {
-                                                  id: number;
-                                                  label: string;
-                                                  disabled: boolean;
-                                              } => option !== null,
-                                          )
+                                                  )
+                                                  .join(', '),
+                                              disabled: false,
+                                          }))
                                           .sort((left, right) =>
                                               left.label.localeCompare(
                                                   right.label,
@@ -12716,7 +12674,7 @@ function ChapterCard({
     );
 }
 
-function OrTypeMultiSelect({
+function OrGroupSelect({
     options,
     selectedTypeIds,
     onChange,
@@ -12725,105 +12683,39 @@ function OrTypeMultiSelect({
     selectedTypeIds: number[];
     onChange: (typeIds: number[]) => void;
 }) {
-    const detailsRef = useRef<HTMLDetailsElement>(null);
     const selected = new Set(selectedTypeIds);
-
-    useEffect(() => {
-        const handleOutsidePointer = (event: PointerEvent) => {
-            const details = detailsRef.current;
-
-            if (
-                details?.open &&
-                event.target instanceof Node &&
-                !details.contains(event.target)
-            ) {
-                details.open = false;
-            }
-        };
-
-        document.addEventListener('pointerdown', handleOutsidePointer);
-
-        return () =>
-            document.removeEventListener('pointerdown', handleOutsidePointer);
-    }, []);
-    const selectedLabels = options
-        .filter((option) => selected.has(option.id))
-        .map((option) => option.label);
-    const buttonLabel =
-        selectedTypeIds.length > 1
-            ? `${selectedTypeIds.length} OR types selected`
-            : 'Select OR types';
+    const selectedOption = options.find(
+        (option) =>
+            option.questionTypeIds.length === selected.size &&
+            option.questionTypeIds.every((typeId) => selected.has(typeId)),
+    );
+    const comboboxOptions: ComboboxOptionItem[] = options.map((option) => ({
+        id: option.id,
+        label: option.label,
+    }));
+    const value = selectedOption
+        ? (comboboxOptions.find((option) => option.id === selectedOption.id) ??
+          null)
+        : null;
 
     return (
-        <details
-            ref={detailsRef}
-            className="group relative min-w-[15rem] flex-1 sm:w-64 sm:flex-none"
-        >
-            <summary
-                className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition-colors group-open:border-brand-500 group-open:ring-2 group-open:ring-brand-500/20 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:group-open:border-brand-400 dark:group-open:ring-brand-400/20 dark:hover:border-slate-700 [&::-webkit-details-marker]:hidden"
-                aria-label="Select question types for the OR group"
-                title={
-                    selectedLabels.join(' OR ') ||
-                    'Select question types for the OR group'
-                }
-            >
-                <Link2Icon className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
-                <span className="min-w-0 flex-1 truncate text-left">
-                    {buttonLabel}
-                </span>
-                <ChevronDownIcon className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/30">
-                <div className="mt-1 max-h-64 overflow-y-auto">
-                    {options.map((option) => {
-                        const checked = selected.has(option.id);
+        <div className="min-w-[15rem] flex-1 sm:w-72 sm:flex-none">
+            <FloatingCombobox
+                label="OR group"
+                leadingIcon={Link2Icon}
+                options={comboboxOptions}
+                value={value}
+                compact
+                placeholder="Select OR group"
+                onChange={(option) => {
+                    const group = options.find(
+                        (candidate) => candidate.id === option?.id,
+                    );
 
-                        return (
-                            <label
-                                key={option.id}
-                                className={cn(
-                                    'flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm transition-colors',
-                                    checked
-                                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
-                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
-                                    option.disabled &&
-                                        !checked &&
-                                        'cursor-not-allowed opacity-40',
-                                )}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    disabled={option.disabled && !checked}
-                                    onChange={() => {
-                                        if (checked) {
-                                            onChange(
-                                                selectedTypeIds.filter(
-                                                    (typeId) =>
-                                                        typeId !== option.id,
-                                                ),
-                                            );
-                                        } else if (!option.disabled) {
-                                            onChange([
-                                                ...selectedTypeIds,
-                                                option.id,
-                                            ]);
-                                        }
-                                    }}
-                                    className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
-                                />
-                                <span className="min-w-0 flex-1 truncate">
-                                    {option.label}
-                                </span>
-                                {checked && (
-                                    <CheckIcon className="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
-                                )}
-                            </label>
-                        );
-                    })}
-                </div>
-            </div>
-        </details>
+                    onChange(group?.questionTypeIds ?? []);
+                }}
+            />
+        </div>
     );
 }
 function MultipartSelectionCard({
@@ -13133,7 +13025,7 @@ function QuestionSelectionCard({
                 <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
                     {section.category === 'Subjective Questions' &&
                         orTypeOptions.length > 0 && (
-                            <OrTypeMultiSelect
+                            <OrGroupSelect
                                 options={orTypeOptions}
                                 selectedTypeIds={selectedOrTypeIds}
                                 onChange={(typeIds) =>
