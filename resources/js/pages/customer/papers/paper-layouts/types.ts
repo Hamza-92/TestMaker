@@ -142,7 +142,12 @@ export interface GeneratedPaperHeader {
     rollNo: string;
 }
 
-export type PaperEnglishFont = 'jameel-noori' | 'sans' | 'serif' | 'mono';
+export type PaperEnglishFont =
+    | 'times-new-roman'
+    | 'jameel-noori'
+    | 'sans'
+    | 'serif'
+    | 'mono';
 export type PaperUrduFont = 'jameel-noori' | 'noto-nastaliq' | 'mehr-nastaliq';
 /**
  * Nastaliq fonts have different x-heights and built-in vertical metrics.
@@ -154,7 +159,7 @@ export const PAPER_URDU_FONT_METRICS: Record<
     { sizeScale: number; lineHeightScale: number; verticalOffsetEm: number }
 > = {
     'jameel-noori': {
-        sizeScale: 1.18,
+        sizeScale: 1.1,
         lineHeightScale: 1.22,
         verticalOffsetEm: -0.16,
     },
@@ -281,7 +286,7 @@ export type PaperHeaderTemplate =
     | 'tabular';
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
-    englishFont: 'jameel-noori',
+    englishFont: 'times-new-roman',
     urduFont: 'jameel-noori',
     headerSize: 12,
     headerLineHeight: 1,
@@ -423,6 +428,7 @@ function pickBorderStyle(
 }
 
 const ENGLISH_FONT_VALUES = new Set<PaperEnglishFont>([
+    'times-new-roman',
     'jameel-noori',
     'sans',
     'serif',

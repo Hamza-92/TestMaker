@@ -64,6 +64,11 @@ interface FontOption<T extends string> {
 
 const ENGLISH_FONT_OPTIONS: Array<FontOption<PaperEnglishFont>> = [
     {
+        value: 'times-new-roman',
+        label: 'Times New Roman',
+        previewFontFamily: '"Times New Roman", Times, serif',
+    },
+    {
         value: 'jameel-noori',
         label: 'Jameel Noori',
         previewFontFamily:

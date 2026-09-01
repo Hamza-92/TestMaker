@@ -11389,6 +11389,7 @@ function GeneratedPaperView({
     // Compose a per-character font-family cascade — Latin glyphs get the
     // English font, Urdu glyphs fall through to the Urdu font automatically.
     const englishStack: Record<string, string> = {
+        'times-new-roman': '"Times New Roman", Times, serif',
         'jameel-noori':
             '"Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif',
         sans: '"Montserrat", system-ui, -apple-system, sans-serif',
