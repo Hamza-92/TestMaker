@@ -143,6 +143,7 @@ class CustomerDashboardData
                 ->where('surface', $surface)
                 ->exists();
     }
+
     private static function patterns(array $access): Collection
     {
         $patternIds = $access['ids']['pattern_access'];
@@ -155,6 +156,7 @@ class CustomerDashboardData
                 $query
                     ->where('classes.status', 1)
                     ->when($classIds !== null, fn ($classQuery) => $classQuery->whereIn('classes.id', $classIds))
+                    ->orderBy('classes.sort_order')
                     ->orderBy('classes.id');
             }])
             ->orderBy('name')

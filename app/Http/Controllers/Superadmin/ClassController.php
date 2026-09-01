@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\Pattern;
 use App\Models\SchoolClass;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -16,8 +17,8 @@ class ClassController extends Controller
     public function index()
     {
         $classes = SchoolClass::with('patterns:id,name,short_name')
-            ->orderByDesc('created_at')
-            ->get(['id', 'name', 'status', 'created_at']);
+            ->ordered()
+            ->get(['id', 'name', 'sort_order', 'status', 'created_at']);
 
         return Inertia::render('superadmin/classes', [
             'classes' => $classes,
@@ -44,15 +45,15 @@ class ClassController extends Controller
 
         return Inertia::render('superadmin/classes/show', [
             'schoolClass' => [
-                'id'                => $class->id,
-                'name'              => $class->name,
-                'status'            => $class->status,
-                'created_at'        => $class->created_at?->toISOString(),
-                'patterns'          => $class->patterns,
+                'id' => $class->id,
+                'name' => $class->name,
+                'status' => $class->status,
+                'created_at' => $class->created_at?->toISOString(),
+                'patterns' => $class->patterns,
                 'subjects_by_pattern' => $subjectsByPattern,
-                'audit_logs'        => $class->auditLogs->map(fn ($log) => [
-                    'id'         => $log->id,
-                    'event'      => $log->event?->value,
+                'audit_logs' => $class->auditLogs->map(fn ($log) => [
+                    'id' => $log->id,
+                    'event' => $log->event?->value,
                     'old_values' => $log->old_values ?? [],
                     'new_values' => $log->new_values ?? [],
                     'changed_by' => $log->changedBy?->name ?? 'System',
@@ -60,6 +61,34 @@ class ClassController extends Controller
                 ]),
             ],
         ]);
+    }
+
+    public function reorder(Request $request)
+    {
+        $validated = $request->validate([
+            'order' => ['required', 'array', 'min:1'],
+            'order.*' => ['required', 'integer', 'distinct', 'exists:classes,id'],
+        ]);
+
+        $existingIds = SchoolClass::query()->pluck('id')->map(fn ($id) => (int) $id);
+        $submittedIds = collect($validated['order'])->map(fn ($id) => (int) $id)->values();
+
+        abort_unless(
+            $submittedIds->count() === $existingIds->count()
+                && $submittedIds->diff($existingIds)->isEmpty(),
+            422,
+            'The class order is out of date. Please refresh and try again.',
+        );
+
+        DB::transaction(function () use ($submittedIds): void {
+            foreach ($submittedIds as $index => $classId) {
+                SchoolClass::query()->whereKey($classId)->update([
+                    'sort_order' => $index + 1,
+                ]);
+            }
+        });
+
+        return back()->with('success', 'Class order saved successfully.');
     }
 
     public function create()
@@ -76,26 +105,26 @@ class ClassController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'          => ['required', 'string', 'max:50', 'unique:classes,name'],
-            'status'        => ['required', 'boolean'],
-            'pattern_ids'   => ['array'],
+            'name' => ['required', 'string', 'max:50', 'unique:classes,name'],
+            'status' => ['required', 'boolean'],
+            'pattern_ids' => ['array'],
             'pattern_ids.*' => ['integer', 'exists:patterns,id'],
         ]);
 
         $class = SchoolClass::create([
-            'name'       => $validated['name'],
-            'status'     => $validated['status'],
+            'name' => $validated['name'],
+            'status' => $validated['status'],
             'created_by' => auth()->id(),
         ]);
 
         $class->patterns()->sync($validated['pattern_ids'] ?? []);
 
         AuditLog::record(
-            model:     $class,
-            event:     AuditEvent::Created,
+            model: $class,
+            event: AuditEvent::Created,
             newValues: [
-                'name'        => $class->name,
-                'status'      => $class->status,
+                'name' => $class->name,
+                'status' => $class->status,
                 'pattern_ids' => $validated['pattern_ids'] ?? [],
             ],
             notes: 'Class created.',
@@ -115,9 +144,9 @@ class ClassController extends Controller
 
         return Inertia::render('superadmin/classes/edit', [
             'schoolClass' => [
-                'id'          => $class->id,
-                'name'        => $class->name,
-                'status'      => $class->status,
+                'id' => $class->id,
+                'name' => $class->name,
+                'status' => $class->status,
                 'pattern_ids' => $class->patterns->pluck('id'),
             ],
             'patterns' => $patterns,
@@ -127,18 +156,18 @@ class ClassController extends Controller
     public function update(Request $request, SchoolClass $class)
     {
         $validated = $request->validate([
-            'name'          => ['required', 'string', 'max:50', Rule::unique('classes', 'name')->ignore($class->id)],
-            'status'        => ['required', 'boolean'],
-            'pattern_ids'   => ['array'],
+            'name' => ['required', 'string', 'max:50', Rule::unique('classes', 'name')->ignore($class->id)],
+            'status' => ['required', 'boolean'],
+            'pattern_ids' => ['array'],
             'pattern_ids.*' => ['integer', 'exists:patterns,id'],
         ]);
 
-        $oldName   = $class->name;
+        $oldName = $class->name;
         $oldStatus = $class->status;
         $oldPatternIds = $class->patterns()->pluck('patterns.id')->toArray();
 
         $class->update([
-            'name'   => $validated['name'],
+            'name' => $validated['name'],
             'status' => $validated['status'],
         ]);
 
@@ -146,19 +175,23 @@ class ClassController extends Controller
 
         $newPatternIds = $validated['pattern_ids'] ?? [];
         $changes = [];
-        if ($oldName   !== $class->name)   $changes['name']   = ['old' => $oldName,   'new' => $class->name];
-        if ($oldStatus !== $class->status) $changes['status'] = ['old' => $oldStatus, 'new' => $class->status];
+        if ($oldName !== $class->name) {
+            $changes['name'] = ['old' => $oldName,   'new' => $class->name];
+        }
+        if ($oldStatus !== $class->status) {
+            $changes['status'] = ['old' => $oldStatus, 'new' => $class->status];
+        }
         if (sort($oldPatternIds) !== sort($newPatternIds)) {
             $changes['pattern_ids'] = ['old' => $oldPatternIds, 'new' => $newPatternIds];
         }
 
-        if (!empty($changes)) {
+        if (! empty($changes)) {
             AuditLog::record(
-                model:     $class,
-                event:     AuditEvent::Updated,
+                model: $class,
+                event: AuditEvent::Updated,
                 oldValues: array_column($changes, 'old', array_keys($changes)[0]) + array_combine(array_keys($changes), array_column($changes, 'old')),
                 newValues: array_combine(array_keys($changes), array_column($changes, 'new')),
-                notes:     'Class updated.',
+                notes: 'Class updated.',
             );
         }
 
@@ -169,10 +202,10 @@ class ClassController extends Controller
     public function destroy(SchoolClass $class)
     {
         AuditLog::record(
-            model:     $class,
-            event:     AuditEvent::Deleted,
+            model: $class,
+            event: AuditEvent::Deleted,
             oldValues: ['name' => $class->name],
-            notes:     'Class deleted.',
+            notes: 'Class deleted.',
         );
 
         $class->delete();

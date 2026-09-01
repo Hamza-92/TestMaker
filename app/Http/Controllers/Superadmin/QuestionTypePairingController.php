@@ -242,7 +242,8 @@ class QuestionTypePairingController extends Controller
                 ->where('patterns.status', 1)
                 ->where('classes.status', 1)
                 ->orderBy('patterns.name')
-                ->orderBy('classes.name')
+                ->orderBy('classes.sort_order')
+                ->orderBy('classes.id')
                 ->get([
                     'pattern_classes.pattern_id',
                     'classes.id',

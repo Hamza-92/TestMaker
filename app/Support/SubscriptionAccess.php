@@ -13,10 +13,13 @@ class SubscriptionAccess
         $patternClassMap = DB::table('pattern_classes')
             ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
             ->where('classes.status', 1)
+            ->orderBy('pattern_classes.pattern_id')
+            ->orderBy('classes.sort_order')
+            ->orderBy('classes.id')
             ->select('pattern_classes.pattern_id', 'pattern_classes.class_id')
             ->get()
             ->groupBy('pattern_id')
-            ->map(fn (Collection $rows) => self::sortIds($rows->pluck('class_id')->all()))
+            ->map(fn (Collection $rows) => $rows->pluck('class_id')->map(fn ($id) => (int) $id)->values()->all())
             ->toArray();
 
         $classSubjectMap = DB::table('class_subjects')

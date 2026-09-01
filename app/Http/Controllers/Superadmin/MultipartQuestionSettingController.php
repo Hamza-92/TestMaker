@@ -169,7 +169,7 @@ class MultipartQuestionSettingController extends Controller
                 ->join('patterns', 'patterns.id', '=', 'pattern_classes.pattern_id')
                 ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
                 ->where('patterns.status', 1)->where('classes.status', 1)
-                ->orderBy('patterns.name')->orderBy('classes.name')
+                ->orderBy('patterns.name')->orderBy('classes.sort_order')->orderBy('classes.id')
                 ->get(['pattern_classes.pattern_id', 'classes.id', 'classes.name']),
             'classSubjects' => DB::table('class_subjects')
                 ->join('patterns', 'patterns.id', '=', 'class_subjects.pattern_id')
@@ -207,6 +207,7 @@ class MultipartQuestionSettingController extends Controller
     private function requestedScope(Request $request): ?array
     {
         $scope = [(int) $request->query('pattern_id', 0), (int) $request->query('class_id', 0), (int) $request->query('subject_id', 0)];
+
         return min($scope) < 1 || ! $this->scopeExists(...$scope) ? null : $scope;
     }
 

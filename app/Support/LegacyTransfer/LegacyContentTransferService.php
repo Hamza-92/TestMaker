@@ -291,7 +291,7 @@ class LegacyContentTransferService
         return [
             'patterns' => $this->targetPatterns(),
             'classes' => SchoolClass::query()
-                ->orderBy('name')
+                ->ordered()
                 ->get(['id', 'name', 'status'])
                 ->map(fn (SchoolClass $class) => $this->targetClassPayload($class))
                 ->values()
@@ -333,7 +333,6 @@ class LegacyContentTransferService
         }
 
         return $pattern->classes()
-            ->orderBy('classes.name')
             ->get(['classes.id', 'classes.name', 'classes.status'])
             ->map(fn (SchoolClass $class) => $this->targetClassPayload($class))
             ->values()

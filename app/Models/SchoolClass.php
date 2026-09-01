@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,9 +15,32 @@ class SchoolClass extends Model
 
     protected $fillable = [
         'name',
+        'sort_order',
         'status',
         'created_by',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'sort_order' => 'integer',
+            'status' => 'integer',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (SchoolClass $schoolClass): void {
+            if (! $schoolClass->sort_order) {
+                $schoolClass->sort_order = ((int) static::query()->max('sort_order')) + 1;
+            }
+        });
+    }
+
+    public function scopeOrdered(Builder $query): Builder
+    {
+        return $query->orderBy('sort_order')->orderBy('id');
+    }
 
     // ── Relationships ─────────────────────────────────────────────────────────
 

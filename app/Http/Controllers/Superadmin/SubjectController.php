@@ -108,7 +108,7 @@ class SubjectController extends Controller
     public function create()
     {
         $patterns = Pattern::where('status', 1)
-            ->with(['classes' => fn ($q) => $q->where('status', 1)->orderBy('name')->select('classes.id', 'classes.name')])
+            ->with(['classes' => fn ($q) => $q->where('status', 1)->select('classes.id', 'classes.name')])
             ->orderBy('name')
             ->get(['id', 'name', 'short_name'])
             ->filter(fn ($p) => $p->classes->isNotEmpty())
@@ -161,7 +161,7 @@ class SubjectController extends Controller
     public function edit(Subject $subject)
     {
         $patterns = Pattern::where('status', 1)
-            ->with(['classes' => fn ($q) => $q->where('status', 1)->orderBy('name')->select('classes.id', 'classes.name')])
+            ->with(['classes' => fn ($q) => $q->where('status', 1)->select('classes.id', 'classes.name')])
             ->orderBy('name')
             ->get(['id', 'name', 'short_name'])
             ->filter(fn ($p) => $p->classes->isNotEmpty())

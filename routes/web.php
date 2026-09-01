@@ -181,6 +181,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/classes', [ClassController::class, 'index'])->name('superadmin.classes')->middleware('permission:classes.view');
         Route::get('superadmin/classes/add', [ClassController::class, 'create'])->name('superadmin.classes.add')->middleware('permission:classes.create');
         Route::post('superadmin/classes', [ClassController::class, 'store'])->name('superadmin.classes.store')->middleware('permission:classes.create');
+        Route::post('superadmin/classes/reorder', [ClassController::class, 'reorder'])->name('superadmin.classes.reorder')->middleware('permission:classes.edit');
         Route::get('superadmin/classes/{class}/edit', [ClassController::class, 'edit'])->name('superadmin.classes.edit')->middleware('permission:classes.edit');
         Route::put('superadmin/classes/{class}', [ClassController::class, 'update'])->name('superadmin.classes.update')->middleware('permission:classes.edit');
         Route::delete('superadmin/classes/{class}', [ClassController::class, 'destroy'])->name('superadmin.classes.destroy')->middleware('permission:classes.delete');

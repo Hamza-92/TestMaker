@@ -207,7 +207,7 @@ class PaperQuestionSectionController extends Controller
         return [
             'patterns' => Pattern::query()->where('status', 1)->orderBy('name')->get(['id', 'name']),
             'patternClasses' => DB::table('pattern_classes')->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
-                ->where('classes.status', 1)->orderBy('classes.name')->get(['pattern_classes.pattern_id', 'classes.id', 'classes.name']),
+                ->where('classes.status', 1)->orderBy('classes.sort_order')->orderBy('classes.id')->get(['pattern_classes.pattern_id', 'classes.id', 'classes.name']),
             'classSubjects' => DB::table('class_subjects')->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
                 ->where('subjects.status', 1)->orderBy('subjects.name_eng')->get(['class_subjects.pattern_id', 'class_subjects.class_id', 'class_subjects.subject_id', 'subjects.name_eng as name']),
         ];
