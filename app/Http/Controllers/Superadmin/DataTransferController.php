@@ -57,6 +57,7 @@ class DataTransferController extends Controller
         $validated = $request->validate([
             'source_pattern' => ['required', 'string'],
             'source_class_id' => ['required', 'integer'],
+            'class_wise' => ['nullable', 'boolean'],
             'source_subject_id' => ['nullable', 'integer'],
             'source_subject_ids' => ['nullable', 'array', 'min:1'],
             'source_subject_ids.*' => ['integer'],

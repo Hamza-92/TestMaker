@@ -24,6 +24,30 @@ class LegacyContentTransferService
     /** Legacy same-statement types print each language statement around one shared middle statement. */
     private const LEGACY_SAME_STATEMENT_TYPES = [336, 386];
 
+    /** Math subjects routed directly from chapters.php to exercise.php in the legacy app. */
+    private const LEGACY_EXERCISE_BASED_MATH_SUBJECT_IDS = [
+        3,
+        21,
+        22,
+        45,
+        51,
+        60,
+        82,
+        101,
+        122,
+        129,
+        156,
+        158,
+        160,
+        170,
+        178,
+        201,
+        207,
+        214,
+    ];
+
+    private const EXERCISE_TOPIC_MINIMUM_COVERAGE = 0.75;
+
     private const SOURCE_PATTERNS = [
         'punjab' => [
             'key' => 'punjab',
@@ -155,20 +179,35 @@ class LegacyContentTransferService
                 ->where('subject.status_punjab', 1))
             ->when(in_array($sourcePattern, ['afaq', 'afaq_sons', 'oxford'], true), fn ($query) => $query->where('subject.afaq', $afaq))
             ->when(in_array($sourcePattern, ['fedral', 'ajk', 'kpk', 'ss', 'sindh'], true), fn ($query) => $query->where('subject.status_punjab', 1))
-            ->selectRaw('subject.id, subject.name, subject.status_punjab, subject.status_smart, count(distinct chapter.id) as chapters_count, count(distinct topic.id) as topics_count, count(distinct question.id) as questions_count')
+            ->selectRaw("subject.id, subject.name, subject.status_punjab, subject.status_smart, count(distinct chapter.id) as chapters_count, count(distinct topic.id) as topics_count, count(distinct question.id) as questions_count, count(distinct case when trim(coalesce(question.exercise, '')) <> '' then question.id end) as exercise_questions_count")
             ->groupBy('subject.id', 'subject.name', 'subject.status_punjab', 'subject.status_smart')
             ->havingRaw('count(distinct question.id) > 0')
             ->orderBy('subject.name')
             ->get()
-            ->map(fn (object $subject) => [
-                'id' => (int) $subject->id,
-                'name' => (string) $subject->name,
-                'status' => (int) ($subject->status_punjab ?: $subject->status_smart ?: 1),
-                'chapters_count' => (int) $subject->chapters_count,
-                'topics_count' => (int) $subject->topics_count,
-                'questions_count' => (int) $subject->questions_count,
-                'subject_type' => ((int) $subject->topics_count) > 0 ? 'topic-wise' : 'chapter-wise',
-            ])
+            ->map(function (object $subject): array {
+                $hasLegacyTopics = ((int) $subject->topics_count) > 0;
+                $usesExerciseTopics = ! $hasLegacyTopics
+                    && $this->hasExerciseBasedMathData(
+                        sourceSubjectId: (int) $subject->id,
+                        questionsCount: (int) $subject->questions_count,
+                        exerciseQuestionsCount: (int) $subject->exercise_questions_count,
+                    );
+
+                return [
+                    'id' => (int) $subject->id,
+                    'name' => (string) $subject->name,
+                    'status' => (int) ($subject->status_punjab ?: $subject->status_smart ?: 1),
+                    'chapters_count' => (int) $subject->chapters_count,
+                    'topics_count' => (int) $subject->topics_count,
+                    'questions_count' => (int) $subject->questions_count,
+                    'exercise_questions_count' => (int) $subject->exercise_questions_count,
+                    'subject_type' => $hasLegacyTopics ? 'topic-wise' : 'chapter-wise',
+                    'class_transfer_type' => ($hasLegacyTopics || $usesExerciseTopics)
+                        ? 'topic-wise'
+                        : 'chapter-wise',
+                    'uses_exercise_topics' => $usesExerciseTopics,
+                ];
+            })
             ->all();
     }
 
@@ -323,9 +362,11 @@ class LegacyContentTransferService
         // Legacy imports can process thousands of questions and migrated assets.
         // Do not let PHP's default 30-second request timer abort a valid transfer.
         set_time_limit(0);
+        ini_set('memory_limit', (string) config('legacy-transfer.memory_limit', '512M'));
 
         $sourcePattern = (string) $options['source_pattern'];
         $sourceClassId = (int) $options['source_class_id'];
+        $classWise = (bool) ($options['class_wise'] ?? false);
         $sourceSubjectIds = isset($options['source_subject_id'])
             ? [(int) $options['source_subject_id']]
             : array_values(array_unique(array_map('intval', $options['source_subject_ids'] ?? [])));
@@ -338,12 +379,28 @@ class LegacyContentTransferService
             : null;
         $convertExercisesToTopics = (bool) ($options['convert_exercises_to_topics'] ?? false);
         $replaceExisting = (bool) ($options['replace_existing'] ?? false);
+
+        if ($classWise) {
+            $sourceChapterIds = [];
+            $sourceTopicIds = [];
+            $convertExercisesToTopics = false;
+            unset($options['target_subject_id']);
+        }
+
         $afaq = $this->sourceAfaq($sourcePattern);
         $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
         $sourceClass = $this->source()->table('pk_class')->where('id', $sourceClassId)->first();
 
         if (! $sourceClass) {
             throw new RuntimeException("Source class {$sourceClassId} was not found.");
+        }
+
+        $visibleSourceSubjects = collect($this->sourceSubjects($sourcePattern, $sourceClassId));
+        if ($classWise && $sourceSubjectIds === []) {
+            $sourceSubjectIds = $visibleSourceSubjects
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
         }
 
         if ($sourceSubjectIds === []) {
@@ -354,7 +411,7 @@ class LegacyContentTransferService
             throw new RuntimeException('Select at least one source chapter or topic.');
         }
 
-        $visibleSourceSubjectIds = collect($this->sourceSubjects($sourcePattern, $sourceClassId))
+        $visibleSourceSubjectIds = $visibleSourceSubjects
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -374,6 +431,16 @@ class LegacyContentTransferService
         $this->questionTypeMap = [];
         $this->mediumIdMap = [];
         $this->assets->reset();
+        $this->prefetchSourceAssets(
+            afaq: $afaq,
+            sourcePattern: $sourcePattern,
+            sourceClassId: $sourceClassId,
+            sourceSubjectIds: $sourceSubjectIds,
+            sourceChapterIds: $sourceChapterIds,
+            sourceTopicIds: $sourceTopicIds,
+            exerciseQuestion: $exerciseQuestion,
+            statusColumn: $statusColumn,
+        );
 
         return DB::transaction(function () use (
             $afaq,
@@ -389,7 +456,8 @@ class LegacyContentTransferService
             $statusColumn,
             $sourceTopicIds,
             $exerciseQuestion,
-            $convertExercisesToTopics
+            $convertExercisesToTopics,
+            $classWise
         ): array {
             $pattern = $this->resolveTargetPattern($options, $creatorId);
             $class = $this->resolveTargetClass($options, $sourceClass, $creatorId);
@@ -418,12 +486,25 @@ class LegacyContentTransferService
                     sourceChapterIds: $sourceChapterIds,
                     sourceTopicIds: $sourceTopicIds,
                 );
-                $subjectType = $convertExercisesToTopics
+                $nativeSubjectType = $this->sourceSubjectType(
+                    $sourcePattern,
+                    $sourceClassId,
+                    $sourceSubjectId,
+                );
+                $convertSubjectExercisesToTopics = $classWise
+                    ? $nativeSubjectType !== 'topic-wise'
+                        && $this->sourceUsesExerciseTopics(
+                            $sourcePattern,
+                            $sourceClassId,
+                            $sourceSubjectId,
+                        )
+                    : $convertExercisesToTopics;
+                $subjectType = $convertSubjectExercisesToTopics
                     ? 'topic-wise'
-                    : $this->sourceSubjectType($sourcePattern, $sourceClassId, $sourceSubjectId);
+                    : $nativeSubjectType;
                 $subject = $this->resolveTargetSubject($sourceSubject, $subjectType, $options, $creatorId);
-                if ($convertExercisesToTopics && $subject->subject_type !== 'topic-wise') {
-                    $subject->update(['subject_type' => 'topic-wise']);
+                if (($classWise || $convertSubjectExercisesToTopics) && $subject->subject_type !== $subjectType) {
+                    $subject->update(['subject_type' => $subjectType]);
                 }
 
                 $classSubject = ClassSubject::query()->firstOrCreate([
@@ -449,7 +530,7 @@ class LegacyContentTransferService
                     sourceChapterIds: $sourceChapterIds,
                     sourceTopicIds: $sourceTopicIds,
                     exerciseQuestion: $exerciseQuestion,
-                    convertExercisesToTopics: $convertExercisesToTopics,
+                    convertExercisesToTopics: $convertSubjectExercisesToTopics,
                     statusColumn: $statusColumn,
                     targetClass: $class,
                     targetPattern: $pattern,
@@ -471,6 +552,10 @@ class LegacyContentTransferService
                 $report['subjects'][] = [
                     'id' => $subject->id,
                     'name' => $subject->name_eng,
+                    'source_id' => $sourceSubjectId,
+                    'source_name' => (string) $sourceSubject->name,
+                    'subject_type' => $subjectType,
+                    'uses_exercise_topics' => $convertSubjectExercisesToTopics,
                     ...$subjectReport,
                 ];
 
@@ -485,6 +570,77 @@ class LegacyContentTransferService
 
             return $report;
         });
+    }
+
+    private function prefetchSourceAssets(
+        int $afaq,
+        string $sourcePattern,
+        int $sourceClassId,
+        array $sourceSubjectIds,
+        array $sourceChapterIds,
+        array $sourceTopicIds,
+        ?int $exerciseQuestion,
+        string $statusColumn,
+    ): void {
+        $applySourceScope = function ($query) use (
+            $afaq,
+            $exerciseQuestion,
+            $sourceChapterIds,
+            $sourceClassId,
+            $sourcePattern,
+            $sourceSubjectIds,
+            $sourceTopicIds,
+            $statusColumn,
+        ): void {
+            $query
+                ->where('chapter.class_id', $sourceClassId)
+                ->whereIn('chapter.subject_id', $sourceSubjectIds)
+                ->where('chapter.afaq', $afaq)
+                ->where("chapter.{$statusColumn}", 1)
+                ->where('question.afaq', $afaq)
+                ->where('question.status', 1)
+                ->where('question.type_id', '!=', 332)
+                ->when($sourceChapterIds !== [], fn ($query) => $query->whereIn('chapter.id', $sourceChapterIds))
+                ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('question.topic_id', $sourceTopicIds))
+                ->when($exerciseQuestion !== null, fn ($query) => $query->where('question.exercise_question', $exerciseQuestion))
+                ->when($sourcePattern === 'pef', fn ($query) => $query->where('question.status_pef', 1));
+        };
+
+        $questions = $this->source()
+            ->table('pk_question as question')
+            ->join('pk_chapter as chapter', 'chapter.id', '=', 'question.chapter_id');
+        $applySourceScope($questions);
+        $questionValues = $questions
+            ->get([
+                'question.statement_en',
+                'question.statement_ur',
+                'question.description_en',
+                'question.description_ur',
+                'question.answer_en',
+                'question.answer_ur',
+                'question.paragraph_questions',
+            ])
+            ->flatMap(fn (object $question) => array_values((array) $question))
+            ->all();
+        $this->assets->prefetchHtml($questionValues);
+        unset($questionValues);
+
+        $options = $this->source()
+            ->table('pk_options as option')
+            ->join('pk_question as question', 'question.id', '=', 'option.question_id')
+            ->join('pk_chapter as chapter', 'chapter.id', '=', 'question.chapter_id');
+        $applySourceScope($options);
+        $optionValues = $options
+            ->get([
+                'option.option_en',
+                'option.option_ur',
+                'option.answer_en',
+                'option.answer_ur',
+            ])
+            ->flatMap(fn (object $option) => array_values((array) $option))
+            ->all();
+        $this->assets->prefetchHtml($optionValues);
+        $this->assets->finishPrefetch();
     }
 
     private function transferSubject(
@@ -1394,6 +1550,7 @@ class LegacyContentTransferService
             }
         }
     }
+
     private function sourceSubjectType(string $sourcePattern, int $sourceClassId, int $sourceSubjectId): string
     {
         $afaq = $this->sourceAfaq($sourcePattern);
@@ -1418,6 +1575,52 @@ class LegacyContentTransferService
             ->count('topic.id');
 
         return $topicsCount > 0 ? 'topic-wise' : 'chapter-wise';
+    }
+
+    private function isLegacyExerciseBasedMathSubject(int $sourceSubjectId): bool
+    {
+        return in_array($sourceSubjectId, self::LEGACY_EXERCISE_BASED_MATH_SUBJECT_IDS, true);
+    }
+
+    private function sourceUsesExerciseTopics(
+        string $sourcePattern,
+        int $sourceClassId,
+        int $sourceSubjectId,
+    ): bool {
+        if (! $this->isLegacyExerciseBasedMathSubject($sourceSubjectId)) {
+            return false;
+        }
+
+        $afaq = $this->sourceAfaq($sourcePattern);
+        $statusColumn = $this->sourceChapterStatusColumn($sourcePattern);
+        $counts = $this->source()
+            ->table('pk_question as question')
+            ->join('pk_chapter as chapter', 'chapter.id', '=', 'question.chapter_id')
+            ->where('chapter.class_id', $sourceClassId)
+            ->where('chapter.subject_id', $sourceSubjectId)
+            ->where('chapter.afaq', $afaq)
+            ->where("chapter.{$statusColumn}", 1)
+            ->where('question.afaq', $afaq)
+            ->where('question.status', 1)
+            ->when($sourcePattern === 'pef', fn ($query) => $query->where('question.status_pef', 1))
+            ->selectRaw("count(distinct question.id) as questions_count, count(distinct case when trim(coalesce(question.exercise, '')) <> '' then question.id end) as exercise_questions_count")
+            ->first();
+
+        return $this->hasExerciseBasedMathData(
+            sourceSubjectId: $sourceSubjectId,
+            questionsCount: (int) ($counts->questions_count ?? 0),
+            exerciseQuestionsCount: (int) ($counts->exercise_questions_count ?? 0),
+        );
+    }
+
+    private function hasExerciseBasedMathData(
+        int $sourceSubjectId,
+        int $questionsCount,
+        int $exerciseQuestionsCount,
+    ): bool {
+        return $this->isLegacyExerciseBasedMathSubject($sourceSubjectId)
+            && $questionsCount > 0
+            && ($exerciseQuestionsCount / $questionsCount) >= self::EXERCISE_TOPIC_MINIMUM_COVERAGE;
     }
 
     private function resolveQuestionSource(object $sourceQuestion): string
