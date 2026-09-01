@@ -17,7 +17,7 @@ class ChapterController extends Controller
             'pattern_id' => ['required', 'integer', 'exists:patterns,id'],
             'name' => ['required', 'string', 'max:150'],
             'name_ur' => ['nullable', 'string', 'max:150'],
-            'group_name' => ['nullable', 'string', 'max:100'],
+            'group_name' => ['nullable', 'string', 'max:300'],
             'group_heading' => ['nullable', 'string', 'max:150'],
             'chapter_number' => [
                 'nullable', 'integer', 'min:1',
@@ -62,7 +62,7 @@ class ChapterController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'name_ur' => ['nullable', 'string', 'max:150'],
-            'group_name' => ['nullable', 'string', 'max:100'],
+            'group_name' => ['nullable', 'string', 'max:300'],
             'group_heading' => ['nullable', 'string', 'max:150'],
             'chapter_number' => [
                 'nullable', 'integer', 'min:1',
