@@ -191,6 +191,7 @@ export type PaperOrGroupLayout = 'stacked' | 'side-by-side';
 export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
 export type PaperOrGroupLabel = 'auto' | 'english' | 'urdu' | 'bilingual';
 export type PaperWatermarkType = 'text' | 'logo';
+export type PaperBubbleSheetNumberFormat = 'number' | 'question';
 
 export interface PaperSettings {
     englishFont: PaperEnglishFont;
@@ -226,6 +227,14 @@ export interface PaperSettings {
     /** Border around a Section A/B/C heading. Zero means no border. */
     sectionHeadingBorderWidth: number;
     sectionHeadingBorderStyle: PaperBorderStyle;
+    /** Print an MCQ bubble sheet immediately below the paper header. */
+    bubbleSheetEnabled: boolean;
+    /** Show the localized answer-sheet heading above the bubbles. */
+    bubbleSheetHeadingEnabled: boolean;
+    /** Number of numbered A-D answer rows shown in the bubble sheet. */
+    bubbleSheetQuestionCount: number;
+    /** Format used for each bubble row label. */
+    bubbleSheetNumberFormat: PaperBubbleSheetNumberFormat;
     /** Divider between question rows inside a section. */
     questionBorderWidth: number;
     questionBorderStyle: PaperBorderStyle;
@@ -306,6 +315,10 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     sectionHeadingLineHeight: 1,
     sectionHeadingBorderWidth: 0,
     sectionHeadingBorderStyle: 'solid',
+    bubbleSheetEnabled: false,
+    bubbleSheetHeadingEnabled: false,
+    bubbleSheetQuestionCount: 20,
+    bubbleSheetNumberFormat: 'number',
     questionBorderWidth: 1,
     questionBorderStyle: 'solid',
     paperSize: 'A4',
@@ -546,6 +559,26 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             source.sectionHeadingBorderStyle,
             DEFAULT_PAPER_SETTINGS.sectionHeadingBorderStyle,
         ),
+        bubbleSheetEnabled:
+            typeof source.bubbleSheetEnabled === 'boolean'
+                ? source.bubbleSheetEnabled
+                : DEFAULT_PAPER_SETTINGS.bubbleSheetEnabled,
+        bubbleSheetHeadingEnabled:
+            typeof source.bubbleSheetHeadingEnabled === 'boolean'
+                ? source.bubbleSheetHeadingEnabled
+                : DEFAULT_PAPER_SETTINGS.bubbleSheetHeadingEnabled,
+        bubbleSheetQuestionCount:
+            typeof source.bubbleSheetQuestionCount === 'number' &&
+            Number.isFinite(source.bubbleSheetQuestionCount)
+                ? Math.min(
+                      Math.max(Math.round(source.bubbleSheetQuestionCount), 1),
+                      200,
+                  )
+                : DEFAULT_PAPER_SETTINGS.bubbleSheetQuestionCount,
+        bubbleSheetNumberFormat:
+            source.bubbleSheetNumberFormat === 'question'
+                ? 'question'
+                : DEFAULT_PAPER_SETTINGS.bubbleSheetNumberFormat,
         questionBorderWidth:
             typeof source.questionBorderWidth === 'number'
                 ? source.questionBorderWidth

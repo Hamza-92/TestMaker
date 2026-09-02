@@ -8,6 +8,7 @@ import {
 import {
     CheckIcon,
     ChevronDownIcon,
+    CircleDotIcon,
     DropletsIcon,
     HeadingIcon,
     ImageIcon,
@@ -30,6 +31,7 @@ import { cn } from '@/lib/utils';
 import type {
     PageNumberFormat,
     PageNumberPosition,
+    PaperBubbleSheetNumberFormat,
     PaperBorderStyle,
     PaperEnglishFont,
     PaperHeaderTemplate,
@@ -165,6 +167,13 @@ const QUESTION_NUMBERING_FORMAT_OPTIONS = [
     { value: 'roman', label: 'i, ii, iii', previewFontFamily: 'inherit' },
     { value: 'alpha', label: 'a, b, c', previewFontFamily: 'inherit' },
 ] as const;
+
+const BUBBLE_SHEET_NUMBER_FORMAT_OPTIONS: Array<
+    FontOption<PaperBubbleSheetNumberFormat>
+> = [
+    { value: 'number', label: '1, 2, 3', previewFontFamily: 'inherit' },
+    { value: 'question', label: 'Q.1, Q.2, Q.3', previewFontFamily: 'inherit' },
+];
 
 const QUESTION_LAYOUT_OPTIONS = [
     { value: 'default', label: 'Default', previewFontFamily: 'inherit' },
@@ -688,6 +697,76 @@ export function PaperSettingsDrawer({
                                 onChange({ headerBorderStyle: v })
                             }
                         />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection
+                        title="Bubble Sheet"
+                        icon={CircleDotIcon}
+                    >
+                        <div className="grid grid-cols-2 gap-2">
+                            <CheckboxField
+                                label="Enabled"
+                                checked={settings.bubbleSheetEnabled}
+                                onChange={(checked) =>
+                                    onChange({
+                                        bubbleSheetEnabled: checked,
+                                    })
+                                }
+                            />
+                            <div
+                                className={cn(
+                                    !settings.bubbleSheetEnabled &&
+                                        'pointer-events-none opacity-50',
+                                )}
+                            >
+                                <CheckboxField
+                                    label="Heading"
+                                    checked={settings.bubbleSheetHeadingEnabled}
+                                    onChange={(checked) =>
+                                        onChange({
+                                            bubbleSheetHeadingEnabled: checked,
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
+                        <div
+                            className={cn(
+                                'mt-3 grid grid-cols-2 gap-2',
+                                !settings.bubbleSheetEnabled &&
+                                    'pointer-events-none opacity-50',
+                            )}
+                        >
+                            <div>
+                                <LabeledStepper
+                                    label="Questions"
+                                    value={settings.bubbleSheetQuestionCount}
+                                    min={1}
+                                    max={200}
+                                    onChange={(value) =>
+                                        onChange({
+                                            bubbleSheetQuestionCount: value,
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    Labels
+                                </p>
+                                <FontPicker
+                                    value={settings.bubbleSheetNumberFormat}
+                                    options={BUBBLE_SHEET_NUMBER_FORMAT_OPTIONS}
+                                    onChange={(
+                                        value: PaperBubbleSheetNumberFormat,
+                                    ) =>
+                                        onChange({
+                                            bubbleSheetNumberFormat: value,
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
                     </CollapsibleSection>
 
                     <CollapsibleSection title="Type Heading" icon={HeadingIcon}>

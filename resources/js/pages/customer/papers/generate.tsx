@@ -46,6 +46,7 @@ import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
 import { AnswerKeySheet } from './paper-layouts/answer-key-sheet';
+import { BubbleSheet } from './paper-layouts/bubble-sheet';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
 import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
@@ -2316,6 +2317,10 @@ export default function GeneratePaper({
     const [chapterMedium, setChapterMedium] =
         useState<ContentMedium>('English');
     const [loadingChapters, setLoadingChapters] = useState(false);
+    const [chapterLoadError, setChapterLoadError] = useState<string | null>(
+        null,
+    );
+    const [chapterRequestVersion, setChapterRequestVersion] = useState(0);
     const [selected, setSelected] = useState<Record<number, Set<number>>>({});
     const [isFooterSticky, setIsFooterSticky] = useState(false);
     const footerSentinelRef = useRef<HTMLDivElement>(null);
@@ -2986,6 +2991,7 @@ export default function GeneratePaper({
         queueMicrotask(() => {
             if (!abortController.signal.aborted) {
                 setLoadingChapters(true);
+                setChapterLoadError(null);
                 setChapters(null);
             }
         });
@@ -2997,25 +3003,60 @@ export default function GeneratePaper({
             },
             signal: abortController.signal,
             credentials: 'same-origin',
+            cache: 'no-store',
         })
-            .then((response) =>
-                response.ok
-                    ? response.json()
-                    : Promise.reject(response.statusText),
-            )
+            .then(async (response) => {
+                if (
+                    response.redirected &&
+                    new URL(response.url).pathname === '/login'
+                ) {
+                    window.location.assign(response.url);
+
+                    throw new DOMException(
+                        'Authentication required',
+                        'AbortError',
+                    );
+                }
+
+                if (!response.ok) {
+                    const payload = (await response
+                        .json()
+                        .catch(() => null)) as { message?: string } | null;
+
+                    throw new Error(
+                        payload?.message ||
+                            `Unable to load chapters (${response.status}).`,
+                    );
+                }
+
+                return response.json();
+            })
             .then((data: { chapters: Chapter[]; medium?: ContentMedium }) => {
+                if (!Array.isArray(data.chapters)) {
+                    throw new Error('The chapter response was not valid.');
+                }
+
                 setChapters(data.chapters);
                 setChapterMedium(data.medium ?? 'English');
             })
             .catch((error) => {
                 if (error?.name !== 'AbortError') {
                     setChapters([]);
+                    setChapterLoadError(
+                        error instanceof Error
+                            ? error.message
+                            : 'Unable to load chapters. Please try again.',
+                    );
                 }
             })
-            .finally(() => setLoadingChapters(false));
+            .finally(() => {
+                if (!abortController.signal.aborted) {
+                    setLoadingChapters(false);
+                }
+            });
 
         return () => abortController.abort();
-    }, [pattern, klass, subject]);
+    }, [pattern, klass, subject, chapterRequestVersion]);
 
     useEffect(() => {
         if (step !== 'questions' || selectedChapterIds.length === 0) {
@@ -3499,6 +3540,7 @@ export default function GeneratePaper({
         setKlass(null);
         setSubject(null);
         setChapters(null);
+        setChapterLoadError(null);
         setSelected({});
         setStep('chapters');
         resetQuestionSelection();
@@ -3508,6 +3550,7 @@ export default function GeneratePaper({
         setKlass(value);
         setSubject(null);
         setChapters(null);
+        setChapterLoadError(null);
         setSelected({});
         setStep('chapters');
         resetQuestionSelection();
@@ -3515,6 +3558,7 @@ export default function GeneratePaper({
 
     function handleSubjectChange(value: ComboboxOptionItem | null) {
         setSubject(value);
+        setChapterLoadError(null);
         setSelected({});
         setStep('chapters');
         resetQuestionSelection();
@@ -6749,6 +6793,29 @@ export default function GeneratePaper({
                                         )}
 
                                         {!loadingChapters &&
+                                            chapterLoadError && (
+                                                <div className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50/70 px-4 py-10 text-center dark:border-red-500/30 dark:bg-red-500/10">
+                                                    <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                                                        {chapterLoadError}
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setChapterRequestVersion(
+                                                                (version) =>
+                                                                    version + 1,
+                                                            )
+                                                        }
+                                                        className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/20"
+                                                    >
+                                                        <RotateCcwIcon className="size-3.5" />
+                                                        Retry
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                        {!loadingChapters &&
+                                            !chapterLoadError &&
                                             chapters &&
                                             chapters.length === 0 && (
                                                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 py-16 text-center dark:border-slate-700 dark:bg-slate-900/40">
@@ -12051,6 +12118,19 @@ function GeneratedPaperView({
                                 gap: `${settings.sectionSpacing}mm`,
                             }}
                         >
+                            {viewMode === 'paper' &&
+                                settings.bubbleSheetEnabled && (
+                                    <BubbleSheet
+                                        count={
+                                            settings.bubbleSheetQuestionCount
+                                        }
+                                        medium={
+                                            paper.sectioning?.medium ??
+                                            'English'
+                                        }
+                                        settings={settings}
+                                    />
+                                )}
                             {viewMode === 'answer_key' ? (
                                 <AnswerKeySheet
                                     paper={paper}
@@ -12112,6 +12192,21 @@ function GeneratedPaperView({
                                                 gap: `${settings.sectionSpacing}mm`,
                                             }}
                                         >
+                                            {viewMode === 'paper' &&
+                                                settings.bubbleSheetEnabled && (
+                                                    <BubbleSheet
+                                                        count={
+                                                            settings.bubbleSheetQuestionCount
+                                                        }
+                                                        medium={
+                                                            variantPaper
+                                                                .sectioning
+                                                                ?.medium ??
+                                                            'English'
+                                                        }
+                                                        settings={settings}
+                                                    />
+                                                )}
                                             {viewMode === 'answer_key' ? (
                                                 <AnswerKeySheet
                                                     paper={variantPaper}

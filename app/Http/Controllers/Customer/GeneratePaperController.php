@@ -182,10 +182,15 @@ class GeneratePaperController extends Controller
             ])
             ->values();
 
-        return response()->json([
-            'chapters' => $chapters,
-            'medium' => $displayMedium,
-        ]);
+        return response()
+            ->json([
+                'chapters' => $chapters,
+                'medium' => $displayMedium,
+            ])
+            // Chapter data can change immediately after a legacy transfer.
+            // Never let the browser reuse a previously empty response for the
+            // same pattern/class/subject URL.
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function questionTypes(Request $request): JsonResponse
