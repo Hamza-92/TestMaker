@@ -11589,6 +11589,7 @@ function GeneratedPaperView({
         const Template = pickSectionTemplate(
             settings.questionLayout,
             section.category,
+            settings.objectiveLayout,
         );
         const questionNumberOffset =
             section.category === 'Objective Questions'

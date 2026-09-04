@@ -1,4 +1,6 @@
+import { BoardObjectiveTableSection } from '../sections/board-objective-table-section';
 import type {
+    PaperObjectiveLayout,
     PaperQuestionLayout,
     PaperSectionCategory,
 } from '../types';
@@ -25,7 +27,15 @@ export {
 export function pickSectionTemplate(
     layout: PaperQuestionLayout,
     category: PaperSectionCategory,
+    objectiveLayout: PaperObjectiveLayout = 'standard',
 ): SectionTemplate {
+    if (
+        category === 'Objective Questions' &&
+        objectiveLayout === 'board-table'
+    ) {
+        return BoardObjectiveTableSection;
+    }
+
     if (layout === 'stacked') {
 return StackedQuestionsTemplate;
 }

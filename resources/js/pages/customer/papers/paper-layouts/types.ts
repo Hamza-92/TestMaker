@@ -187,6 +187,7 @@ export type PaperQuestionNumberingFormat =
     | 'roman'
     | 'alpha';
 export type PaperQuestionLayout = 'default' | 'stacked' | 'columns' | 'inline';
+export type PaperObjectiveLayout = 'standard' | 'board-table';
 export type PaperOrGroupLayout = 'stacked' | 'side-by-side';
 export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
 export type PaperOrGroupLabel = 'auto' | 'english' | 'urdu' | 'bilingual';
@@ -274,6 +275,8 @@ export interface PaperSettings {
      * Other values force the same template for all sections.
      */
     questionLayout: PaperQuestionLayout;
+    /** Layout used specifically for objective question sections. */
+    objectiveLayout: PaperObjectiveLayout;
     /** How paired subjective alternatives are arranged on the paper. */
     orGroupLayout: PaperOrGroupLayout;
     /** Visual treatment of the OR marker between paired alternatives. */
@@ -339,6 +342,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     repeatHeaderOnEachPage: false,
     questionNumberingFormat: 'roman',
     questionLayout: 'default',
+    objectiveLayout: 'standard',
     orGroupLayout: 'stacked',
     orGroupDividerStyle: 'line',
     orGroupLabel: 'auto',
@@ -367,6 +371,10 @@ const QUESTION_LAYOUT_VALUES = new Set<PaperQuestionLayout>([
     'stacked',
     'columns',
     'inline',
+]);
+const OBJECTIVE_LAYOUT_VALUES = new Set<PaperObjectiveLayout>([
+    'standard',
+    'board-table',
 ]);
 const OR_GROUP_LAYOUT_VALUES = new Set<PaperOrGroupLayout>([
     'stacked',
@@ -667,6 +675,11 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             source.questionLayout,
             QUESTION_LAYOUT_VALUES,
             DEFAULT_PAPER_SETTINGS.questionLayout,
+        ),
+        objectiveLayout: pickEnum(
+            source.objectiveLayout,
+            OBJECTIVE_LAYOUT_VALUES,
+            DEFAULT_PAPER_SETTINGS.objectiveLayout,
         ),
         orGroupLayout: pickEnum(
             source.orGroupLayout,

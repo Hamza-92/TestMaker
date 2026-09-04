@@ -680,6 +680,28 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: inherit;
 }
 
+/* Board-style objective paper: one bordered S#/question/A-D table. */
+[data-print-paper] [data-paper-objective-table] {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+[data-print-paper] [data-paper-objective-table] thead {
+    display: table-header-group;
+}
+[data-print-paper] [data-paper-objective-table] tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+[data-print-paper] [data-paper-objective-table] th,
+[data-print-paper] [data-paper-objective-table] td {
+    border-width: var(--paper-question-border-width, 1px);
+    border-style: var(--paper-question-border-style, solid);
+    border-color: currentColor;
+    box-sizing: border-box;
+}
+
 [data-print-paper] [data-paper-urdu-content],
 [data-print-paper] [data-paper-urdu-content] *,
 [data-print-paper] [dir='rtl'],

@@ -12,11 +12,8 @@ import {
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import {
-    MAX_SECTION_COLUMNS,
-    MIN_SECTION_COLUMNS,
-} from '../types';
 import { ConfirmDialog } from '../confirm-dialog';
+import { MAX_SECTION_COLUMNS, MIN_SECTION_COLUMNS } from '../types';
 
 interface QuestionHoverActionsProps {
     canSwap: boolean;
@@ -199,6 +196,7 @@ export function SectionControls({
     onEdit,
     onDelete,
     onColumnsChange,
+    showBlockSettings = true,
 }: {
     canMoveUp: boolean;
     canMoveDown: boolean;
@@ -212,6 +210,7 @@ export function SectionControls({
     onEdit: () => void;
     onDelete: () => void;
     onColumnsChange: (value: number) => void;
+    showBlockSettings?: boolean;
 }) {
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -270,21 +269,27 @@ export function SectionControls({
                         icon={<FilePenLineIcon className="size-4" />}
                         onClick={onEdit}
                     />
-                    <div className="relative">
-                        <SectionButton
-                            label="Block settings"
-                            variant={isSettingsOpen ? 'primary' : 'default'}
-                            icon={<SlidersHorizontalIcon className="size-4" />}
-                            onClick={() => setIsSettingsOpen((open) => !open)}
-                        />
-                        {isSettingsOpen && (
-                            <BlockSettingsPopover
-                                columns={columns}
-                                onChange={onColumnsChange}
-                                onClose={() => setIsSettingsOpen(false)}
+                    {showBlockSettings && (
+                        <div className="relative">
+                            <SectionButton
+                                label="Block settings"
+                                variant={isSettingsOpen ? 'primary' : 'default'}
+                                icon={
+                                    <SlidersHorizontalIcon className="size-4" />
+                                }
+                                onClick={() =>
+                                    setIsSettingsOpen((open) => !open)
+                                }
                             />
-                        )}
-                    </div>
+                            {isSettingsOpen && (
+                                <BlockSettingsPopover
+                                    columns={columns}
+                                    onChange={onColumnsChange}
+                                    onClose={() => setIsSettingsOpen(false)}
+                                />
+                            )}
+                        </div>
+                    )}
                     <SectionButton
                         label="Delete section"
                         variant="danger"
