@@ -115,9 +115,7 @@ function patternLabel(pattern: PatternFilterOption | null) {
         return 'Unknown Pattern';
     }
 
-    return pattern.short_name
-        ? `${pattern.short_name}`
-        : pattern.name;
+    return pattern.short_name ? `${pattern.short_name}` : pattern.name;
 }
 
 function groupLinks(subject: Subject) {
@@ -155,7 +153,9 @@ function groupLinks(subject: Subject) {
             ),
         }))
         .sort((left, right) =>
-            patternLabel(left.pattern).localeCompare(patternLabel(right.pattern)),
+            patternLabel(left.pattern).localeCompare(
+                patternLabel(right.pattern),
+            ),
         );
 }
 
@@ -310,7 +310,8 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
 
         return allClassOptions.filter(
             (option) =>
-                availableIds.has(option.id) || String(option.id) === classFilter,
+                availableIds.has(option.id) ||
+                String(option.id) === classFilter,
         );
     }, [activeFilters, allClassOptions, classFilter, searchMatchedSubjects]);
 
@@ -335,7 +336,9 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                 .filter((subject) =>
                     matchesFacetFilters(subject, activeFilters, ['status']),
                 )
-                .map((subject) => (subject.status === 1 ? 'active' : 'inactive')),
+                .map((subject) =>
+                    subject.status === 1 ? 'active' : 'inactive',
+                ),
         );
 
         return STATUS_OPTIONS.filter(
@@ -408,10 +411,12 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                     {can('subjects.create') && (
                         <Link
                             href="/superadmin/subjects/add"
-                            className="bg-primary text-primary-foreground flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-primary/90"
+                            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <PlusIcon size={16} color="currentColor" />
-                            <span className="hidden sm:inline">Add Subject</span>
+                            <span className="hidden sm:inline">
+                                Add Subject
+                            </span>
                         </Link>
                     )}
                 </div>
@@ -419,7 +424,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                 <div className="space-y-4 rounded-xl border p-4 shadow-sm">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="relative min-w-0 flex-1">
-                            <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                            <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 placeholder="Search subjects..."
                                 value={search}
@@ -436,7 +441,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                 type="button"
                                 onClick={clearFilters}
                                 disabled={!hasActiveFilters}
-                                className="border-input hover:bg-accent flex h-10 items-center rounded-lg border px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 items-center rounded-lg border border-input px-4 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Clear Filters
                             </button>
@@ -477,7 +482,9 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                 <SelectValue placeholder="Pattern" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All patterns</SelectItem>
+                                <SelectItem value="all">
+                                    All patterns
+                                </SelectItem>
                                 {patternOptions.map((pattern) => (
                                     <SelectItem
                                         key={pattern.id}
@@ -520,10 +527,12 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                             }}
                         >
                             <SelectTrigger>
-                                <SelectValue placeholder="Type" />
+                                <SelectValue placeholder="Default structure" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All types</SelectItem>
+                                <SelectItem value="all">
+                                    All default structures
+                                </SelectItem>
                                 {typeOptions.map((option) => (
                                     <SelectItem
                                         key={option.value}
@@ -546,7 +555,9 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All statuses</SelectItem>
+                                <SelectItem value="all">
+                                    All statuses
+                                </SelectItem>
                                 {statusOptions.map((option) => (
                                     <SelectItem
                                         key={option.value}
@@ -569,7 +580,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                         Subject
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                                        Type
+                                        Default Structure
                                     </th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                                         Linked To
@@ -630,61 +641,75 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                                         </span>
                                                     ) : (
                                                         <div className="flex max-w-xl flex-wrap gap-1.5">
-                                                            {links.map((link) => (
-                                                                <span
-                                                                    key={link.key}
-                                                                    className="inline-flex items-center gap-1.5 rounded-full border bg-muted/20 px-3 py-1 text-xs"
-                                                                >
-                                                                    <span className="font-medium text-foreground">
-                                                                        {patternLabel(
-                                                                            link.pattern,
-                                                                        )}
+                                                            {links.map(
+                                                                (link) => (
+                                                                    <span
+                                                                        key={
+                                                                            link.key
+                                                                        }
+                                                                        className="inline-flex items-center gap-1.5 rounded-full border bg-muted/20 px-3 py-1 text-xs"
+                                                                    >
+                                                                        <span className="font-medium text-foreground">
+                                                                            {patternLabel(
+                                                                                link.pattern,
+                                                                            )}
+                                                                        </span>
+                                                                        <span className="text-muted-foreground">
+                                                                            :
+                                                                        </span>
+                                                                        <span className="text-muted-foreground">
+                                                                            {link.classes
+                                                                                .map(
+                                                                                    (
+                                                                                        schoolClass,
+                                                                                    ) =>
+                                                                                        schoolClass.name,
+                                                                                )
+                                                                                .join(
+                                                                                    ', ',
+                                                                                ) ||
+                                                                                'No class'}
+                                                                        </span>
                                                                     </span>
-                                                                    <span className="text-muted-foreground">
-                                                                        :
-                                                                    </span>
-                                                                    <span className="text-muted-foreground">
-                                                                        {link.classes
-                                                                            .map(
-                                                                                (
-                                                                                    schoolClass,
-                                                                                ) =>
-                                                                                    schoolClass.name,
-                                                                            )
-                                                                            .join(
-                                                                                ', ',
-                                                                            ) ||
-                                                                            'No class'}
-                                                                    </span>
-                                                                </span>
-                                                            ))}
+                                                                ),
+                                                            )}
                                                         </div>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 align-top">
-                                                    {statusBadge(subject.status)}
+                                                    {statusBadge(
+                                                        subject.status,
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 align-top">
                                                     <div className="flex items-center justify-center gap-1">
                                                         <Link
                                                             href={`/superadmin/subjects/${subject.id}`}
-                                                            className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors"
+                                                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                                         >
                                                             <EyeIcon className="size-4" />
                                                         </Link>
-                                                        {can('subjects.edit') && (
+                                                        {can(
+                                                            'subjects.edit',
+                                                        ) && (
                                                             <Link
                                                                 href={`/superadmin/subjects/${subject.id}/edit`}
-                                                                className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md p-1.5 transition-colors"
+                                                                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                                             >
                                                                 <PencilIcon className="size-4" />
                                                             </Link>
                                                         )}
-                                                        {can('subjects.delete') && (
+                                                        {can(
+                                                            'subjects.delete',
+                                                        ) && (
                                                             <button
                                                                 type="button"
-                                                                onClick={() => setDeleteTarget(subject)}
-                                                                className="text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-colors"
+                                                                onClick={() =>
+                                                                    setDeleteTarget(
+                                                                        subject,
+                                                                    )
+                                                                }
+                                                                className="rounded-md p-1.5 text-destructive transition-colors hover:bg-destructive/10"
                                                             >
                                                                 <Trash2Icon className="size-4" />
                                                             </button>
@@ -699,7 +724,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                         </table>
                     </div>
 
-                    <div className="bg-muted/20 flex items-center justify-between border-t px-4 py-3">
+                    <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-3">
                         <p className="text-xs text-muted-foreground">
                             {filtered.length === 0
                                 ? 'No results'
@@ -710,7 +735,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                 type="button"
                                 onClick={() => goTo(1)}
                                 disabled={safePage === 1}
-                                className="hover:bg-accent rounded p-1.5 transition-colors disabled:opacity-30"
+                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
                             >
                                 <ChevronsLeftIcon className="size-4" />
                             </button>
@@ -718,7 +743,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                 type="button"
                                 onClick={() => goTo(safePage - 1)}
                                 disabled={safePage === 1}
-                                className="hover:bg-accent rounded p-1.5 transition-colors disabled:opacity-30"
+                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
                             >
                                 <ChevronLeftIcon className="size-4" />
                             </button>
@@ -739,10 +764,10 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                             if (
                                                 index > 0 &&
                                                 value -
-                                                (array[
-                                                    index - 1
-                                                ] as number) >
-                                                1
+                                                    (array[
+                                                        index - 1
+                                                    ] as number) >
+                                                    1
                                             ) {
                                                 carry.push('ellipsis');
                                             }
@@ -780,7 +805,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                 type="button"
                                 onClick={() => goTo(safePage + 1)}
                                 disabled={safePage === totalPages}
-                                className="hover:bg-accent rounded p-1.5 transition-colors disabled:opacity-30"
+                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
                             >
                                 <ChevronRightIcon className="size-4" />
                             </button>
@@ -788,7 +813,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                                 type="button"
                                 onClick={() => goTo(totalPages)}
                                 disabled={safePage === totalPages}
-                                className="hover:bg-accent rounded p-1.5 transition-colors disabled:opacity-30"
+                                className="rounded p-1.5 transition-colors hover:bg-accent disabled:opacity-30"
                             >
                                 <ChevronsRightIcon className="size-4" />
                             </button>
@@ -814,7 +839,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                         <button
                             type="button"
                             onClick={() => setDeleteTarget(null)}
-                            className="border-input hover:bg-accent flex h-9 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+                            className="flex h-9 items-center rounded-lg border border-input px-4 text-sm font-medium transition-colors hover:bg-accent"
                         >
                             Cancel
                         </button>
@@ -822,7 +847,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                             type="button"
                             onClick={confirmDelete}
                             disabled={deleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors disabled:opacity-60"
+                            className="flex h-9 items-center gap-2 rounded-lg bg-destructive px-4 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
                         >
                             <Trash2Icon className="size-4" />
                             {deleting ? 'Deleting...' : 'Delete'}

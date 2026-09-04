@@ -454,7 +454,7 @@ class QuestionBulkImporter
                     'question_type_id' => $questionType->id,
                     'medium_id' => $this->defaultMediumId(),
                     'chapter_id' => $chapter->id,
-                    'topic_id' => $chapter->subject?->subject_type === 'topic-wise'
+                    'topic_id' => $chapter->effectiveSubjectType() === 'topic-wise'
                         ? $topic?->id
                         : null,
                     'statement_en' => $questionPayload['statement_en'],

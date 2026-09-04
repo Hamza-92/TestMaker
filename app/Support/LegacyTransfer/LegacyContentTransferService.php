@@ -350,7 +350,13 @@ class LegacyContentTransferService
             ->where('class_subjects.pattern_id', $targetPatternId)
             ->where('class_subjects.class_id', $targetClassId)
             ->orderBy('subjects.name_eng')
-            ->get(['subjects.id', 'subjects.name_eng', 'subjects.name_ur', 'subjects.subject_type', 'subjects.status'])
+            ->get([
+                'subjects.id',
+                'subjects.name_eng',
+                'subjects.name_ur',
+                DB::raw('COALESCE(class_subjects.subject_type, subjects.subject_type) as subject_type'),
+                'subjects.status',
+            ])
             ->map(fn (Subject $subject) => $this->targetSubjectPayload($subject))
             ->values()
             ->all();
@@ -502,15 +508,18 @@ class LegacyContentTransferService
                     ? 'topic-wise'
                     : $nativeSubjectType;
                 $subject = $this->resolveTargetSubject($sourceSubject, $subjectType, $options, $creatorId);
-                if (($classWise || $convertSubjectExercisesToTopics) && $subject->subject_type !== $subjectType) {
-                    $subject->update(['subject_type' => $subjectType]);
-                }
+                $classSubject = ClassSubject::query()->firstOrCreate(
+                    [
+                        'class_id' => $class->id,
+                        'pattern_id' => $pattern->id,
+                        'subject_id' => $subject->id,
+                    ],
+                    ['subject_type' => $subjectType],
+                );
 
-                $classSubject = ClassSubject::query()->firstOrCreate([
-                    'class_id' => $class->id,
-                    'pattern_id' => $pattern->id,
-                    'subject_id' => $subject->id,
-                ]);
+                if ($classSubject->subject_type !== $subjectType) {
+                    $classSubject->subject_type = $subjectType;
+                }
 
                 if ($replaceExisting) {
                     Chapter::query()
@@ -545,6 +554,7 @@ class LegacyContentTransferService
                     );
                 }
                 $classSubject->update([
+                    'subject_type' => $subjectType,
                     'medium_id' => $this->mediumId($detectedMedium),
                 ]);
 

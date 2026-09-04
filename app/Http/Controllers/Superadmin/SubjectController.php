@@ -30,13 +30,14 @@ class SubjectController extends Controller
 
     public function show(Subject $subject)
     {
-        $chaptersWith = ['schoolClass:id,name', 'pattern:id,name,short_name'];
-        if ($subject->subject_type === 'topic-wise') {
-            $chaptersWith['topics'] = fn ($q) => $q
+        $chaptersWith = [
+            'schoolClass:id,name',
+            'pattern:id,name,short_name',
+            'topics' => fn ($q) => $q
                 ->withCount('questions')
                 ->orderBy('sort_id')
-                ->orderBy('name');
-        }
+                ->orderBy('name'),
+        ];
 
         $subject->load([
             'classSubjects.schoolClass:id,name,status',
@@ -53,7 +54,11 @@ class SubjectController extends Controller
             ->groupBy('pattern_id')
             ->map(fn ($items) => [
                 'pattern' => $items->first()->pattern,
-                'classes' => $items->map(fn ($cs) => $cs->schoolClass)->filter()->values(),
+                'classes' => $items->map(fn ($cs) => $cs->schoolClass ? [
+                    'id' => $cs->schoolClass->id,
+                    'name' => $cs->schoolClass->name,
+                    'subject_type' => $cs->effectiveSubjectType(),
+                ] : null)->filter()->values(),
             ])
             ->values();
 
@@ -69,9 +74,10 @@ class SubjectController extends Controller
             'questions_count' => $ch->questions_count,
             'class_id' => $ch->class_id,
             'pattern_id' => $ch->pattern_id,
+            'subject_type' => $ch->effectiveSubjectType(),
             'class' => $ch->schoolClass ? ['id' => $ch->schoolClass->id, 'name' => $ch->schoolClass->name] : null,
             'pattern' => $ch->pattern ? ['id' => $ch->pattern->id,    'name' => $ch->pattern->name] : null,
-            'topics' => $subject->subject_type === 'topic-wise'
+            'topics' => $ch->effectiveSubjectType() === 'topic-wise'
                 ? $ch->topics->map(fn ($t) => [
                     'id' => $t->id,
                     'name' => $t->name,
@@ -129,6 +135,7 @@ class SubjectController extends Controller
             'links' => ['array'],
             'links.*.class_id' => ['required', 'integer', 'exists:classes,id'],
             'links.*.pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'links.*.subject_type' => ['nullable', 'in:chapter-wise,topic-wise'],
         ]);
 
         $subject = Subject::create([
@@ -168,8 +175,14 @@ class SubjectController extends Controller
             ->values();
 
         $existingLinks = $subject->classSubjects()
-            ->get(['class_id', 'pattern_id'])
-            ->map(fn ($cs) => ['class_id' => $cs->class_id, 'pattern_id' => $cs->pattern_id]);
+            ->get(['class_id', 'pattern_id', 'subject_type'])
+            ->map(fn ($cs) => [
+                'class_id' => $cs->class_id,
+                'pattern_id' => $cs->pattern_id,
+                'subject_type' => in_array($cs->subject_type, ClassSubject::SUBJECT_TYPES, true)
+                    ? $cs->subject_type
+                    : $subject->subject_type,
+            ]);
 
         return Inertia::render('superadmin/subjects/edit', [
             'subject' => $subject->only(['id', 'name_eng', 'name_ur', 'subject_type', 'status']),
@@ -188,6 +201,7 @@ class SubjectController extends Controller
             'links' => ['array'],
             'links.*.class_id' => ['required', 'integer', 'exists:classes,id'],
             'links.*.pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'links.*.subject_type' => ['nullable', 'in:chapter-wise,topic-wise'],
         ]);
 
         $oldValues = $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']);
@@ -231,16 +245,31 @@ class SubjectController extends Controller
 
     private function syncLinks(Subject $subject, array $links): void
     {
-        $subject->classSubjects()->delete();
-
         $rows = collect($links)->unique(fn ($l) => $l['class_id'].'-'.$l['pattern_id']);
 
+        $selectedKeys = $rows
+            ->map(fn ($link) => $link['class_id'].'-'.$link['pattern_id'])
+            ->all();
+
+        $subject->classSubjects()->get()->each(function (ClassSubject $classSubject) use ($selectedKeys): void {
+            $key = $classSubject->class_id.'-'.$classSubject->pattern_id;
+
+            if (! in_array($key, $selectedKeys, true)) {
+                $classSubject->delete();
+            }
+        });
+
         foreach ($rows as $link) {
-            ClassSubject::create([
-                'subject_id' => $subject->id,
-                'class_id' => $link['class_id'],
-                'pattern_id' => $link['pattern_id'],
-            ]);
+            ClassSubject::query()->updateOrCreate(
+                [
+                    'subject_id' => $subject->id,
+                    'class_id' => $link['class_id'],
+                    'pattern_id' => $link['pattern_id'],
+                ],
+                [
+                    'subject_type' => $link['subject_type'] ?? $subject->subject_type,
+                ],
+            );
         }
     }
 }

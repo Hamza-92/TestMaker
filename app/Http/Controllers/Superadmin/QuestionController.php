@@ -72,7 +72,7 @@ class QuestionController extends Controller
         }
 
         return Inertia::render('superadmin/questions', [
-            'chapters'      => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
             'questions'     => $questions,
             'filters'       => ['chapter_id' => $chapterId, 'topic_id' => $topicId],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
@@ -149,7 +149,7 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters'      => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
             'mediumOptions' => $this->mediumOptions(),
@@ -223,7 +223,7 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters'      => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
             'mediumOptions' => $this->mediumOptions(),
@@ -450,7 +450,7 @@ class QuestionController extends Controller
                 ),
             ],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
-            'chapters'      => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'mediumOptions' => $this->mediumOptions(),
             'backHref'      => $backHref,
@@ -549,7 +549,7 @@ class QuestionController extends Controller
             'question_type_id' => $questionType->id,
             'medium_id' => $validated['medium_id'] ?? Medium::query()->where('name', 'Both')->value('id'),
             'chapter_id' => $validated['chapter_id'],
-            'topic_id' => $chapter->subject?->subject_type === 'topic-wise'
+            'topic_id' => $chapter->effectiveSubjectType() === 'topic-wise'
                 ? ($validated['topic_id'] ?? null)
                 : null,
             'statement_en' => $questionPayload['statement_en'],
@@ -763,7 +763,7 @@ class QuestionController extends Controller
                 'id' => $chapter->subject->id,
                 'name_eng' => $chapter->subject->name_eng,
                 'name_ur' => $chapter->subject->name_ur,
-                'subject_type' => $chapter->subject->subject_type,
+                'subject_type' => $chapter->effectiveSubjectType(),
                 'status' => $chapter->subject->status,
             ],
             'class' => [
@@ -844,7 +844,7 @@ class QuestionController extends Controller
                     'id' => $chapter->subject->id,
                     'name_eng' => $chapter->subject->name_eng,
                     'name_ur' => $chapter->subject->name_ur,
-                    'subject_type' => $chapter->subject->subject_type,
+                    'subject_type' => $chapter->effectiveSubjectType(),
                     'status' => $chapter->subject->status,
                 ],
                 'class' => [
@@ -905,7 +905,7 @@ class QuestionController extends Controller
                     'id' => $question->chapter->subject->id,
                     'name_eng' => $question->chapter->subject->name_eng,
                     'name_ur' => $question->chapter->subject->name_ur,
-                    'subject_type' => $question->chapter->subject->subject_type,
+                    'subject_type' => $question->chapter->effectiveSubjectType(),
                 ],
                 'class' => [
                     'id' => $question->chapter->schoolClass->id,

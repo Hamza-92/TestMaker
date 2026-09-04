@@ -56,12 +56,14 @@ class QuestionUpsertRequest extends FormRequest
                 }
             }
 
-            if ($chapter->subject?->subject_type !== 'topic-wise' && $topicId) {
+            $subjectType = $chapter->effectiveSubjectType();
+
+            if ($subjectType !== 'topic-wise' && $topicId) {
                 $validator->errors()->add('topic_id', 'Selected topic is invalid.');
             }
 
             if (
-                $chapter->subject?->subject_type === 'topic-wise'
+                $subjectType === 'topic-wise'
                 && $chapter->topics->isNotEmpty()
                 && ! $topicId
             ) {

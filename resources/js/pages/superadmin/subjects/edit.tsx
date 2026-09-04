@@ -3,7 +3,13 @@ import { ArrowLeftIcon, BookOpenIcon, LinkIcon, SaveIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,6 +28,7 @@ interface PatternWithClasses {
 interface LinkItem {
     class_id: number;
     pattern_id: number;
+    subject_type: string;
 }
 
 interface SubjectData {
@@ -43,17 +50,27 @@ interface FormData {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-function Field({ label, required, error, children }: {
-    label: string; required?: boolean; error?: string; children: React.ReactNode;
+function Field({
+    label,
+    required,
+    error,
+    children,
+}: {
+    label: string;
+    required?: boolean;
+    error?: string;
+    children: React.ReactNode;
 }) {
     return (
         <div className="min-w-0 space-y-1.5">
             <Label className="flex items-center gap-1">
                 {label}
-                {required && <span className="text-destructive text-xs">*</span>}
+                {required && (
+                    <span className="text-xs text-destructive">*</span>
+                )}
             </Label>
             {children}
-            {error && <p className="text-destructive text-xs">{error}</p>}
+            {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
     );
 }
@@ -69,23 +86,52 @@ export default function EditSubject({
     existingLinks: LinkItem[];
 }) {
     const { data, setData, post, processing, errors } = useForm<FormData>({
-        _method:      'put',
-        name_eng:     subject.name_eng,
-        name_ur:      subject.name_ur ?? '',
+        _method: 'put',
+        name_eng: subject.name_eng,
+        name_ur: subject.name_ur ?? '',
         subject_type: subject.subject_type,
-        status:       String(subject.status),
-        links:        existingLinks,
+        status: String(subject.status),
+        links: existingLinks,
     });
 
     const isLinked = (class_id: number, pattern_id: number) =>
-        data.links.some((l) => l.class_id === class_id && l.pattern_id === pattern_id);
+        data.links.some(
+            (l) => l.class_id === class_id && l.pattern_id === pattern_id,
+        );
 
     const toggleLink = (class_id: number, pattern_id: number) => {
         if (isLinked(class_id, pattern_id)) {
-            setData('links', data.links.filter((l) => !(l.class_id === class_id && l.pattern_id === pattern_id)));
+            setData(
+                'links',
+                data.links.filter(
+                    (l) =>
+                        !(
+                            l.class_id === class_id &&
+                            l.pattern_id === pattern_id
+                        ),
+                ),
+            );
         } else {
-            setData('links', [...data.links, { class_id, pattern_id }]);
+            setData('links', [
+                ...data.links,
+                { class_id, pattern_id, subject_type: data.subject_type },
+            ]);
         }
+    };
+
+    const setLinkSubjectType = (
+        class_id: number,
+        pattern_id: number,
+        subject_type: string,
+    ) => {
+        setData(
+            'links',
+            data.links.map((link) =>
+                link.class_id === class_id && link.pattern_id === pattern_id
+                    ? { ...link, subject_type }
+                    : link,
+            ),
+        );
     };
 
     const isPatternAllSelected = (pattern: PatternWithClasses) =>
@@ -96,11 +142,19 @@ export default function EditSubject({
 
     const togglePattern = (pattern: PatternWithClasses) => {
         if (isPatternAllSelected(pattern)) {
-            setData('links', data.links.filter((l) => l.pattern_id !== pattern.id));
+            setData(
+                'links',
+                data.links.filter((l) => l.pattern_id !== pattern.id),
+            );
         } else {
-            const existing = data.links.filter((l) => l.pattern_id !== pattern.id);
-            const toAdd = pattern.classes.map((c) => ({ class_id: c.id, pattern_id: pattern.id }));
-            setData('links', [...existing, ...toAdd]);
+            const toAdd = pattern.classes
+                .filter((c) => !isLinked(c.id, pattern.id))
+                .map((c) => ({
+                    class_id: c.id,
+                    pattern_id: pattern.id,
+                    subject_type: data.subject_type,
+                }));
+            setData('links', [...data.links, ...toAdd]);
         }
     };
 
@@ -115,48 +169,63 @@ export default function EditSubject({
         <>
             <Head title={`Edit Subject - ${subject.name_eng}`} />
             <div className="mx-auto w-full max-w-2xl min-w-0 space-y-6 p-4 md:p-6">
-
                 {/* ── Header ──────────────────────────────────────────────── */}
                 <div className="flex min-w-0 items-center gap-4">
                     <Link
                         href="/superadmin/subjects"
-                        className="hover:bg-accent border-input flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors"
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
                     >
                         <ArrowLeftIcon className="size-4" />
                     </Link>
                     <div>
                         <h1 className="h1-semibold">Edit Subject</h1>
-                        <p className="text-muted-foreground text-sm">Update subject details and class links</p>
+                        <p className="text-sm text-muted-foreground">
+                            Update subject details and class links
+                        </p>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5">
-
+                <form
+                    onSubmit={handleSubmit}
+                    className="w-full min-w-0 space-y-5"
+                >
                     {/* ── Section 1: Subject Details ───────────────────────── */}
                     <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
                         <div className="flex items-start gap-3">
-                            <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <BookOpenIcon className="size-4" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium">Subject Details</p>
-                                <p className="text-muted-foreground text-xs">Name, type and status</p>
+                                <p className="text-sm font-medium">
+                                    Subject Details
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Name, default structure and status
+                                </p>
                             </div>
                         </div>
                         <Separator />
 
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Name (English)" required error={errors.name_eng}>
+                            <Field
+                                label="Name (English)"
+                                required
+                                error={errors.name_eng}
+                            >
                                 <Input
                                     value={data.name_eng}
-                                    onChange={(e) => setData('name_eng', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('name_eng', e.target.value)
+                                    }
                                     placeholder="e.g. Biology"
                                 />
                             </Field>
                             <Field label="Name (Urdu)" error={errors.name_ur}>
                                 <Input
                                     value={data.name_ur}
-                                    onChange={(e) => setData('name_ur', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('name_ur', e.target.value)
+                                    }
                                     placeholder="e.g. حیاتیات"
                                     dir="rtl"
                                 />
@@ -164,31 +233,56 @@ export default function EditSubject({
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Subject Type" required error={errors.subject_type}>
-                                <Select value={data.subject_type} onValueChange={(v) => setData('subject_type', v)}>
+                            <Field
+                                label="Default Structure"
+                                required
+                                error={errors.subject_type}
+                            >
+                                <Select
+                                    value={data.subject_type}
+                                    onValueChange={(v) =>
+                                        setData('subject_type', v)
+                                    }
+                                >
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="chapter-wise">Chapter-wise</SelectItem>
-                                        <SelectItem value="topic-wise">Topic-wise</SelectItem>
+                                        <SelectItem value="chapter-wise">
+                                            Chapter-wise
+                                        </SelectItem>
+                                        <SelectItem value="topic-wise">
+                                            Topic-wise
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    Used when a new class link is selected.
+                                </p>
                             </Field>
-                            <Field label="Status" required error={errors.status}>
-                                <Select value={data.status} onValueChange={(v) => setData('status', v)}>
+                            <Field
+                                label="Status"
+                                required
+                                error={errors.status}
+                            >
+                                <Select
+                                    value={data.status}
+                                    onValueChange={(v) => setData('status', v)}
+                                >
                                     <SelectTrigger className="w-full">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="1">
                                             <span className="flex items-center gap-2">
-                                                <span className="size-2 rounded-full bg-emerald-500" /> Active
+                                                <span className="size-2 rounded-full bg-emerald-500" />{' '}
+                                                Active
                                             </span>
                                         </SelectItem>
                                         <SelectItem value="0">
                                             <span className="flex items-center gap-2">
-                                                <span className="size-2 rounded-full bg-gray-400" /> Inactive
+                                                <span className="size-2 rounded-full bg-gray-400" />{' '}
+                                                Inactive
                                             </span>
                                         </SelectItem>
                                     </SelectContent>
@@ -201,69 +295,165 @@ export default function EditSubject({
                     <div className="w-full min-w-0 space-y-5 rounded-xl border p-5 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex items-start gap-3">
-                                <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+                                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                     <LinkIcon className="size-4" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium">Class Links</p>
-                                    <p className="text-muted-foreground text-xs">
-                                        Choose exactly which pattern → class combinations this subject belongs to
+                                    <p className="text-sm font-medium">
+                                        Class Links
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Choose exactly which pattern → class
+                                        combinations this subject belongs to
                                     </p>
                                 </div>
                             </div>
                             {totalSelected > 0 && (
-                                <span className="text-primary shrink-0 text-xs font-medium">{totalSelected} selected</span>
+                                <span className="shrink-0 text-xs font-medium text-primary">
+                                    {totalSelected} selected
+                                </span>
                             )}
                         </div>
                         <Separator />
 
                         {patterns.length === 0 ? (
-                            <p className="text-muted-foreground text-sm italic">
+                            <p className="text-sm text-muted-foreground italic">
                                 No patterns with linked classes found.{' '}
-                                <Link href="/superadmin/classes" className="text-primary hover:underline">Set up classes</Link> first.
+                                <Link
+                                    href="/superadmin/classes"
+                                    className="text-primary hover:underline"
+                                >
+                                    Set up classes
+                                </Link>{' '}
+                                first.
                             </p>
                         ) : (
                             <div className="space-y-4">
                                 {patterns.map((pattern) => {
-                                    const allSel  = isPatternAllSelected(pattern);
-                                    const someSel = isPatternSomeSelected(pattern);
+                                    const allSel =
+                                        isPatternAllSelected(pattern);
+                                    const someSel =
+                                        isPatternSomeSelected(pattern);
 
                                     return (
-                                        <div key={pattern.id} className="rounded-lg border overflow-hidden">
+                                        <div
+                                            key={pattern.id}
+                                            className="overflow-hidden rounded-lg border"
+                                        >
                                             {/* Pattern header row */}
-                                            <label className="bg-muted/50 flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-muted/80 transition-colors">
+                                            <label className="flex cursor-pointer items-center gap-3 bg-muted/50 px-4 py-3 transition-colors hover:bg-muted/80">
                                                 <Checkbox
                                                     checked={allSel}
-                                                    data-state={someSel && !allSel ? 'indeterminate' : undefined}
-                                                    onCheckedChange={() => togglePattern(pattern)}
+                                                    data-state={
+                                                        someSel && !allSel
+                                                            ? 'indeterminate'
+                                                            : undefined
+                                                    }
+                                                    onCheckedChange={() =>
+                                                        togglePattern(pattern)
+                                                    }
                                                 />
-                                                <span className="text-sm font-semibold">{pattern.name}</span>
+                                                <span className="text-sm font-semibold">
+                                                    {pattern.name}
+                                                </span>
                                                 {pattern.short_name && (
-                                                    <span className="text-muted-foreground text-xs">({pattern.short_name})</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        ({pattern.short_name})
+                                                    </span>
                                                 )}
-                                                <span className="text-muted-foreground ml-auto text-xs">
-                                                    {pattern.classes.filter((c) => isLinked(c.id, pattern.id)).length} / {pattern.classes.length}
+                                                <span className="ml-auto text-xs text-muted-foreground">
+                                                    {
+                                                        pattern.classes.filter(
+                                                            (c) =>
+                                                                isLinked(
+                                                                    c.id,
+                                                                    pattern.id,
+                                                                ),
+                                                        ).length
+                                                    }{' '}
+                                                    / {pattern.classes.length}
                                                 </span>
                                             </label>
 
                                             {/* Class checkboxes */}
                                             <div className="grid gap-px bg-border sm:grid-cols-2">
                                                 {pattern.classes.map((cls) => {
-                                                    const checked = isLinked(cls.id, pattern.id);
+                                                    const checked = isLinked(
+                                                        cls.id,
+                                                        pattern.id,
+                                                    );
 
                                                     return (
-                                                        <label
+                                                        <div
                                                             key={cls.id}
-                                                            className={`flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                                                                checked ? 'bg-primary/5' : 'bg-background hover:bg-muted/40'
+                                                            className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                                                checked
+                                                                    ? 'bg-primary/5'
+                                                                    : 'bg-background hover:bg-muted/40'
                                                             }`}
                                                         >
                                                             <Checkbox
-                                                                checked={checked}
-                                                                onCheckedChange={() => toggleLink(cls.id, pattern.id)}
+                                                                checked={
+                                                                    checked
+                                                                }
+                                                                onCheckedChange={() =>
+                                                                    toggleLink(
+                                                                        cls.id,
+                                                                        pattern.id,
+                                                                    )
+                                                                }
                                                             />
-                                                            {cls.name}
-                                                        </label>
+                                                            <button
+                                                                type="button"
+                                                                className="min-w-0 flex-1 text-left"
+                                                                onClick={() =>
+                                                                    toggleLink(
+                                                                        cls.id,
+                                                                        pattern.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                {cls.name}
+                                                            </button>
+                                                            {checked && (
+                                                                <Select
+                                                                    value={
+                                                                        data.links.find(
+                                                                            (
+                                                                                link,
+                                                                            ) =>
+                                                                                link.class_id ===
+                                                                                    cls.id &&
+                                                                                link.pattern_id ===
+                                                                                    pattern.id,
+                                                                        )
+                                                                            ?.subject_type ??
+                                                                        data.subject_type
+                                                                    }
+                                                                    onValueChange={(
+                                                                        value,
+                                                                    ) =>
+                                                                        setLinkSubjectType(
+                                                                            cls.id,
+                                                                            pattern.id,
+                                                                            value,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <SelectTrigger className="h-8 w-36 bg-background">
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="chapter-wise">
+                                                                            Chapter-wise
+                                                                        </SelectItem>
+                                                                        <SelectItem value="topic-wise">
+                                                                            Topic-wise
+                                                                        </SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            )}
+                                                        </div>
                                                     );
                                                 })}
                                             </div>
@@ -278,14 +468,14 @@ export default function EditSubject({
                     <div className="flex items-center justify-end gap-3 pb-2">
                         <Link
                             href="/superadmin/subjects"
-                            className="border-input hover:bg-accent flex h-9 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors"
+                            className="flex h-9 items-center gap-2 rounded-lg border border-input px-4 text-sm font-medium transition-colors hover:bg-accent"
                         >
                             Cancel
                         </Link>
                         <button
                             type="submit"
                             disabled={processing}
-                            className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-9 items-center gap-2 rounded-lg px-5 text-sm font-medium shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex h-9 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <SaveIcon className="size-4" />
                             {processing ? 'Saving…' : 'Update Subject'}

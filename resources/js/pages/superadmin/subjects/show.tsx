@@ -41,6 +41,7 @@ interface ClassItem {
     id: number;
     name: string;
     status: number;
+    subject_type: 'chapter-wise' | 'topic-wise';
 }
 interface PatternItem {
     id: number;
@@ -74,6 +75,7 @@ interface ChapterData {
     questions_count: number;
     class_id: number;
     pattern_id: number;
+    subject_type: 'chapter-wise' | 'topic-wise';
     class: { id: number; name: string } | null;
     pattern: { id: number; name: string } | null;
     topics: TopicData[];
@@ -105,6 +107,7 @@ interface Combo {
     label: string;
     class_id: number;
     pattern_id: number;
+    subject_type: 'chapter-wise' | 'topic-wise';
 }
 
 interface ChapterFormData {
@@ -691,8 +694,6 @@ function ChaptersTab({
     subject: SubjectData;
     combos: Combo[];
 }) {
-    const isTopicWise = subject.subject_type === 'topic-wise';
-
     const initialPatternId =
         subject.links_by_pattern.length === 1
             ? subject.links_by_pattern[0].pattern.id.toString()
@@ -706,6 +707,12 @@ function ChaptersTab({
     const [patternFilter, setPatternFilter] =
         useState<string>(initialPatternId);
     const [classFilter, setClassFilter] = useState<string>(initialClassId);
+    const isTopicWise =
+        combos.find(
+            (combo) =>
+                combo.pattern_id.toString() === patternFilter &&
+                combo.class_id.toString() === classFilter,
+        )?.subject_type === 'topic-wise';
     const [expandedChapters, setExpandedChapters] = useState<Set<number>>(
         new Set(),
     );
@@ -1304,6 +1311,7 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                     label: `${cls.name} — ${group.pattern.name}`,
                     class_id: cls.id,
                     pattern_id: group.pattern.id,
+                    subject_type: cls.subject_type,
                 })),
             ),
         [subject.links_by_pattern],
@@ -1356,7 +1364,7 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                                     variant="outline"
                                     className={`${typeClass} font-medium`}
                                 >
-                                    {typeLabel}
+                                    Default: {typeLabel}
                                 </Badge>
                                 {subject.status === 1 ? (
                                     <Badge
@@ -1395,7 +1403,7 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                     <div className="grid hidden divide-y sm:grid-cols-4 sm:divide-x sm:divide-y-0">
                         <div className="p-5 text-center">
                             <p className="text-xs text-muted-foreground">
-                                Type
+                                Default Structure
                             </p>
                             <p className="mt-1 font-semibold">{typeLabel}</p>
                         </div>
@@ -1430,10 +1438,16 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                         {(['overview', 'chapters'] as const).map((tab) => {
                             const labels = {
                                 overview: 'Overview',
-                                chapters:
-                                    subject.subject_type === 'topic-wise'
-                                        ? 'Chapters & Topics'
-                                        : 'Chapters',
+                                chapters: subject.links_by_pattern.some(
+                                    (group) =>
+                                        group.classes.some(
+                                            (schoolClass) =>
+                                                schoolClass.subject_type ===
+                                                'topic-wise',
+                                        ),
+                                )
+                                    ? 'Chapters & Topics'
+                                    : 'Chapters',
                             };
                             const icons = {
                                 overview: <SchoolIcon className="size-3.5" />,
@@ -1524,6 +1538,20 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                                                         <span className="font-medium">
                                                             {cls.name}
                                                         </span>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                cls.subject_type ===
+                                                                'topic-wise'
+                                                                    ? 'border-violet-200 bg-violet-50 text-xs text-violet-700'
+                                                                    : 'border-blue-200 bg-blue-50 text-xs text-blue-700'
+                                                            }
+                                                        >
+                                                            {cls.subject_type ===
+                                                            'topic-wise'
+                                                                ? 'Topic-wise'
+                                                                : 'Chapter-wise'}
+                                                        </Badge>
                                                         {cls.status !== 1 && (
                                                             <Badge
                                                                 variant="outline"
@@ -1573,14 +1601,18 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                         <SectionHeader
                             icon={<LayersIcon className="size-4" />}
                             title={
-                                subject.subject_type === 'topic-wise'
+                                subject.links_by_pattern.some((group) =>
+                                    group.classes.some(
+                                        (schoolClass) =>
+                                            schoolClass.subject_type ===
+                                            'topic-wise',
+                                    ),
+                                )
                                     ? 'Chapters & Topics'
                                     : 'Chapters'
                             }
                             description={
-                                subject.subject_type === 'topic-wise'
-                                    ? 'Manage chapters and their topics for each class–pattern combination'
-                                    : 'Manage chapters for each class–pattern combination'
+                                'Manage chapters and topics according to each class–pattern structure'
                             }
                         />
                         <Separator />

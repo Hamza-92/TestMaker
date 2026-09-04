@@ -22,6 +22,20 @@ class Chapter extends Model
         'created_by',
     ];
 
+    public function effectiveSubjectType(): string
+    {
+        $fallback = $this->relationLoaded('subject')
+            ? $this->subject?->subject_type
+            : $this->subject()->value('subject_type');
+
+        return ClassSubject::subjectTypeForScope(
+            (int) $this->pattern_id,
+            (int) $this->class_id,
+            (int) $this->subject_id,
+            $fallback,
+        );
+    }
+
     // ── Relationships ─────────────────────────────────────────────────────────
 
     public function subject(): BelongsTo

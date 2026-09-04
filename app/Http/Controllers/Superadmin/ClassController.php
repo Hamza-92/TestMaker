@@ -39,7 +39,10 @@ class ClassController extends Controller
             ->groupBy('pattern_id')
             ->map(fn ($items) => [
                 'pattern' => $items->first()->pattern,
-                'subjects' => $items->map(fn ($cs) => $cs->subject)->filter()->values(),
+                'subjects' => $items->map(fn ($cs) => $cs->subject ? [
+                    ...$cs->subject->toArray(),
+                    'subject_type' => $cs->effectiveSubjectType(),
+                ] : null)->filter()->values(),
             ])
             ->values();
 
