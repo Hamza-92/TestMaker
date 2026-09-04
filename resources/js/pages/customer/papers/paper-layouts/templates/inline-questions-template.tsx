@@ -20,6 +20,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     headingNumber,
     questionNumberOffset,
     numberingFormat,
+    hideHeadingMarks,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -49,6 +50,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                 titleUrdu={section.titleUrdu}
                 requiredQuestions={section.requiredQuestions}
                 marksEach={section.marksEach}
+                hideMarks={hideHeadingMarks}
             />
 
             {/* Inline question stream — each question rendered as a span with a

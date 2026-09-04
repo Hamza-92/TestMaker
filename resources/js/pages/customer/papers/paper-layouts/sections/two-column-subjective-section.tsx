@@ -16,6 +16,7 @@ interface TwoColumnSubjectiveSectionProps {
     headingNumber: number | null;
     questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;
+    hideHeadingMarks?: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;
@@ -53,6 +54,7 @@ export function TwoColumnSubjectiveSection({
     headingNumber,
     questionNumberOffset,
     numberingFormat,
+    hideHeadingMarks,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -86,6 +88,7 @@ export function TwoColumnSubjectiveSection({
                 titleUrdu={section.titleUrdu}
                 requiredQuestions={section.requiredQuestions}
                 marksEach={section.marksEach}
+                hideMarks={hideHeadingMarks}
             />
 
             {/* Question container — border on all 4 sides; subjective items sit

@@ -8,6 +8,7 @@ interface QuestionTypeHeadingProps {
     titleUrdu?: string | null;
     requiredQuestions: number;
     marksEach: number;
+    hideMarks?: boolean;
 }
 
 export function QuestionTypeHeading({
@@ -18,6 +19,7 @@ export function QuestionTypeHeading({
     titleUrdu,
     requiredQuestions,
     marksEach,
+    hideMarks = false,
 }: QuestionTypeHeadingProps) {
     const hideInternalSchemaLabel = (value: string | null | undefined) =>
         value?.trim().toLowerCase() === 'subjective_same_statement';
@@ -87,9 +89,11 @@ export function QuestionTypeHeading({
                         </>
                     )}
                 </div>
-                <div className="shrink-0 whitespace-nowrap">
-                    ({requiredQuestions}x{marksEach}={totalMarks})
-                </div>
+                {!hideMarks && (
+                    <div className="shrink-0 whitespace-nowrap">
+                        ({requiredQuestions}x{marksEach}={totalMarks})
+                    </div>
+                )}
             </div>
         );
     }
@@ -97,7 +101,11 @@ export function QuestionTypeHeading({
     return (
         <div
             data-paper-heading
-            className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 px-2 py-1 text-sm font-bold"
+            className={
+                hideMarks
+                    ? 'grid grid-cols-2 items-start gap-x-3 px-2 py-1 text-sm font-bold'
+                    : 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 px-2 py-1 text-sm font-bold'
+            }
         >
             <div className="min-w-0 text-left" dir="ltr">
                 {printedHeadingNumber !== null && (
@@ -113,9 +121,11 @@ export function QuestionTypeHeading({
                     className="align-baseline"
                 />
             </div>
-            <div className="shrink-0 self-start text-center whitespace-nowrap">
-                ({requiredQuestions}x{marksEach}={totalMarks})
-            </div>
+            {!hideMarks && (
+                <div className="shrink-0 self-start text-center whitespace-nowrap">
+                    ({requiredQuestions}x{marksEach}={totalMarks})
+                </div>
+            )}
             <div
                 className="min-w-0 text-right"
                 dir="rtl"

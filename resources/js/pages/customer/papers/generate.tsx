@@ -76,8 +76,10 @@ const QuestionEditModal = lazy(() =>
     })),
 );
 import { MultipartSection } from './paper-layouts/sections/multipart-section';
+import { FederalSubjectiveOrSection } from './paper-layouts/sections/federal-subjective-or-section';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
 import { pickSectionTemplate } from './paper-layouts/templates';
+import type { SectionTemplateProps } from './paper-layouts/templates/template-props';
 import {
     clampSectionColumns,
     DEFAULT_PAPER_SETTINGS,
@@ -2744,7 +2746,12 @@ export default function GeneratePaper({
         () =>
             new Set(
                 generatedPaper?.sections.flatMap((section) =>
-                    section.questions
+                    [
+                        ...section.questions,
+                        ...(section.multipart?.rows.flatMap((row) =>
+                            row.parts.map((part) => part.question),
+                        ) ?? []),
+                    ]
                         .map((question) => question.sourceQuestionId)
                         .filter((id): id is number => id !== null),
                 ) ?? [],
@@ -3294,18 +3301,12 @@ export default function GeneratePaper({
             return;
         }
 
-        setGeneratedPaper((current) =>
-            current
-                ? {
-                      ...current,
-                      settings: normalizePaperSettings({
-                          ...current.settings,
-                          ...pendingTemplate.settings,
-                      }),
-                  }
-                : current,
-        );
+        updatePaperSettings(pendingTemplate.settings);
         templateSettingsAppliedRef.current = true;
+        // updatePaperSettings intentionally uses the just-generated paper and
+        // pools; re-running this effect after every editor change would apply
+        // the template repeatedly.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingTemplate, generatedPaper]);
 
     useEffect(() => {
@@ -4721,21 +4722,132 @@ export default function GeneratePaper({
     }
 
     function updatePaperSettings(patch: Partial<PaperSettings>) {
-        setGeneratedPaper((current) =>
-            current
-                ? {
-                      ...current,
-                      // Spread DEFAULT first so any field missing from an
-                      // older in-memory settings object gets backfilled, then
-                      // the loaded settings, then the patch wins.
-                      settings: {
-                          ...DEFAULT_PAPER_SETTINGS,
-                          ...(current.settings ?? {}),
-                          ...patch,
-                      },
-                  }
-                : current,
+        if (!generatedPaper) {
+            return;
+        }
+
+        const previousSettings = normalizePaperSettings(
+            generatedPaper.settings,
         );
+        const nextSettings = normalizePaperSettings({
+            ...previousSettings,
+            ...patch,
+            ...(patch.paperLayout === 'federal-board'
+                ? { showSections: true }
+                : {}),
+        });
+        let sections = generatedPaper.sections;
+
+        if (
+            previousSettings.paperLayout !== 'federal-board' &&
+            nextSettings.paperLayout === 'federal-board'
+        ) {
+            const reservedQuestionIds = new Set(generatedSourceQuestionIds);
+            const federalSections: GeneratedPaperSection[] = [];
+
+            for (const section of sections) {
+                const alreadyPaired = Boolean(
+                    section.orGroupId &&
+                    sections.some(
+                        (candidate) =>
+                            candidate.id !== section.id &&
+                            candidate.orGroupId === section.orGroupId,
+                    ),
+                );
+
+                if (
+                    section.category !== 'Subjective Questions' ||
+                    section.multipart ||
+                    section.orRole === 'alternative' ||
+                    alreadyPaired ||
+                    section.questionTypeId === null
+                ) {
+                    federalSections.push(section);
+                    continue;
+                }
+
+                const candidates = shuffledQuestions(
+                    (questionPoolsByType[section.questionTypeId] ?? []).filter(
+                        (question) => !reservedQuestionIds.has(question.id),
+                    ),
+                ).slice(0, section.questions.length);
+
+                if (candidates.length < section.questions.length) {
+                    toast.error(
+                        `Federal Board layout needs ${section.questions.length} more unused questions for ${plainQuestionText(section.title)}.`,
+                    );
+                    return;
+                }
+
+                candidates.forEach((question) =>
+                    reservedQuestionIds.add(question.id),
+                );
+                const groupId = nextPaperSectionId('federal_or');
+                const primary: GeneratedPaperSection = {
+                    ...section,
+                    federalAutoOr: true,
+                    orGroupId: groupId,
+                    orPairingId: null,
+                    orQuestionTypeId: section.questionTypeId,
+                    orGroupTypeIds: [section.questionTypeId],
+                    orRole: 'primary',
+                    orLabel: 'OR',
+                };
+                const alternative: GeneratedPaperSection = {
+                    ...section,
+                    id: nextPaperSectionId('federal_alt'),
+                    questions: candidates.map((question) =>
+                        paperQuestionFromManual(
+                            question,
+                            nextPaperQuestionId('federal_q'),
+                        ),
+                    ),
+                    federalAutoOr: true,
+                    orGroupId: groupId,
+                    orPairingId: null,
+                    orQuestionTypeId: section.questionTypeId,
+                    orGroupTypeIds: [section.questionTypeId],
+                    orRole: 'alternative',
+                    orLabel: 'OR',
+                };
+
+                federalSections.push(primary, alternative);
+            }
+
+            sections = federalSections;
+        } else if (
+            previousSettings.paperLayout === 'federal-board' &&
+            nextSettings.paperLayout !== 'federal-board'
+        ) {
+            sections = sections
+                .filter(
+                    (section) =>
+                        !(
+                            section.federalAutoOr &&
+                            section.orRole === 'alternative'
+                        ),
+                )
+                .map((section) =>
+                    section.federalAutoOr
+                        ? {
+                              ...section,
+                              federalAutoOr: false,
+                              orGroupId: null,
+                              orPairingId: null,
+                              orQuestionTypeId: null,
+                              orGroupTypeIds: null,
+                              orRole: null,
+                              orLabel: null,
+                          }
+                        : section,
+                );
+        }
+
+        setGeneratedPaper({
+            ...generatedPaper,
+            sections,
+            settings: nextSettings,
+        });
     }
 
     function updatePaperQuestionText(
@@ -5668,13 +5780,34 @@ export default function GeneratePaper({
             ),
             columns: clampSectionColumns(questionType.columnPerRow, 1),
         };
+        const usesFederalAutoOr =
+            questionType.category === 'Subjective Questions' &&
+            normalizePaperSettings(generatedPaper?.settings).paperLayout ===
+                'federal-board';
+        const federalAlternatives = usesFederalAutoOr
+            ? shuffledQuestions(
+                  values.poolQuestions.filter(
+                      (question) =>
+                          !generatedSourceQuestionIds.has(question.id) &&
+                          !selectedQuestions.some(
+                              (selected) => selected.id === question.id,
+                          ),
+                  ),
+              ).slice(0, totalQuestions)
+            : [];
+
+        if (usesFederalAutoOr && federalAlternatives.length < totalQuestions) {
+            throw new Error(
+                `Federal Board layout needs ${totalQuestions} more unused questions for ${questionType.title}.`,
+            );
+        }
 
         setGeneratedPaper((current) => {
             if (!current) {
                 return current;
             }
 
-            const sectionWithGrouping = current.sectioning?.active
+            let sectionWithGrouping = current.sectioning?.active
                 ? {
                       ...newSection,
                       paperSectionKey: paperSectionKeyForType(
@@ -5685,9 +5818,43 @@ export default function GeneratePaper({
                   }
                 : newSection;
 
+            if (!usesFederalAutoOr) {
+                return {
+                    ...current,
+                    sections: [...current.sections, sectionWithGrouping],
+                };
+            }
+
+            const groupId = nextPaperSectionId('federal_or');
+            sectionWithGrouping = {
+                ...sectionWithGrouping,
+                federalAutoOr: true,
+                orGroupId: groupId,
+                orPairingId: null,
+                orQuestionTypeId: questionType.questionTypeId,
+                orGroupTypeIds: [questionType.questionTypeId],
+                orRole: 'primary',
+                orLabel: 'OR',
+            };
+            const alternative: GeneratedPaperSection = {
+                ...sectionWithGrouping,
+                id: nextPaperSectionId('federal_alt'),
+                questions: federalAlternatives.map((question) =>
+                    paperQuestionFromManual(
+                        question,
+                        nextPaperQuestionId('federal_q'),
+                    ),
+                ),
+                orRole: 'alternative',
+            };
+
             return {
                 ...current,
-                sections: [...current.sections, sectionWithGrouping],
+                sections: [
+                    ...current.sections,
+                    sectionWithGrouping,
+                    alternative,
+                ],
             };
         });
         closeAddPaperSectionModal();
@@ -11260,19 +11427,36 @@ function PaperSectionHeading({
     index,
     medium,
     settings,
+    totalMarks,
+    questionCount,
+    marksEach,
+    federal = false,
 }: {
     index: number;
     medium: 'English' | 'Urdu' | 'Both';
     settings: PaperSettings;
+    totalMarks?: number;
+    questionCount?: number;
+    marksEach?: number;
+    federal?: boolean;
 }) {
-    const english = `Section ${englishSectionIdentifier(index)}`;
+    const english = `${federal ? 'SECTION –' : 'Section'} ${englishSectionIdentifier(index)}`;
     const urdu = `حصہ ${urduSectionIdentifier(index)}`;
-    const openingBracket = settings.sectionHeadingBrackets ? '(' : '';
-    const closingBracket = settings.sectionHeadingBrackets ? ')' : '';
+    const openingBracket =
+        !federal && settings.sectionHeadingBrackets ? '(' : '';
+    const closingBracket =
+        !federal && settings.sectionHeadingBrackets ? ')' : '';
+    const marksFormula =
+        typeof totalMarks === 'number'
+            ? typeof questionCount === 'number' && typeof marksEach === 'number'
+                ? `${questionCount}x${marksEach} = ${totalMarks} Marks`
+                : `${totalMarks} Marks`
+            : '';
 
     return (
         <div
             data-paper-section-heading
+            data-paper-federal-section-heading={federal ? true : undefined}
             className="break-after-avoid text-center font-bold"
             style={{
                 color: settings.textColor,
@@ -11309,6 +11493,11 @@ function PaperSectionHeading({
                 english
             )}
             {closingBracket}
+            {marksFormula && (
+                <span className="ml-1" dir="ltr">
+                    ({marksFormula})
+                </span>
+            )}
         </div>
     );
 }
@@ -11589,7 +11778,9 @@ function GeneratedPaperView({
         const Template = pickSectionTemplate(
             settings.questionLayout,
             section.category,
-            settings.objectiveLayout,
+            settings.paperLayout === 'federal-board'
+                ? 'board-table'
+                : settings.objectiveLayout,
         );
         const questionNumberOffset =
             section.category === 'Objective Questions'
@@ -11617,6 +11808,7 @@ function GeneratedPaperView({
                 )}
                 questionNumberOffset={questionNumberOffset}
                 numberingFormat={settings.questionNumberingFormat}
+                hideHeadingMarks={settings.paperLayout === 'federal-board'}
                 canMoveUp={interactive && canMoveUp}
                 canMoveDown={interactive && canMoveDown}
                 onEditSection={interactive ? onEditSection : () => {}}
@@ -11656,10 +11848,214 @@ function GeneratedPaperView({
         );
     }
 
+    function createSectionTemplateProps(
+        targetPaper: GeneratedPaper,
+        section: GeneratedPaperSection,
+        interactive: boolean,
+        canMoveUp: boolean,
+        canMoveDown: boolean,
+    ): SectionTemplateProps {
+        const sectionIndex = targetPaper.sections.findIndex(
+            (candidate) => candidate.id === section.id,
+        );
+
+        return {
+            section,
+            index: sectionIndex,
+            headingNumber: sectionHeadingNumber(
+                targetPaper.sections,
+                sectionIndex,
+            ),
+            questionNumberOffset: 0,
+            numberingFormat: 'numeric',
+            hideHeadingMarks: true,
+            canMoveUp: interactive && canMoveUp,
+            canMoveDown: interactive && canMoveDown,
+            onEditSection: interactive ? onEditSection : () => {},
+            onDeleteSection: interactive ? onDeleteSection : () => {},
+            onMoveUp: interactive
+                ? (sectionId) => onMoveSection(sectionId, -1)
+                : () => {},
+            onMoveDown: interactive
+                ? (sectionId) => onMoveSection(sectionId, 1)
+                : () => {},
+            onShuffleQuestions: interactive ? onShuffleQuestions : () => {},
+            onAddRandomQuestion: interactive ? onAddRandomQuestion : () => {},
+            onAddCustomQuestion: interactive ? onAddCustomQuestion : () => {},
+            onEditQuestion: interactive ? onEditQuestion : () => {},
+            onRandomQuestion: interactive ? onRandomQuestion : () => {},
+            onPickQuestion: interactive ? onPickQuestion : () => {},
+            onRemoveQuestion: interactive ? onRemoveQuestion : () => {},
+            onAnswerLinesChange: interactive
+                ? onQuestionAnswerLinesChange
+                : () => {},
+            onAnswerLineSpacingChange: interactive
+                ? onQuestionAnswerLineSpacingChange
+                : () => {},
+            onQuestionImageSizeChange: interactive
+                ? onQuestionImageSizeChange
+                : () => {},
+            onColumnsChange: interactive ? onColumnsChange : () => {},
+        };
+    }
+
+    function renderFederalPaperSections(
+        targetPaper: GeneratedPaper,
+        interactive: boolean,
+    ): ReactNode[] {
+        const logicalSections = targetPaper.sections.filter(
+            (section) => section.orRole !== 'alternative',
+        );
+        const sectionKey = (section: GeneratedPaperSection): string => {
+            if (section.category === 'Objective Questions') {
+                return OBJECTIVE_PAPER_SECTION_KEY;
+            }
+
+            if (section.multipart) {
+                return `multipart:${section.multipart.groupId ?? section.id}`;
+            }
+
+            return `subjective:${section.questionTypeId ?? section.id}`;
+        };
+        const encounteredKeys = [
+            ...new Set(logicalSections.map((section) => sectionKey(section))),
+        ];
+        const orderedKeys = encounteredKeys.includes(
+            OBJECTIVE_PAPER_SECTION_KEY,
+        )
+            ? [
+                  OBJECTIVE_PAPER_SECTION_KEY,
+                  ...encounteredKeys.filter(
+                      (key) => key !== OBJECTIVE_PAPER_SECTION_KEY,
+                  ),
+              ]
+            : encounteredKeys;
+        const headingIndexByKey = new Map(
+            orderedKeys.map((key, index) => [key, index]),
+        );
+
+        return targetPaper.sections.map((section, sectionIndex) => {
+            if (section.orRole === 'alternative') {
+                return null;
+            }
+
+            const logicalIndex = logicalSections.findIndex(
+                (candidate) => candidate.id === section.id,
+            );
+            const key = sectionKey(section);
+            const previous = logicalSections[logicalIndex - 1];
+            const groupedSections = logicalSections.filter(
+                (candidate) => sectionKey(candidate) === key,
+            );
+            const showHeading = !previous || sectionKey(previous) !== key;
+            const totalMarks = paperTotalMarks({
+                ...targetPaper,
+                sections: groupedSections,
+            });
+            const formulaMarks =
+                !section.multipart &&
+                groupedSections.every(
+                    (candidate) => candidate.marksEach === section.marksEach,
+                )
+                    ? section.marksEach
+                    : undefined;
+            const questionCount =
+                formulaMarks === undefined
+                    ? undefined
+                    : groupedSections.reduce(
+                          (total, candidate) =>
+                              total + candidate.requiredQuestions,
+                          0,
+                      );
+            const heading = showHeading ? (
+                <PaperSectionHeading
+                    index={headingIndexByKey.get(key) ?? 0}
+                    medium={targetPaper.sectioning?.medium ?? 'English'}
+                    settings={settings}
+                    totalMarks={totalMarks}
+                    questionCount={questionCount}
+                    marksEach={formulaMarks}
+                    federal
+                />
+            ) : null;
+            const canMoveUp = logicalIndex > 0;
+            const canMoveDown = logicalIndex < logicalSections.length - 1;
+
+            if (
+                section.category === 'Objective Questions' ||
+                section.multipart
+            ) {
+                return (
+                    <div key={section.id} className="contents">
+                        {heading}
+                        {renderPaperSection(
+                            targetPaper,
+                            section,
+                            sectionIndex,
+                            interactive,
+                            canMoveUp,
+                            canMoveDown,
+                        )}
+                    </div>
+                );
+            }
+
+            const alternative = section.orGroupId
+                ? targetPaper.sections.find(
+                      (candidate) =>
+                          candidate.orGroupId === section.orGroupId &&
+                          candidate.orRole === 'alternative',
+                  )
+                : undefined;
+
+            if (!alternative) {
+                return (
+                    <div key={section.id} className="contents">
+                        {heading}
+                        {renderPaperSection(
+                            targetPaper,
+                            section,
+                            sectionIndex,
+                            interactive,
+                            canMoveUp,
+                            canMoveDown,
+                        )}
+                    </div>
+                );
+            }
+
+            return (
+                <div key={section.orGroupId ?? section.id} className="contents">
+                    {heading}
+                    <FederalSubjectiveOrSection
+                        primary={createSectionTemplateProps(
+                            targetPaper,
+                            section,
+                            interactive,
+                            canMoveUp,
+                            canMoveDown,
+                        )}
+                        alternative={createSectionTemplateProps(
+                            targetPaper,
+                            alternative,
+                            interactive,
+                            false,
+                            false,
+                        )}
+                    />
+                </div>
+            );
+        });
+    }
+
     function renderPaperSections(
         targetPaper: GeneratedPaper,
         interactive: boolean,
     ): ReactNode[] {
+        if (settings.paperLayout === 'federal-board') {
+            return renderFederalPaperSections(targetPaper, interactive);
+        }
+
         const logicalSections = targetPaper.sections.filter(
             (section) => section.orRole !== 'alternative',
         );
@@ -12284,7 +12680,10 @@ function GeneratedPaperView({
             <PaperSettingsDrawer
                 open={isSettingsDrawerOpen}
                 settings={settings}
-                sectioningAvailable={Boolean(rawPaper.sectioning?.active)}
+                sectioningAvailable={
+                    settings.paperLayout === 'federal-board' ||
+                    Boolean(rawPaper.sectioning?.active)
+                }
                 defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                 onChange={onSettingsChange}
                 onClose={() => setIsSettingsDrawerOpen(false)}

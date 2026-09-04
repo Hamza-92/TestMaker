@@ -18,6 +18,8 @@ export interface SectionTemplateProps {
     /** Number of questions in earlier objective types; subjective types receive zero. */
     questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;
+    /** Board layouts can move the marks formula into the Section A/B/C heading. */
+    hideHeadingMarks?: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;

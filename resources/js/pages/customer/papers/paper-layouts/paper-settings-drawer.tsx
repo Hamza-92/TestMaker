@@ -35,6 +35,7 @@ import type {
     PaperBorderStyle,
     PaperEnglishFont,
     PaperHeaderTemplate,
+    PaperLayout,
     PaperOrientation,
     PaperObjectiveLayout,
     PaperOrGroupDividerStyle,
@@ -188,6 +189,15 @@ const OBJECTIVE_LAYOUT_OPTIONS: Array<FontOption<PaperObjectiveLayout>> = [
     {
         value: 'board-table',
         label: 'Board table',
+        previewFontFamily: 'inherit',
+    },
+];
+
+const PAPER_LAYOUT_OPTIONS: Array<FontOption<PaperLayout>> = [
+    { value: 'standard', label: 'Standard', previewFontFamily: 'inherit' },
+    {
+        value: 'federal-board',
+        label: 'Federal Board',
         previewFontFamily: 'inherit',
     },
 ];
@@ -810,9 +820,14 @@ export function PaperSettingsDrawer({
                             <CheckboxField
                                 label="Sections"
                                 checked={
-                                    sectioningAvailable && settings.showSections
+                                    settings.paperLayout === 'federal-board' ||
+                                    (sectioningAvailable &&
+                                        settings.showSections)
                                 }
-                                disabled={!sectioningAvailable}
+                                disabled={
+                                    settings.paperLayout === 'federal-board' ||
+                                    !sectioningAvailable
+                                }
                                 onChange={(checked) =>
                                     onChange({ showSections: checked })
                                 }
@@ -921,6 +936,18 @@ export function PaperSettingsDrawer({
                         title="Questions"
                         icon={ListOrderedIcon}
                     >
+                        <div className="mb-3">
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Paper Layout
+                            </p>
+                            <FontPicker
+                                value={settings.paperLayout}
+                                options={PAPER_LAYOUT_OPTIONS}
+                                onChange={(value: PaperLayout) =>
+                                    onChange({ paperLayout: value })
+                                }
+                            />
+                        </div>
                         <div className="mb-3 grid grid-cols-2 gap-2">
                             <div>
                                 <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">

@@ -92,6 +92,8 @@ export interface GeneratedPaperSection {
     orGroupTypeIds?: number[] | null;
     orRole?: 'primary' | 'alternative' | null;
     orLabel?: string | null;
+    /** True when the Federal Board layout created this same-type OR companion. */
+    federalAutoOr?: boolean;
     multipart?: GeneratedMultipartSection | null;
     /** Stable grouping key used only to place the visible Section A/B/C heading. */
     paperSectionKey?: string | null;
@@ -188,6 +190,7 @@ export type PaperQuestionNumberingFormat =
     | 'alpha';
 export type PaperQuestionLayout = 'default' | 'stacked' | 'columns' | 'inline';
 export type PaperObjectiveLayout = 'standard' | 'board-table';
+export type PaperLayout = 'standard' | 'federal-board';
 export type PaperOrGroupLayout = 'stacked' | 'side-by-side';
 export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
 export type PaperOrGroupLabel = 'auto' | 'english' | 'urdu' | 'bilingual';
@@ -195,6 +198,8 @@ export type PaperWatermarkType = 'text' | 'logo';
 export type PaperBubbleSheetNumberFormat = 'number' | 'question';
 
 export interface PaperSettings {
+    /** Board-specific rules that control section grouping and question layout. */
+    paperLayout: PaperLayout;
     englishFont: PaperEnglishFont;
     urduFont: PaperUrduFont;
     /** Paper header font size in px (the school/exam/class/subject fields at the top). */
@@ -298,6 +303,7 @@ export type PaperHeaderTemplate =
     | 'tabular';
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
+    paperLayout: 'standard',
     englishFont: 'times-new-roman',
     urduFont: 'jameel-noori',
     headerSize: 12,
@@ -376,6 +382,7 @@ const OBJECTIVE_LAYOUT_VALUES = new Set<PaperObjectiveLayout>([
     'standard',
     'board-table',
 ]);
+const PAPER_LAYOUT_VALUES = new Set<PaperLayout>(['standard', 'federal-board']);
 const OR_GROUP_LAYOUT_VALUES = new Set<PaperOrGroupLayout>([
     'stacked',
     'side-by-side',
@@ -483,6 +490,11 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
     const urduCandidate = source.urduFont as PaperUrduFont | undefined;
 
     return {
+        paperLayout: pickEnum(
+            source.paperLayout,
+            PAPER_LAYOUT_VALUES,
+            DEFAULT_PAPER_SETTINGS.paperLayout,
+        ),
         englishFont:
             englishCandidate && ENGLISH_FONT_VALUES.has(englishCandidate)
                 ? englishCandidate

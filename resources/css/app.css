@@ -702,6 +702,37 @@ input[type='date']::-webkit-calendar-picker-indicator {
     box-sizing: border-box;
 }
 
+/* Federal Board subjective sections: Q# | question | marks | OR | question | marks. */
+[data-print-paper] [data-paper-federal-or-table] {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+[data-print-paper] [data-paper-federal-or-table] thead {
+    display: table-header-group;
+}
+[data-print-paper] [data-paper-federal-or-table] tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+[data-print-paper] [data-paper-federal-or-table] th,
+[data-print-paper] [data-paper-federal-or-table] td {
+    border-width: var(--paper-question-border-width, 1px);
+    border-style: var(--paper-question-border-style, solid);
+    border-color: currentColor;
+    box-sizing: border-box;
+}
+[data-print-paper] [data-paper-federal-or-table] th {
+    font-size: var(--paper-question-size, 0.875rem);
+    line-height: var(--paper-question-line-height, 1.5);
+    font-weight: 700;
+}
+[data-print-paper] [data-paper-federal-section-heading] {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 [data-print-paper] [data-paper-urdu-content],
 [data-print-paper] [data-paper-urdu-content] *,
 [data-print-paper] [dir='rtl'],

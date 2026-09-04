@@ -28,6 +28,7 @@ export function BoardObjectiveTableSection(props: SectionTemplateProps) {
                 titleUrdu={section.titleUrdu}
                 requiredQuestions={section.requiredQuestions}
                 marksEach={section.marksEach}
+                hideMarks={props.hideHeadingMarks}
             />
 
             <table data-paper-objective-table>
@@ -175,7 +176,7 @@ function BoardObjectiveTableRow({
     );
 }
 
-function BilingualTableContent({
+export function BilingualTableContent({
     value,
     urduOnly,
     forceRtl,

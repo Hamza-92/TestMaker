@@ -17,6 +17,7 @@ interface BoxedObjectiveSectionProps {
     headingNumber: number | null;
     questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;
+    hideHeadingMarks?: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;
@@ -56,6 +57,7 @@ export function BoxedObjectiveSection({
     headingNumber,
     questionNumberOffset,
     numberingFormat,
+    hideHeadingMarks,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -89,6 +91,7 @@ export function BoxedObjectiveSection({
                 titleUrdu={section.titleUrdu}
                 requiredQuestions={section.requiredQuestions}
                 marksEach={section.marksEach}
+                hideMarks={hideHeadingMarks}
             />
 
             {/* Question container ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â border on all 4 sides; question rows act as
