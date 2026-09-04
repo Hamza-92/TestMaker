@@ -1,4 +1,5 @@
 import { PassageQuestionContent } from '../questions/passage-question-content';
+import { QuestionTypeHeading } from '../questions/question-type-heading';
 import type { SectionTemplateProps } from '../templates/template-props';
 import type { GeneratedPaperQuestion } from '../types';
 import { BilingualTableContent } from './board-objective-table-section';
@@ -18,6 +19,17 @@ export function FederalSubjectiveOrSection({
 
     return (
         <section className="paper-section" data-federal-subjective-section>
+            <QuestionTypeHeading
+                index={primary.index}
+                headingNumber={null}
+                title={section.title}
+                titleEnglish={section.titleEnglish}
+                titleUrdu={section.titleUrdu}
+                requiredQuestions={section.requiredQuestions}
+                marksEach={section.marksEach}
+                hideMarks
+            />
+
             <table data-paper-federal-or-table>
                 <colgroup>
                     <col style={{ width: '6%' }} />
@@ -55,7 +67,7 @@ export function FederalSubjectiveOrSection({
                                 question={question}
                                 props={primary}
                             />
-                            <td className="px-1 py-1 text-center align-middle font-semibold tabular-nums">
+                            <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
                                 {section.marksEach}
                             </td>
                             <td className="px-1 py-1 text-center align-middle font-bold">
@@ -71,7 +83,7 @@ export function FederalSubjectiveOrSection({
                             ) : (
                                 <td className="px-2 py-1" />
                             )}
-                            <td className="px-1 py-1 text-center align-middle font-semibold tabular-nums">
+                            <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
                                 {section.marksEach}
                             </td>
                         </tr>
@@ -111,7 +123,7 @@ function FederalQuestionCell({
     const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
 
     return (
-        <td className="group/question relative px-2 py-1 align-top font-semibold">
+        <td className="group/question relative px-2 py-1 align-top font-normal">
             <BilingualTableContent
                 value={question.text}
                 urduOnly={urduOnly}

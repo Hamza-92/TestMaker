@@ -701,6 +701,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
     border-color: currentColor;
     box-sizing: border-box;
 }
+[data-print-paper] [data-paper-objective-table] th {
+    font-size: var(--paper-question-size, 0.875rem);
+    line-height: var(--paper-question-line-height, 1.5);
+    font-weight: 700;
+}
 
 /* Federal Board subjective sections: Q# | question | marks | OR | question | marks. */
 [data-print-paper] [data-paper-federal-or-table] {

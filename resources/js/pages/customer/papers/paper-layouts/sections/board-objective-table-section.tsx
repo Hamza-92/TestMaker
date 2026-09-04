@@ -105,7 +105,7 @@ function BoardObjectiveTableRow({
             <td className="px-1 py-1 text-center align-middle font-bold">
                 {number}.
             </td>
-            <td className="group/question relative px-2 py-1 align-middle font-semibold">
+            <td className="group/question relative px-2 py-1 align-middle font-normal">
                 <BilingualTableContent
                     value={question.text}
                     urduOnly={urduOnly}
@@ -159,7 +159,7 @@ function BoardObjectiveTableRow({
                 return (
                     <td
                         key={option?.id ?? `empty-${optionIndex}`}
-                        className="px-2 py-1 text-center align-middle font-medium"
+                        className="px-2 py-1 text-center align-middle font-normal"
                     >
                         {option && (
                             <BilingualTableContent
