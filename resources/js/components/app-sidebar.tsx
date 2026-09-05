@@ -5,6 +5,7 @@ import {
     DatabaseIcon,
     HelpCircleIcon,
     LayoutGrid,
+    LayoutPanelTopIcon,
     SchoolIcon,
     Settings2Icon,
     ShapesIcon,
@@ -48,6 +49,11 @@ export function AppSidebar() {
                       title: 'Patterns',
                       href: '/superadmin/patterns',
                       icon: TagIcon,
+                  },
+                  {
+                      title: 'Paper Layouts',
+                      href: '/superadmin/paper-layouts',
+                      icon: LayoutPanelTopIcon,
                   },
               ]
             : []),

@@ -16,6 +16,7 @@ class Pattern extends Model
         'description',
         'icon',
         'color',
+        'paper_layout',
         'status',
         'created_by',
     ];

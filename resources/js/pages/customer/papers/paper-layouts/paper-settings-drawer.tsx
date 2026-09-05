@@ -35,9 +35,7 @@ import type {
     PaperBorderStyle,
     PaperEnglishFont,
     PaperHeaderTemplate,
-    PaperLayout,
     PaperOrientation,
-    PaperObjectiveLayout,
     PaperOrGroupDividerStyle,
     PaperOrGroupLabel,
     PaperOrGroupLayout,
@@ -183,24 +181,6 @@ const QUESTION_LAYOUT_OPTIONS = [
     { value: 'columns', label: 'Columns (2)', previewFontFamily: 'inherit' },
     { value: 'inline', label: 'Inline', previewFontFamily: 'inherit' },
 ] as const;
-
-const OBJECTIVE_LAYOUT_OPTIONS: Array<FontOption<PaperObjectiveLayout>> = [
-    { value: 'standard', label: 'Standard', previewFontFamily: 'inherit' },
-    {
-        value: 'board-table',
-        label: 'Board table',
-        previewFontFamily: 'inherit',
-    },
-];
-
-const PAPER_LAYOUT_OPTIONS: Array<FontOption<PaperLayout>> = [
-    { value: 'standard', label: 'Standard', previewFontFamily: 'inherit' },
-    {
-        value: 'federal-board',
-        label: 'Federal Board',
-        previewFontFamily: 'inherit',
-    },
-];
 
 const OR_GROUP_LAYOUT_OPTIONS: Array<FontOption<PaperOrGroupLayout>> = [
     { value: 'stacked', label: 'Stacked', previewFontFamily: 'inherit' },
@@ -938,41 +918,15 @@ export function PaperSettingsDrawer({
                     >
                         <div className="mb-3">
                             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                Paper Layout
+                                General Layout
                             </p>
                             <FontPicker
-                                value={settings.paperLayout}
-                                options={PAPER_LAYOUT_OPTIONS}
-                                onChange={(value: PaperLayout) =>
-                                    onChange({ paperLayout: value })
+                                value={settings.questionLayout}
+                                options={QUESTION_LAYOUT_OPTIONS}
+                                onChange={(value: PaperQuestionLayout) =>
+                                    onChange({ questionLayout: value })
                                 }
                             />
-                        </div>
-                        <div className="mb-3 grid grid-cols-2 gap-2">
-                            <div>
-                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                    General Layout
-                                </p>
-                                <FontPicker
-                                    value={settings.questionLayout}
-                                    options={QUESTION_LAYOUT_OPTIONS}
-                                    onChange={(value: PaperQuestionLayout) =>
-                                        onChange({ questionLayout: value })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                    Objective Layout
-                                </p>
-                                <FontPicker
-                                    value={settings.objectiveLayout}
-                                    options={OBJECTIVE_LAYOUT_OPTIONS}
-                                    onChange={(value: PaperObjectiveLayout) =>
-                                        onChange({ objectiveLayout: value })
-                                    }
-                                />
-                            </div>
                         </div>
                         <div className="mb-3">
                             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
