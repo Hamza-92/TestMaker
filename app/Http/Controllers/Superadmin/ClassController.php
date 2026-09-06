@@ -16,7 +16,7 @@ class ClassController extends Controller
 {
     public function index()
     {
-        $classes = SchoolClass::with('patterns:id,name,short_name')
+        $classes = SchoolClass::with('patterns:id,name,sort_order,short_name')
             ->ordered()
             ->get(['id', 'name', 'sort_order', 'status', 'created_at']);
 
@@ -97,7 +97,7 @@ class ClassController extends Controller
     public function create()
     {
         $patterns = Pattern::where('status', 1)
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'short_name']);
 
         return Inertia::render('superadmin/classes/add', [
@@ -140,7 +140,7 @@ class ClassController extends Controller
     public function edit(SchoolClass $class)
     {
         $patterns = Pattern::where('status', 1)
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'short_name']);
 
         $class->load('patterns:id');

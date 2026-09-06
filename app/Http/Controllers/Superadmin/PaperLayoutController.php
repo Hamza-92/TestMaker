@@ -18,7 +18,7 @@ class PaperLayoutController extends Controller
     public function index()
     {
         $patterns = Pattern::query()
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'short_name', 'paper_layout', 'status'])
             ->map(fn (Pattern $pattern) => [
                 'id' => $pattern->id,

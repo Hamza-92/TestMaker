@@ -308,7 +308,7 @@ class LegacyContentTransferService
     public function targetPatterns(): array
     {
         return Pattern::query()
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'short_name', 'status'])
             ->map(fn (Pattern $pattern) => [
                 'id' => $pattern->id,

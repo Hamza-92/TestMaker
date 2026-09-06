@@ -205,7 +205,7 @@ class PaperQuestionSectionController extends Controller
     private function scopeCatalog(): array
     {
         return [
-            'patterns' => Pattern::query()->where('status', 1)->orderBy('name')->get(['id', 'name']),
+            'patterns' => Pattern::query()->where('status', 1)->ordered()->get(['id', 'name']),
             'patternClasses' => DB::table('pattern_classes')->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
                 ->where('classes.status', 1)->orderBy('classes.sort_order')->orderBy('classes.id')->get(['pattern_classes.pattern_id', 'classes.id', 'classes.name']),
             'classSubjects' => DB::table('class_subjects')->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')

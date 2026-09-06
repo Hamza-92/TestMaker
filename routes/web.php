@@ -172,6 +172,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/patterns', [PatternController::class, 'index'])->name('superadmin.patterns')->middleware('permission:patterns.view');
         Route::get('superadmin/patterns/add', [PatternController::class, 'create'])->name('superadmin.patterns.add')->middleware('permission:patterns.create');
         Route::post('superadmin/patterns', [PatternController::class, 'store'])->name('superadmin.patterns.store')->middleware('permission:patterns.create');
+        Route::post('superadmin/patterns/reorder', [PatternController::class, 'reorder'])->name('superadmin.patterns.reorder')->middleware('permission:patterns.edit');
         Route::get('superadmin/patterns/{pattern}/edit', [PatternController::class, 'edit'])->name('superadmin.patterns.edit')->middleware('permission:patterns.edit');
         Route::put('superadmin/patterns/{pattern}', [PatternController::class, 'update'])->name('superadmin.patterns.update')->middleware('permission:patterns.edit');
         Route::delete('superadmin/patterns/{pattern}', [PatternController::class, 'destroy'])->name('superadmin.patterns.destroy')->middleware('permission:patterns.delete');

@@ -115,7 +115,7 @@ class SubjectController extends Controller
     {
         $patterns = Pattern::where('status', 1)
             ->with(['classes' => fn ($q) => $q->where('status', 1)->select('classes.id', 'classes.name')])
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'short_name'])
             ->filter(fn ($p) => $p->classes->isNotEmpty())
             ->values();
@@ -169,7 +169,7 @@ class SubjectController extends Controller
     {
         $patterns = Pattern::where('status', 1)
             ->with(['classes' => fn ($q) => $q->where('status', 1)->select('classes.id', 'classes.name')])
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'short_name'])
             ->filter(fn ($p) => $p->classes->isNotEmpty())
             ->values();

@@ -159,7 +159,7 @@ class CustomerDashboardData
                     ->orderBy('classes.sort_order')
                     ->orderBy('classes.id');
             }])
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'short_name', 'description', 'icon', 'color'])
             ->values()
             ->map(function (Pattern $pattern, int $index): array {

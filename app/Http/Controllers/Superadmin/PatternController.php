@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\Pattern;
 use App\Models\SchoolClass;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -21,12 +22,40 @@ class PatternController extends Controller
 
     public function index()
     {
-        $patterns = Pattern::orderByDesc('created_at')
-            ->get(['id', 'name', 'short_name', 'description', 'icon', 'color', 'status', 'created_at']);
+        $patterns = Pattern::ordered()
+            ->get(['id', 'name', 'sort_order', 'short_name', 'description', 'icon', 'color', 'status', 'created_at']);
 
         return Inertia::render('superadmin/patterns', [
             'patterns' => $patterns,
         ]);
+    }
+
+    public function reorder(Request $request)
+    {
+        $validated = $request->validate([
+            'order' => ['required', 'array', 'min:1'],
+            'order.*' => ['required', 'integer', 'distinct', 'exists:patterns,id'],
+        ]);
+
+        $existingIds = Pattern::query()->pluck('id')->map(fn ($id) => (int) $id);
+        $submittedIds = collect($validated['order'])->map(fn ($id) => (int) $id)->values();
+
+        abort_unless(
+            $submittedIds->count() === $existingIds->count()
+                && $submittedIds->diff($existingIds)->isEmpty(),
+            422,
+            'The pattern order is out of date. Please refresh and try again.',
+        );
+
+        DB::transaction(function () use ($submittedIds): void {
+            foreach ($submittedIds as $index => $patternId) {
+                Pattern::query()->whereKey($patternId)->update([
+                    'sort_order' => $index + 1,
+                ]);
+            }
+        });
+
+        return back()->with('success', 'Pattern order saved successfully.');
     }
 
     public function show(Pattern $pattern)

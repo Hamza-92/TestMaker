@@ -32,7 +32,7 @@ class GeneratePaperController extends Controller
 
         $patterns = Pattern::where('status', 1)
             ->when($patternIds !== null, fn ($q) => $q->whereIn('id', $patternIds))
-            ->orderBy('name')
+            ->ordered()
             ->get(['id', 'name', 'paper_layout']);
 
         $patternClasses = DB::table('pattern_classes')

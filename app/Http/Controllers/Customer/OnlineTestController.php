@@ -465,7 +465,7 @@ class OnlineTestController extends Controller
             'patterns' => Pattern::query()
                 ->where('status', 1)
                 ->when($patternIds !== null, fn ($query) => $query->whereIn('id', $patternIds))
-                ->orderBy('name')
+                ->ordered()
                 ->get(['id', 'name', 'short_name']),
             'patternClasses' => DB::table('pattern_classes')
                 ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')

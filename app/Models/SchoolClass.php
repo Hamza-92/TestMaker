@@ -46,7 +46,9 @@ class SchoolClass extends Model
 
     public function patterns(): BelongsToMany
     {
-        return $this->belongsToMany(Pattern::class, 'pattern_classes', 'class_id', 'pattern_id');
+        return $this->belongsToMany(Pattern::class, 'pattern_classes', 'class_id', 'pattern_id')
+            ->orderBy('patterns.sort_order')
+            ->orderBy('patterns.id');
     }
 
     public function classSubjects(): HasMany

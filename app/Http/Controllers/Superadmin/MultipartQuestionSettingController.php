@@ -164,18 +164,18 @@ class MultipartQuestionSettingController extends Controller
     private function scopeCatalog(): array
     {
         return [
-            'patterns' => Pattern::query()->where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
+            'patterns' => Pattern::query()->where('status', 1)->ordered()->get(['id', 'name', 'short_name']),
             'patternClasses' => DB::table('pattern_classes')
                 ->join('patterns', 'patterns.id', '=', 'pattern_classes.pattern_id')
                 ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
                 ->where('patterns.status', 1)->where('classes.status', 1)
-                ->orderBy('patterns.name')->orderBy('classes.sort_order')->orderBy('classes.id')
+                ->orderBy('patterns.sort_order')->orderBy('patterns.id')->orderBy('classes.sort_order')->orderBy('classes.id')
                 ->get(['pattern_classes.pattern_id', 'classes.id', 'classes.name']),
             'classSubjects' => DB::table('class_subjects')
                 ->join('patterns', 'patterns.id', '=', 'class_subjects.pattern_id')
                 ->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
                 ->where('patterns.status', 1)->where('subjects.status', 1)
-                ->orderBy('patterns.name')->orderBy('subjects.name_eng')
+                ->orderBy('patterns.sort_order')->orderBy('patterns.id')->orderBy('subjects.name_eng')
                 ->get(['class_subjects.pattern_id', 'class_subjects.class_id', 'class_subjects.subject_id', 'subjects.name_eng as name']),
         ];
     }

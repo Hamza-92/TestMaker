@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,7 @@ class Pattern extends Model
 {
     protected $fillable = [
         'name',
+        'sort_order',
         'short_name',
         'description',
         'icon',
@@ -20,6 +22,27 @@ class Pattern extends Model
         'status',
         'created_by',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'sort_order' => 'integer',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Pattern $pattern): void {
+            if (! $pattern->sort_order) {
+                $pattern->sort_order = ((int) static::query()->max('sort_order')) + 1;
+            }
+        });
+    }
+
+    public function scopeOrdered(Builder $query): Builder
+    {
+        return $query->orderBy('sort_order')->orderBy('id');
+    }
 
     // ── Relationships ─────────────────────────────────────────────────────────
 

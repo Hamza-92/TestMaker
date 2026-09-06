@@ -237,7 +237,7 @@ class CustomerSubscriptionController extends Controller
     private function accessResources(): array
     {
         return [
-            'patterns' => Pattern::where('status', 1)->orderBy('name')->get(['id', 'name', 'short_name']),
+            'patterns' => Pattern::where('status', 1)->ordered()->get(['id', 'name', 'short_name']),
             'classes'  => SchoolClass::where('status', 1)->ordered()->get(['id', 'name']),
             'subjects' => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
             ...SubscriptionAccess::buildMaps(),

@@ -392,14 +392,15 @@ class QuestionTypeController extends Controller
         return [
             'patterns' => Pattern::query()
                 ->where('status', 1)
-                ->orderBy('name')
+                ->ordered()
                 ->get(['id', 'name']),
             'patternClasses' => DB::table('pattern_classes')
                 ->join('patterns', 'patterns.id', '=', 'pattern_classes.pattern_id')
                 ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')
                 ->where('patterns.status', 1)
                 ->where('classes.status', 1)
-                ->orderBy('patterns.name')
+                ->orderBy('patterns.sort_order')
+                ->orderBy('patterns.id')
                 ->orderBy('classes.sort_order')
                 ->orderBy('classes.id')
                 ->get([
@@ -412,7 +413,8 @@ class QuestionTypeController extends Controller
                 ->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
                 ->where('patterns.status', 1)
                 ->where('subjects.status', 1)
-                ->orderBy('patterns.name')
+                ->orderBy('patterns.sort_order')
+                ->orderBy('patterns.id')
                 ->orderBy('subjects.name_eng')
                 ->get([
                     'class_subjects.pattern_id',

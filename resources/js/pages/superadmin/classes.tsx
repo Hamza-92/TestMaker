@@ -35,6 +35,7 @@ import { usePermission } from '@/hooks/use-permission';
 interface Pattern {
     id: number;
     name: string;
+    sort_order: number;
     short_name: string | null;
 }
 
@@ -91,7 +92,7 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
             }
         }
 
-        return result.sort((a, b) => a.name.localeCompare(b.name));
+        return result.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
     }, [classes]);
 
     // ── Filter + Search ──────────────────────────────────────────────────────
