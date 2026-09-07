@@ -97,7 +97,7 @@ export function TwoColumnSubjectiveSection({
             <div
                 data-paper-question-group="grid"
                 dir={section.questionTextRtl ? 'rtl' : undefined}
-                className="grid gap-0 px-2 py-1"
+                className="grid gap-0 px-2 py-2"
                 style={{
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
                 }}
