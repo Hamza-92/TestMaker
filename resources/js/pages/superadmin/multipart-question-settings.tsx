@@ -315,7 +315,9 @@ export default function MultipartQuestionSettings({
                         <Button
                             onClick={save}
                             disabled={
-                                !canEdit || saving || selectedTypeIds.length < 2
+                                !canEdit ||
+                                saving ||
+                                selectedTypeIds.length === 0
                             }
                         >
                             <SaveIcon className="mr-2 size-4" />

@@ -366,7 +366,7 @@ class GeneratePaperController extends Controller
             ->filter(fn (int $id) => $availableSubjectiveTypeIds->contains($id))
             ->values();
 
-        if ($typeIds->count() < 2) {
+        if ($typeIds->isEmpty()) {
             return null;
         }
 

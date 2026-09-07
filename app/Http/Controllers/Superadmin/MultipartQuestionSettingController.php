@@ -73,7 +73,7 @@ class MultipartQuestionSettingController extends Controller
             'choice_count' => ['required', 'integer', 'min:1', 'max:5'],
             'heading_en' => ['nullable', 'string', 'max:255'],
             'heading_ur' => ['nullable', 'string', 'max:1000'],
-            'part_type_ids' => ['required', 'array', 'min:2', 'max:5'],
+            'part_type_ids' => ['required', 'array', 'min:1', 'max:5'],
             'part_type_ids.*' => ['required', 'integer', 'distinct', 'exists:question_types,id'],
         ]);
 
