@@ -1734,6 +1734,116 @@ function organizeGeneratedPaperSections(
     );
 }
 
+function insertGeneratedPaperSections(
+    existingSections: GeneratedPaperSection[],
+    addedSections: GeneratedPaperSection[],
+    questionTypeOrder: number[],
+    sectioning: PaperSectioningConfig | undefined,
+): GeneratedPaperSection[] {
+    if (addedSections.length === 0) {
+        return existingSections;
+    }
+
+    const activeSectioning = sectioning?.active ? sectioning : null;
+    const addedSectionKey = activeSectioning
+        ? paperSectionKeyForBlock(addedSections, activeSectioning)
+        : undefined;
+    const preparedSections = addedSections.map((section) =>
+        addedSectionKey
+            ? { ...section, paperSectionKey: addedSectionKey }
+            : section,
+    );
+    const typeRanks = new Map(
+        questionTypeOrder.map((questionTypeId, index) => [
+            questionTypeId,
+            index,
+        ]),
+    );
+    const orderedSectionKeys = activeSectioning
+        ? [
+              OBJECTIVE_PAPER_SECTION_KEY,
+              ...activeSectioning.groups.map(
+                  (group) => `configured:${group.id}`,
+              ),
+              FALLBACK_PAPER_SECTION_KEY,
+          ]
+        : [];
+
+    const blocks = existingSections.reduce<GeneratedPaperSection[][]>(
+        (groups, section) => {
+            const blockKey = section.orGroupId ?? section.id;
+            const previous = groups.at(-1);
+            const previousKey = previous?.[0]?.orGroupId ?? previous?.[0]?.id;
+
+            if (previous && previousKey === blockKey) {
+                previous.push(section);
+            } else {
+                groups.push([section]);
+            }
+
+            return groups;
+        },
+        [],
+    );
+
+    const blockRank = (block: GeneratedPaperSection[]): [number, number] => {
+        const primary =
+            block.find((section) => section.orRole === 'primary') ?? block[0];
+
+        if (!primary) {
+            return [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER];
+        }
+
+        let sectionRank: number;
+
+        if (activeSectioning) {
+            const key =
+                primary.paperSectionKey ??
+                paperSectionKeyForBlock(block, activeSectioning);
+            const keyIndex = orderedSectionKeys.indexOf(key);
+            sectionRank =
+                keyIndex === -1 ? orderedSectionKeys.length : keyIndex;
+        } else {
+            sectionRank = primary.category === 'Objective Questions' ? 0 : 1;
+        }
+
+        if (primary.multipart) {
+            return [sectionRank, Number.MAX_SAFE_INTEGER];
+        }
+
+        const ranks = block
+            .map((section) => section.questionTypeId)
+            .filter((id): id is number => typeof id === 'number')
+            .map(
+                (questionTypeId) =>
+                    typeRanks.get(questionTypeId) ??
+                    Number.MAX_SAFE_INTEGER - 1,
+            );
+
+        return [
+            sectionRank,
+            ranks.length > 0 ? Math.min(...ranks) : Number.MAX_SAFE_INTEGER - 1,
+        ];
+    };
+    const addedRank = blockRank(preparedSections);
+    const insertionIndex = blocks.findIndex((block) => {
+        const rank = blockRank(block);
+
+        return (
+            rank[0] > addedRank[0] ||
+            (rank[0] === addedRank[0] && rank[1] > addedRank[1])
+        );
+    });
+
+    if (insertionIndex === -1) {
+        return [...existingSections, ...preparedSections];
+    }
+
+    return blocks.flatMap((block, index) =>
+        index === insertionIndex ? [...preparedSections, ...block] : block,
+    );
+}
+
 function mergeQuestionSections(
     incoming: QuestionTypeCount[],
     existing: QuestionSelectionSection[],
@@ -5890,23 +6000,16 @@ export default function GeneratePaper({
                     return current;
                 }
 
-                const paperSectionKey = current.sectioning?.active
-                    ? paperSectionKeyForType(
-                          primary.questionTypeId,
-                          primary.category,
-                          current.sectioning,
-                      )
-                    : undefined;
-
                 return {
                     ...current,
-                    sections: [
-                        ...current.sections,
-                        ...newSections.map((section) => ({
-                            ...section,
-                            ...(paperSectionKey ? { paperSectionKey } : {}),
-                        })),
-                    ],
+                    sections: insertGeneratedPaperSections(
+                        current.sections,
+                        newSections,
+                        questionSelection.sections.map(
+                            (section) => section.questionTypeId,
+                        ),
+                        current.sectioning,
+                    ),
                 };
             });
             closeAddPaperSectionModal();
@@ -6048,19 +6151,16 @@ export default function GeneratePaper({
                     return current;
                 }
 
-                const paperSectionKey = current.sectioning?.active
-                    ? paperSectionKeyForBlock(newSections, current.sectioning)
-                    : undefined;
-
                 return {
                     ...current,
-                    sections: [
-                        ...current.sections,
-                        ...newSections.map((section) => ({
-                            ...section,
-                            ...(paperSectionKey ? { paperSectionKey } : {}),
-                        })),
-                    ],
+                    sections: insertGeneratedPaperSections(
+                        current.sections,
+                        newSections,
+                        questionSelection.sections.map(
+                            (section) => section.questionTypeId,
+                        ),
+                        current.sectioning,
+                    ),
                 };
             });
             closeAddPaperSectionModal();
@@ -6164,7 +6264,14 @@ export default function GeneratePaper({
             if (!usesFederalAutoOr) {
                 return {
                     ...current,
-                    sections: [...current.sections, sectionWithGrouping],
+                    sections: insertGeneratedPaperSections(
+                        current.sections,
+                        [sectionWithGrouping],
+                        questionSelection.sections.map(
+                            (section) => section.questionTypeId,
+                        ),
+                        current.sectioning,
+                    ),
                 };
             }
 
@@ -6193,11 +6300,14 @@ export default function GeneratePaper({
 
             return {
                 ...current,
-                sections: [
-                    ...current.sections,
-                    sectionWithGrouping,
-                    alternative,
-                ],
+                sections: insertGeneratedPaperSections(
+                    current.sections,
+                    [sectionWithGrouping, alternative],
+                    questionSelection.sections.map(
+                        (section) => section.questionTypeId,
+                    ),
+                    current.sectioning,
+                ),
             };
         });
         closeAddPaperSectionModal();
