@@ -655,6 +655,81 @@ function questionSourceBadgeClass(source: string | null): string {
     }
 }
 
+function questionSourceItemLabel(
+    source: string | null,
+    sourceLabel: string | null,
+): string {
+    const normalizedValues = [source, sourceLabel]
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) =>
+            value
+                .trim()
+                .toLowerCase()
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' '),
+        );
+
+    if (
+        normalizedValues.includes('exercise') ||
+        normalizedValues.includes('exercise question') ||
+        normalizedValues.includes('exercise questions')
+    ) {
+        return 'Exercise Question';
+    }
+
+    if (
+        normalizedValues.includes('exercise example') ||
+        normalizedValues.includes('exercise examples')
+    ) {
+        return 'Exercise Example';
+    }
+
+    if (
+        normalizedValues.includes('conceptual') ||
+        normalizedValues.includes('conceptual question') ||
+        normalizedValues.includes('conceptual questions')
+    ) {
+        return 'Conceptual Question';
+    }
+
+    if (
+        normalizedValues.includes('past paper') ||
+        normalizedValues.includes('past papers') ||
+        normalizedValues.includes('past paper question') ||
+        normalizedValues.includes('past paper questions')
+    ) {
+        return 'Past Paper Question';
+    }
+
+    if (
+        normalizedValues.includes('additional') ||
+        normalizedValues.includes('additional question') ||
+        normalizedValues.includes('additional questions')
+    ) {
+        return 'Additional Question';
+    }
+
+    const label = (sourceLabel ?? source)?.trim();
+
+    if (!label) {
+        return 'No source';
+    }
+
+    if (/\b(?:question|example)$/i.test(label)) {
+        return label;
+    }
+
+    if (/\bquestions$/i.test(label)) {
+        return label.replace(/questions$/i, 'Question');
+    }
+
+    if (/\bexamples$/i.test(label)) {
+        return label.replace(/examples$/i, 'Example');
+    }
+
+    return `${label} Question`;
+}
+
 function normalizeSourceOptions(sourceOptions: SourceOption[]): SourceOption[] {
     return sourceOptions.length > 0 ? sourceOptions : fallbackSourceOptions;
 }
@@ -7916,11 +7991,10 @@ function ManualQuestionPickerModal({
                                                     )}
                                                 >
                                                     <RichTextLabel
-                                                        value={
-                                                            question.sourceLabel ??
-                                                            question.source ??
-                                                            'No source'
-                                                        }
+                                                        value={questionSourceItemLabel(
+                                                            question.source,
+                                                            question.sourceLabel,
+                                                        )}
                                                     />
                                                 </span>
                                                 {selectedElsewhere && (
@@ -11441,11 +11515,10 @@ function QuestionSearchRow({
                             )}
                         >
                             <RichTextLabel
-                                value={
-                                    question.sourceLabel ??
-                                    question.source ??
-                                    'No source'
-                                }
+                                value={questionSourceItemLabel(
+                                    question.source,
+                                    question.sourceLabel,
+                                )}
                             />
                         </span>
                     </span>
@@ -13369,11 +13442,10 @@ function PaperQuestionPickerModal({
                                             )}
                                         >
                                             <RichTextLabel
-                                                value={
-                                                    question.sourceLabel ??
-                                                    question.source ??
-                                                    'No source'
-                                                }
+                                                value={questionSourceItemLabel(
+                                                    question.source,
+                                                    question.sourceLabel,
+                                                )}
                                             />
                                         </span>
                                         <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
