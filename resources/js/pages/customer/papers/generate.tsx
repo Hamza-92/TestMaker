@@ -271,6 +271,7 @@ type QuestionSectionField =
 
 interface QuestionSelectionRow {
     id: string;
+    chapterNumbers?: string;
     requiredQuestions: string;
     marksPerQuestion: string;
     choiceQuestions: string;
@@ -358,6 +359,7 @@ interface QuestionSelectionSection {
     columnPerRow: number;
     sortOrder?: number | null;
     selectionMode?: SelectionMode;
+    showChapterField?: boolean;
     orPairingId?: number | null;
     /** Legacy single alternative type. */
     orQuestionTypeId?: number | null;
@@ -480,7 +482,7 @@ type ManualPickerSide = 'primary' | 'alternative';
 
 interface ManualPickerRow {
     multipartSelectionId?: string;
-    multipartChapterNumbers?: string;
+    chapterNumbers?: string;
     section: QuestionSelectionSection;
     row: QuestionSelectionRow;
     target: number;
@@ -828,7 +830,21 @@ function normalizeQuestionSelection(value: unknown): QuestionSelectionState {
             source.globalFilters && typeof source.globalFilters === 'object'
                 ? source.globalFilters
                 : {},
-        sections: Array.isArray(source.sections) ? source.sections : [],
+        sections: Array.isArray(source.sections)
+            ? source.sections.map((section) => ({
+                  ...section,
+                  showChapterField: section.showChapterField === true,
+                  rows: Array.isArray(section.rows)
+                      ? section.rows.map((row) => ({
+                            ...row,
+                            chapterNumbers:
+                                typeof row.chapterNumbers === 'string'
+                                    ? row.chapterNumbers
+                                    : '',
+                        }))
+                      : [],
+              }))
+            : [],
         multipart,
         multipartChoiceCount:
             typeof source.multipartChoiceCount === 'number' &&
@@ -846,6 +862,7 @@ function normalizeQuestionSelection(value: unknown): QuestionSelectionState {
 function createQuestionRow(id: string): QuestionSelectionRow {
     return {
         id,
+        chapterNumbers: '',
         requiredQuestions: '',
         marksPerQuestion: '',
         choiceQuestions: '',
@@ -882,6 +899,8 @@ function normalizeQuestionRow(
     );
     const normalized = {
         ...row,
+        chapterNumbers:
+            typeof row.chapterNumbers === 'string' ? row.chapterNumbers : '',
         requiredQuestions,
         marksPerQuestion:
             toNumber(requiredQuestions) === 0 ? '' : row.marksPerQuestion,
@@ -1113,6 +1132,7 @@ function federalizeGeneratedSections(
     questionPools: Record<number, ManualQuestion[]>,
     nextSectionId: (prefix?: string) => string,
     nextQuestionId: (prefix?: string) => string,
+    chapterNumberInputs: Record<string, string> = {},
 ): { sections: GeneratedPaperSection[]; error: string | null } {
     const reservedQuestionIds = new Set(
         sections.flatMap((section) =>
@@ -1151,7 +1171,12 @@ function federalizeGeneratedSections(
 
         const candidates = shuffledQuestions(
             (questionPools[section.questionTypeId] ?? []).filter(
-                (question) => !reservedQuestionIds.has(question.id),
+                (question) =>
+                    !reservedQuestionIds.has(question.id) &&
+                    questionMatchesChapterNumbers(
+                        question,
+                        parseChapterNumbers(chapterNumberInputs[section.id]),
+                    ),
             ),
         ).slice(0, section.questions.length);
 
@@ -1681,6 +1706,7 @@ function mergeQuestionSections(
             columnPerRow: item.columnPerRow,
             sortOrder: item.sortOrder,
             selectionMode: current?.selectionMode ?? 'automatic',
+            showChapterField: current?.showChapterField ?? false,
             orPairingId: keepsGroup ? group?.id : null,
             orQuestionTypeId: keepsGroup ? (alternativeIds[0] ?? null) : null,
             orGroupTypeIds: keepsGroup ? memberIds : undefined,
@@ -1847,6 +1873,44 @@ function AutoPickSwitch({
         >
             <SparklesIcon className="size-3.5 text-brand-600 dark:text-brand-300" />
             <span>Auto Pick</span>
+            <span
+                className={cn(
+                    'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                    enabled
+                        ? 'bg-brand-600 dark:bg-brand-500'
+                        : 'bg-slate-300 dark:bg-slate-700',
+                )}
+                aria-hidden="true"
+            >
+                <span
+                    className={cn(
+                        'size-4 rounded-full bg-white shadow-sm transition-transform dark:bg-slate-100',
+                        enabled ? 'translate-x-4' : 'translate-x-0.5',
+                    )}
+                />
+            </span>
+        </button>
+    );
+}
+
+function ChapterFieldSwitch({
+    enabled,
+    onChange,
+}: {
+    enabled: boolean;
+    onChange: (enabled: boolean) => void;
+}) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label="Show Chapter Field"
+            onClick={() => onChange(!enabled)}
+            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-brand-200 hover:bg-brand-50 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/10"
+        >
+            <BookOpenIcon className="size-3.5 text-brand-600 dark:text-brand-300" />
+            <span>Show Chapter Field</span>
             <span
                 className={cn(
                     'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
@@ -2684,6 +2748,9 @@ export default function GeneratePaper({
                 const rows: ManualPickerRow[] = [
                     {
                         ...item,
+                        chapterNumbers: item.section.showChapterField
+                            ? item.row.chapterNumbers
+                            : undefined,
                         side: 'primary',
                         questionTypeId: item.section.questionTypeId,
                         selectedQuestionIds: item.row.selectedQuestionIds,
@@ -2702,6 +2769,9 @@ export default function GeneratePaper({
 
                             return {
                                 ...item,
+                                chapterNumbers: item.section.showChapterField
+                                    ? item.row.chapterNumbers
+                                    : undefined,
                                 side: 'alternative',
                                 alternativeTypeId,
                                 questionTypeId: alternativeTypeId,
@@ -2761,7 +2831,7 @@ export default function GeneratePaper({
                     return [
                         {
                             multipartSelectionId: selection.id,
-                            multipartChapterNumbers: part.chapterNumbers,
+                            chapterNumbers: part.chapterNumbers,
                             section: syntheticSection,
                             row: syntheticRow,
                             target: rowTarget(part),
@@ -2848,7 +2918,7 @@ export default function GeneratePaper({
     const filteredManualQuestions = useMemo(() => {
         const search = manualSearch.trim().toLowerCase();
         const chapterNumbers = parseChapterNumbers(
-            activeManualPickerRow?.multipartChapterNumbers,
+            activeManualPickerRow?.chapterNumbers,
         );
 
         return manualQuestions.filter((question) => {
@@ -2881,7 +2951,7 @@ export default function GeneratePaper({
             );
         });
     }, [
-        activeManualPickerRow?.multipartChapterNumbers,
+        activeManualPickerRow?.chapterNumbers,
         activeManualSelectedQuestionIds,
         manualQuestions,
         manualSearch,
@@ -3899,6 +3969,65 @@ export default function GeneratePaper({
         }
     }
 
+    function handleChapterFieldVisibilityChange(
+        sectionId: string,
+        enabled: boolean,
+    ) {
+        setQuestionSelection((current) => ({
+            ...current,
+            sections: current.sections.map((section) =>
+                section.id === sectionId
+                    ? {
+                          ...section,
+                          showChapterField: enabled,
+                          rows: section.rows.map((row) => ({
+                              ...row,
+                              chapterNumbers: enabled
+                                  ? (row.chapterNumbers ?? '')
+                                  : '',
+                          })),
+                      }
+                    : section,
+            ),
+        }));
+
+        if (manualPickerTarget?.sectionId === sectionId) {
+            closeManualQuestionPicker();
+        }
+    }
+
+    function handleSectionChapterNumbersChange(
+        sectionId: string,
+        rowId: string,
+        chapterNumbers: string,
+    ) {
+        setQuestionSelection((current) => ({
+            ...current,
+            sections: current.sections.map((section) =>
+                section.id === sectionId
+                    ? {
+                          ...section,
+                          rows: section.rows.map((row) =>
+                              row.id === rowId
+                                  ? {
+                                        ...row,
+                                        chapterNumbers,
+                                        selectedQuestionIds: [],
+                                        orSelectedQuestionIds: [],
+                                        orSelectedQuestionIdsByType: {},
+                                    }
+                                  : row,
+                          ),
+                      }
+                    : section,
+            ),
+        }));
+
+        if (manualPickerTarget?.sectionId === sectionId) {
+            closeManualQuestionPicker();
+        }
+    }
+
     function handleMultipartAutoPickChange(
         selectionId: string,
         enabled: boolean,
@@ -4219,6 +4348,9 @@ export default function GeneratePaper({
                         rowTarget(row),
                         section.title,
                         mode,
+                        section.showChapterField
+                            ? row.chapterNumbers
+                            : undefined,
                     );
                     const alternativeIds = orAlternativeTypeIds(section);
                     const alternatives = alternativeIds
@@ -4273,6 +4405,9 @@ export default function GeneratePaper({
                                     rowTarget(row),
                                     alternative.title,
                                     mode,
+                                    section.showChapterField
+                                        ? row.chapterNumbers
+                                        : undefined,
                                 ),
                                 section.id +
                                     '_' +
@@ -4412,6 +4547,17 @@ export default function GeneratePaper({
                     pools,
                     nextPaperSectionId,
                     nextPaperQuestionId,
+                    Object.fromEntries(
+                        activeRows
+                            .filter(
+                                ({ section }) =>
+                                    section.showChapterField === true,
+                            )
+                            .map(({ section, row }) => [
+                                section.id + '_' + row.id,
+                                row.chapterNumbers ?? '',
+                            ]),
+                    ),
                 );
 
                 if (federalized.error) {
@@ -4918,6 +5064,16 @@ export default function GeneratePaper({
                 questionPoolsByType,
                 nextPaperSectionId,
                 nextPaperQuestionId,
+                Object.fromEntries(
+                    questionSelection.sections
+                        .filter((section) => section.showChapterField === true)
+                        .flatMap((section) =>
+                            section.rows.map((row) => [
+                                section.id + '_' + row.id,
+                                row.chapterNumbers ?? '',
+                            ]),
+                        ),
+                ),
             );
 
             if (federalized.error) {
@@ -6731,6 +6887,12 @@ export default function GeneratePaper({
                                 autoPick={
                                     questionSectionSelectionMode(section) ===
                                     'automatic'
+                                }
+                                onChapterFieldVisibilityChange={
+                                    handleChapterFieldVisibilityChange
+                                }
+                                onChapterNumbersChange={
+                                    handleSectionChapterNumbersChange
                                 }
                                 onAutoPickChange={handleAutoPickChange}
                                 onOrGroupTypesChange={updateOrGroupTypes}
@@ -8678,7 +8840,7 @@ function AddMultipartPaperSectionModal({
 
         return {
             multipartSelectionId: manualSelection.id,
-            multipartChapterNumbers: manualRow.chapterNumbers,
+            chapterNumbers: manualRow.chapterNumbers,
             section,
             row: manualRow,
             target: 1,
@@ -13778,6 +13940,8 @@ function QuestionSelectionCard({
     orTypeOptions,
     selectedOrTypeIds,
     autoPick,
+    onChapterFieldVisibilityChange,
+    onChapterNumbersChange,
     onAutoPickChange,
     onOrGroupTypesChange,
     onChange,
@@ -13796,6 +13960,15 @@ function QuestionSelectionCard({
     orTypeOptions: OrTypeOption[];
     selectedOrTypeIds: number[];
     autoPick: boolean;
+    onChapterFieldVisibilityChange: (
+        sectionId: string,
+        enabled: boolean,
+    ) => void;
+    onChapterNumbersChange: (
+        sectionId: string,
+        rowId: string,
+        chapterNumbers: string,
+    ) => void;
     onAutoPickChange: (sectionId: string, enabled: boolean) => void;
     onOrGroupTypesChange: (sectionId: string, typeIds: number[]) => void;
     onChange: (
@@ -13887,6 +14060,12 @@ function QuestionSelectionCard({
                                 }
                             />
                         )}
+                    <ChapterFieldSwitch
+                        enabled={section.showChapterField ?? false}
+                        onChange={(enabled) =>
+                            onChapterFieldVisibilityChange(section.id, enabled)
+                        }
+                    />
                     <AutoPickSwitch
                         enabled={autoPick}
                         onChange={(enabled) =>
@@ -13917,7 +14096,12 @@ function QuestionSelectionCard({
                 {section.rows.map((row, index) => (
                     <div
                         key={row.id}
-                        className="grid gap-2.5 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800"
+                        className={cn(
+                            'grid gap-2.5 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 lg:items-end dark:border-slate-800',
+                            section.showChapterField
+                                ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]'
+                                : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]',
+                        )}
                     >
                         <NumberField
                             label="Choice"
@@ -13951,6 +14135,18 @@ function QuestionSelectionCard({
                                 )
                             }
                         />
+                        {section.showChapterField && (
+                            <ChapterNumbersField
+                                value={row.chapterNumbers ?? ''}
+                                onChange={(chapterNumbers) =>
+                                    onChapterNumbersChange(
+                                        section.id,
+                                        row.id,
+                                        chapterNumbers,
+                                    )
+                                }
+                            />
+                        )}
                         <NumberField
                             label="Marks"
                             value={row.marksPerQuestion}
