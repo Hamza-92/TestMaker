@@ -13,6 +13,7 @@ import {
     BookOpenIcon,
     ChevronDownIcon,
     CheckIcon,
+    CircleDotIcon,
     ClockIcon,
     FileTextIcon,
     GraduationCapIcon,
@@ -11758,7 +11759,9 @@ function GeneratedPaperView({
     const [isConfirmingBack, setIsConfirmingBack] = useState(false);
     const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
     const [isSetsMenuOpen, setIsSetsMenuOpen] = useState(false);
+    const [isBubbleSheetMenuOpen, setIsBubbleSheetMenuOpen] = useState(false);
     const setsMenuRef = useRef<HTMLDivElement>(null);
+    const bubbleSheetMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isSetsMenuOpen) {
@@ -11776,6 +11779,23 @@ function GeneratedPaperView({
         return () =>
             document.removeEventListener('pointerdown', handlePointerDown);
     }, [isSetsMenuOpen]);
+
+    useEffect(() => {
+        if (!isBubbleSheetMenuOpen) {
+            return;
+        }
+
+        const handlePointerDown = (event: PointerEvent) => {
+            if (!bubbleSheetMenuRef.current?.contains(event.target as Node)) {
+                setIsBubbleSheetMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+
+        return () =>
+            document.removeEventListener('pointerdown', handlePointerDown);
+    }, [isBubbleSheetMenuOpen]);
 
     // Compose a per-character font-family cascade — Latin glyphs get the
     // English font, Urdu glyphs fall through to the Urdu font automatically.
@@ -12398,14 +12418,205 @@ function GeneratedPaperView({
                                 />
                             </span>
                         </button>
+                        <div ref={bubbleSheetMenuRef} className="relative">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded={isBubbleSheetMenuOpen}
+                                onClick={() => {
+                                    setIsSetsMenuOpen(false);
+                                    setIsBubbleSheetMenuOpen((open) => !open);
+                                }}
+                                className={cn(
+                                    'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors',
+                                    settings.bubbleSheetEnabled
+                                        ? 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
+                                )}
+                            >
+                                <CircleDotIcon className="size-3.5" />
+                                <span>Bubbles</span>
+                                <span className="font-bold tabular-nums">
+                                    {settings.bubbleSheetEnabled
+                                        ? settings.bubbleSheetQuestionCount
+                                        : 'Off'}
+                                </span>
+                                <ChevronDownIcon
+                                    className={cn(
+                                        'size-3 opacity-60 transition-transform',
+                                        isBubbleSheetMenuOpen && 'rotate-180',
+                                    )}
+                                />
+                            </button>
+                            {isBubbleSheetMenuOpen && (
+                                <div
+                                    role="menu"
+                                    className="absolute top-full left-0 z-30 mt-1.5 w-56 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900"
+                                >
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={
+                                            settings.bubbleSheetEnabled
+                                        }
+                                        onClick={() =>
+                                            onSettingsChange({
+                                                bubbleSheetEnabled:
+                                                    !settings.bubbleSheetEnabled,
+                                            })
+                                        }
+                                        className="flex w-full cursor-pointer items-center justify-between rounded-lg px-1 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                                    >
+                                        <span>Show bubble sheet</span>
+                                        <span
+                                            aria-hidden="true"
+                                            className={cn(
+                                                'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                                settings.bubbleSheetEnabled
+                                                    ? 'bg-brand-600'
+                                                    : 'bg-slate-200 dark:bg-slate-700',
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                    settings.bubbleSheetEnabled
+                                                        ? 'translate-x-3.5'
+                                                        : 'translate-x-0',
+                                                )}
+                                            />
+                                        </span>
+                                    </button>
+
+                                    <div
+                                        className={cn(
+                                            'mt-2 space-y-2 border-t border-slate-100 pt-2 dark:border-slate-800',
+                                            !settings.bubbleSheetEnabled &&
+                                                'pointer-events-none opacity-45',
+                                        )}
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                                Questions
+                                            </span>
+                                            <div className="flex h-7 items-center overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                                                <button
+                                                    type="button"
+                                                    aria-label="Decrease bubble questions"
+                                                    onClick={() =>
+                                                        onSettingsChange({
+                                                            bubbleSheetQuestionCount:
+                                                                Math.max(
+                                                                    1,
+                                                                    settings.bubbleSheetQuestionCount -
+                                                                        1,
+                                                                ),
+                                                        })
+                                                    }
+                                                    className="flex h-full w-7 cursor-pointer items-center justify-center text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                                >
+                                                    <MinusIcon className="size-3" />
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={200}
+                                                    value={
+                                                        settings.bubbleSheetQuestionCount
+                                                    }
+                                                    aria-label="Bubble questions"
+                                                    onChange={(event) =>
+                                                        onSettingsChange({
+                                                            bubbleSheetQuestionCount:
+                                                                Math.max(
+                                                                    1,
+                                                                    Math.min(
+                                                                        200,
+                                                                        Number(
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        ) || 1,
+                                                                    ),
+                                                                ),
+                                                        })
+                                                    }
+                                                    className="h-full w-10 [appearance:textfield] border-x border-slate-200 bg-white text-center text-xs font-semibold text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    aria-label="Increase bubble questions"
+                                                    onClick={() =>
+                                                        onSettingsChange({
+                                                            bubbleSheetQuestionCount:
+                                                                Math.min(
+                                                                    200,
+                                                                    settings.bubbleSheetQuestionCount +
+                                                                        1,
+                                                                ),
+                                                        })
+                                                    }
+                                                    className="flex h-full w-7 cursor-pointer items-center justify-center text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                                >
+                                                    <PlusIcon className="size-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={
+                                                    settings.bubbleSheetHeadingEnabled
+                                                }
+                                                onClick={() =>
+                                                    onSettingsChange({
+                                                        bubbleSheetHeadingEnabled:
+                                                            !settings.bubbleSheetHeadingEnabled,
+                                                    })
+                                                }
+                                                className={cn(
+                                                    'h-7 cursor-pointer rounded-md px-2 text-[11px] font-semibold transition-colors',
+                                                    settings.bubbleSheetHeadingEnabled
+                                                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+                                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+                                                )}
+                                            >
+                                                Heading
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    onSettingsChange({
+                                                        bubbleSheetNumberFormat:
+                                                            settings.bubbleSheetNumberFormat ===
+                                                            'number'
+                                                                ? 'question'
+                                                                : 'number',
+                                                    })
+                                                }
+                                                className="h-7 cursor-pointer rounded-md bg-slate-100 px-2 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                            >
+                                                {settings.bubbleSheetNumberFormat ===
+                                                'number'
+                                                    ? '1, 2, 3'
+                                                    : 'Q.1, Q.2'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <div ref={setsMenuRef} className="relative">
                             <button
                                 type="button"
                                 aria-haspopup="menu"
                                 aria-expanded={isSetsMenuOpen}
-                                onClick={() =>
-                                    setIsSetsMenuOpen((open) => !open)
-                                }
+                                onClick={() => {
+                                    setIsBubbleSheetMenuOpen(false);
+                                    setIsSetsMenuOpen((open) => !open);
+                                }}
                                 className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
                                 <ShuffleIcon className="size-3.5 text-slate-400" />
