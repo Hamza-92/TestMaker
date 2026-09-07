@@ -596,6 +596,62 @@ const fallbackSourceOptions: SourceOption[] = [
     { value: 'conceptual questions', label: 'Conceptual Questions' },
 ];
 
+function questionSourceBackgroundClass(
+    source: string | null,
+    selected = false,
+): string {
+    const normalizedSource = source?.trim().toLowerCase() ?? '';
+
+    if (selected) {
+        switch (normalizedSource) {
+            case 'exercise':
+                return 'bg-sky-100/75 dark:bg-sky-900/30';
+            case 'additional':
+                return 'bg-amber-100/75 dark:bg-amber-900/30';
+            case 'past paper':
+                return 'bg-violet-100/75 dark:bg-violet-900/30';
+            case 'exercise examples':
+                return 'bg-emerald-100/75 dark:bg-emerald-900/30';
+            case 'conceptual questions':
+                return 'bg-rose-100/75 dark:bg-rose-900/30';
+            default:
+                return 'bg-slate-100/80 dark:bg-slate-800/70';
+        }
+    }
+
+    switch (normalizedSource) {
+        case 'exercise':
+            return 'bg-sky-50/70 hover:bg-sky-100/60 dark:bg-sky-950/25 dark:hover:bg-sky-900/30';
+        case 'additional':
+            return 'bg-amber-50/70 hover:bg-amber-100/60 dark:bg-amber-950/25 dark:hover:bg-amber-900/30';
+        case 'past paper':
+            return 'bg-violet-50/70 hover:bg-violet-100/60 dark:bg-violet-950/25 dark:hover:bg-violet-900/30';
+        case 'exercise examples':
+            return 'bg-emerald-50/70 hover:bg-emerald-100/60 dark:bg-emerald-950/25 dark:hover:bg-emerald-900/30';
+        case 'conceptual questions':
+            return 'bg-rose-50/70 hover:bg-rose-100/60 dark:bg-rose-950/25 dark:hover:bg-rose-900/30';
+        default:
+            return 'bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800';
+    }
+}
+
+function questionSourceBadgeClass(source: string | null): string {
+    switch (source?.trim().toLowerCase() ?? '') {
+        case 'exercise':
+            return 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300';
+        case 'additional':
+            return 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300';
+        case 'past paper':
+            return 'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300';
+        case 'exercise examples':
+            return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300';
+        case 'conceptual questions':
+            return 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300';
+        default:
+            return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+    }
+}
+
 function normalizeSourceOptions(sourceOptions: SourceOption[]): SourceOption[] {
     return sourceOptions.length > 0 ? sourceOptions : fallbackSourceOptions;
 }
@@ -7609,9 +7665,14 @@ function ManualQuestionPickerModal({
                                             onToggleQuestion(question.id)
                                         }
                                         className={cn(
-                                            'group flex w-full cursor-pointer items-start gap-3 rounded-xl border border-l-4 bg-white p-3 text-left transition-[border-color,box-shadow,opacity] focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:outline-none dark:bg-slate-900',
+                                            'group flex w-full cursor-pointer items-start gap-3 rounded-xl border border-l-4 p-3 text-left transition-[background-color,border-color,box-shadow,opacity] focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:outline-none',
+                                            questionSourceBackgroundClass(
+                                                question.source ??
+                                                    question.sourceLabel,
+                                                checked,
+                                            ),
                                             checked
-                                                ? 'border-brand-300 border-l-brand-600 bg-brand-50/45 shadow-sm shadow-brand-900/5 dark:border-brand-500/45 dark:border-l-brand-400 dark:bg-brand-500/10'
+                                                ? 'border-brand-300 border-l-brand-600 shadow-sm shadow-brand-900/5 dark:border-brand-500/45 dark:border-l-brand-400'
                                                 : 'border-slate-200 border-l-slate-200 hover:border-brand-200 hover:shadow-sm dark:border-slate-800 dark:border-l-slate-800 dark:hover:border-brand-500/35',
                                             disabled &&
                                                 'cursor-not-allowed opacity-50',
@@ -7682,7 +7743,15 @@ function ManualQuestionPickerModal({
                                                         />
                                                     </span>
                                                 )}
-                                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                <span
+                                                    className={cn(
+                                                        'rounded-md px-1.5 py-0.5',
+                                                        questionSourceBadgeClass(
+                                                            question.source ??
+                                                                question.sourceLabel,
+                                                        ),
+                                                    )}
+                                                >
                                                     <RichTextLabel
                                                         value={
                                                             question.sourceLabel ??
@@ -11155,10 +11224,14 @@ function QuestionSearchRow({
             disabled={disabled}
             onClick={onToggle}
             className={cn(
-                'block w-full cursor-pointer px-4 py-3 text-left transition-colors',
+                'block w-full cursor-pointer px-4 py-3 text-left transition-[background-color,box-shadow,opacity]',
+                questionSourceBackgroundClass(
+                    question.source ?? question.sourceLabel,
+                    checked,
+                ),
                 checked
-                    ? 'bg-brand-50/70 dark:bg-brand-500/10'
-                    : 'hover:bg-slate-50 dark:hover:bg-slate-950/60',
+                    ? 'ring-1 ring-brand-300 ring-inset dark:ring-brand-500/50'
+                    : '',
                 disabled && 'cursor-not-allowed opacity-50',
             )}
         >
@@ -11196,7 +11269,14 @@ function QuestionSearchRow({
                                 <RichTextLabel value={question.topic.name} />
                             </span>
                         )}
-                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                        <span
+                            className={cn(
+                                'rounded-md px-1.5 py-0.5',
+                                questionSourceBadgeClass(
+                                    question.source ?? question.sourceLabel,
+                                ),
+                            )}
+                        >
                             <RichTextLabel
                                 value={
                                     question.sourceLabel ??
@@ -12871,10 +12951,14 @@ function PaperQuestionPickerModal({
                                 disabled={isUsed || isCurrent}
                                 onClick={() => setPendingReplacement(question)}
                                 className={cn(
-                                    'flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
+                                    'flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition-[background-color,border-color,opacity]',
+                                    questionSourceBackgroundClass(
+                                        question.source ?? question.sourceLabel,
+                                        isCurrent,
+                                    ),
                                     isCurrent
-                                        ? 'border-brand-300 bg-brand-50/60 dark:border-brand-500/40 dark:bg-brand-500/10'
-                                        : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50/30 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/5',
+                                        ? 'border-brand-300 dark:border-brand-500/40'
+                                        : 'border-slate-200 hover:border-brand-200 dark:border-slate-800 dark:hover:border-brand-500/30',
                                     isUsed && 'cursor-not-allowed opacity-50',
                                 )}
                             >
@@ -12902,7 +12986,15 @@ function PaperQuestionPickerModal({
                                         />
                                     </span>
                                     <span className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                        <span
+                                            className={cn(
+                                                'rounded-md px-1.5 py-0.5',
+                                                questionSourceBadgeClass(
+                                                    question.source ??
+                                                        question.sourceLabel,
+                                                ),
+                                            )}
+                                        >
                                             <RichTextLabel
                                                 value={
                                                     question.sourceLabel ??
