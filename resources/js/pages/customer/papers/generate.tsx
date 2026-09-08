@@ -2693,6 +2693,13 @@ export default function GeneratePaper({
     const schoolAddress =
         typeof auth.user.address === 'string' ? auth.user.address : '';
     const showSchoolAddress = Boolean(auth.user.is_show_address);
+
+    useEffect(() => {
+        document.body.setAttribute('data-paper-workflow', '');
+
+        return () => document.body.removeAttribute('data-paper-workflow');
+    }, []);
+
     const sourceFilters = useMemo(
         () => normalizeSourceOptions(sourceOptions),
         [sourceOptions],

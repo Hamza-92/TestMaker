@@ -16,6 +16,18 @@
     font-display: swap;
 }
 
+/* Keep Urdu labels legible throughout paper setup, picker modals, and saved
+   paper editing. Print-paper rules below remain responsible for the font
+   selected in the paper settings. */
+[data-paper-workflow] [dir='rtl'],
+[data-paper-workflow] [dir='rtl'] *,
+[data-paper-workflow] [lang='ur'],
+[data-paper-workflow] [lang='ur'] *,
+[data-paper-workflow] [data-paper-urdu-content],
+[data-paper-workflow] [data-paper-urdu-content] * {
+    font-family: 'Jameel Noori Nastaleeq', serif !important;
+}
+
 @theme {
     --font-sans:
         'Montserrat', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
