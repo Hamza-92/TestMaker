@@ -27,6 +27,7 @@ export function BoardObjectiveTableSection(props: SectionTemplateProps) {
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}
                 requiredQuestions={section.requiredQuestions}
+                choiceQuestions={section.totalQuestions}
                 marksEach={section.marksEach}
                 hideMarks={props.hideHeadingMarks}
             />

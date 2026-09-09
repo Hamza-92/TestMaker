@@ -7,6 +7,7 @@ interface QuestionTypeHeadingProps {
     titleEnglish?: string | null;
     titleUrdu?: string | null;
     requiredQuestions: number;
+    choiceQuestions: number;
     marksEach: number;
     hideMarks?: boolean;
 }
@@ -18,6 +19,7 @@ export function QuestionTypeHeading({
     titleEnglish,
     titleUrdu,
     requiredQuestions,
+    choiceQuestions,
     marksEach,
     hideMarks = false,
 }: QuestionTypeHeadingProps) {
@@ -32,6 +34,13 @@ export function QuestionTypeHeading({
     const visibleTitle = hideInternalSchemaLabel(title) ? '' : title;
     const isBilingual = english !== '' && urdu !== '';
     const totalMarks = requiredQuestions * marksEach;
+    const showRequiredChoice = requiredQuestions < choiceQuestions;
+    const englishChoiceLabel = showRequiredChoice
+        ? `[Any ${requiredQuestions}]`
+        : '';
+    const urduChoiceLabel = showRequiredChoice
+        ? `[\u06a9\u0648\u0626\u06cc \u0633\u06d2 \u0628\u06be\u06cc ${requiredQuestions}]`
+        : '';
     const printedHeadingNumber =
         headingNumber === undefined ? index + 1 : headingNumber;
 
@@ -71,6 +80,11 @@ export function QuestionTypeHeading({
                                 inline
                                 className="text-right align-baseline"
                             />
+                            {showRequiredChoice && (
+                                <span className="mr-1 align-baseline whitespace-nowrap">
+                                    {urduChoiceLabel}
+                                </span>
+                            )}
                         </>
                     ) : (
                         <>
@@ -86,6 +100,11 @@ export function QuestionTypeHeading({
                                 inline
                                 className="align-baseline"
                             />
+                            {showRequiredChoice && (
+                                <span className="ml-1 align-baseline whitespace-nowrap">
+                                    {englishChoiceLabel}
+                                </span>
+                            )}
                         </>
                     )}
                 </div>
@@ -120,6 +139,11 @@ export function QuestionTypeHeading({
                     inline
                     className="align-baseline"
                 />
+                {showRequiredChoice && (
+                    <span className="ml-1 align-baseline whitespace-nowrap">
+                        {englishChoiceLabel}
+                    </span>
+                )}
             </div>
             {!hideMarks && (
                 <div className="shrink-0 self-start text-center whitespace-nowrap">
@@ -146,6 +170,11 @@ export function QuestionTypeHeading({
                     inline
                     className="text-right align-baseline"
                 />
+                {showRequiredChoice && (
+                    <span className="mr-1 align-baseline whitespace-nowrap">
+                        {urduChoiceLabel}
+                    </span>
+                )}
             </div>
         </div>
     );

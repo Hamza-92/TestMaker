@@ -26,6 +26,7 @@ export function FederalSubjectiveOrSection({
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}
                 requiredQuestions={section.requiredQuestions}
+                choiceQuestions={section.totalQuestions}
                 marksEach={section.marksEach}
                 hideMarks
             />
