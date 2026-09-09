@@ -8,15 +8,137 @@ use App\Http\Requests\Superadmin\QuestionTypeUpsertRequest;
 use App\Models\AuditLog;
 use App\Models\Pattern;
 use App\Models\QuestionType;
+use App\Models\QuestionTypeHeading;
 use App\Models\QuestionTypeOrder;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class QuestionTypeController extends Controller
 {
+    public function headings()
+    {
+        return Inertia::render('superadmin/question-types/headings', [
+            'questionTypes' => QuestionType::query()
+                ->withCount('headingRules')
+                ->orderByDesc('is_objective')
+                ->orderBy('name')
+                ->get(['id', 'name', 'name_ur', 'heading_en', 'heading_ur', 'is_objective'])
+                ->map(fn (QuestionType $type) => [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                    'name_ur' => $type->name_ur,
+                    'is_objective' => (bool) $type->is_objective,
+                    'heading_en' => $type->heading_en,
+                    'heading_ur' => $type->heading_ur,
+                    'rules_count' => $type->heading_rules_count,
+                ])->values(),
+        ]);
+    }
+
+    public function headingRules(QuestionType $questionType)
+    {
+        return Inertia::render('superadmin/question-types/heading-rules', [
+            'questionType' => [
+                'id' => $questionType->id,
+                'name' => $questionType->name,
+                'name_ur' => $questionType->name_ur,
+                'heading_en' => $questionType->heading_en,
+                'heading_ur' => $questionType->heading_ur,
+                'is_objective' => (bool) $questionType->is_objective,
+            ],
+            'catalog' => $this->orderCatalog(),
+            'rules' => QuestionTypeHeading::query()
+                ->where('question_type_id', $questionType->id)
+                ->orderBy('pattern_id')
+                ->orderByRaw('class_id IS NULL DESC')
+                ->orderBy('class_id')
+                ->orderByRaw('subject_id IS NULL DESC')
+                ->orderBy('subject_id')
+                ->get(['id', 'pattern_id', 'class_id', 'subject_id', 'heading_en', 'heading_ur']),
+        ]);
+    }
+
+    public function saveHeadingRule(Request $request, QuestionType $questionType)
+    {
+        $scope = $this->headingScope($request);
+        $validated = $request->validate([
+            'heading_en' => ['nullable', 'string', 'max:150'],
+            'heading_ur' => ['nullable', 'string', 'max:150'],
+        ]);
+        $values = [
+            'heading_en' => trim((string) ($validated['heading_en'] ?? '')) ?: null,
+            'heading_ur' => trim((string) ($validated['heading_ur'] ?? '')) ?: null,
+        ];
+        if ($values['heading_en'] === null && $values['heading_ur'] === null) {
+            throw ValidationException::withMessages([
+                'heading_en' => 'Enter an English or Urdu heading for this rule.',
+            ]);
+        }
+
+        $identity = [
+            'question_type_id' => $questionType->id,
+            'scope_key' => QuestionTypeHeading::scopeKey(...array_values($scope)),
+        ];
+        $old = QuestionTypeHeading::query()->where($identity)->first();
+        $oldValues = $old?->only(['heading_en', 'heading_ur']) ?? ['heading_en' => null, 'heading_ur' => null];
+        QuestionTypeHeading::query()->updateOrCreate($identity, [...$scope, ...$values]);
+        AuditLog::record(
+            model: $questionType,
+            event: AuditEvent::Updated,
+            oldValues: [...$scope, ...$oldValues],
+            newValues: [...$scope, ...$values],
+            notes: 'Scoped question type heading rule saved.',
+        );
+
+        return back()->with('success', $old ? 'Heading rule updated.' : 'Heading rule added.');
+    }
+
+    public function destroyHeadingRule(QuestionType $questionType, QuestionTypeHeading $headingRule)
+    {
+        abort_unless((int) $headingRule->question_type_id === (int) $questionType->id, 404);
+        $oldValues = $headingRule->only([
+            'pattern_id', 'class_id', 'subject_id', 'heading_en', 'heading_ur',
+        ]);
+        $headingRule->delete();
+        AuditLog::record(
+            model: $questionType,
+            event: AuditEvent::Updated,
+            oldValues: $oldValues,
+            newValues: [],
+            notes: 'Scoped question type heading rule removed.',
+        );
+
+        return back()->with('success', 'Heading rule removed.');
+    }
+
+    private function headingScope(Request $request): array
+    {
+        $data = $request->validate([
+            'pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'class_id' => ['nullable', 'integer', 'exists:classes,id'],
+            'subject_id' => ['nullable', 'integer', 'exists:subjects,id'],
+        ]);
+        $scope = [
+            'pattern_id' => (int) $data['pattern_id'],
+            'class_id' => filled($data['class_id'] ?? null) ? (int) $data['class_id'] : null,
+            'subject_id' => filled($data['subject_id'] ?? null) ? (int) $data['subject_id'] : null,
+        ];
+        if ($scope['class_id'] !== null && ! DB::table('pattern_classes')
+            ->where('pattern_id', $scope['pattern_id'])->where('class_id', $scope['class_id'])->exists()) {
+            throw ValidationException::withMessages(['class_id' => 'Choose a class linked to this pattern.']);
+        }
+        if ($scope['subject_id'] !== null && ($scope['class_id'] === null || ! DB::table('class_subjects')
+            ->where($scope)->exists())) {
+            throw ValidationException::withMessages(['subject_id' => 'Choose a subject linked to this pattern and class.']);
+        }
+
+        return $scope;
+    }
+
     public function index(Request $request)
     {
         return $this->renderIndex('all', $request);

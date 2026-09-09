@@ -5,6 +5,7 @@ import {
     ChevronsLeftIcon,
     ChevronsRightIcon,
     EyeIcon,
+    HeadingIcon,
     PencilIcon,
     SearchIcon,
     Trash2Icon,
@@ -876,6 +877,13 @@ export default function QuestionTypes({
                                                         title="View"
                                                     >
                                                         <EyeIcon className="size-4" />
+                                                    </Link>
+                                                    <Link
+                                                        href={`/superadmin/question-types/${qt.id}/headings`}
+                                                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                        title="Headings"
+                                                    >
+                                                        <HeadingIcon className="size-4" />
                                                     </Link>
                                                     {can(
                                                         'question_types.edit',

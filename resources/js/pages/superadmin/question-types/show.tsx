@@ -3,6 +3,7 @@ import {
     ArrowLeftIcon,
     CalendarIcon,
     FileQuestionIcon,
+    HeadingIcon,
     LogsIcon,
     PencilIcon,
 } from 'lucide-react';
@@ -197,12 +198,22 @@ export default function ShowQuestionType({
                             )}
                         </div>
                     </div>
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={`${backHref}/${questionType.id}/edit`}>
-                            <PencilIcon className="size-4" />
-                            Edit
-                        </Link>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button asChild variant="outline" size="sm">
+                            <Link
+                                href={`/superadmin/question-types/${questionType.id}/headings`}
+                            >
+                                <HeadingIcon className="size-4" />
+                                Headings
+                            </Link>
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={`${backHref}/${questionType.id}/edit`}>
+                                <PencilIcon className="size-4" />
+                                Edit
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Body */}

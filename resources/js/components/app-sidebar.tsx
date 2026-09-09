@@ -109,6 +109,10 @@ export function AppSidebar() {
                               href: '/superadmin/question-types/subjective',
                           },
                           {
+                              title: 'Type Headings',
+                              href: '/superadmin/question-types/headings',
+                          },
+                          {
                               title: 'OR Pairing Settings',
                               href: '/superadmin/question-type-pairings',
                           },

@@ -14,6 +14,7 @@ use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\QuestionTypeOrGroup;
 use App\Support\AppUserAccess;
+use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use App\Support\SubjectiveAnswerAccess;
 use Illuminate\Http\JsonResponse;
@@ -252,6 +253,8 @@ class GeneratePaperController extends Controller
             ->get()
             ->values();
 
+        $rows = QuestionTypeHeadingResolver::apply($rows, (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id);
+
         $sections = $rows->map(fn ($row, int $index) => [
             'id' => 'sec_'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
             'questionTypeId' => (int) $row->id,
@@ -376,6 +379,8 @@ class GeneratePaperController extends Controller
             ->whereIn('id', $typeIds)
             ->get(['id', 'name', 'name_ur', 'heading_en', 'heading_ur', 'question_text_rtl'])
             ->keyBy('id');
+
+        $types = QuestionTypeHeadingResolver::apply($types, (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id);
 
         return [
             'id' => $setting->id,

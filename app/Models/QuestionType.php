@@ -64,6 +64,11 @@ class QuestionType extends Model
         return $this->hasMany(Question::class);
     }
 
+    public function headingRules(): HasMany
+    {
+        return $this->hasMany(QuestionTypeHeading::class);
+    }
+
     public function auditLogs(): MorphMany
     {
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');

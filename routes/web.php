@@ -221,6 +221,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // â”€â”€â”€ Question Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types')->middleware('permission:question_types.view');
+        Route::get('superadmin/question-types/headings', [QuestionTypeController::class, 'headings'])->name('superadmin.question-types.headings')->middleware('permission:question_types.view');
+        Route::get('superadmin/question-types/{questionType}/headings', [QuestionTypeController::class, 'headingRules'])->name('superadmin.question-types.heading-rules')->middleware('permission:question_types.view');
+        Route::put('superadmin/question-types/{questionType}/headings', [QuestionTypeController::class, 'saveHeadingRule'])->name('superadmin.question-types.heading-rules.update')->middleware('permission:question_types.edit');
+        Route::delete('superadmin/question-types/{questionType}/headings/{headingRule}', [QuestionTypeController::class, 'destroyHeadingRule'])->name('superadmin.question-types.heading-rules.destroy')->middleware('permission:question_types.edit');
         Route::get('superadmin/question-type-pairings', [QuestionTypePairingController::class, 'index'])->name('superadmin.question-type-pairings')->middleware('permission:question_types.view');
         Route::post('superadmin/question-type-pairings', [QuestionTypePairingController::class, 'store'])->name('superadmin.question-type-pairings.store')->middleware('permission:question_types.edit');
         Route::patch('superadmin/question-type-pairings/{group}', [QuestionTypePairingController::class, 'update'])->name('superadmin.question-type-pairings.update')->middleware('permission:question_types.edit');
