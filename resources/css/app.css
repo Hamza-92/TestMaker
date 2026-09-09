@@ -817,10 +817,18 @@ input[type='date']::-webkit-calendar-picker-indicator {
     body:has([data-print-paper]) [data-print-paper] {
         width: 100% !important;
         max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
         box-shadow: none !important;
+        break-inside: avoid-page;
+        page-break-inside: avoid;
+    }
+
+    body:has([data-print-paper]) [data-print-set-list] > [data-print-paper] {
+        margin-top: 4mm !important;
     }
 
     /* The formal layout still uses its grid structure. Keep its label/value

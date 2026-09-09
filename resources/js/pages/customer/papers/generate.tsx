@@ -13596,7 +13596,7 @@ function GeneratedPaperView({
                 </main>
 
                 {printAllSets && numSets > 1 && (
-                    <div className="hidden print:block">
+                    <div data-print-set-list className="hidden print:block">
                         {Array.from({ length: numSets }).map((_, index) => {
                             if (index === activeSetIndex) {
                                 return null;
@@ -13608,10 +13608,7 @@ function GeneratedPaperView({
                                 <main
                                     key={`variant-${index}`}
                                     data-print-paper
-                                    style={{
-                                        ...paperShellStyle,
-                                        breakBefore: 'page',
-                                    }}
+                                    style={paperShellStyle}
                                     className="relative mx-auto overflow-hidden bg-white print:overflow-visible print:shadow-none"
                                 >
                                     <div className="relative z-10">
