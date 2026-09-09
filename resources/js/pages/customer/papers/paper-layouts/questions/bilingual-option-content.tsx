@@ -1,4 +1,8 @@
-import { splitBilingualParts } from './bilingual-question-row';
+import {
+    bilingualPartsHaveSameVisibleText,
+    containsUrduScript,
+    splitBilingualParts,
+} from './bilingual-question-row';
 import { QuestionContent } from './question-content';
 
 interface BilingualOptionContentProps {
@@ -39,6 +43,36 @@ export function BilingualOptionContent({
 }: BilingualOptionContentProps) {
     const parts = splitBilingualParts(value);
 
+    if (parts && bilingualPartsHaveSameVisibleText(parts)) {
+        const isUrdu = containsUrduScript(parts.english);
+
+        return (
+            <span
+                dir={isUrdu ? 'rtl' : 'ltr'}
+                data-paper-urdu-content={isUrdu ? true : undefined}
+                className={
+                    isUrdu
+                        ? 'paper-option-line text-right'
+                        : 'paper-option-line'
+                }
+                style={
+                    isUrdu
+                        ? { fontFamily: 'var(--paper-urdu-font)' }
+                        : undefined
+                }
+            >
+                <span dir="ltr" className="font-semibold">
+                    ({label})
+                </span>{' '}
+                <QuestionContent
+                    value={parts.english}
+                    inline
+                    className="align-baseline"
+                />
+            </span>
+        );
+    }
+
     if (parts && canRenderCompact(parts)) {
         return (
             <span
@@ -74,6 +108,7 @@ export function BilingualOptionContent({
             </span>
         );
     }
+
     if (parts) {
         return (
             <span

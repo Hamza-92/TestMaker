@@ -1,4 +1,8 @@
-import { splitBilingualParts } from '../questions/bilingual-question-row';
+import {
+    bilingualPartsHaveSameVisibleText,
+    containsUrduScript,
+    splitBilingualParts,
+} from '../questions/bilingual-question-row';
 import { QuestionContent } from '../questions/question-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
 import type { SectionTemplateProps } from '../templates/template-props';
@@ -168,6 +172,7 @@ function BoardObjectiveTableRow({
                                 urduOnly={urduOnly}
                                 forceRtl={section.questionTextRtl}
                                 centered
+                                collapseIdentical
                             />
                         )}
                     </td>
@@ -182,13 +187,38 @@ export function BilingualTableContent({
     urduOnly,
     forceRtl,
     centered = false,
+    collapseIdentical = false,
 }: {
     value: string;
     urduOnly: boolean;
     forceRtl?: boolean;
     centered?: boolean;
+    collapseIdentical?: boolean;
 }) {
     const parts = splitBilingualParts(value);
+
+    if (
+        parts &&
+        collapseIdentical &&
+        bilingualPartsHaveSameVisibleText(parts)
+    ) {
+        const rtl = containsUrduScript(parts.english);
+
+        return (
+            <div
+                dir={rtl ? 'rtl' : 'ltr'}
+                data-paper-urdu-content={rtl ? true : undefined}
+                className={
+                    centered ? 'text-center' : rtl ? 'text-right' : 'text-left'
+                }
+                style={
+                    rtl ? { fontFamily: 'var(--paper-urdu-font)' } : undefined
+                }
+            >
+                <QuestionContent value={parts.english} />
+            </div>
+        );
+    }
 
     if (parts) {
         return (

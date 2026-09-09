@@ -17,6 +17,42 @@ export interface BilingualParts {
     urdu: string;
 }
 
+function normalizedVisibleText(value: string): string {
+    let text = value;
+
+    if (typeof document !== 'undefined') {
+        const root = document.createElement('div');
+        root.innerHTML = value;
+        text = root.textContent ?? '';
+    } else {
+        text = value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+    }
+
+    return text
+        .normalize('NFKC')
+        .replace(/[\u200b-\u200f\u2066-\u2069\ufeff]/g, '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+export function bilingualPartsHaveSameVisibleText(
+    parts: BilingualParts,
+): boolean {
+    const english = normalizedVisibleText(parts.english);
+    const urdu = normalizedVisibleText(parts.urdu);
+    const compactEnglish = english.replace(/\s+/g, '');
+    const compactUrdu = urdu.replace(/\s+/g, '');
+
+    return compactEnglish !== '' && compactEnglish === compactUrdu;
+}
+
+export function containsUrduScript(value: string): boolean {
+    return /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/.test(
+        normalizedVisibleText(value),
+    );
+}
+
 export function BilingualQuestionRow({
     value,
     indexLabel,

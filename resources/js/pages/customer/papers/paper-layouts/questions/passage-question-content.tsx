@@ -1,5 +1,10 @@
 import { cn } from '@/lib/utils';
 import type { GeneratedPaperPassageQuestion } from '../types';
+import {
+    bilingualPartsHaveSameVisibleText,
+    containsUrduScript,
+    splitBilingualParts,
+} from './bilingual-question-row';
 import { QuestionContent } from './question-content';
 
 const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -101,11 +106,7 @@ function PassageOptions({
                         <span className="font-semibold">
                             ({optionLabels[optionIndex] ?? optionIndex + 1})
                         </span>{' '}
-                        <QuestionContent
-                            value={option.text}
-                            inline
-                            className="align-baseline"
-                        />
+                        <PassageOptionValue value={option.text} inline />
                     </span>
                 ))}
             </span>
@@ -124,13 +125,37 @@ function PassageOptions({
                     <span className="shrink-0 font-semibold">
                         ({optionLabels[optionIndex] ?? optionIndex + 1})
                     </span>
-                    <QuestionContent
-                        value={option.text}
-                        inline
-                        className="min-w-0 align-baseline"
-                    />
+                    <PassageOptionValue value={option.text} inline />
                 </div>
             ))}
         </div>
+    );
+}
+
+function PassageOptionValue({
+    value,
+    inline,
+}: {
+    value: string;
+    inline?: boolean;
+}) {
+    const parts = splitBilingualParts(value);
+    const collapse = parts && bilingualPartsHaveSameVisibleText(parts);
+    const renderedValue = collapse ? parts.english : value;
+    const rtl = collapse ? containsUrduScript(parts.english) : false;
+
+    return (
+        <span
+            dir={rtl ? 'rtl' : undefined}
+            data-paper-urdu-content={rtl ? true : undefined}
+            className="min-w-0"
+            style={rtl ? { fontFamily: 'var(--paper-urdu-font)' } : undefined}
+        >
+            <QuestionContent
+                value={renderedValue}
+                inline={inline}
+                className="align-baseline"
+            />
+        </span>
     );
 }
