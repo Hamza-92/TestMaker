@@ -265,7 +265,11 @@ interface SourceOption {
 
 type StepState = 'active' | 'done' | 'upcoming';
 type FormStep = 'chapters' | 'questions';
-type PaperViewMode = 'paper' | 'answer_key' | 'subjective_answers';
+type PaperViewMode =
+    | 'paper'
+    | 'answer_key'
+    | 'answers_on_paper'
+    | 'subjective_answers';
 type SelectionMode = 'automatic' | 'manual';
 type SourceFilterKey = string;
 type SectionCategory = 'Objective Questions' | 'Subjective Questions';
@@ -12385,6 +12389,8 @@ function GeneratedPaperView({
             : activeViewMode === 'subjective_answers'
               ? 'Subjective Answers'
               : null;
+    const showsPaper =
+        activeViewMode === 'paper' || activeViewMode === 'answers_on_paper';
 
     useEffect(() => {
         if (!isSetsMenuOpen) {
@@ -12587,6 +12593,10 @@ function GeneratedPaperView({
                 questionNumberOffset={questionNumberOffset}
                 numberingFormat={settings.questionNumberingFormat}
                 hideHeadingMarks={settings.paperLayout === 'federal-board'}
+                showCorrectAnswers={
+                    activeViewMode === 'answers_on_paper' &&
+                    section.category === 'Objective Questions'
+                }
                 canMoveUp={interactive && canMoveUp}
                 canMoveDown={interactive && canMoveDown}
                 onEditSection={interactive ? onEditSection : () => {}}
@@ -12647,6 +12657,7 @@ function GeneratedPaperView({
             questionNumberOffset: 0,
             numberingFormat: 'numeric',
             hideHeadingMarks: true,
+            showCorrectAnswers: false,
             canMoveUp: interactive && canMoveUp,
             canMoveDown: interactive && canMoveDown,
             onEditSection: interactive ? onEditSection : () => {},
@@ -13035,6 +13046,40 @@ function GeneratedPaperView({
                                     className={cn(
                                         'size-3.5 rounded-full bg-white shadow-sm transition-transform',
                                         activeViewMode === 'answer_key'
+                                            ? 'translate-x-3.5'
+                                            : 'translate-x-0',
+                                    )}
+                                />
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={activeViewMode === 'answers_on_paper'}
+                            onClick={() =>
+                                onViewModeChange(
+                                    activeViewMode === 'answers_on_paper'
+                                        ? 'paper'
+                                        : 'answers_on_paper',
+                                )
+                            }
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            <CheckIcon className="size-3.5 text-slate-400" />
+                            <span>Answers on Paper</span>
+                            <span
+                                aria-hidden="true"
+                                className={cn(
+                                    'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                    activeViewMode === 'answers_on_paper'
+                                        ? 'bg-brand-600'
+                                        : 'bg-slate-200 dark:bg-slate-700',
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                        activeViewMode === 'answers_on_paper'
                                             ? 'translate-x-3.5'
                                             : 'translate-x-0',
                                     )}
@@ -13507,11 +13552,7 @@ function GeneratedPaperView({
                             logoUrl={defaultWatermarkLogoUrl}
                             address={schoolAddress}
                             showAddress={showSchoolAddress}
-                            onChange={
-                                activeViewMode !== 'paper'
-                                    ? () => {}
-                                    : onHeaderChange
-                            }
+                            onChange={answersTitle ? () => {} : onHeaderChange}
                             paddingX={settings.headerPaddingX}
                             paddingY={settings.headerPaddingY}
                         />
@@ -13522,23 +13563,20 @@ function GeneratedPaperView({
                                 gap: `${settings.sectionSpacing}mm`,
                             }}
                         >
-                            {activeViewMode === 'paper' &&
-                                settings.bubbleSheetEnabled && (
-                                    <BubbleSheet
-                                        count={
-                                            settings.bubbleSheetQuestionCount
-                                        }
-                                        medium={
-                                            paper.sectioning?.medium ??
-                                            'English'
-                                        }
-                                        settings={settings}
-                                    />
-                                )}
+                            {showsPaper && settings.bubbleSheetEnabled && (
+                                <BubbleSheet
+                                    count={settings.bubbleSheetQuestionCount}
+                                    medium={
+                                        paper.sectioning?.medium ?? 'English'
+                                    }
+                                    settings={settings}
+                                />
+                            )}
                             {activeViewMode === 'answer_key' ? (
                                 <AnswerKeySheet
                                     paper={paper}
                                     setIndex={activeSetIndex}
+                                    showSetLabel={numSets > 1}
                                     settings={settings}
                                     style={{}}
                                 />
@@ -13546,6 +13584,7 @@ function GeneratedPaperView({
                                 <SubjectiveAnswerSheet
                                     paper={paper}
                                     setIndex={activeSetIndex}
+                                    showSetLabel={numSets > 1}
                                     settings={settings}
                                     style={{}}
                                 />
@@ -13601,7 +13640,7 @@ function GeneratedPaperView({
                                                 gap: `${settings.sectionSpacing}mm`,
                                             }}
                                         >
-                                            {activeViewMode === 'paper' &&
+                                            {showsPaper &&
                                                 settings.bubbleSheetEnabled && (
                                                     <BubbleSheet
                                                         count={
@@ -13620,6 +13659,7 @@ function GeneratedPaperView({
                                                 <AnswerKeySheet
                                                     paper={variantPaper}
                                                     setIndex={index}
+                                                    showSetLabel={numSets > 1}
                                                     settings={settings}
                                                     style={{}}
                                                 />
@@ -13628,6 +13668,7 @@ function GeneratedPaperView({
                                                 <SubjectiveAnswerSheet
                                                     paper={variantPaper}
                                                     setIndex={index}
+                                                    showSetLabel={numSets > 1}
                                                     settings={settings}
                                                     style={{}}
                                                 />

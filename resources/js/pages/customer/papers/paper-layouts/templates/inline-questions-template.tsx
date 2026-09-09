@@ -21,6 +21,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     questionNumberOffset,
     numberingFormat,
     hideHeadingMarks,
+    showCorrectAnswers = false,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -133,6 +134,11 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                                     optionLabels[optionIndex]
                                                 }
                                                 urduOnly={isUrduOnly}
+                                                showCorrectAnswer={
+                                                    isObjective &&
+                                                    showCorrectAnswers &&
+                                                    option.isCorrect === true
+                                                }
                                             />
                                         </span>
                                     ))}
@@ -143,6 +149,9 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                     questions={question.passageQuestions}
                                     inline
                                     rtl={section.questionTextRtl}
+                                    showCorrectAnswers={
+                                        isObjective && showCorrectAnswers
+                                    }
                                 />
                             )}
                         </span>

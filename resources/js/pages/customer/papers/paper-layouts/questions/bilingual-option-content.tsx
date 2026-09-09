@@ -9,6 +9,24 @@ interface BilingualOptionContentProps {
     value: string;
     label: string;
     urduOnly?: boolean;
+    showCorrectAnswer?: boolean;
+}
+
+export function CorrectAnswerTick({ show }: { show: boolean }) {
+    if (!show) {
+        return null;
+    }
+
+    return (
+        <span
+            data-paper-correct-answer
+            aria-label="Correct answer"
+            className="ml-1 inline-block font-bold"
+            style={{ fontFamily: 'Arial, sans-serif' }}
+        >
+            ✓
+        </span>
+    );
 }
 
 /**
@@ -40,6 +58,7 @@ export function BilingualOptionContent({
     value,
     label,
     urduOnly = false,
+    showCorrectAnswer = false,
 }: BilingualOptionContentProps) {
     const parts = splitBilingualParts(value);
 
@@ -63,6 +82,7 @@ export function BilingualOptionContent({
             >
                 <span dir="ltr" className="font-semibold">
                     ({label})
+                    <CorrectAnswerTick show={showCorrectAnswer} />
                 </span>{' '}
                 <QuestionContent
                     value={parts.english}
@@ -80,7 +100,10 @@ export function BilingualOptionContent({
                 className="paper-bilingual-option paper-bilingual-option--compact"
             >
                 <span dir="ltr" className="paper-bilingual-option__english">
-                    <span className="font-semibold">({label})</span>{' '}
+                    <span className="font-semibold">
+                        ({label})
+                        <CorrectAnswerTick show={showCorrectAnswer} />
+                    </span>{' '}
                     <QuestionContent
                         value={parts.english}
                         inline
@@ -116,7 +139,10 @@ export function BilingualOptionContent({
                 className="paper-bilingual-option"
             >
                 <span dir="ltr" className="paper-bilingual-option__english">
-                    <span className="font-semibold">({label})</span>{' '}
+                    <span className="font-semibold">
+                        ({label})
+                        <CorrectAnswerTick show={showCorrectAnswer} />
+                    </span>{' '}
                     <QuestionContent
                         value={parts.english}
                         inline
@@ -154,6 +180,7 @@ export function BilingualOptionContent({
             }
         >
             <span className="font-semibold">({label})</span>{' '}
+            <CorrectAnswerTick show={showCorrectAnswer} />{' '}
             <QuestionContent value={value} inline className="align-baseline" />
         </span>
     );

@@ -20,6 +20,8 @@ export interface SectionTemplateProps {
     numberingFormat: PaperQuestionNumberingFormat;
     /** Board layouts can move the marks formula into the Section A/B/C heading. */
     hideHeadingMarks?: boolean;
+    /** Marks correct objective options without changing the normal paper view. */
+    showCorrectAnswers?: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;

@@ -1,3 +1,4 @@
+import { CorrectAnswerTick } from '../questions/bilingual-option-content';
 import {
     bilingualPartsHaveSameVisibleText,
     containsUrduScript,
@@ -173,6 +174,10 @@ function BoardObjectiveTableRow({
                                 forceRtl={section.questionTextRtl}
                                 centered
                                 collapseIdentical
+                                showCorrectAnswer={
+                                    props.showCorrectAnswers === true &&
+                                    option.isCorrect === true
+                                }
                             />
                         )}
                     </td>
@@ -188,12 +193,14 @@ export function BilingualTableContent({
     forceRtl,
     centered = false,
     collapseIdentical = false,
+    showCorrectAnswer = false,
 }: {
     value: string;
     urduOnly: boolean;
     forceRtl?: boolean;
     centered?: boolean;
     collapseIdentical?: boolean;
+    showCorrectAnswer?: boolean;
 }) {
     const parts = splitBilingualParts(value);
 
@@ -215,6 +222,7 @@ export function BilingualTableContent({
                     rtl ? { fontFamily: 'var(--paper-urdu-font)' } : undefined
                 }
             >
+                <CorrectAnswerTick show={showCorrectAnswer} />{' '}
                 <QuestionContent value={parts.english} />
             </div>
         );
@@ -227,6 +235,7 @@ export function BilingualTableContent({
                     dir="ltr"
                     className={centered ? 'text-center' : 'text-left'}
                 >
+                    <CorrectAnswerTick show={showCorrectAnswer} />{' '}
                     <QuestionContent value={parts.english} />
                 </div>
                 <div
@@ -252,6 +261,7 @@ export function BilingualTableContent({
             }
             style={rtl ? { fontFamily: 'var(--paper-urdu-font)' } : undefined}
         >
+            <CorrectAnswerTick show={showCorrectAnswer} />{' '}
             <QuestionContent value={value} />
         </div>
     );

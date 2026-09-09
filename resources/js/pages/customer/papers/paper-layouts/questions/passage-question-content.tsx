@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import type { GeneratedPaperPassageQuestion } from '../types';
+import { CorrectAnswerTick } from './bilingual-option-content';
 import {
     bilingualPartsHaveSameVisibleText,
     containsUrduScript,
@@ -13,10 +14,12 @@ export function PassageQuestionContent({
     questions,
     inline = false,
     rtl = false,
+    showCorrectAnswers = false,
 }: {
     questions: GeneratedPaperPassageQuestion[];
     inline?: boolean;
     rtl?: boolean;
+    showCorrectAnswers?: boolean;
 }) {
     if (inline) {
         return (
@@ -49,6 +52,7 @@ export function PassageQuestionContent({
                                 options={question.options}
                                 inline
                                 rtl={rtl}
+                                showCorrectAnswers={showCorrectAnswers}
                             />
                         </span>
                     ))}
@@ -75,7 +79,11 @@ export function PassageQuestionContent({
                             className="min-w-0 flex-1"
                         />
                     </div>
-                    <PassageOptions options={question.options} rtl={rtl} />
+                    <PassageOptions
+                        options={question.options}
+                        rtl={rtl}
+                        showCorrectAnswers={showCorrectAnswers}
+                    />
                 </div>
             ))}
         </div>
@@ -86,10 +94,12 @@ function PassageOptions({
     options,
     inline = false,
     rtl = false,
+    showCorrectAnswers = false,
 }: {
     options: GeneratedPaperPassageQuestion['options'];
     inline?: boolean;
     rtl?: boolean;
+    showCorrectAnswers?: boolean;
 }) {
     if (options.length === 0) {
         return null;
@@ -105,6 +115,12 @@ function PassageOptions({
                     >
                         <span className="font-semibold">
                             ({optionLabels[optionIndex] ?? optionIndex + 1})
+                            <CorrectAnswerTick
+                                show={
+                                    showCorrectAnswers &&
+                                    option.isCorrect === true
+                                }
+                            />
                         </span>{' '}
                         <PassageOptionValue value={option.text} inline />
                     </span>
@@ -124,6 +140,11 @@ function PassageOptions({
                 <div key={option.id} className="flex items-start gap-1">
                     <span className="shrink-0 font-semibold">
                         ({optionLabels[optionIndex] ?? optionIndex + 1})
+                        <CorrectAnswerTick
+                            show={
+                                showCorrectAnswers && option.isCorrect === true
+                            }
+                        />
                     </span>
                     <PassageOptionValue value={option.text} inline />
                 </div>

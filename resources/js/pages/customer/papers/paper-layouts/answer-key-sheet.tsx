@@ -13,6 +13,7 @@ import type {
 interface Props {
     paper: GeneratedPaper;
     setIndex: number;
+    showSetLabel?: boolean;
     settings: PaperSettings;
     style: CSSProperties;
 }
@@ -89,11 +90,18 @@ function answerSectionNumber(
     );
 }
 
-export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
+export function AnswerKeySheet({
+    paper,
+    setIndex,
+    showSetLabel = false,
+    settings,
+    style,
+}: Props) {
     return (
         <AnswersSheet
             paper={paper}
             setIndex={setIndex}
+            showSetLabel={showSetLabel}
             settings={settings}
             style={style}
             scope="objective"
@@ -105,6 +113,7 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
 export function SubjectiveAnswerSheet({
     paper,
     setIndex,
+    showSetLabel = false,
     settings,
     style,
 }: Props) {
@@ -112,6 +121,7 @@ export function SubjectiveAnswerSheet({
         <AnswersSheet
             paper={paper}
             setIndex={setIndex}
+            showSetLabel={showSetLabel}
             settings={settings}
             style={style}
             scope="subjective"
@@ -123,6 +133,7 @@ export function SubjectiveAnswerSheet({
 function AnswersSheet({
     paper,
     setIndex,
+    showSetLabel = false,
     settings,
     style,
     scope,
@@ -133,7 +144,7 @@ function AnswersSheet({
 }) {
     const category =
         scope === 'objective' ? 'Objective Questions' : 'Subjective Questions';
-    const showSetLabel = paper.sections.some(
+    const hasAnswers = paper.sections.some(
         (section) => section.category === category,
     );
 
@@ -155,7 +166,7 @@ function AnswersSheet({
                         {title}
                     </p>
                 </div>
-                {showSetLabel && (
+                {showSetLabel && hasAnswers && (
                     <p
                         className="text-xs font-semibold tracking-wider uppercase"
                         style={{ color: settings.textColor }}
@@ -184,6 +195,22 @@ function AnswersSheet({
                         paper.sections,
                         sectionIndex,
                     );
+                    const questionNumberOffset =
+                        scope === 'objective'
+                            ? paper.sections
+                                  .slice(0, sectionIndex)
+                                  .filter(
+                                      (candidate) =>
+                                          candidate.category ===
+                                              'Objective Questions' &&
+                                          candidate.orRole !== 'alternative',
+                                  )
+                                  .reduce(
+                                      (total, candidate) =>
+                                          total + candidate.questions.length,
+                                      0,
+                                  )
+                            : 0;
 
                     if (section.multipart) {
                         return (
@@ -202,6 +229,8 @@ function AnswersSheet({
                                 key={section.id}
                                 section={section}
                                 sectionNumber={sectionNumber}
+                                continuousNumbering={scope === 'objective'}
+                                questionNumberOffset={questionNumberOffset}
                                 settings={settings}
                             />
                         );
@@ -224,6 +253,14 @@ function AnswersSheet({
                                           <SectionAnswers
                                               section={groupSection}
                                               sectionNumber={sectionNumber}
+                                              continuousNumbering={
+                                                  scope === 'objective'
+                                              }
+                                              questionNumberOffset={
+                                                  scope === 'objective'
+                                                      ? questionNumberOffset
+                                                      : 0
+                                              }
                                               settings={settings}
                                               showOrPrefix={index === 0}
                                           />
@@ -237,6 +274,14 @@ function AnswersSheet({
                                           <SectionAnswers
                                               section={groupSection}
                                               sectionNumber={sectionNumber}
+                                              continuousNumbering={
+                                                  scope === 'objective'
+                                              }
+                                              questionNumberOffset={
+                                                  scope === 'objective'
+                                                      ? questionNumberOffset
+                                                      : 0
+                                              }
                                               settings={settings}
                                               showOrPrefix={index === 0}
                                           />
@@ -366,11 +411,15 @@ function AnswerKeyOrDivider({
 function SectionAnswers({
     section,
     sectionNumber,
+    continuousNumbering = false,
+    questionNumberOffset = 0,
     settings,
     showOrPrefix = true,
 }: {
     section: GeneratedPaperSection;
     sectionNumber: number;
+    continuousNumbering?: boolean;
+    questionNumberOffset?: number;
     settings: PaperSettings;
     showOrPrefix?: boolean;
 }) {
@@ -399,7 +448,9 @@ function SectionAnswers({
                         style={{ color: settings.textColor }}
                     >
                         <span className="min-w-[1.75rem] font-medium">
-                            {sectionNumber}.{questionIndex + 1}
+                            {continuousNumbering
+                                ? questionNumberOffset + questionIndex + 1
+                                : `${sectionNumber}.${questionIndex + 1}`}
                         </span>
                         <QuestionContent
                             as="span"

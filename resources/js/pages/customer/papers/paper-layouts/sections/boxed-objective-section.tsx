@@ -18,6 +18,7 @@ interface BoxedObjectiveSectionProps {
     questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;
     hideHeadingMarks?: boolean;
+    showCorrectAnswers?: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;
@@ -58,6 +59,7 @@ export function BoxedObjectiveSection({
     questionNumberOffset,
     numberingFormat,
     hideHeadingMarks,
+    showCorrectAnswers = false,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -116,6 +118,7 @@ export function BoxedObjectiveSection({
                         question={question}
                         index={questionIndex + questionNumberOffset}
                         numberingFormat={numberingFormat}
+                        showCorrectAnswers={showCorrectAnswers}
                         section={section}
                         onEditQuestion={onEditQuestion}
                         onRandomQuestion={onRandomQuestion}
@@ -149,6 +152,7 @@ function ObjectiveQuestionRow({
     question,
     index,
     numberingFormat,
+    showCorrectAnswers,
     section,
     onEditQuestion,
     onRandomQuestion,
@@ -161,6 +165,7 @@ function ObjectiveQuestionRow({
     question: GeneratedPaperQuestion;
     index: number;
     numberingFormat: PaperQuestionNumberingFormat;
+    showCorrectAnswers: boolean;
     section: GeneratedPaperSection;
     onEditQuestion: (sectionId: string, questionId: string) => void;
     onRandomQuestion: (sectionId: string, questionId: string) => void;
@@ -245,6 +250,7 @@ function ObjectiveQuestionRow({
                     <PassageQuestionContent
                         questions={question.passageQuestions}
                         rtl={section.questionTextRtl}
+                        showCorrectAnswers={showCorrectAnswers}
                     />
                 </div>
             )}
@@ -293,6 +299,10 @@ function ObjectiveQuestionRow({
                                     value={option.text}
                                     label={optionLabels[optionIndex]}
                                     urduOnly={urduOnly}
+                                    showCorrectAnswer={
+                                        showCorrectAnswers &&
+                                        option.isCorrect === true
+                                    }
                                 />
                             </div>
                         ))}
