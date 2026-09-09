@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\PaperFolder;
+use App\Support\SubjectiveAnswerAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -239,6 +240,10 @@ class PaperController extends Controller
             'is_draft' => 'boolean',
         ]);
 
+        if (! SubjectiveAnswerAccess::allows(auth()->user())) {
+            $data['paper_data'] = SubjectiveAnswerAccess::redactPaperData($data['paper_data']);
+        }
+
         $paper = auth()->user()->papers()->create($data);
         $this->recordPaperActivity(
             $paper,
@@ -265,6 +270,10 @@ class PaperController extends Controller
             'paper_data' => 'required|array',
             'is_draft' => 'boolean',
         ]);
+
+        if (! SubjectiveAnswerAccess::allows(auth()->user())) {
+            $data['paper_data'] = SubjectiveAnswerAccess::redactPaperData($data['paper_data']);
+        }
 
         $wasDraft = (bool) $paper->is_draft;
         $oldValues = $paper->only(['name', 'subject', 'class_name', 'total_marks', 'is_draft']);
@@ -315,6 +324,10 @@ class PaperController extends Controller
         abort_if($paper->user_id !== auth()->id(), 403);
 
         $paperData = $paper->paper_data;
+
+        if (! SubjectiveAnswerAccess::allows(auth()->user())) {
+            $paperData = SubjectiveAnswerAccess::redactPaperData($paperData);
+        }
 
         $savedPaper = [
             'id' => $paper->id,

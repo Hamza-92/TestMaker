@@ -46,7 +46,10 @@ import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
-import { AnswerKeySheet } from './paper-layouts/answer-key-sheet';
+import {
+    AnswerKeySheet,
+    SubjectiveAnswerSheet,
+} from './paper-layouts/answer-key-sheet';
 import { BubbleSheet } from './paper-layouts/bubble-sheet';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
@@ -252,6 +255,7 @@ interface Props {
     savedPaper?: SavedPaperProp;
     appliedTemplate?: AppliedTemplate;
     initialPatternId?: number | null;
+    canViewSubjectiveAnswers: boolean;
 }
 
 interface SourceOption {
@@ -261,6 +265,7 @@ interface SourceOption {
 
 type StepState = 'active' | 'done' | 'upcoming';
 type FormStep = 'chapters' | 'questions';
+type PaperViewMode = 'paper' | 'answer_key' | 'subjective_answers';
 type SelectionMode = 'automatic' | 'manual';
 type SourceFilterKey = string;
 type SectionCategory = 'Objective Questions' | 'Subjective Questions';
@@ -604,7 +609,7 @@ interface GeneratedPaperSessionPayload extends DraftPayload {
     isDirty: boolean;
     activeSetIndex: number;
     numSets: number;
-    viewMode: 'paper' | 'answer_key';
+    viewMode: PaperViewMode;
 }
 
 function clearGeneratedPaperSession(): void {
@@ -2730,6 +2735,7 @@ export default function GeneratePaper({
     savedPaper,
     appliedTemplate,
     initialPatternId,
+    canViewSubjectiveAnswers,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
@@ -2859,7 +2865,7 @@ export default function GeneratePaper({
     );
     const [activeSetIndex, setActiveSetIndex] = useState(0);
     const [numSets, setNumSets] = useState(1);
-    const [viewMode, setViewMode] = useState<'paper' | 'answer_key'>('paper');
+    const [viewMode, setViewMode] = useState<PaperViewMode>('paper');
     const [printAllSets, setPrintAllSets] = useState(false);
     const [savedPaperId, setSavedPaperId] = useState<number | null>(null);
     const [savedPaperName, setSavedPaperName] = useState('');
@@ -3883,7 +3889,12 @@ export default function GeneratePaper({
                     setIsDirty(session.isDirty ?? true);
                     setActiveSetIndex(session.activeSetIndex ?? 0);
                     setNumSets(session.numSets ?? 1);
-                    setViewMode(session.viewMode ?? 'paper');
+                    setViewMode(
+                        session.viewMode === 'subjective_answers' &&
+                            !canViewSubjectiveAnswers
+                            ? 'paper'
+                            : (session.viewMode ?? 'paper'),
+                    );
                     setRecoveryDraft(null);
 
                     return;
@@ -7406,6 +7417,7 @@ export default function GeneratePaper({
                         defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                         schoolAddress={schoolAddress}
                         showSchoolAddress={showSchoolAddress}
+                        canViewSubjectiveAnswers={canViewSubjectiveAnswers}
                         pickerTarget={activePaperPickerContext}
                         pickerQuestions={filteredPaperPickerQuestions}
                         pickerSearch={paperQuestionSearch}
@@ -12252,6 +12264,7 @@ function GeneratedPaperView({
     defaultWatermarkLogoUrl,
     schoolAddress,
     showSchoolAddress,
+    canViewSubjectiveAnswers,
     pickerTarget,
     pickerQuestions,
     pickerSearch,
@@ -12293,16 +12306,17 @@ function GeneratedPaperView({
     rawPaper: GeneratedPaper;
     activeSetIndex: number;
     numSets: number;
-    viewMode: 'paper' | 'answer_key';
+    viewMode: PaperViewMode;
     onActiveSetChange: (index: number) => void;
     onNumSetsChange: (count: number) => void;
-    onViewModeChange: (mode: 'paper' | 'answer_key') => void;
+    onViewModeChange: (mode: PaperViewMode) => void;
     printAllSets: boolean;
     onPrintAllSets: () => void;
     totalMarks: number;
     defaultWatermarkLogoUrl: string;
     schoolAddress: string;
     showSchoolAddress: boolean;
+    canViewSubjectiveAnswers: boolean;
     pickerTarget: {
         section: GeneratedPaperSection;
         question: GeneratedPaperQuestion;
@@ -12361,6 +12375,16 @@ function GeneratedPaperView({
     const [isBubbleSheetMenuOpen, setIsBubbleSheetMenuOpen] = useState(false);
     const setsMenuRef = useRef<HTMLDivElement>(null);
     const bubbleSheetMenuRef = useRef<HTMLDivElement>(null);
+    const activeViewMode: PaperViewMode =
+        viewMode === 'subjective_answers' && !canViewSubjectiveAnswers
+            ? 'paper'
+            : viewMode;
+    const answersTitle =
+        activeViewMode === 'answer_key'
+            ? 'Answer Key'
+            : activeViewMode === 'subjective_answers'
+              ? 'Subjective Answers'
+              : null;
 
     useEffect(() => {
         if (!isSetsMenuOpen) {
@@ -12986,10 +13010,10 @@ function GeneratedPaperView({
                         <button
                             type="button"
                             role="switch"
-                            aria-checked={viewMode === 'answer_key'}
+                            aria-checked={activeViewMode === 'answer_key'}
                             onClick={() =>
                                 onViewModeChange(
-                                    viewMode === 'answer_key'
+                                    activeViewMode === 'answer_key'
                                         ? 'paper'
                                         : 'answer_key',
                                 )
@@ -13002,7 +13026,7 @@ function GeneratedPaperView({
                                 aria-hidden="true"
                                 className={cn(
                                     'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
-                                    viewMode === 'answer_key'
+                                    activeViewMode === 'answer_key'
                                         ? 'bg-brand-600'
                                         : 'bg-slate-200 dark:bg-slate-700',
                                 )}
@@ -13010,13 +13034,52 @@ function GeneratedPaperView({
                                 <span
                                     className={cn(
                                         'size-3.5 rounded-full bg-white shadow-sm transition-transform',
-                                        viewMode === 'answer_key'
+                                        activeViewMode === 'answer_key'
                                             ? 'translate-x-3.5'
                                             : 'translate-x-0',
                                     )}
                                 />
                             </span>
                         </button>
+                        {canViewSubjectiveAnswers && (
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={
+                                    activeViewMode === 'subjective_answers'
+                                }
+                                onClick={() =>
+                                    onViewModeChange(
+                                        activeViewMode === 'subjective_answers'
+                                            ? 'paper'
+                                            : 'subjective_answers',
+                                    )
+                                }
+                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                <BookOpenIcon className="size-3.5 text-slate-400" />
+                                <span>Subjective Answers</span>
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                        activeViewMode === 'subjective_answers'
+                                            ? 'bg-brand-600'
+                                            : 'bg-slate-200 dark:bg-slate-700',
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                            activeViewMode ===
+                                                'subjective_answers'
+                                                ? 'translate-x-3.5'
+                                                : 'translate-x-0',
+                                        )}
+                                    />
+                                </span>
+                            </button>
+                        )}
                         <div ref={bubbleSheetMenuRef} className="relative">
                             <button
                                 type="button"
@@ -13437,16 +13500,15 @@ function GeneratedPaperView({
                             header={{
                                 ...paper.header,
                                 marks: totalMarks,
-                                type:
-                                    viewMode === 'answer_key'
-                                        ? `Answer Key${numSets > 1 ? ` — Set ${setLabelFor(activeSetIndex)}` : ''}`
-                                        : paper.header.type,
+                                type: answersTitle
+                                    ? `${answersTitle}${numSets > 1 ? ` — Set ${setLabelFor(activeSetIndex)}` : ''}`
+                                    : paper.header.type,
                             }}
                             logoUrl={defaultWatermarkLogoUrl}
                             address={schoolAddress}
                             showAddress={showSchoolAddress}
                             onChange={
-                                viewMode === 'answer_key'
+                                activeViewMode !== 'paper'
                                     ? () => {}
                                     : onHeaderChange
                             }
@@ -13460,7 +13522,7 @@ function GeneratedPaperView({
                                 gap: `${settings.sectionSpacing}mm`,
                             }}
                         >
-                            {viewMode === 'paper' &&
+                            {activeViewMode === 'paper' &&
                                 settings.bubbleSheetEnabled && (
                                     <BubbleSheet
                                         count={
@@ -13473,8 +13535,15 @@ function GeneratedPaperView({
                                         settings={settings}
                                     />
                                 )}
-                            {viewMode === 'answer_key' ? (
+                            {activeViewMode === 'answer_key' ? (
                                 <AnswerKeySheet
+                                    paper={paper}
+                                    setIndex={activeSetIndex}
+                                    settings={settings}
+                                    style={{}}
+                                />
+                            ) : activeViewMode === 'subjective_answers' ? (
+                                <SubjectiveAnswerSheet
                                     paper={paper}
                                     setIndex={activeSetIndex}
                                     settings={settings}
@@ -13512,13 +13581,11 @@ function GeneratedPaperView({
                                             header={{
                                                 ...variantPaper.header,
                                                 marks: totalMarks,
-                                                type:
-                                                    viewMode === 'answer_key'
-                                                        ? `Answer Key — Set ${setLabelFor(index)}`
-                                                        : variantPaper.header
-                                                                .type
-                                                          ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
-                                                          : `Set ${setLabelFor(index)}`,
+                                                type: answersTitle
+                                                    ? `${answersTitle} — Set ${setLabelFor(index)}`
+                                                    : variantPaper.header.type
+                                                      ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
+                                                      : `Set ${setLabelFor(index)}`,
                                             }}
                                             logoUrl={defaultWatermarkLogoUrl}
                                             address={schoolAddress}
@@ -13534,7 +13601,7 @@ function GeneratedPaperView({
                                                 gap: `${settings.sectionSpacing}mm`,
                                             }}
                                         >
-                                            {viewMode === 'paper' &&
+                                            {activeViewMode === 'paper' &&
                                                 settings.bubbleSheetEnabled && (
                                                     <BubbleSheet
                                                         count={
@@ -13549,8 +13616,16 @@ function GeneratedPaperView({
                                                         settings={settings}
                                                     />
                                                 )}
-                                            {viewMode === 'answer_key' ? (
+                                            {activeViewMode === 'answer_key' ? (
                                                 <AnswerKeySheet
+                                                    paper={variantPaper}
+                                                    setIndex={index}
+                                                    settings={settings}
+                                                    style={{}}
+                                                />
+                                            ) : activeViewMode ===
+                                              'subjective_answers' ? (
+                                                <SubjectiveAnswerSheet
                                                     paper={variantPaper}
                                                     setIndex={index}
                                                     settings={settings}

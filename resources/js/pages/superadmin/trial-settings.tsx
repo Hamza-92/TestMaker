@@ -1,9 +1,10 @@
 import { Head, useForm } from '@inertiajs/react';
-import { ClockIcon, SaveIcon, Settings2Icon } from 'lucide-react';
+import { BookOpenCheckIcon, ClockIcon, SaveIcon, Settings2Icon } from 'lucide-react';
 import { HierarchicalAccessControl } from '@/components/subscription-access-control';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import type {
     AccessClass,
     AccessPattern,
@@ -16,6 +17,7 @@ import type {
 interface TrialSettings {
     id: number;
     trial_duration_days: number;
+    allow_subjective_answers: boolean;
     access_scope: SubscriptionAccessScope | null;
 }
 
@@ -30,8 +32,9 @@ interface Props {
 
 interface FormData {
     trial_duration_days: number;
+    allow_subjective_answers: boolean;
     access_scope: SubscriptionAccessScope | null;
-    [key: string]: number | SubscriptionAccessScope | null;
+    [key: string]: number | boolean | SubscriptionAccessScope | null;
 }
 
 function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
@@ -50,6 +53,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 export default function TrialSettingsPage({ settings, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
     const { data, setData, put, processing, errors, isDirty } = useForm<FormData>({
         trial_duration_days: settings.trial_duration_days,
+        allow_subjective_answers: settings.allow_subjective_answers,
         access_scope:        settings.access_scope,
     });
 
@@ -96,6 +100,25 @@ export default function TrialSettingsPage({ settings, patterns, classes, subject
                             {errors.trial_duration_days && (
                                 <p className="text-destructive text-xs">{errors.trial_duration_days}</p>
                             )}
+                        </div>
+                    </div>
+
+                    <div className="w-full min-w-0 space-y-4 rounded-xl border p-5 shadow-sm">
+                        <SectionHeader icon={<BookOpenCheckIcon className="size-4" />} title="Trial Features" />
+                        <Separator />
+
+                        <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                            <div className="min-w-0">
+                                <Label htmlFor="allow_subjective_answers">Subjective Answers</Label>
+                                <p className="text-muted-foreground mt-0.5 text-xs">
+                                    Allow trial customers to view and print subjective answer sheets.
+                                </p>
+                            </div>
+                            <Switch
+                                id="allow_subjective_answers"
+                                checked={data.allow_subjective_answers}
+                                onCheckedChange={(checked) => setData('allow_subjective_answers', checked)}
+                            />
                         </div>
                     </div>
 

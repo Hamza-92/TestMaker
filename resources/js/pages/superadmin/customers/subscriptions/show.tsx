@@ -76,6 +76,7 @@ interface Subscription {
     status: SubscriptionStatus;
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
+    allow_subjective_answers: boolean;
     max_teachers: number | null;
     access_scope: SubscriptionAccessScope | null;
     access_overview: AccessOverviewPattern[];
@@ -618,6 +619,19 @@ export default function ShowSubscription({
                             label="Online MCQ Tests"
                             value={
                                 subscription.allow_online_mcq_tests ? (
+                                    <span className="flex items-center gap-1.5 font-medium text-emerald-600">
+                                        <BadgeCheckIcon className="size-4" />
+                                        Enabled
+                                    </span>
+                                ) : (
+                                    <span className="text-muted-foreground italic">Disabled</span>
+                                )
+                            }
+                        />
+                        <InfoCell
+                            label="Subjective Answers"
+                            value={
+                                subscription.allow_subjective_answers ? (
                                     <span className="flex items-center gap-1.5 font-medium text-emerald-600">
                                         <BadgeCheckIcon className="size-4" />
                                         Enabled

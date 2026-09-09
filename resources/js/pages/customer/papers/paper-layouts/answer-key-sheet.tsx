@@ -90,7 +90,52 @@ function answerSectionNumber(
 }
 
 export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
-    const showSetLabel = paper.sections.length > 0;
+    return (
+        <AnswersSheet
+            paper={paper}
+            setIndex={setIndex}
+            settings={settings}
+            style={style}
+            scope="objective"
+            title="Answer Key"
+        />
+    );
+}
+
+export function SubjectiveAnswerSheet({
+    paper,
+    setIndex,
+    settings,
+    style,
+}: Props) {
+    return (
+        <AnswersSheet
+            paper={paper}
+            setIndex={setIndex}
+            settings={settings}
+            style={style}
+            scope="subjective"
+            title="Subjective Answers"
+        />
+    );
+}
+
+function AnswersSheet({
+    paper,
+    setIndex,
+    settings,
+    style,
+    scope,
+    title,
+}: Props & {
+    scope: 'objective' | 'subjective';
+    title: string;
+}) {
+    const category =
+        scope === 'objective' ? 'Objective Questions' : 'Subjective Questions';
+    const showSetLabel = paper.sections.some(
+        (section) => section.category === category,
+    );
 
     return (
         <div style={style} className="answer-key-sheet space-y-4">
@@ -107,7 +152,7 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
                         className="text-base font-semibold"
                         style={{ color: settings.textColor }}
                     >
-                        Answer Key
+                        {title}
                     </p>
                 </div>
                 {showSetLabel && (
@@ -121,7 +166,10 @@ export function AnswerKeySheet({ paper, setIndex, settings, style }: Props) {
             </div>
             <div className="space-y-4">
                 {paper.sections.map((section, sectionIndex) => {
-                    if (section.orRole === 'alternative') {
+                    if (
+                        section.category !== category ||
+                        section.orRole === 'alternative'
+                    ) {
                         return null;
                     }
 

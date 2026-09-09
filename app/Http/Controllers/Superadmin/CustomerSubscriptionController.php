@@ -83,6 +83,7 @@ class CustomerSubscriptionController extends Controller
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
                 'allow_online_mcq_tests' => $subscription->allow_online_mcq_tests,
+                'allow_subjective_answers' => $subscription->allow_subjective_answers,
                 'max_teachers'      => $subscription->max_teachers,
                 'is_question_based' => $subscription->is_question_based,
                 'pattern_access'    => $summaryIds['pattern_access'],
@@ -269,6 +270,7 @@ class CustomerSubscriptionController extends Controller
                 'status'            => $subscription->status?->value,
                 'allow_teachers'    => $subscription->allow_teachers,
                 'allow_online_mcq_tests' => $subscription->allow_online_mcq_tests,
+                'allow_subjective_answers' => $subscription->allow_subjective_answers,
                 'max_teachers'      => $subscription->max_teachers,
                 'is_question_based' => $subscription->is_question_based,
                 'access_scope'      => SubscriptionAccess::resolveScope($subscription, $resources),
@@ -302,6 +304,7 @@ class CustomerSubscriptionController extends Controller
             'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
             'allow_online_mcq_tests' => ['boolean'],
+            'allow_subjective_answers' => ['boolean'],
             'max_teachers'       => ['nullable', 'integer', 'min:1'],
         ]);
 
@@ -325,6 +328,7 @@ class CustomerSubscriptionController extends Controller
             'class_access'   => $oldSummaryIds['class_access'],
             'subject_access' => $oldSummaryIds['subject_access'],
             'access_scope'   => $oldAccessScope,
+            'allow_subjective_answers' => (bool) $subscription->allow_subjective_answers,
         ];
 
         DB::transaction(function () use ($validated, $startedAt, $expiredAt, $duration, $subscription, $oldValues, $accessScope, $summaryIds) {
@@ -337,6 +341,7 @@ class CustomerSubscriptionController extends Controller
                 'access_scope'       => $accessScope,
                 'allow_teachers'     => $validated['allow_teachers'] ?? false,
                 'allow_online_mcq_tests' => $validated['allow_online_mcq_tests'] ?? false,
+                'allow_subjective_answers' => $validated['allow_subjective_answers'] ?? false,
                 'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'is_question_based'  => $isQuestionBased,
                 'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
@@ -359,6 +364,7 @@ class CustomerSubscriptionController extends Controller
                     'class_access'   => $subscription->class_access,
                     'subject_access' => $subscription->subject_access,
                     'access_scope'   => $subscription->access_scope,
+                    'allow_subjective_answers' => (bool) $subscription->allow_subjective_answers,
                 ],
                 actor: auth()->user(),
                 notes: 'Subscription updated.',
@@ -415,6 +421,7 @@ class CustomerSubscriptionController extends Controller
             'access_scope'       => ['nullable', 'array'],
             'allow_teachers'     => ['boolean'],
             'allow_online_mcq_tests' => ['boolean'],
+            'allow_subjective_answers' => ['boolean'],
             'max_teachers'       => ['nullable', 'integer', 'min:1'],
             // Payment (optional)
             'has_payment'        => ['boolean'],
@@ -465,6 +472,7 @@ class CustomerSubscriptionController extends Controller
                 'access_scope'       => $accessScope,
                 'allow_teachers'     => $validated['allow_teachers'] ?? false,
                 'allow_online_mcq_tests' => $validated['allow_online_mcq_tests'] ?? false,
+                'allow_subjective_answers' => $validated['allow_subjective_answers'] ?? false,
                 'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'is_question_based'  => $isQuestionBased,
                 'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
@@ -487,6 +495,7 @@ class CustomerSubscriptionController extends Controller
                     'class_access'   => $createdSubscription->class_access,
                     'subject_access' => $createdSubscription->subject_access,
                     'access_scope'   => $createdSubscription->access_scope,
+                    'allow_subjective_answers' => (bool) $createdSubscription->allow_subjective_answers,
                 ],
                 actor: auth()->user(),
                 notes: 'Subscription created for customer.',

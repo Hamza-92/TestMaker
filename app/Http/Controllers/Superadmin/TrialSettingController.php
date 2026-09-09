@@ -33,6 +33,7 @@ class TrialSettingController extends Controller
 
         $data = $request->validate([
             'trial_duration_days' => ['required', 'integer', 'min:1', 'max:365'],
+            'allow_subjective_answers' => ['boolean'],
             'access_scope'        => ['nullable', 'array'],
         ]);
 
@@ -40,6 +41,7 @@ class TrialSettingController extends Controller
 
         TrialSetting::current()->update([
             'trial_duration_days' => $data['trial_duration_days'],
+            'allow_subjective_answers' => $data['allow_subjective_answers'] ?? false,
             'access_scope'        => $accessScope,
         ]);
 

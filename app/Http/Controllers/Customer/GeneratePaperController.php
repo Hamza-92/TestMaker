@@ -15,6 +15,7 @@ use App\Models\QuestionType;
 use App\Models\QuestionTypeOrGroup;
 use App\Support\AppUserAccess;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
+use App\Support\SubjectiveAnswerAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -100,6 +101,7 @@ class GeneratePaperController extends Controller
                     'label' => ucfirst($value),
                 ])
                 ->values(),
+            'canViewSubjectiveAnswers' => SubjectiveAnswerAccess::allows(auth()->user()),
         ];
     }
 
@@ -404,6 +406,7 @@ class GeneratePaperController extends Controller
         }
 
         $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
+        $canViewSubjectiveAnswers = SubjectiveAnswerAccess::allows(auth()->user());
         $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
             ->where('questions.question_type_id', $data['question_type_id'])
             ->with([
@@ -416,7 +419,7 @@ class GeneratePaperController extends Controller
             ->orderBy('questions.topic_id')
             ->orderBy('questions.id')
             ->get()
-            ->map(function (Question $question) use ($displayMedium) {
+            ->map(function (Question $question) use ($displayMedium, $canViewSubjectiveAnswers) {
                 $content = QuestionTypeSchemaRegistry::contentFromQuestion(
                     $question,
                     $question->questionType,
@@ -430,9 +433,15 @@ class GeneratePaperController extends Controller
                         'have_answer' => $question->questionType->have_answer,
                     ],
                 );
+                $includeAnswers = (bool) $question->questionType->is_objective
+                    || $canViewSubjectiveAnswers;
 
-                $summaryEn = $this->localizedQuestionSummary($question, $content, 'en');
-                $summaryUr = $this->localizedQuestionSummary($question, $content, 'ur');
+                $summaryEn = $this->localizedQuestionSummary($question, $content, 'en', $includeAnswers);
+                $summaryUr = $this->localizedQuestionSummary($question, $content, 'ur', $includeAnswers);
+
+                if (! $includeAnswers) {
+                    $content = SubjectiveAnswerAccess::redactQuestionContent($content);
+                }
 
                 return [
                     'id' => $question->id,
@@ -613,28 +622,41 @@ class GeneratePaperController extends Controller
         Question $question,
         array $content,
         string $locale,
+        bool $includeAnswers = true,
     ): ?string {
         if ((bool) $question->questionType->options_only) {
             return null;
         }
 
-        foreach ([
+        $attributes = [
             "statement_{$locale}",
             "description_{$locale}",
-            "answer_{$locale}",
-        ] as $attribute) {
+        ];
+
+        if ($includeAnswers) {
+            $attributes[] = "answer_{$locale}";
+        }
+
+        foreach ($attributes as $attribute) {
             $value = trim((string) $question->{$attribute});
             if ($value !== '') {
                 return $value;
             }
         }
 
-        return $this->firstLocalizedContentValue($content, "_{$locale}");
+        return $this->firstLocalizedContentValue($content, "_{$locale}", $includeAnswers);
     }
 
-    private function firstLocalizedContentValue(array $content, string $suffix): ?string
-    {
+    private function firstLocalizedContentValue(
+        array $content,
+        string $suffix,
+        bool $includeAnswers = true,
+    ): ?string {
         foreach ($content as $key => $value) {
+            if (! $includeAnswers && is_string($key) && preg_match('/^(?:answer|correct)(?:_|$)|^is_correct$/i', $key) === 1) {
+                continue;
+            }
+
             if (is_string($key) && str_ends_with($key, $suffix) && ! is_array($value)) {
                 $normalized = trim((string) $value);
                 if ($normalized !== '') {
@@ -645,7 +667,7 @@ class GeneratePaperController extends Controller
 
         foreach ($content as $value) {
             if (is_array($value)) {
-                $localized = $this->firstLocalizedContentValue($value, $suffix);
+                $localized = $this->firstLocalizedContentValue($value, $suffix, $includeAnswers);
                 if ($localized !== null) {
                     return $localized;
                 }

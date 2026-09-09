@@ -8,17 +8,20 @@ class TrialSetting extends Model
 {
     protected $fillable = [
         'trial_duration_days',
+        'allow_subjective_answers',
         'access_scope',
     ];
 
     protected $casts = [
         'access_scope' => 'array',
+        'allow_subjective_answers' => 'boolean',
     ];
 
     public static function current(): self
     {
         $instance = static::firstOrCreate([], [
             'trial_duration_days' => 30,
+            'allow_subjective_answers' => false,
             'access_scope'        => null,
         ]);
 
