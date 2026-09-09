@@ -5,7 +5,7 @@ import {
     ComboboxOptions,
 } from '@headlessui/react';
 
-import { Head, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -578,6 +578,8 @@ function draftKey(paperId: number | null): string {
     return `paper_active_draft:${paperId ?? 'new'}`;
 }
 
+const GENERATED_PAPER_SESSION_KEY = 'paper_generated_view';
+
 interface DraftPayload {
     savedAt: number;
     paper: GeneratedPaper;
@@ -588,6 +590,47 @@ interface DraftPayload {
         pattern: ComboboxOptionItem;
         klass: ComboboxOptionItem;
         subject: ComboboxOptionItem;
+    };
+}
+
+interface GeneratedPaperSessionPayload extends DraftPayload {
+    chapterMedium: ContentMedium;
+    questionTypePairings: QuestionTypePairing[];
+    multipartConfig: MultipartConfig | null;
+    paperSectioning: PaperSectioningConfig;
+    savedPaperId: number | null;
+    savedPaperName: string;
+    savedPaperIsDraft: boolean;
+    isDirty: boolean;
+    activeSetIndex: number;
+    numSets: number;
+    viewMode: 'paper' | 'answer_key';
+}
+
+function clearGeneratedPaperSession(): void {
+    try {
+        sessionStorage.removeItem(GENERATED_PAPER_SESSION_KEY);
+    } catch {
+        // sessionStorage unavailable
+    }
+}
+
+function serializablePaperMeta(
+    pattern: ComboboxOptionItem,
+    klass: ComboboxOptionItem,
+    subject: ComboboxOptionItem,
+): DraftPayload['meta'] {
+    const plainOption = (option: ComboboxOptionItem): ComboboxOptionItem => ({
+        id: option.id,
+        label: option.label,
+        ...(option.searchLabel ? { searchLabel: option.searchLabel } : {}),
+        ...(option.hint ? { hint: option.hint } : {}),
+    });
+
+    return {
+        pattern: plainOption(pattern),
+        klass: plainOption(klass),
+        subject: plainOption(subject),
     };
 }
 
@@ -2700,6 +2743,14 @@ export default function GeneratePaper({
         return () => document.body.removeAttribute('data-paper-workflow');
     }, []);
 
+    useEffect(
+        () =>
+            router.on('before', () => {
+                clearGeneratedPaperSession();
+            }),
+        [],
+    );
+
     const sourceFilters = useMemo(
         () => normalizeSourceOptions(sourceOptions),
         [sourceOptions],
@@ -2795,6 +2846,7 @@ export default function GeneratePaper({
     const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastSavedRef = useRef<number | null>(null);
     const isRestoringRef = useRef(false);
+    const restoredGeneratedSessionRef = useRef(false);
     const [pendingTemplate] = useState<AppliedTemplate | null>(
         appliedTemplate ?? null,
     );
@@ -2819,8 +2871,12 @@ export default function GeneratePaper({
     const [isDirty, setIsDirty] = useState(false);
 
     useEffect(() => {
+        if (generatedPaper) {
+            return;
+        }
+
         setPaperSectioning(INACTIVE_PAPER_SECTIONING);
-    }, [pattern?.id, klass?.id, subject?.id]);
+    }, [generatedPaper, pattern?.id, klass?.id, subject?.id]);
 
     const patternOptions = useMemo<ComboboxOptionItem[]>(
         () =>
@@ -3787,6 +3843,53 @@ export default function GeneratePaper({
 
     useEffect(() => {
         try {
+            if (!savedPaper) {
+                const sessionRaw = sessionStorage.getItem(
+                    GENERATED_PAPER_SESSION_KEY,
+                );
+
+                if (sessionRaw) {
+                    const session = JSON.parse(
+                        sessionRaw,
+                    ) as GeneratedPaperSessionPayload;
+
+                    isRestoringRef.current = true;
+                    restoredGeneratedSessionRef.current = true;
+                    setGeneratedPaper({
+                        ...session.paper,
+                        settings: normalizePaperSettings(
+                            session.paper.settings,
+                        ),
+                    });
+                    setQuestionPoolsByType({});
+                    setQuestionSelection(
+                        normalizeQuestionSelection(session.questionSelection),
+                    );
+                    setSelected(
+                        deserializeChapterSelection(session.chapterSelection),
+                    );
+                    setPattern(session.meta.pattern);
+                    setKlass(session.meta.klass);
+                    setSubject(session.meta.subject);
+                    setChapterMedium(session.chapterMedium ?? 'English');
+                    setQuestionTypePairings(session.questionTypePairings ?? []);
+                    setMultipartConfig(session.multipartConfig ?? null);
+                    setPaperSectioning(
+                        session.paperSectioning ?? INACTIVE_PAPER_SECTIONING,
+                    );
+                    setSavedPaperId(session.savedPaperId ?? null);
+                    setSavedPaperName(session.savedPaperName ?? '');
+                    setSavedPaperIsDraft(session.savedPaperIsDraft ?? false);
+                    setIsDirty(session.isDirty ?? true);
+                    setActiveSetIndex(session.activeSetIndex ?? 0);
+                    setNumSets(session.numSets ?? 1);
+                    setViewMode(session.viewMode ?? 'paper');
+                    setRecoveryDraft(null);
+
+                    return;
+                }
+            }
+
             // Look up the draft for the paper we're editing (or the "new" bucket
             // if this is a fresh paper). savedPaper.id is read directly from the
             // prop because the savedPaperId state hook hasn't been set yet on
@@ -3797,10 +3900,65 @@ export default function GeneratePaper({
                 setRecoveryDraft(JSON.parse(raw) as DraftPayload);
             }
         } catch {
-            // ignore corrupted draft
+            // Ignore corrupted recovery data and remove the unusable snapshot.
+            clearGeneratedPaperSession();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (!generatedPaper || !pattern || !klass || !subject) {
+            return;
+        }
+
+        try {
+            sessionStorage.setItem(
+                GENERATED_PAPER_SESSION_KEY,
+                JSON.stringify({
+                    savedAt: Date.now(),
+                    paper: generatedPaper,
+                    // Full question pools can exceed the browser's storage
+                    // quota. They are reloaded in the background after a
+                    // refresh instead of being embedded in this snapshot.
+                    questionPoolsByType: {},
+                    questionSelection,
+                    chapterSelection: serializeChapterSelection(selected),
+                    meta: serializablePaperMeta(pattern, klass, subject),
+                    chapterMedium,
+                    questionTypePairings,
+                    multipartConfig,
+                    paperSectioning,
+                    savedPaperId,
+                    savedPaperName,
+                    savedPaperIsDraft,
+                    isDirty,
+                    activeSetIndex,
+                    numSets,
+                    viewMode,
+                } satisfies GeneratedPaperSessionPayload),
+            );
+        } catch {
+            clearGeneratedPaperSession();
+        }
+    }, [
+        generatedPaper,
+        questionSelection,
+        selected,
+        pattern,
+        klass,
+        subject,
+        chapterMedium,
+        questionTypePairings,
+        multipartConfig,
+        paperSectioning,
+        savedPaperId,
+        savedPaperName,
+        savedPaperIsDraft,
+        isDirty,
+        activeSetIndex,
+        numSets,
+        viewMode,
+    ]);
 
     useEffect(() => {
         // Only autosave when the user has actually changed something. Without
@@ -3832,7 +3990,7 @@ export default function GeneratePaper({
                         questionPoolsByType,
                         questionSelection,
                         chapterSelection: serializeChapterSelection(selected),
-                        meta: { pattern, klass, subject },
+                        meta: serializablePaperMeta(pattern, klass, subject),
                     } satisfies DraftPayload),
                 );
                 setDraftStatus('saved');
@@ -3918,6 +4076,7 @@ export default function GeneratePaper({
     }, [generatedPaper]);
 
     function resetQuestionSelection() {
+        clearGeneratedPaperSession();
         setQuestionSelection({
             globalFilters: createGlobalFilters(sourceFilters),
             sections: [],
@@ -4358,6 +4517,71 @@ export default function GeneratePaper({
 
         return data.questions;
     }
+
+    useEffect(() => {
+        if (!restoredGeneratedSessionRef.current || !generatedPaper) {
+            return;
+        }
+
+        const questionTypeIds = [
+            ...new Set(
+                generatedPaper.sections.flatMap((section) => [
+                    ...(typeof section.questionTypeId === 'number'
+                        ? [section.questionTypeId]
+                        : []),
+                    ...(section.multipart?.rows.flatMap((row) =>
+                        row.parts
+                            .map((part) => part.typeId)
+                            .filter((typeId): typeId is number =>
+                                Number.isInteger(typeId),
+                            ),
+                    ) ?? []),
+                ]),
+            ),
+        ];
+
+        if (questionTypeIds.length === 0) {
+            restoredGeneratedSessionRef.current = false;
+
+            return;
+        }
+
+        let cancelled = false;
+
+        void Promise.all(
+            questionTypeIds.map(
+                async (questionTypeId) =>
+                    [
+                        questionTypeId,
+                        await fetchQuestionPool(questionTypeId),
+                    ] as const,
+            ),
+        )
+            .then((entries) => {
+                if (!cancelled) {
+                    setQuestionPoolsByType(Object.fromEntries(entries));
+                    restoredGeneratedSessionRef.current = false;
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    restoredGeneratedSessionRef.current = false;
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+        // The pool loader intentionally runs only for a restored generated
+        // session; its query inputs are all listed below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        generatedPaper,
+        selectedChapterIds,
+        selectedTopicIds,
+        activeSourceValues,
+        chapterMedium,
+    ]);
 
     async function searchPaperQuestionPool(
         questionTypeId: number,
@@ -4810,6 +5034,8 @@ export default function GeneratePaper({
             clearTimeout(autoSaveRef.current);
         }
 
+        clearGeneratedPaperSession();
+
         setGeneratedPaper(null);
         setPaperQuestionPickerTarget(null);
         setPaperQuestionSearch('');
@@ -4843,7 +5069,7 @@ export default function GeneratePaper({
                     questionPoolsByType,
                     questionSelection,
                     chapterSelection: serializeChapterSelection(selected),
-                    meta: { pattern, klass, subject },
+                    meta: serializablePaperMeta(pattern, klass, subject),
                 } satisfies DraftPayload),
             );
         } catch {
@@ -4967,7 +5193,10 @@ export default function GeneratePaper({
                 questionPoolsByType,
                 questionSelection,
                 chapterSelection: serializeChapterSelection(selected),
-                meta: { pattern, klass, subject },
+                meta:
+                    pattern && klass && subject
+                        ? serializablePaperMeta(pattern, klass, subject)
+                        : null,
             },
         };
 
@@ -5066,7 +5295,10 @@ export default function GeneratePaper({
                 questionPoolsByType,
                 questionSelection,
                 chapterSelection: serializeChapterSelection(selected),
-                meta: { pattern, klass, subject },
+                meta:
+                    pattern && klass && subject
+                        ? serializablePaperMeta(pattern, klass, subject)
+                        : null,
             },
         };
 
@@ -8771,6 +9003,7 @@ function AddPaperSectionModal({
                     {activeTab === 'chapters' && (
                         <ChapterTopicFilterPanel
                             chapters={chapters}
+                            medium={medium}
                             localChapterIds={localChapterIds}
                             localTopicIds={localTopicIds}
                             onToggleChapter={toggleChapter}
@@ -11647,12 +11880,14 @@ function QuestionSearchRow({
 
 function ChapterTopicFilterPanel({
     chapters,
+    medium = 'Both',
     localChapterIds,
     localTopicIds,
     onToggleChapter,
     onToggleTopic,
 }: {
     chapters: Chapter[];
+    medium?: ContentMedium;
     localChapterIds: Set<number>;
     localTopicIds: Set<number>;
     onToggleChapter: (chapter: Chapter) => void;
@@ -11708,7 +11943,13 @@ function ChapterTopicFilterPanel({
                             </span>
                             <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                    <RichTextLabel value={chapter.name} />
+                                    <BilingualPickerName
+                                        english={
+                                            chapter.name_eng ?? chapter.name
+                                        }
+                                        urdu={chapter.name_ur}
+                                        medium={medium}
+                                    />
                                 </span>
                                 {chapter.topics.length > 0 && (
                                     <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -11754,7 +11995,13 @@ function ChapterTopicFilterPanel({
                                                     />
                                                 )}
                                             </span>
-                                            <RichTextLabel value={topic.name} />
+                                            <BilingualPickerName
+                                                english={
+                                                    topic.name_eng ?? topic.name
+                                                }
+                                                urdu={topic.name_ur}
+                                                medium={medium}
+                                            />
                                         </button>
                                     );
                                 })}
@@ -13633,7 +13880,7 @@ function BilingualPickerName({
                 </span>
                 <span
                     dir="rtl"
-                    className="min-w-0 flex-1 truncate text-right"
+                    className="min-w-0 flex-1 truncate text-right text-base"
                     title={plainQuestionText(urduName)}
                 >
                     <RichTextLabel value={urduName} />
@@ -13646,7 +13893,10 @@ function BilingualPickerName({
         return (
             <span
                 dir="rtl"
-                className={cn('min-w-0 flex-1 truncate text-right', className)}
+                className={cn(
+                    'min-w-0 flex-1 truncate text-right text-base',
+                    className,
+                )}
                 title={plainQuestionText(urduValue)}
             >
                 <RichTextLabel value={urduValue} />
