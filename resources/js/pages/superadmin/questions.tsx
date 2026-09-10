@@ -4,6 +4,7 @@ import {
     ChevronRightIcon,
     ChevronsLeftIcon,
     ChevronsRightIcon,
+    ArrowRightLeftIcon,
     EyeIcon,
     PencilIcon,
     SearchIcon,
@@ -11,8 +12,9 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
-import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -27,7 +29,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import type { ChapterOption, QuestionTypeOption, SourceOption } from './questions/form';
+import { usePermission } from '@/hooks/use-permission';
+import { BulkQuestionTypeChangeDialog } from './questions/change-type-dialog';
+import type {
+    ChapterOption,
+    QuestionTypeOption,
+    SourceOption,
+} from './questions/form';
 
 interface QuestionRow {
     id: number;
@@ -43,7 +51,11 @@ interface QuestionRow {
         name_ur: string | null;
         chapter_number: number | null;
         group_name: string | null;
-        subject: { id: number; name_eng: string; subject_type: 'chapter-wise' | 'topic-wise' };
+        subject: {
+            id: number;
+            name_eng: string;
+            subject_type: 'chapter-wise' | 'topic-wise';
+        };
         class: { id: number; name: string };
         pattern: { id: number; name: string; short_name: string | null };
     };
@@ -60,21 +72,32 @@ interface Filters {
 
 function uniqueById<T extends { id: number }>(arr: T[]): T[] {
     const seen = new Set<number>();
+
     return arr.filter((item) => {
-        if (seen.has(item.id)) return false;
+        if (seen.has(item.id)) {
+            return false;
+        }
+
         seen.add(item.id);
+
         return true;
     });
 }
 
 function StatusBadge({ status }: { status: number }) {
     return status === 1 ? (
-        <Badge variant="outline" className="border-emerald-200 bg-emerald-100 font-medium text-emerald-700">
+        <Badge
+            variant="outline"
+            className="border-emerald-200 bg-emerald-100 font-medium text-emerald-700"
+        >
             <span className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />
             Active
         </Badge>
     ) : (
-        <Badge variant="outline" className="border-gray-200 bg-gray-100 font-medium text-gray-600">
+        <Badge
+            variant="outline"
+            className="border-gray-200 bg-gray-100 font-medium text-gray-600"
+        >
             <span className="mr-1 inline-block size-1.5 rounded-full bg-gray-400" />
             Inactive
         </Badge>
@@ -83,11 +106,17 @@ function StatusBadge({ status }: { status: number }) {
 
 function KindBadge({ isObjective }: { isObjective: boolean }) {
     return isObjective ? (
-        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[11px] font-normal text-blue-700 px-1.5 py-0">
+        <Badge
+            variant="outline"
+            className="border-blue-200 bg-blue-50 px-1.5 py-0 text-[11px] font-normal text-blue-700"
+        >
             Obj
         </Badge>
     ) : (
-        <Badge variant="outline" className="border-violet-200 bg-violet-50 text-[11px] font-normal text-violet-700 px-1.5 py-0">
+        <Badge
+            variant="outline"
+            className="border-violet-200 bg-violet-50 px-1.5 py-0 text-[11px] font-normal text-violet-700"
+        >
             Subj
         </Badge>
     );
@@ -100,8 +129,7 @@ export default function Questions({
     chapters,
     questions,
     filters,
-    questionTypes: _questionTypes,
-    sourceOptions: _sourceOptions,
+    questionTypes,
 }: {
     chapters: ChapterOption[];
     questions: QuestionRow[] | null;
@@ -110,6 +138,7 @@ export default function Questions({
     sourceOptions: SourceOption[];
 }) {
     const { can } = usePermission();
+    const canEditQuestions = can('questions.edit');
 
     // ── Derive the initial chapter from filters ──────────────────────────────
     const activeChapter = useMemo(
@@ -136,10 +165,14 @@ export default function Questions({
 
     // ── Search / pagination (client-side, within loaded questions) ────────────
     const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [deleteTarget, setDeleteTarget] = useState<QuestionRow | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [changeTypeOpen, setChangeTypeOpen] = useState(false);
 
     // ── Cascaded dropdown options ─────────────────────────────────────────────
     const patterns = useMemo(
@@ -195,14 +228,28 @@ export default function Questions({
 
     const isTopicWise = selectedChapter?.subject.subject_type === 'topic-wise';
     const availableTopics = selectedChapter?.topics ?? [];
+    const availableQuestionTypes = useMemo(() => {
+        const typeIds = new Set(
+            (questions ?? []).map((question) => question.question_type.id),
+        );
+
+        return questionTypes.filter((type) => typeIds.has(type.id));
+    }, [questionTypes, questions]);
 
     // ── Navigate to load questions from server ────────────────────────────────
     const navigate = (newChapterId: string, newTopicId = '') => {
+        setSelectedIds(new Set());
+        setChangeTypeOpen(false);
         let url = '/superadmin/questions';
+
         if (newChapterId) {
             url += `/chapters/${newChapterId}`;
-            if (newTopicId) url += `/topics/${newTopicId}`;
+
+            if (newTopicId) {
+                url += `/topics/${newTopicId}`;
+            }
         }
+
         router.get(url, {}, { preserveState: true, replace: true });
     };
 
@@ -214,7 +261,10 @@ export default function Questions({
         setSubjectId('');
         setChapterId('');
         setTopicId('');
-        if (filters.chapter_id) navigate('');
+
+        if (filters.chapter_id) {
+            navigate('');
+        }
     };
 
     const handleClassChange = (val: string) => {
@@ -223,7 +273,10 @@ export default function Questions({
         setSubjectId('');
         setChapterId('');
         setTopicId('');
-        if (filters.chapter_id) navigate('');
+
+        if (filters.chapter_id) {
+            navigate('');
+        }
     };
 
     const handleSubjectChange = (val: string) => {
@@ -231,15 +284,25 @@ export default function Questions({
         setSubjectId(v);
         setChapterId('');
         setTopicId('');
-        if (filters.chapter_id) navigate('');
+
+        if (filters.chapter_id) {
+            navigate('');
+        }
     };
 
     const handleChapterChange = (val: string) => {
         const v = val === NONE ? '' : val;
         setChapterId(v);
         setTopicId('');
-        if (!v) { navigate(''); return; }
+
+        if (!v) {
+            navigate('');
+
+            return;
+        }
+
         const ch = availableChapters.find((c) => String(c.id) === v);
+
         if (ch?.subject.subject_type !== 'topic-wise') {
             navigate(v);
         }
@@ -254,26 +317,92 @@ export default function Questions({
 
     // ── Client-side search within loaded questions ────────────────────────────
     const filtered = useMemo(() => {
-        if (!questions) return [];
-        const q = search.toLowerCase().trim();
-        if (!q) return questions;
-        return questions.filter((r) =>
-            r.summary_text.toLowerCase().includes(q) ||
-            r.question_type.name.toLowerCase().includes(q),
-        );
-    }, [questions, search]);
+        if (!questions) {
+            return [];
+        }
+
+        const normalizedSearch = search.toLowerCase().trim();
+
+        return questions.filter((question) => {
+            const matchesSearch =
+                normalizedSearch === '' ||
+                question.summary_text
+                    .toLowerCase()
+                    .includes(normalizedSearch) ||
+                question.question_type.name
+                    .toLowerCase()
+                    .includes(normalizedSearch);
+            const matchesType =
+                typeFilter === 'all' ||
+                String(question.question_type.id) === typeFilter;
+            const matchesStatus =
+                statusFilter === 'all' ||
+                (statusFilter === 'active' && question.status === 1) ||
+                (statusFilter === 'inactive' && question.status === 0);
+
+            return matchesSearch && matchesType && matchesStatus;
+        });
+    }, [questions, search, statusFilter, typeFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const safePage = Math.min(page, totalPages);
-    const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+    const paginated = filtered.slice(
+        (safePage - 1) * pageSize,
+        safePage * pageSize,
+    );
     const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
+    const selectedQuestions = (questions ?? []).filter((question) =>
+        selectedIds.has(question.id),
+    );
+    const filteredIds = filtered.map((question) => question.id);
+    const allFilteredSelected =
+        filteredIds.length > 0 &&
+        filteredIds.every((questionId) => selectedIds.has(questionId));
+    const someFilteredSelected = filteredIds.some((questionId) =>
+        selectedIds.has(questionId),
+    );
+
+    const toggleQuestion = (questionId: number, checked: boolean) => {
+        setSelectedIds((current) => {
+            const next = new Set(current);
+
+            if (checked) {
+                next.add(questionId);
+            } else {
+                next.delete(questionId);
+            }
+
+            return next;
+        });
+    };
+
+    const toggleAllFiltered = (checked: boolean) => {
+        setSelectedIds((current) => {
+            const next = new Set(current);
+            filteredIds.forEach((questionId) => {
+                if (checked) {
+                    next.add(questionId);
+                } else {
+                    next.delete(questionId);
+                }
+            });
+
+            return next;
+        });
+    };
 
     // ── Delete ────────────────────────────────────────────────────────────────
     const confirmDelete = () => {
-        if (!deleteTarget) return;
+        if (!deleteTarget) {
+            return;
+        }
+
         setDeleting(true);
         router.delete(`/superadmin/questions/${deleteTarget.id}`, {
-            onFinish: () => { setDeleting(false); setDeleteTarget(null); },
+            onFinish: () => {
+                setDeleting(false);
+                setDeleteTarget(null);
+            },
         });
     };
 
@@ -281,12 +410,13 @@ export default function Questions({
     const addHref = topicId
         ? `/superadmin/questions/chapters/${chapterId}/topics/${topicId}/add`
         : chapterId
-        ? `/superadmin/questions/chapters/${chapterId}/add`
-        : '/superadmin/questions/add';
+          ? `/superadmin/questions/chapters/${chapterId}/add`
+          : '/superadmin/questions/add';
 
     // ── Chapter label helper ──────────────────────────────────────────────────
     const chapterLabel = (c: ChapterOption) => {
         const title = c.chapter_number ? `Chapter ${c.chapter_number}` : c.name;
+
         return c.group_name ? `${c.group_name} / ${title}` : title;
     };
 
@@ -304,19 +434,37 @@ export default function Questions({
                         <h1 className="h1-semibold">Questions</h1>
                         {showTable && (
                             <p className="mt-0.5 text-sm text-muted-foreground">
-                                {filtered.length} question{filtered.length !== 1 ? 's' : ''}
+                                {filtered.length} question
+                                {filtered.length !== 1 ? 's' : ''}
                             </p>
                         )}
                     </div>
-                    {canAddQuestion && can('questions.create') && (
-                        <Link
-                            href={addHref}
-                            className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-                        >
-                            <PlusIcon size={16} color="currentColor" />
-                            <span className="hidden sm:inline">Add Question</span>
-                        </Link>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {showTable && canEditQuestions && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={selectedQuestions.length === 0}
+                                onClick={() => setChangeTypeOpen(true)}
+                            >
+                                <ArrowRightLeftIcon className="size-4" />
+                                Change type
+                                {selectedQuestions.length > 0 &&
+                                    ` (${selectedQuestions.length})`}
+                            </Button>
+                        )}
+                        {canAddQuestion && can('questions.create') && (
+                            <Link
+                                href={addHref}
+                                className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                            >
+                                <PlusIcon size={16} color="currentColor" />
+                                <span className="hidden sm:inline">
+                                    Add Question
+                                </span>
+                            </Link>
+                        )}
+                    </div>
                 </div>
 
                 {/* Cascading Filters */}
@@ -331,7 +479,9 @@ export default function Questions({
                                 <SelectValue placeholder="Pattern" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value={NONE}>All patterns</SelectItem>
+                                <SelectItem value={NONE}>
+                                    All patterns
+                                </SelectItem>
                                 {patterns.map((p) => (
                                     <SelectItem key={p.id} value={String(p.id)}>
                                         {p.short_name ?? p.name}
@@ -350,7 +500,9 @@ export default function Questions({
                                 <SelectValue placeholder="Class" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value={NONE}>All classes</SelectItem>
+                                <SelectItem value={NONE}>
+                                    All classes
+                                </SelectItem>
                                 {availableClasses.map((c) => (
                                     <SelectItem key={c.id} value={String(c.id)}>
                                         {c.name}
@@ -369,7 +521,9 @@ export default function Questions({
                                 <SelectValue placeholder="Subject" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value={NONE}>All subjects</SelectItem>
+                                <SelectItem value={NONE}>
+                                    All subjects
+                                </SelectItem>
                                 {availableSubjects.map((s) => (
                                     <SelectItem key={s.id} value={String(s.id)}>
                                         {s.name_eng}
@@ -388,7 +542,9 @@ export default function Questions({
                                 <SelectValue placeholder="Chapter" />
                             </SelectTrigger>
                             <SelectContent className="max-h-80">
-                                <SelectItem value={NONE}>Select chapter</SelectItem>
+                                <SelectItem value={NONE}>
+                                    Select chapter
+                                </SelectItem>
                                 {availableChapters.map((c) => (
                                     <SelectItem key={c.id} value={String(c.id)}>
                                         {chapterLabel(c)}
@@ -408,9 +564,14 @@ export default function Questions({
                                     <SelectValue placeholder="Topic" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-80">
-                                    <SelectItem value={NONE}>All topics</SelectItem>
+                                    <SelectItem value={NONE}>
+                                        All topics
+                                    </SelectItem>
                                     {availableTopics.map((t) => (
-                                        <SelectItem key={t.id} value={String(t.id)}>
+                                        <SelectItem
+                                            key={t.id}
+                                            value={String(t.id)}
+                                        >
                                             {t.name}
                                         </SelectItem>
                                     ))}
@@ -426,9 +587,13 @@ export default function Questions({
                 {!showTable && (
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center text-muted-foreground">
                         <SearchIcon className="mb-3 size-8 opacity-30" />
-                        <p className="text-sm font-medium">Select a chapter to view questions</p>
+                        <p className="text-sm font-medium">
+                            Select a chapter to view questions
+                        </p>
                         {isTopicWise && chapterId && !topicId && (
-                            <p className="mt-1 text-xs opacity-70">Then select a topic</p>
+                            <p className="mt-1 text-xs opacity-70">
+                                Then select a topic
+                            </p>
                         )}
                     </div>
                 )}
@@ -444,20 +609,77 @@ export default function Questions({
                                     type="text"
                                     placeholder="Search questions…"
                                     value={search}
-                                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                                    className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-lg border bg-transparent px-3 py-1 pl-9 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
+                                    onChange={(e) => {
+                                        setSearch(e.target.value);
+                                        setPage(1);
+                                    }}
+                                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 pl-9 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 />
                             </div>
                             <Select
-                                value={String(pageSize)}
-                                onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}
+                                value={typeFilter}
+                                onValueChange={(value) => {
+                                    setTypeFilter(value);
+                                    setPage(1);
+                                }}
                             >
-                                <SelectTrigger className="w-20">
+                                <SelectTrigger className="w-44">
+                                    <SelectValue placeholder="Question type" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-72">
+                                    <SelectItem value="all">
+                                        All types
+                                    </SelectItem>
+                                    {availableQuestionTypes.map((type) => (
+                                        <SelectItem
+                                            key={type.id}
+                                            value={String(type.id)}
+                                        >
+                                            {type.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select
+                                value={statusFilter}
+                                onValueChange={(value) => {
+                                    setStatusFilter(value);
+                                    setPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-36">
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All statuses
+                                    </SelectItem>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="inactive">
+                                        Inactive
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Select
+                                value={String(pageSize)}
+                                onValueChange={(value) => {
+                                    setPageSize(Number(value));
+                                    setPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-24">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {PAGE_SIZE_OPTIONS.map((n) => (
-                                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                                    {PAGE_SIZE_OPTIONS.map((value) => (
+                                        <SelectItem
+                                            key={value}
+                                            value={String(value)}
+                                        >
+                                            {value}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -468,20 +690,62 @@ export default function Questions({
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/40">
-                                            <th className="w-10 px-3 py-3 text-left font-medium text-muted-foreground">#</th>
-                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">Question</th>
-                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">Type</th>
-                                            {isTopicWise && !topicId && (
-                                                <th className="px-3 py-3 text-left font-medium text-muted-foreground">Topic</th>
+                                            {canEditQuestions && (
+                                                <th className="w-10 px-3 py-3 text-center">
+                                                    <Checkbox
+                                                        aria-label="Select all questions"
+                                                        checked={
+                                                            allFilteredSelected
+                                                                ? true
+                                                                : someFilteredSelected
+                                                                  ? 'indeterminate'
+                                                                  : false
+                                                        }
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            toggleAllFiltered(
+                                                                checked ===
+                                                                    true,
+                                                            )
+                                                        }
+                                                    />
+                                                </th>
                                             )}
-                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">Status</th>
+                                            <th className="w-10 px-3 py-3 text-left font-medium text-muted-foreground">
+                                                #
+                                            </th>
+                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">
+                                                Question
+                                            </th>
+                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">
+                                                Type
+                                            </th>
+                                            {isTopicWise && !topicId && (
+                                                <th className="px-3 py-3 text-left font-medium text-muted-foreground">
+                                                    Topic
+                                                </th>
+                                            )}
+                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">
+                                                Status
+                                            </th>
                                             <th className="w-24 px-3 py-3" />
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
                                         {paginated.length === 0 ? (
                                             <tr>
-                                                <td colSpan={isTopicWise && !topicId ? 6 : 5} className="py-16 text-center text-muted-foreground">
+                                                <td
+                                                    colSpan={
+                                                        (isTopicWise && !topicId
+                                                            ? 6
+                                                            : 5) +
+                                                        (canEditQuestions
+                                                            ? 1
+                                                            : 0)
+                                                    }
+                                                    className="py-16 text-center text-muted-foreground"
+                                                >
                                                     <SearchIcon className="mx-auto mb-2 size-8 opacity-30" />
                                                     No questions found
                                                 </td>
@@ -492,25 +756,66 @@ export default function Questions({
                                                     key={q.id}
                                                     className={`transition-colors ${i % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
                                                 >
+                                                    {canEditQuestions && (
+                                                        <td className="px-3 py-3 text-center">
+                                                            <Checkbox
+                                                                aria-label={`Select question ${q.id}`}
+                                                                checked={selectedIds.has(
+                                                                    q.id,
+                                                                )}
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) =>
+                                                                    toggleQuestion(
+                                                                        q.id,
+                                                                        checked ===
+                                                                            true,
+                                                                    )
+                                                                }
+                                                            />
+                                                        </td>
+                                                    )}
                                                     <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                                                        {(safePage - 1) * pageSize + i + 1}
+                                                        {(safePage - 1) *
+                                                            pageSize +
+                                                            i +
+                                                            1}
                                                     </td>
-                                                    <td className="px-3 py-3 max-w-sm">
-                                                        <p className="line-clamp-2 text-sm">{q.summary_text}</p>
+                                                    <td className="max-w-sm px-3 py-3">
+                                                        <p className="line-clamp-2 text-sm">
+                                                            {q.summary_text}
+                                                        </p>
                                                     </td>
                                                     <td className="px-3 py-3">
                                                         <div className="flex items-center gap-1.5">
-                                                            <KindBadge isObjective={q.question_type.is_objective} />
-                                                            <span className="text-xs text-muted-foreground">{q.question_type.name}</span>
+                                                            <KindBadge
+                                                                isObjective={
+                                                                    q
+                                                                        .question_type
+                                                                        .is_objective
+                                                                }
+                                                            />
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {
+                                                                    q
+                                                                        .question_type
+                                                                        .name
+                                                                }
+                                                            </span>
                                                         </div>
                                                     </td>
-                                                    {isTopicWise && !topicId && (
-                                                        <td className="px-3 py-3 text-xs text-muted-foreground">
-                                                            {q.topic?.name ?? '—'}
-                                                        </td>
-                                                    )}
+                                                    {isTopicWise &&
+                                                        !topicId && (
+                                                            <td className="px-3 py-3 text-xs text-muted-foreground">
+                                                                {q.topic
+                                                                    ?.name ??
+                                                                    '—'}
+                                                            </td>
+                                                        )}
                                                     <td className="px-3 py-3">
-                                                        <StatusBadge status={q.status} />
+                                                        <StatusBadge
+                                                            status={q.status}
+                                                        />
                                                     </td>
                                                     <td className="px-3 py-3">
                                                         <div className="flex items-center justify-end gap-1">
@@ -521,7 +826,9 @@ export default function Questions({
                                                             >
                                                                 <EyeIcon className="size-4" />
                                                             </Link>
-                                                            {can('questions.edit') && (
+                                                            {can(
+                                                                'questions.edit',
+                                                            ) && (
                                                                 <Link
                                                                     href={`/superadmin/questions/${q.id}/edit`}
                                                                     className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -530,10 +837,16 @@ export default function Questions({
                                                                     <PencilIcon className="size-4" />
                                                                 </Link>
                                                             )}
-                                                            {can('questions.delete') && (
+                                                            {can(
+                                                                'questions.delete',
+                                                            ) && (
                                                                 <button
                                                                     type="button"
-                                                                    onClick={() => setDeleteTarget(q)}
+                                                                    onClick={() =>
+                                                                        setDeleteTarget(
+                                                                            q,
+                                                                        )
+                                                                    }
                                                                     className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                                                                     title="Delete"
                                                                 >
@@ -557,17 +870,39 @@ export default function Questions({
                                         : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
                                 </p>
                                 <div className="flex items-center gap-1">
-                                    <button type="button" onClick={() => goTo(1)} disabled={safePage === 1} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                    <button
+                                        type="button"
+                                        onClick={() => goTo(1)}
+                                        disabled={safePage === 1}
+                                        className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
+                                    >
                                         <ChevronsLeftIcon className="size-4" />
                                     </button>
-                                    <button type="button" onClick={() => goTo(safePage - 1)} disabled={safePage === 1} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                    <button
+                                        type="button"
+                                        onClick={() => goTo(safePage - 1)}
+                                        disabled={safePage === 1}
+                                        className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
+                                    >
                                         <ChevronLeftIcon className="size-4" />
                                     </button>
-                                    <span className="px-2 text-sm text-muted-foreground">{safePage} / {totalPages}</span>
-                                    <button type="button" onClick={() => goTo(safePage + 1)} disabled={safePage === totalPages} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                    <span className="px-2 text-sm text-muted-foreground">
+                                        {safePage} / {totalPages}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => goTo(safePage + 1)}
+                                        disabled={safePage === totalPages}
+                                        className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
+                                    >
                                         <ChevronRightIcon className="size-4" />
                                     </button>
-                                    <button type="button" onClick={() => goTo(totalPages)} disabled={safePage === totalPages} className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40">
+                                    <button
+                                        type="button"
+                                        onClick={() => goTo(totalPages)}
+                                        disabled={safePage === totalPages}
+                                        className="rounded-lg p-2 transition-colors hover:bg-accent disabled:opacity-40"
+                                    >
                                         <ChevronsRightIcon className="size-4" />
                                     </button>
                                 </div>
@@ -578,7 +913,10 @@ export default function Questions({
             </div>
 
             {/* Delete dialog */}
-            <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+            <Dialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => !open && setDeleteTarget(null)}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogTitle>Delete Question</DialogTitle>
                     <DialogDescription>
@@ -603,6 +941,14 @@ export default function Questions({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <BulkQuestionTypeChangeDialog
+                open={changeTypeOpen}
+                onOpenChange={setChangeTypeOpen}
+                questions={selectedQuestions}
+                questionTypes={questionTypes}
+                onChanged={() => setSelectedIds(new Set())}
+            />
         </>
     );
 }

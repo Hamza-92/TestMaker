@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
+    ArrowRightLeftIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
     ChevronsLeftIcon,
@@ -15,6 +16,7 @@ import {
 import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -30,6 +32,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { usePermission } from '@/hooks/use-permission';
+import { BulkQuestionTypeChangeDialog } from './change-type-dialog';
 import type { QuestionTypeOption, SourceOption } from './form';
 
 interface TopicContext {
@@ -156,6 +160,8 @@ export default function ChapterQuestions({
     sourceOptions: SourceOption[];
     scopedTopic?: ScopedTopic | null;
 }) {
+    const { can } = usePermission();
+    const canEditQuestions = can('questions.edit');
     const [search, setSearch] = useState('');
     const [topicFilter, setTopicFilter] = useState('all');
     const [typeFilter, setTypeFilter] = useState('all');
@@ -165,6 +171,8 @@ export default function ChapterQuestions({
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<QuestionRow | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [changeTypeOpen, setChangeTypeOpen] = useState(false);
 
     const baseHref = `/superadmin/subjects/${chapter.subject.id}/chapters/${chapter.id}/questions`;
     const topicBase = scopedTopic
@@ -259,6 +267,45 @@ export default function ChapterQuestions({
         (safePage - 1) * pageSize,
         safePage * pageSize,
     );
+    const selectedQuestions = questions.filter((question) =>
+        selectedIds.has(question.id),
+    );
+    const filteredIds = filtered.map((question) => question.id);
+    const allFilteredSelected =
+        filteredIds.length > 0 &&
+        filteredIds.every((questionId) => selectedIds.has(questionId));
+    const someFilteredSelected = filteredIds.some((questionId) =>
+        selectedIds.has(questionId),
+    );
+
+    const toggleQuestion = (questionId: number, checked: boolean) => {
+        setSelectedIds((current) => {
+            const next = new Set(current);
+
+            if (checked) {
+                next.add(questionId);
+            } else {
+                next.delete(questionId);
+            }
+
+            return next;
+        });
+    };
+
+    const toggleAllFiltered = (checked: boolean) => {
+        setSelectedIds((current) => {
+            const next = new Set(current);
+            filteredIds.forEach((questionId) => {
+                if (checked) {
+                    next.add(questionId);
+                } else {
+                    next.delete(questionId);
+                }
+            });
+
+            return next;
+        });
+    };
 
     const clearFilters = () => {
         setSearch('');
@@ -499,11 +546,47 @@ export default function ChapterQuestions({
                     </div>
                 </div>
 
+                {canEditQuestions && (
+                    <div className="flex justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={selectedQuestions.length === 0}
+                            onClick={() => setChangeTypeOpen(true)}
+                        >
+                            <ArrowRightLeftIcon className="size-4" />
+                            Change type
+                            {selectedQuestions.length > 0 &&
+                                ` (${selectedQuestions.length})`}
+                        </Button>
+                    </div>
+                )}
+
                 <div className="overflow-hidden rounded-lg border">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b bg-muted/40">
+                                    {canEditQuestions && (
+                                        <th className="w-10 px-3 py-2.5 text-center">
+                                            <Checkbox
+                                                aria-label="Select all questions"
+                                                checked={
+                                                    allFilteredSelected
+                                                        ? true
+                                                        : someFilteredSelected
+                                                          ? 'indeterminate'
+                                                          : false
+                                                }
+                                                onCheckedChange={(checked) =>
+                                                    toggleAllFiltered(
+                                                        checked === true,
+                                                    )
+                                                }
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">
                                         Question
                                     </th>
@@ -529,9 +612,10 @@ export default function ChapterQuestions({
                                     <tr>
                                         <td
                                             colSpan={
-                                                isTopicWise && !scopedTopic
+                                                (isTopicWise && !scopedTopic
                                                     ? 6
-                                                    : 5
+                                                    : 5) +
+                                                (canEditQuestions ? 1 : 0)
                                             }
                                             className="py-12 text-center text-muted-foreground"
                                         >
@@ -544,6 +628,25 @@ export default function ChapterQuestions({
                                             key={question.id}
                                             className={`transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
                                         >
+                                            {canEditQuestions && (
+                                                <td className="px-3 py-2.5 text-center">
+                                                    <Checkbox
+                                                        aria-label={`Select question ${question.id}`}
+                                                        checked={selectedIds.has(
+                                                            question.id,
+                                                        )}
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            toggleQuestion(
+                                                                question.id,
+                                                                checked ===
+                                                                    true,
+                                                            )
+                                                        }
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="px-3 py-2.5">
                                                 <p className="font-medium">
                                                     {truncateText(
@@ -679,6 +782,14 @@ export default function ChapterQuestions({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <BulkQuestionTypeChangeDialog
+                open={changeTypeOpen}
+                onOpenChange={setChangeTypeOpen}
+                questions={selectedQuestions}
+                questionTypes={questionTypes}
+                onChanged={() => setSelectedIds(new Set())}
+            />
         </>
     );
 }

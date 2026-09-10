@@ -8,13 +8,14 @@ use App\Http\Requests\Superadmin\QuestionBulkImportRequest;
 use App\Http\Requests\Superadmin\QuestionUpsertRequest;
 use App\Models\AuditLog;
 use App\Models\Chapter;
+use App\Models\Medium;
 use App\Models\Question;
 use App\Models\QuestionOption;
-use App\Models\Medium;
 use App\Models\QuestionType;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Support\Questions\QuestionBulkImporter;
+use App\Support\Questions\QuestionTypeChanger;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,30 @@ class QuestionController extends Controller
     public function index()
     {
         return $this->renderQuestionsIndex(null, null);
+    }
+
+    public function bulkUpdateType(Request $request, QuestionTypeChanger $changer): RedirectResponse
+    {
+        $validated = $request->validate([
+            'question_ids' => ['required', 'array', 'min:1'],
+            'question_ids.*' => ['required', 'integer', 'distinct', 'exists:questions,id'],
+            'question_type_id' => ['required', 'integer', 'exists:question_types,id'],
+        ]);
+        $targetType = QuestionType::query()
+            ->where('status', 1)
+            ->findOrFail($validated['question_type_id']);
+        $changed = $changer->change(
+            Question::query()->whereKey($validated['question_ids']),
+            $targetType,
+            'question_type_id',
+        );
+
+        return back()->with(
+            'success',
+            $changed === 1
+                ? '1 question type changed.'
+                : "{$changed} question types changed.",
+        );
     }
 
     public function chapterFilter(Chapter $chapter)
@@ -73,8 +98,8 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions', [
             'chapters' => $this->chapterFormOptions(includeInactive: true),
-            'questions'     => $questions,
-            'filters'       => ['chapter_id' => $chapterId, 'topic_id' => $topicId],
+            'questions' => $questions,
+            'filters' => ['chapter_id' => $chapterId, 'topic_id' => $topicId],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
         ]);
@@ -131,15 +156,15 @@ class QuestionController extends Controller
             : ($chapterId ? "/superadmin/questions/chapters/{$chapterId}" : '/superadmin/questions');
 
         return Inertia::render('superadmin/questions/add', [
-            'questionTypes'    => $this->questionTypeFormOptions(),
-            'chapters'         => $this->chapterFormOptions(includeInactive: true),
-            'sourceOptions'    => $this->sourceOptions(),
+            'questionTypes' => $this->questionTypeFormOptions(),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapterId,
-            'mediumOptions'    => $this->mediumOptions(),
-            'defaultTopicId'   => $topicId,
-            'lockedChapterId'  => $chapterId,
-            'lockedTopicId'    => $topicId,
-            'backHref'         => $backHref,
+            'mediumOptions' => $this->mediumOptions(),
+            'defaultTopicId' => $topicId,
+            'lockedChapterId' => $chapterId,
+            'lockedTopicId' => $topicId,
+            'backHref' => $backHref,
         ]);
     }
 
@@ -149,7 +174,7 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters'      => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
             'mediumOptions' => $this->mediumOptions(),
@@ -223,7 +248,7 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters'      => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
             'mediumOptions' => $this->mediumOptions(),
@@ -453,7 +478,7 @@ class QuestionController extends Controller
             'chapters' => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
             'mediumOptions' => $this->mediumOptions(),
-            'backHref'      => $backHref,
+            'backHref' => $backHref,
         ]);
     }
 
@@ -721,6 +746,7 @@ class QuestionController extends Controller
             ])
             ->values();
     }
+
     private function mediumOptions(): Collection
     {
         return Medium::query()
@@ -729,7 +755,6 @@ class QuestionController extends Controller
             ->map(fn (Medium $medium) => ['id' => $medium->id, 'name' => $medium->name])
             ->values();
     }
-
 
     private function ensureChapterBelongsToSubject(Subject $subject, Chapter $chapter): void
     {

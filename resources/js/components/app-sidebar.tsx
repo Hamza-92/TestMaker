@@ -112,6 +112,14 @@ export function AppSidebar() {
                               title: 'Type Headings',
                               href: '/superadmin/question-types/headings',
                           },
+                          ...(can('questions.view')
+                              ? [
+                                    {
+                                        title: 'Change Types',
+                                        href: '/superadmin/question-types/change',
+                                    },
+                                ]
+                              : []),
                           {
                               title: 'OR Pairing Settings',
                               href: '/superadmin/question-type-pairings',

@@ -222,6 +222,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // â”€â”€â”€ Question Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/question-types', [QuestionTypeController::class, 'index'])->name('superadmin.question-types')->middleware('permission:question_types.view');
         Route::get('superadmin/question-types/headings', [QuestionTypeController::class, 'headings'])->name('superadmin.question-types.headings')->middleware('permission:question_types.view');
+        Route::get('superadmin/question-types/change', [QuestionTypeController::class, 'changeTypes'])->name('superadmin.question-types.change')->middleware('permission:questions.view');
+        Route::patch('superadmin/question-types/change', [QuestionTypeController::class, 'replaceScopedType'])->name('superadmin.question-types.change.update')->middleware('permission:questions.edit');
         Route::get('superadmin/question-types/{questionType}/headings', [QuestionTypeController::class, 'headingRules'])->name('superadmin.question-types.heading-rules')->middleware('permission:question_types.view');
         Route::put('superadmin/question-types/{questionType}/headings', [QuestionTypeController::class, 'saveHeadingRule'])->name('superadmin.question-types.heading-rules.update')->middleware('permission:question_types.edit');
         Route::delete('superadmin/question-types/{questionType}/headings/{headingRule}', [QuestionTypeController::class, 'destroyHeadingRule'])->name('superadmin.question-types.heading-rules.destroy')->middleware('permission:question_types.edit');
@@ -261,6 +263,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('superadmin/questions/import/preview', [QuestionController::class, 'previewImport'])->name('superadmin.questions.import.preview')->middleware('permission:questions.import');
         Route::post('superadmin/questions/import', [QuestionController::class, 'storeImport'])->name('superadmin.questions.import.store')->middleware('permission:questions.import');
         Route::get('superadmin/questions/import/template', [QuestionController::class, 'downloadImportTemplate'])->name('superadmin.questions.import.template')->middleware('permission:questions.import');
+        Route::patch('superadmin/questions/type', [QuestionController::class, 'bulkUpdateType'])->name('superadmin.questions.type.update')->middleware('permission:questions.edit');
         Route::get('superadmin/questions/chapters/{chapter}/add', [QuestionController::class, 'createForChapterClean'])->name('superadmin.questions.chapters.add')->middleware('permission:questions.create');
         Route::get('superadmin/questions/chapters/{chapter}/topics/{topic}/add', [QuestionController::class, 'createForTopicClean'])->name('superadmin.questions.chapters.topics.add')->middleware('permission:questions.create');
         Route::get('superadmin/questions/chapters/{chapter}/topics/{topic}', [QuestionController::class, 'topicFilter'])->name('superadmin.questions.topic')->middleware('permission:questions.view');

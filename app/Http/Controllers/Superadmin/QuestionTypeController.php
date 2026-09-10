@@ -7,9 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Superadmin\QuestionTypeUpsertRequest;
 use App\Models\AuditLog;
 use App\Models\Pattern;
+use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\QuestionTypeHeading;
 use App\Models\QuestionTypeOrder;
+use App\Support\Questions\QuestionTypeChanger;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -19,6 +21,97 @@ use Inertia\Inertia;
 
 class QuestionTypeController extends Controller
 {
+    public function changeTypes(Request $request, QuestionTypeChanger $changer)
+    {
+        $scope = $this->typeChangeScope($request);
+
+        return Inertia::render('superadmin/question-types/change', [
+            'catalog' => $this->orderCatalog(),
+            'filters' => $scope === null
+                ? ['pattern_id' => null, 'class_id' => null, 'subject_id' => null]
+                : [
+                    'pattern_id' => $scope[0],
+                    'class_id' => $scope[1],
+                    'subject_id' => $scope[2],
+                ],
+            'scopedTypes' => $scope === null
+                ? []
+                : $this->typesUsedInScope(...$scope, changer: $changer),
+            'questionTypes' => QuestionType::query()
+                ->where('status', 1)
+                ->orderByDesc('is_objective')
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                    'is_objective',
+                    'schema_key',
+                    'objective_type_id',
+                    'have_description',
+                    'have_answer',
+                ])
+                ->map(fn (QuestionType $type) => [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                    'is_objective' => (bool) $type->is_objective,
+                    'schema_key' => $changer->schemaKey($type),
+                ])
+                ->values(),
+        ]);
+    }
+
+    public function replaceScopedType(Request $request, QuestionTypeChanger $changer)
+    {
+        $validated = $request->validate([
+            'pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            'subject_id' => ['required', 'integer', 'exists:subjects,id'],
+            'source_question_type_id' => ['required', 'integer', 'exists:question_types,id'],
+            'question_type_id' => [
+                'required',
+                'integer',
+                'different:source_question_type_id',
+                'exists:question_types,id',
+            ],
+        ]);
+        $scope = [
+            (int) $validated['pattern_id'],
+            (int) $validated['class_id'],
+            (int) $validated['subject_id'],
+        ];
+        if (! $this->scopeExists(...$scope)) {
+            throw ValidationException::withMessages([
+                'subject_id' => 'Choose a subject linked to this pattern and class.',
+            ]);
+        }
+
+        $targetType = QuestionType::query()
+            ->where('status', 1)
+            ->findOrFail($validated['question_type_id']);
+        $changed = $changer->change(
+            Question::query()
+                ->where('question_type_id', $validated['source_question_type_id'])
+                ->whereIn('chapter_id', DB::table('chapters')
+                    ->where('pattern_id', $scope[0])
+                    ->where('class_id', $scope[1])
+                    ->where('subject_id', $scope[2])
+                    ->select('id')),
+            $targetType,
+            'question_type_id',
+        );
+
+        return redirect()->route('superadmin.question-types.change', [
+            'pattern_id' => $scope[0],
+            'class_id' => $scope[1],
+            'subject_id' => $scope[2],
+        ])->with(
+            'success',
+            $changed === 1
+                ? '1 question type changed.'
+                : "{$changed} question types changed.",
+        );
+    }
+
     public function headings()
     {
         return Inertia::render('superadmin/question-types/headings', [
@@ -545,6 +638,58 @@ class QuestionTypeController extends Controller
                     'subjects.name_eng as name',
                 ]),
         ];
+    }
+
+    private function typeChangeScope(Request $request): ?array
+    {
+        $scope = [
+            (int) $request->query('pattern_id', 0),
+            (int) $request->query('class_id', 0),
+            (int) $request->query('subject_id', 0),
+        ];
+
+        return min($scope) > 0 && $this->scopeExists(...$scope)
+            ? $scope
+            : null;
+    }
+
+    private function typesUsedInScope(
+        int $patternId,
+        int $classId,
+        int $subjectId,
+        QuestionTypeChanger $changer,
+    ): array {
+        $counts = Question::query()
+            ->join('chapters', 'chapters.id', '=', 'questions.chapter_id')
+            ->where('chapters.pattern_id', $patternId)
+            ->where('chapters.class_id', $classId)
+            ->where('chapters.subject_id', $subjectId)
+            ->selectRaw('questions.question_type_id, COUNT(questions.id) as questions_count')
+            ->groupBy('questions.question_type_id')
+            ->pluck('questions_count', 'questions.question_type_id');
+
+        return QuestionType::query()
+            ->whereIn('id', $counts->keys())
+            ->orderByDesc('is_objective')
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'is_objective',
+                'schema_key',
+                'objective_type_id',
+                'have_description',
+                'have_answer',
+            ])
+            ->map(fn (QuestionType $type) => [
+                'id' => $type->id,
+                'name' => $type->name,
+                'is_objective' => (bool) $type->is_objective,
+                'schema_key' => $changer->schemaKey($type),
+                'questions_count' => (int) $counts->get($type->id, 0),
+            ])
+            ->values()
+            ->all();
     }
 
     private function scopedQuestionTypes(string $kind, Request $request): array
