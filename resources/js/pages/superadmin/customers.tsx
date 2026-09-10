@@ -93,7 +93,7 @@ type ColumnKey =
     | 'joined'
     | 'actions';
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30];
+const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
 
 const ALL_COLUMNS: ColumnKey[] = [
     'customer', 'setup', 'email', 'school', 'location', 'account_type', 'account_status',
@@ -271,7 +271,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
     const [planFilter, setPlanFilter] = useState<string>('all');
     const [joinedFrom, setJoinedFrom] = useState('');
     const [joinedTo, setJoinedTo] = useState('');
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(300);
     const [page, setPage] = useState(1);
     const [visibleCols, setVisibleCols] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE_COLUMNS);
 
@@ -889,5 +889,4 @@ Customers.layout = {
         { title: 'Customers', href: '/superadmin/customers' },
     ],
 };
-
 

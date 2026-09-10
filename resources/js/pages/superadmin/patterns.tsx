@@ -42,14 +42,14 @@ interface Pattern {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const PAGE_SIZE_OPTIONS = [5, 10, 20];
+const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Patterns({ patterns }: { patterns: Pattern[] }) {
     const { can } = usePermission();
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(300);
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<Pattern | null>(null);
     const [deleting, setDeleting] = useState(false);

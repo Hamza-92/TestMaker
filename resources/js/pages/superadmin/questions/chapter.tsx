@@ -92,7 +92,7 @@ interface QuestionRow {
     items_count: number;
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
 const BLANK_SOURCE_VALUE = '__blank__';
 
 function statusBadge(status: number) {
@@ -167,7 +167,7 @@ export default function ChapterQuestions({
     const [typeFilter, setTypeFilter] = useState('all');
     const [sourceFilter, setSourceFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [pageSize, setPageSize] = useState(20);
+    const [pageSize, setPageSize] = useState(300);
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<QuestionRow | null>(null);
     const [deleting, setDeleting] = useState(false);

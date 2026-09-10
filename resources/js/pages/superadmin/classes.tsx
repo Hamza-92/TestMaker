@@ -49,7 +49,7 @@ interface SchoolClass {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const PAGE_SIZE_OPTIONS = [5, 10, 20];
+const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
 
 const PATTERN_COLORS = [
     'bg-blue-100 text-blue-700 border-blue-200',
@@ -68,7 +68,7 @@ export default function Classes({ classes }: { classes: SchoolClass[] }) {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [patternFilter, setPatternFilter] = useState<string>('all');
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(300);
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null);
     const [deleting, setDeleting] = useState(false);

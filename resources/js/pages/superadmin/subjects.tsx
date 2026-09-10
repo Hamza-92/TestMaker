@@ -70,7 +70,7 @@ interface FacetFilters {
     status: string;
 }
 
-const PAGE_SIZE_OPTIONS = [5, 10, 20];
+const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
 const TYPE_CONFIG = {
     'chapter-wise': {
         label: 'Chapter-wise',
@@ -214,7 +214,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
     const [classFilter, setClassFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [typeFilter, setTypeFilter] = useState('all');
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(300);
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<Subject | null>(null);
     const [deleting, setDeleting] = useState(false);
