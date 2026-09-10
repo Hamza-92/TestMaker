@@ -86,7 +86,7 @@ interface OrderCatalog {
     classSubjects: OrderSubject[];
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
 
 function orderQuestionTypes(
     questionTypes: QuestionType[],
@@ -172,7 +172,7 @@ export default function QuestionTypes({
     const [answerFilter, setAnswerFilter] = useState('all');
     const [schemaFilter, setSchemaFilter] = useState('all');
     const kindFilter = initialKind;
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(300);
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<QuestionType | null>(null);
     const [deleting, setDeleting] = useState(false);
