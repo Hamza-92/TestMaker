@@ -111,6 +111,11 @@ function PassageOptions({
                 {options.map((option, optionIndex) => (
                     <span
                         key={option.id}
+                        data-paper-correct-option={
+                            showCorrectAnswers && option.isCorrect === true
+                                ? true
+                                : undefined
+                        }
                         className="inline-flex items-baseline"
                     >
                         <span className="font-semibold">
@@ -137,7 +142,15 @@ function PassageOptions({
             )}
         >
             {options.map((option, optionIndex) => (
-                <div key={option.id} className="flex items-start gap-1">
+                <div
+                    key={option.id}
+                    data-paper-correct-option={
+                        showCorrectAnswers && option.isCorrect === true
+                            ? true
+                            : undefined
+                    }
+                    className="flex items-start gap-1"
+                >
                     <span className="shrink-0 font-semibold">
                         ({optionLabels[optionIndex] ?? optionIndex + 1})
                         <CorrectAnswerTick

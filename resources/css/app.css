@@ -692,6 +692,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: inherit;
 }
 
+[data-print-paper] [data-paper-correct-option],
+[data-print-paper] [data-paper-correct-option] * {
+    color: #15803d !important;
+}
+
 /* Board-style objective paper: one bordered S#/question/A-D table. */
 [data-print-paper] [data-paper-objective-table] {
     width: 100%;
@@ -825,6 +830,11 @@ input[type='date']::-webkit-calendar-picker-indicator {
         box-shadow: none !important;
         break-inside: avoid-page;
         page-break-inside: avoid;
+    }
+
+    [data-print-paper] [data-paper-correct-option],
+    [data-print-paper] [data-paper-correct-option] * {
+        color: #000 !important;
     }
 
     body:has([data-print-paper]) [data-print-set-list] > [data-print-paper] {

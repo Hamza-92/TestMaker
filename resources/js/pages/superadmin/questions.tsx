@@ -122,7 +122,7 @@ function KindBadge({ isObjective }: { isObjective: boolean }) {
     );
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
 const NONE = '__none__';
 
 export default function Questions({
@@ -168,7 +168,7 @@ export default function Questions({
     const [typeFilter, setTypeFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(300);
     const [deleteTarget, setDeleteTarget] = useState<QuestionRow | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());

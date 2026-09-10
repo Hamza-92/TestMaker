@@ -215,6 +215,7 @@ export function BilingualTableContent({
             <div
                 dir={rtl ? 'rtl' : 'ltr'}
                 data-paper-urdu-content={rtl ? true : undefined}
+                data-paper-correct-option={showCorrectAnswer ? true : undefined}
                 className={
                     centered ? 'text-center' : rtl ? 'text-right' : 'text-left'
                 }
@@ -230,7 +231,10 @@ export function BilingualTableContent({
 
     if (parts) {
         return (
-            <div className="flex min-w-0 flex-col gap-0.5">
+            <div
+                data-paper-correct-option={showCorrectAnswer ? true : undefined}
+                className="flex min-w-0 flex-col gap-0.5"
+            >
                 <div
                     dir="ltr"
                     className={centered ? 'text-center' : 'text-left'}
@@ -256,6 +260,7 @@ export function BilingualTableContent({
         <div
             dir={rtl ? 'rtl' : 'ltr'}
             data-paper-urdu-content={rtl ? true : undefined}
+            data-paper-correct-option={showCorrectAnswer ? true : undefined}
             className={
                 centered ? 'text-center' : rtl ? 'text-right' : 'text-left'
             }

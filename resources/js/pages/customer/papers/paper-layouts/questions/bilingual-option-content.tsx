@@ -69,6 +69,7 @@ export function BilingualOptionContent({
             <span
                 dir={isUrdu ? 'rtl' : 'ltr'}
                 data-paper-urdu-content={isUrdu ? true : undefined}
+                data-paper-correct-option={showCorrectAnswer ? true : undefined}
                 className={
                     isUrdu
                         ? 'paper-option-line text-right'
@@ -97,6 +98,7 @@ export function BilingualOptionContent({
         return (
             <span
                 data-paper-bilingual-option
+                data-paper-correct-option={showCorrectAnswer ? true : undefined}
                 className="paper-bilingual-option paper-bilingual-option--compact"
             >
                 <span dir="ltr" className="paper-bilingual-option__english">
@@ -136,6 +138,7 @@ export function BilingualOptionContent({
         return (
             <span
                 data-paper-bilingual-option
+                data-paper-correct-option={showCorrectAnswer ? true : undefined}
                 className="paper-bilingual-option"
             >
                 <span dir="ltr" className="paper-bilingual-option__english">
@@ -172,6 +175,7 @@ export function BilingualOptionContent({
         <span
             dir={urduOnly ? 'rtl' : 'ltr'}
             data-paper-urdu-content={urduOnly ? true : undefined}
+            data-paper-correct-option={showCorrectAnswer ? true : undefined}
             className={
                 urduOnly ? 'paper-option-line text-right' : 'paper-option-line'
             }
