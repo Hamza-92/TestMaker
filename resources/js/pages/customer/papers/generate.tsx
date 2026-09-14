@@ -2329,9 +2329,9 @@ function ScopePicker({
                     {level !== 'pattern' && (
                         <Button
                             type="button"
-                            variant="ghost"
-                            size={level === 'ready' ? 'sm' : 'icon-sm'}
-                            className="-ml-2 shrink-0 cursor-pointer"
+                            variant="secondary"
+                            size="sm"
+                            className="shrink-0 cursor-pointer border-slate-300 bg-slate-100 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
                             aria-label="Go back"
                             onClick={() =>
                                 level === 'ready'
@@ -2342,7 +2342,7 @@ function ScopePicker({
                             }
                         >
                             <ArrowLeftIcon />
-                            {level === 'ready' && 'Back'}
+                            Back
                         </Button>
                     )}
                     {title && (
