@@ -1,10 +1,40 @@
 import type { PaperSettings } from './types';
+import { QuestionContent } from './questions/question-content';
 
 const BUBBLE_OPTIONS = ['A', 'B', 'C', 'D'] as const;
 
 type PaperMedium = 'English' | 'Urdu' | 'Both';
 
-function BubbleSheetTitle({ medium }: { medium: PaperMedium }) {
+export function defaultBubbleSheetHeading(medium: PaperMedium): string {
+    if (medium === 'Urdu') {
+        return 'معروضی سوالات کی جوابی شیٹ';
+    }
+
+    if (medium === 'Both') {
+        return 'MCQs Answer Sheet / معروضی سوالات کی جوابی شیٹ';
+    }
+
+    return 'MCQs Answer Sheet';
+}
+
+function BubbleSheetTitle({
+    medium,
+    customHeading,
+}: {
+    medium: PaperMedium;
+    customHeading: string;
+}) {
+    if (customHeading.trim()) {
+        return (
+            <QuestionContent
+                as="span"
+                inline
+                value={customHeading}
+                className="block"
+            />
+        );
+    }
+
     if (medium === 'Urdu') {
         return <span dir="rtl">معروضی سوالات کی جوابی شیٹ</span>;
     }
@@ -27,11 +57,13 @@ export function BubbleSheet({
     medium,
     settings,
     pageBreakAfter = false,
+    onEditHeading,
 }: {
     count: number;
     medium: PaperMedium;
     settings: PaperSettings;
     pageBreakAfter?: boolean;
+    onEditHeading?: () => void;
 }) {
     const normalizedCount = Math.min(Math.max(Math.round(count), 1), 200);
 
@@ -60,7 +92,24 @@ export function BubbleSheet({
                         breakAfter: 'avoid',
                     }}
                 >
-                    <BubbleSheetTitle medium={medium} />
+                    {onEditHeading ? (
+                        <button
+                            type="button"
+                            onClick={onEditHeading}
+                            aria-label="Edit bubble sheet heading"
+                            className="w-full cursor-pointer bg-transparent text-inherit print:cursor-default"
+                        >
+                            <BubbleSheetTitle
+                                medium={medium}
+                                customHeading={settings.bubbleSheetHeading}
+                            />
+                        </button>
+                    ) : (
+                        <BubbleSheetTitle
+                            medium={medium}
+                            customHeading={settings.bubbleSheetHeading}
+                        />
+                    )}
                 </h2>
             )}
 

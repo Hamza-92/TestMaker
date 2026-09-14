@@ -25,6 +25,7 @@ import {
     Link2Icon,
     Loader2Icon,
     MinusIcon,
+    PencilIcon,
     PlusIcon,
     PrinterIcon,
     RotateCcwIcon,
@@ -50,7 +51,10 @@ import {
     AnswerKeySheet,
     SubjectiveAnswerSheet,
 } from './paper-layouts/answer-key-sheet';
-import { BubbleSheet } from './paper-layouts/bubble-sheet';
+import {
+    BubbleSheet,
+    defaultBubbleSheetHeading,
+} from './paper-layouts/bubble-sheet';
 import { ConfirmDialog } from './paper-layouts/confirm-dialog';
 import { GoBackDialog } from './paper-layouts/go-back-dialog';
 import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
@@ -12487,6 +12491,8 @@ function GeneratedPaperView({
     const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
     const [isSetsMenuOpen, setIsSetsMenuOpen] = useState(false);
     const [isBubbleSheetMenuOpen, setIsBubbleSheetMenuOpen] = useState(false);
+    const [isBubbleSheetHeadingEditorOpen, setIsBubbleSheetHeadingEditorOpen] =
+        useState(false);
     const setsMenuRef = useRef<HTMLDivElement>(null);
     const bubbleSheetMenuRef = useRef<HTMLDivElement>(null);
     const activeViewMode: PaperViewMode =
@@ -13470,7 +13476,7 @@ function GeneratedPaperView({
                                             </label>
                                         )}
 
-                                        <div className="grid grid-cols-2 gap-1.5">
+                                        <div className="grid grid-cols-3 gap-1.5">
                                             <button
                                                 type="button"
                                                 role="switch"
@@ -13491,6 +13497,23 @@ function GeneratedPaperView({
                                                 )}
                                             >
                                                 Heading
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsBubbleSheetMenuOpen(
+                                                        false,
+                                                    );
+                                                    setIsBubbleSheetHeadingEditorOpen(
+                                                        true,
+                                                    );
+                                                }}
+                                                aria-label="Edit bubble sheet heading"
+                                                title="Edit bubble sheet heading"
+                                                className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md bg-slate-100 px-2 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                            >
+                                                <PencilIcon className="size-3" />
+                                                Edit
                                             </button>
                                             <button
                                                 type="button"
@@ -13785,6 +13808,9 @@ function GeneratedPaperView({
                                     count={settings.bubbleSheetQuestionCount}
                                     medium={bubbleSheetMedium}
                                     settings={settings}
+                                    onEditHeading={() =>
+                                        setIsBubbleSheetHeadingEditorOpen(true)
+                                    }
                                     pageBreakAfter={
                                         !bubbleSheetOnly &&
                                         settings.bubbleSheetMode ===
@@ -13961,6 +13987,28 @@ function GeneratedPaperView({
                     onSelect={onPickerSelect}
                     onClose={onPickerClose}
                 />
+            )}
+
+            {isBubbleSheetHeadingEditorOpen && (
+                <Suspense fallback={null}>
+                    <QuestionEditModal
+                        question={{
+                            text:
+                                settings.bubbleSheetHeading ||
+                                defaultBubbleSheetHeading(bubbleSheetMedium),
+                        }}
+                        title="Edit Bubble Sheet Heading"
+                        saveLabel="Update Heading"
+                        onClose={() => setIsBubbleSheetHeadingEditorOpen(false)}
+                        onSave={(value) => {
+                            onSettingsChange({
+                                bubbleSheetHeading: value,
+                                bubbleSheetHeadingEnabled: true,
+                            });
+                            setIsBubbleSheetHeadingEditorOpen(false);
+                        }}
+                    />
+                </Suspense>
             )}
 
             {/* Floating right-edge gear → opens the live paper settings drawer. */}

@@ -238,6 +238,8 @@ export interface PaperSettings {
     bubbleSheetEnabled: boolean;
     /** Show the localized answer-sheet heading above the bubbles. */
     bubbleSheetHeadingEnabled: boolean;
+    /** Optional rich-text override for the localized answer-sheet heading. */
+    bubbleSheetHeading: string;
     /** Number of numbered A-D answer rows shown in the bubble sheet. */
     bubbleSheetQuestionCount: number;
     /** Format used for each bubble row label. */
@@ -329,6 +331,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     sectionHeadingBorderStyle: 'solid',
     bubbleSheetEnabled: false,
     bubbleSheetHeadingEnabled: false,
+    bubbleSheetHeading: '',
     bubbleSheetQuestionCount: 20,
     bubbleSheetNumberFormat: 'number',
     bubbleSheetMode: 'inline',
@@ -596,6 +599,10 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             typeof source.bubbleSheetHeadingEnabled === 'boolean'
                 ? source.bubbleSheetHeadingEnabled
                 : DEFAULT_PAPER_SETTINGS.bubbleSheetHeadingEnabled,
+        bubbleSheetHeading:
+            typeof source.bubbleSheetHeading === 'string'
+                ? source.bubbleSheetHeading
+                : DEFAULT_PAPER_SETTINGS.bubbleSheetHeading,
         bubbleSheetQuestionCount:
             typeof source.bubbleSheetQuestionCount === 'number' &&
             Number.isFinite(source.bubbleSheetQuestionCount)
