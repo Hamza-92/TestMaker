@@ -602,7 +602,8 @@ interface DraftPayload {
     };
 }
 
-interface GeneratedPaperSessionPayload extends DraftPayload {
+interface GeneratedPaperSessionPayload extends Omit<DraftPayload, 'meta'> {
+    meta: DraftPayload['meta'] | null;
     chapterMedium: ContentMedium;
     questionTypePairings: QuestionTypePairing[];
     multipartConfig: MultipartConfig | null;
@@ -2264,6 +2265,7 @@ function ScopePicker({
     chapters,
     allChaptersState,
     onToggleAllChapters,
+    onOpenBubbleSheet,
 }: {
     pattern: ComboboxOptionItem | null;
     klass: ComboboxOptionItem | null;
@@ -2277,6 +2279,7 @@ function ScopePicker({
     chapters: Chapter[] | null;
     allChaptersState: () => 'unchecked' | 'checked' | 'indeterminate';
     onToggleAllChapters: () => void;
+    onOpenBubbleSheet: () => void;
 }) {
     const level = !pattern
         ? 'pattern'
@@ -2344,6 +2347,18 @@ function ScopePicker({
                         </h2>
                     )}
                 </div>
+                {level === 'pattern' && (
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="w-full cursor-pointer sm:w-auto"
+                        onClick={onOpenBubbleSheet}
+                    >
+                        <CircleDotIcon />
+                        Bubble Sheet
+                    </Button>
+                )}
                 {level === 'ready' && chapters && chapters.length > 0 && (
                     <Button
                         type="button"
@@ -3878,9 +3893,9 @@ export default function GeneratePaper({
                     setSelected(
                         deserializeChapterSelection(session.chapterSelection),
                     );
-                    setPattern(session.meta.pattern);
-                    setKlass(session.meta.klass);
-                    setSubject(session.meta.subject);
+                    setPattern(session.meta?.pattern ?? null);
+                    setKlass(session.meta?.klass ?? null);
+                    setSubject(session.meta?.subject ?? null);
                     setChapterMedium(session.chapterMedium ?? 'English');
                     setQuestionTypePairings(session.questionTypePairings ?? []);
                     setMultipartConfig(session.multipartConfig ?? null);
@@ -3922,7 +3937,14 @@ export default function GeneratePaper({
     }, []);
 
     useEffect(() => {
-        if (!generatedPaper || !pattern || !klass || !subject) {
+        if (!generatedPaper) {
+            return;
+        }
+
+        const isStandaloneBubbleSheet =
+            generatedPaper.documentKind === 'bubble-sheet';
+
+        if (!isStandaloneBubbleSheet && (!pattern || !klass || !subject)) {
             return;
         }
 
@@ -3938,7 +3960,10 @@ export default function GeneratePaper({
                     questionPoolsByType: {},
                     questionSelection,
                     chapterSelection: serializeChapterSelection(selected),
-                    meta: serializablePaperMeta(pattern, klass, subject),
+                    meta:
+                        pattern && klass && subject
+                            ? serializablePaperMeta(pattern, klass, subject)
+                            : null,
                     chapterMedium,
                     questionTypePairings,
                     multipartConfig,
@@ -5044,6 +5069,57 @@ export default function GeneratePaper({
         }
     }
 
+    function openStandaloneBubbleSheet() {
+        resetQuestionSelection();
+        setPattern(null);
+        setKlass(null);
+        setSubject(null);
+        setChapters(null);
+        setSelected({});
+        setChapterMedium('English');
+        setPaperSectioning(INACTIVE_PAPER_SECTIONING);
+        setActiveSetIndex(0);
+        setNumSets(1);
+        setViewMode('paper');
+        setPrintAllSets(false);
+        setSavedPaperId(null);
+        setSavedPaperName('');
+        setSavedPaperIsDraft(false);
+        setIsDirty(false);
+        isRestoringRef.current = true;
+        setGeneratedPaper({
+            id: `bubble_sheet_${Date.now()}`,
+            documentKind: 'bubble-sheet',
+            header: {
+                schoolName:
+                    (auth.user.school_name as string) ||
+                    auth.user.name ||
+                    'School Name',
+                exam: '',
+                className: '',
+                section: '',
+                subject: '',
+                studentName: '',
+                type: 'Bubble Sheet',
+                date: '',
+                duration: '',
+                marks: 0,
+                passingMarks: 0,
+                rollNo: '',
+            },
+            sections: [],
+            sectioning: {
+                ...INACTIVE_PAPER_SECTIONING,
+                medium: 'English',
+            },
+            settings: {
+                ...DEFAULT_PAPER_SETTINGS,
+                bubbleSheetEnabled: true,
+                bubbleSheetMode: 'only',
+            },
+        });
+    }
+
     function returnToPaperSetup() {
         if (autoSaveRef.current) {
             clearTimeout(autoSaveRef.current);
@@ -5555,6 +5631,22 @@ export default function GeneratePaper({
             sections,
             settings: nextSettings,
         });
+    }
+
+    function updateBubbleSheetMedium(medium: ContentMedium) {
+        setChapterMedium(medium);
+        setGeneratedPaper((current) =>
+            current
+                ? {
+                      ...current,
+                      sectioning: {
+                          active: current.sectioning?.active ?? false,
+                          groups: current.sectioning?.groups ?? [],
+                          medium,
+                      },
+                  }
+                : current,
+        );
     }
 
     function updatePaperQuestionText(
@@ -7361,45 +7453,57 @@ export default function GeneratePaper({
     return (
         <>
             <Head
-                title={generatedPaper ? 'Generated Paper' : 'Generate Paper'}
+                title={
+                    generatedPaper?.documentKind === 'bubble-sheet'
+                        ? 'Bubble Sheet'
+                        : generatedPaper
+                          ? 'Generated Paper'
+                          : 'Generate Paper'
+                }
             />
 
             {generatedPaper ? (
                 <>
-                    {recoveryDraft && (
-                        <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10 print:hidden">
-                            <div className="flex items-center gap-3">
-                                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
-                                    <ClockIcon className="size-4" />
+                    {recoveryDraft &&
+                        generatedPaper.documentKind !== 'bubble-sheet' && (
+                            <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10 print:hidden">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+                                        <ClockIcon className="size-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                                            Unsaved changes from your last
+                                            session
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                                            Auto-saved{' '}
+                                            {draftTimeAgo(
+                                                recoveryDraft.savedAt,
+                                            )}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                                        Unsaved changes from your last session
-                                    </p>
-                                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
-                                        Auto-saved{' '}
-                                        {draftTimeAgo(recoveryDraft.savedAt)}
-                                    </p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            restoreDraft(recoveryDraft)
+                                        }
+                                        className="cursor-pointer rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-slate-950 dark:hover:bg-amber-400"
+                                    >
+                                        Restore Changes
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={dismissRecoveryDraft}
+                                        className="cursor-pointer rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-500/30 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10"
+                                    >
+                                        Discard
+                                    </button>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => restoreDraft(recoveryDraft)}
-                                    className="cursor-pointer rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-slate-950 dark:hover:bg-amber-400"
-                                >
-                                    Restore Changes
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={dismissRecoveryDraft}
-                                    className="cursor-pointer rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-500/30 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10"
-                                >
-                                    Discard
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                        )}
                     <GeneratedPaperView
                         paper={variantForSet(generatedPaper, activeSetIndex)}
                         rawPaper={generatedPaper}
@@ -7448,6 +7552,7 @@ export default function GeneratePaper({
                             ...(generatedPaper.settings ?? {}),
                         }}
                         onSettingsChange={updatePaperSettings}
+                        onBubbleSheetMediumChange={updateBubbleSheetMedium}
                         onAddSection={openAddPaperSectionModal}
                         onQuestionImageSizeChange={updatePaperQuestionImageSize}
                         onQuestionAnswerLinesChange={
@@ -7656,6 +7761,9 @@ export default function GeneratePaper({
                                     chapters={chapters}
                                     allChaptersState={allChaptersState}
                                     onToggleAllChapters={toggleAllChapters}
+                                    onOpenBubbleSheet={
+                                        openStandaloneBubbleSheet
+                                    }
                                 />
 
                                 {pattern && klass && subject && (
@@ -12287,6 +12395,7 @@ function GeneratedPaperView({
     onHeaderChange,
     settings,
     onSettingsChange,
+    onBubbleSheetMediumChange,
     onAddSection,
     onEditSection,
     onDeleteSection,
@@ -12342,6 +12451,7 @@ function GeneratedPaperView({
     onHeaderChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     settings: PaperSettings;
     onSettingsChange: (patch: Partial<PaperSettings>) => void;
+    onBubbleSheetMediumChange: (medium: ContentMedium) => void;
     onAddSection: () => void;
     onEditSection: (sectionId: string) => void;
     onDeleteSection: (sectionId: string) => void;
@@ -12391,6 +12501,13 @@ function GeneratedPaperView({
               : null;
     const showsPaper =
         activeViewMode === 'paper' || activeViewMode === 'answers_on_paper';
+    const isStandaloneBubbleSheet = paper.documentKind === 'bubble-sheet';
+    const bubbleSheetVisible =
+        isStandaloneBubbleSheet || settings.bubbleSheetEnabled;
+    const bubbleSheetOnly =
+        isStandaloneBubbleSheet ||
+        (settings.bubbleSheetEnabled && settings.bubbleSheetMode === 'only');
+    const bubbleSheetMedium = paper.sectioning?.medium ?? 'English';
 
     useEffect(() => {
         if (!isSetsMenuOpen) {
@@ -12998,6 +13115,12 @@ function GeneratedPaperView({
         });
     }
     function handleBackClick() {
+        if (isStandaloneBubbleSheet) {
+            onGoBack();
+
+            return;
+        }
+
         if (savedPaperId !== null && !isDirty) {
             onGoBack();
         } else {
@@ -13010,120 +13133,134 @@ function GeneratedPaperView({
             <div data-paper-shell className="w-full space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-1.5 print:hidden">
                     <div className="flex items-center gap-1.5">
-                        <button
-                            type="button"
-                            onClick={onAddSection}
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                        >
-                            <PlusIcon className="size-3.5" />
-                            Add Section
-                        </button>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={activeViewMode === 'answer_key'}
-                            onClick={() =>
-                                onViewModeChange(
-                                    activeViewMode === 'answer_key'
-                                        ? 'paper'
-                                        : 'answer_key',
-                                )
-                            }
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                            <KeyRoundIcon className="size-3.5 text-slate-400" />
-                            <span>Answer Key</span>
-                            <span
-                                aria-hidden="true"
-                                className={cn(
-                                    'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
-                                    activeViewMode === 'answer_key'
-                                        ? 'bg-brand-600'
-                                        : 'bg-slate-200 dark:bg-slate-700',
-                                )}
-                            >
-                                <span
-                                    className={cn(
-                                        'size-3.5 rounded-full bg-white shadow-sm transition-transform',
-                                        activeViewMode === 'answer_key'
-                                            ? 'translate-x-3.5'
-                                            : 'translate-x-0',
-                                    )}
-                                />
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={activeViewMode === 'answers_on_paper'}
-                            onClick={() =>
-                                onViewModeChange(
-                                    activeViewMode === 'answers_on_paper'
-                                        ? 'paper'
-                                        : 'answers_on_paper',
-                                )
-                            }
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                            <CheckIcon className="size-3.5 text-slate-400" />
-                            <span>Answers on Paper</span>
-                            <span
-                                aria-hidden="true"
-                                className={cn(
-                                    'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
-                                    activeViewMode === 'answers_on_paper'
-                                        ? 'bg-brand-600'
-                                        : 'bg-slate-200 dark:bg-slate-700',
-                                )}
-                            >
-                                <span
-                                    className={cn(
-                                        'size-3.5 rounded-full bg-white shadow-sm transition-transform',
-                                        activeViewMode === 'answers_on_paper'
-                                            ? 'translate-x-3.5'
-                                            : 'translate-x-0',
-                                    )}
-                                />
-                            </span>
-                        </button>
-                        {canViewSubjectiveAnswers && (
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={
-                                    activeViewMode === 'subjective_answers'
-                                }
-                                onClick={() =>
-                                    onViewModeChange(
-                                        activeViewMode === 'subjective_answers'
-                                            ? 'paper'
-                                            : 'subjective_answers',
-                                    )
-                                }
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                                <BookOpenIcon className="size-3.5 text-slate-400" />
-                                <span>Subjective Answers</span>
-                                <span
-                                    aria-hidden="true"
-                                    className={cn(
-                                        'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
-                                        activeViewMode === 'subjective_answers'
-                                            ? 'bg-brand-600'
-                                            : 'bg-slate-200 dark:bg-slate-700',
-                                    )}
+                        {!isStandaloneBubbleSheet && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={onAddSection}
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
                                 >
+                                    <PlusIcon className="size-3.5" />
+                                    Add Section
+                                </button>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={
+                                        activeViewMode === 'answer_key'
+                                    }
+                                    onClick={() =>
+                                        onViewModeChange(
+                                            activeViewMode === 'answer_key'
+                                                ? 'paper'
+                                                : 'answer_key',
+                                        )
+                                    }
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    <KeyRoundIcon className="size-3.5 text-slate-400" />
+                                    <span>Answer Key</span>
                                     <span
+                                        aria-hidden="true"
                                         className={cn(
-                                            'size-3.5 rounded-full bg-white shadow-sm transition-transform',
-                                            activeViewMode ===
-                                                'subjective_answers'
-                                                ? 'translate-x-3.5'
-                                                : 'translate-x-0',
+                                            'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                            activeViewMode === 'answer_key'
+                                                ? 'bg-brand-600'
+                                                : 'bg-slate-200 dark:bg-slate-700',
                                         )}
-                                    />
-                                </span>
-                            </button>
+                                    >
+                                        <span
+                                            className={cn(
+                                                'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                activeViewMode === 'answer_key'
+                                                    ? 'translate-x-3.5'
+                                                    : 'translate-x-0',
+                                            )}
+                                        />
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={
+                                        activeViewMode === 'answers_on_paper'
+                                    }
+                                    onClick={() =>
+                                        onViewModeChange(
+                                            activeViewMode ===
+                                                'answers_on_paper'
+                                                ? 'paper'
+                                                : 'answers_on_paper',
+                                        )
+                                    }
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    <CheckIcon className="size-3.5 text-slate-400" />
+                                    <span>Answers on Paper</span>
+                                    <span
+                                        aria-hidden="true"
+                                        className={cn(
+                                            'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                            activeViewMode ===
+                                                'answers_on_paper'
+                                                ? 'bg-brand-600'
+                                                : 'bg-slate-200 dark:bg-slate-700',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                activeViewMode ===
+                                                    'answers_on_paper'
+                                                    ? 'translate-x-3.5'
+                                                    : 'translate-x-0',
+                                            )}
+                                        />
+                                    </span>
+                                </button>
+                                {canViewSubjectiveAnswers && (
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={
+                                            activeViewMode ===
+                                            'subjective_answers'
+                                        }
+                                        onClick={() =>
+                                            onViewModeChange(
+                                                activeViewMode ===
+                                                    'subjective_answers'
+                                                    ? 'paper'
+                                                    : 'subjective_answers',
+                                            )
+                                        }
+                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                    >
+                                        <BookOpenIcon className="size-3.5 text-slate-400" />
+                                        <span>Subjective Answers</span>
+                                        <span
+                                            aria-hidden="true"
+                                            className={cn(
+                                                'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                                activeViewMode ===
+                                                    'subjective_answers'
+                                                    ? 'bg-brand-600'
+                                                    : 'bg-slate-200 dark:bg-slate-700',
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                    activeViewMode ===
+                                                        'subjective_answers'
+                                                        ? 'translate-x-3.5'
+                                                        : 'translate-x-0',
+                                                )}
+                                            />
+                                        </span>
+                                    </button>
+                                )}
+                            </>
                         )}
                         <div ref={bubbleSheetMenuRef} className="relative">
                             <button
@@ -13136,7 +13273,7 @@ function GeneratedPaperView({
                                 }}
                                 className={cn(
                                     'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors',
-                                    settings.bubbleSheetEnabled
+                                    bubbleSheetVisible
                                         ? 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20'
                                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
                                 )}
@@ -13144,7 +13281,7 @@ function GeneratedPaperView({
                                 <CircleDotIcon className="size-3.5" />
                                 <span>Bubbles</span>
                                 <span className="font-bold tabular-nums">
-                                    {settings.bubbleSheetEnabled
+                                    {bubbleSheetVisible
                                         ? settings.bubbleSheetQuestionCount
                                         : 'Off'}
                                 </span>
@@ -13160,45 +13297,47 @@ function GeneratedPaperView({
                                     role="menu"
                                     className="absolute top-full left-0 z-30 mt-1.5 w-56 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900"
                                 >
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={
-                                            settings.bubbleSheetEnabled
-                                        }
-                                        onClick={() =>
-                                            onSettingsChange({
-                                                bubbleSheetEnabled:
-                                                    !settings.bubbleSheetEnabled,
-                                            })
-                                        }
-                                        className="flex w-full cursor-pointer items-center justify-between rounded-lg px-1 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200"
-                                    >
-                                        <span>Show bubble sheet</span>
-                                        <span
-                                            aria-hidden="true"
-                                            className={cn(
-                                                'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                    {!isStandaloneBubbleSheet && (
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={
                                                 settings.bubbleSheetEnabled
-                                                    ? 'bg-brand-600'
-                                                    : 'bg-slate-200 dark:bg-slate-700',
-                                            )}
+                                            }
+                                            onClick={() =>
+                                                onSettingsChange({
+                                                    bubbleSheetEnabled:
+                                                        !settings.bubbleSheetEnabled,
+                                                })
+                                            }
+                                            className="flex w-full cursor-pointer items-center justify-between rounded-lg px-1 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200"
                                         >
+                                            <span>Show bubble sheet</span>
                                             <span
+                                                aria-hidden="true"
                                                 className={cn(
-                                                    'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                    'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
                                                     settings.bubbleSheetEnabled
-                                                        ? 'translate-x-3.5'
-                                                        : 'translate-x-0',
+                                                        ? 'bg-brand-600'
+                                                        : 'bg-slate-200 dark:bg-slate-700',
                                                 )}
-                                            />
-                                        </span>
-                                    </button>
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                        settings.bubbleSheetEnabled
+                                                            ? 'translate-x-3.5'
+                                                            : 'translate-x-0',
+                                                    )}
+                                                />
+                                            </span>
+                                        </button>
+                                    )}
 
                                     <div
                                         className={cn(
                                             'mt-2 space-y-2 border-t border-slate-100 pt-2 dark:border-slate-800',
-                                            !settings.bubbleSheetEnabled &&
+                                            !bubbleSheetVisible &&
                                                 'pointer-events-none opacity-45',
                                         )}
                                     >
@@ -13270,6 +13409,67 @@ function GeneratedPaperView({
                                             </div>
                                         </div>
 
+                                        {isStandaloneBubbleSheet ? (
+                                            <label className="flex items-center justify-between gap-2">
+                                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                                    Medium
+                                                </span>
+                                                <select
+                                                    value={bubbleSheetMedium}
+                                                    onChange={(event) =>
+                                                        onBubbleSheetMediumChange(
+                                                            event.target
+                                                                .value as ContentMedium,
+                                                        )
+                                                    }
+                                                    className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                                >
+                                                    <option value="English">
+                                                        English
+                                                    </option>
+                                                    <option value="Urdu">
+                                                        Urdu
+                                                    </option>
+                                                    <option value="Both">
+                                                        Both
+                                                    </option>
+                                                </select>
+                                            </label>
+                                        ) : (
+                                            <label className="flex items-center justify-between gap-2">
+                                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                                    Print
+                                                </span>
+                                                <select
+                                                    value={
+                                                        settings.bubbleSheetMode
+                                                    }
+                                                    onChange={(event) => {
+                                                        onViewModeChange(
+                                                            'paper',
+                                                        );
+                                                        onSettingsChange({
+                                                            bubbleSheetEnabled: true,
+                                                            bubbleSheetMode:
+                                                                event.target
+                                                                    .value as PaperSettings['bubbleSheetMode'],
+                                                        });
+                                                    }}
+                                                    className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                                >
+                                                    <option value="inline">
+                                                        Same page
+                                                    </option>
+                                                    <option value="separate-page">
+                                                        Questions next page
+                                                    </option>
+                                                    <option value="only">
+                                                        Only sheet
+                                                    </option>
+                                                </select>
+                                            </label>
+                                        )}
+
                                         <div className="grid grid-cols-2 gap-1.5">
                                             <button
                                                 type="button"
@@ -13315,165 +13515,175 @@ function GeneratedPaperView({
                                 </div>
                             )}
                         </div>
-                        <div ref={setsMenuRef} className="relative">
-                            <button
-                                type="button"
-                                aria-haspopup="menu"
-                                aria-expanded={isSetsMenuOpen}
-                                onClick={() => {
-                                    setIsBubbleSheetMenuOpen(false);
-                                    setIsSetsMenuOpen((open) => !open);
-                                }}
-                                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                                <ShuffleIcon className="size-3.5 text-slate-400" />
-                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                    Sets
-                                </span>
-                                <span>{numSets}</span>
-                                <ChevronDownIcon
-                                    className={cn(
-                                        'size-3 text-slate-400 transition-transform',
-                                        isSetsMenuOpen && 'rotate-180',
-                                    )}
-                                />
-                            </button>
-                            {isSetsMenuOpen && (
-                                <div
-                                    role="menu"
-                                    className="absolute top-full left-0 z-30 mt-1.5 min-w-36 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900"
+                        {!isStandaloneBubbleSheet && (
+                            <div ref={setsMenuRef} className="relative">
+                                <button
+                                    type="button"
+                                    aria-haspopup="menu"
+                                    aria-expanded={isSetsMenuOpen}
+                                    onClick={() => {
+                                        setIsBubbleSheetMenuOpen(false);
+                                        setIsSetsMenuOpen((open) => !open);
+                                    }}
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                    <div className="space-y-0.5">
-                                        {[1, 2, 3].map((n) => (
-                                            <button
-                                                key={n}
-                                                type="button"
-                                                role="menuitem"
-                                                onClick={() => {
-                                                    onNumSetsChange(n);
+                                    <ShuffleIcon className="size-3.5 text-slate-400" />
+                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        Sets
+                                    </span>
+                                    <span>{numSets}</span>
+                                    <ChevronDownIcon
+                                        className={cn(
+                                            'size-3 text-slate-400 transition-transform',
+                                            isSetsMenuOpen && 'rotate-180',
+                                        )}
+                                    />
+                                </button>
+                                {isSetsMenuOpen && (
+                                    <div
+                                        role="menu"
+                                        className="absolute top-full left-0 z-30 mt-1.5 min-w-36 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900"
+                                    >
+                                        <div className="space-y-0.5">
+                                            {[1, 2, 3].map((n) => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    role="menuitem"
+                                                    onClick={() => {
+                                                        onNumSetsChange(n);
 
-                                                    if (activeSetIndex >= n) {
-                                                        onActiveSetChange(
-                                                            n - 1,
-                                                        );
-                                                    }
-                                                }}
-                                                className={cn(
-                                                    'flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold transition-colors',
-                                                    numSets === n
-                                                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
-                                                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
-                                                )}
-                                            >
-                                                <span>{n}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                    {numSets > 1 && (
-                                        <>
-                                            <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
-                                            <div className="flex items-center gap-1">
-                                                {SET_LABELS.slice(
-                                                    0,
-                                                    numSets,
-                                                ).map((label, index) => (
-                                                    <button
-                                                        key={label}
-                                                        type="button"
-                                                        role="menuitem"
-                                                        onClick={() =>
+                                                        if (
+                                                            activeSetIndex >= n
+                                                        ) {
                                                             onActiveSetChange(
-                                                                index,
-                                                            )
+                                                                n - 1,
+                                                            );
                                                         }
-                                                        className={cn(
-                                                            'flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-xs font-semibold transition-colors',
-                                                            activeSetIndex ===
-                                                                index
-                                                                ? 'bg-brand-600 text-white'
-                                                                : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
-                                                        )}
-                                                    >
-                                                        <span>{label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        {isDraft && savedPaperId !== null && (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                                <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
-                                Draft
-                            </span>
+                                                    }}
+                                                    className={cn(
+                                                        'flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold transition-colors',
+                                                        numSets === n
+                                                            ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+                                                            : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                                    )}
+                                                >
+                                                    <span>{n}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {numSets > 1 && (
+                                            <>
+                                                <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
+                                                <div className="flex items-center gap-1">
+                                                    {SET_LABELS.slice(
+                                                        0,
+                                                        numSets,
+                                                    ).map((label, index) => (
+                                                        <button
+                                                            key={label}
+                                                            type="button"
+                                                            role="menuitem"
+                                                            onClick={() =>
+                                                                onActiveSetChange(
+                                                                    index,
+                                                                )
+                                                            }
+                                                            className={cn(
+                                                                'flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-xs font-semibold transition-colors',
+                                                                activeSetIndex ===
+                                                                    index
+                                                                    ? 'bg-brand-600 text-white'
+                                                                    : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800',
+                                                            )}
+                                                        >
+                                                            <span>{label}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         )}
+                        {!isStandaloneBubbleSheet &&
+                            isDraft &&
+                            savedPaperId !== null && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                                    <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                                    Draft
+                                </span>
+                            )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <button
-                            type="button"
-                            onClick={onSaveDraft}
-                            disabled={isSavingDraft || isSavingPaper}
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
-                        >
-                            {isSavingDraft ? (
-                                <>
-                                    <Loader2Icon className="size-4 animate-spin" />
-                                    Saving…
-                                </>
-                            ) : (
-                                <>
-                                    <BookmarkIcon className="size-3.5" />
-                                    Save as Draft
-                                </>
-                            )}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onOpenSavePaperModal}
-                            disabled={isSavingPaper || isSavingDraft}
-                            className={cn(
-                                'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
-                                savedPaperId !== null && !isDirty
-                                    ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400'
-                                    : savedPaperId !== null && isDirty
-                                      ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400'
-                                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
-                            )}
-                        >
-                            {isSavingPaper ? (
-                                <>
-                                    <Loader2Icon className="size-4 animate-spin" />
-                                    Saving…
-                                </>
-                            ) : savedPaperId !== null && !isDirty ? (
-                                <>
-                                    <CheckIcon className="size-3.5" />
-                                    Saved
-                                </>
-                            ) : savedPaperId !== null && isDirty ? (
-                                <>
-                                    <SaveIcon className="size-3.5" />
-                                    Save Paper
-                                    <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
-                                </>
-                            ) : (
-                                <>
-                                    <SaveIcon className="size-3.5" />
-                                    Save Paper
-                                </>
-                            )}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onOpenSaveAsTemplate}
-                            title="Save as template"
-                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                        >
-                            <LayoutTemplateIcon className="size-3.5" />
-                            Save as Template
-                        </button>
+                        {!isStandaloneBubbleSheet && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={onSaveDraft}
+                                    disabled={isSavingDraft || isSavingPaper}
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                                >
+                                    {isSavingDraft ? (
+                                        <>
+                                            <Loader2Icon className="size-4 animate-spin" />
+                                            Saving…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <BookmarkIcon className="size-3.5" />
+                                            Save as Draft
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onOpenSavePaperModal}
+                                    disabled={isSavingPaper || isSavingDraft}
+                                    className={cn(
+                                        'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                                        savedPaperId !== null && !isDirty
+                                            ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400'
+                                            : savedPaperId !== null && isDirty
+                                              ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400'
+                                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+                                    )}
+                                >
+                                    {isSavingPaper ? (
+                                        <>
+                                            <Loader2Icon className="size-4 animate-spin" />
+                                            Saving…
+                                        </>
+                                    ) : savedPaperId !== null && !isDirty ? (
+                                        <>
+                                            <CheckIcon className="size-3.5" />
+                                            Saved
+                                        </>
+                                    ) : savedPaperId !== null && isDirty ? (
+                                        <>
+                                            <SaveIcon className="size-3.5" />
+                                            Save Paper
+                                            <span className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <SaveIcon className="size-3.5" />
+                                            Save Paper
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onOpenSaveAsTemplate}
+                                    title="Save as template"
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                                >
+                                    <LayoutTemplateIcon className="size-3.5" />
+                                    Save as Template
+                                </button>
+                            </>
+                        )}
                         <button
                             type="button"
                             onClick={() =>
@@ -13506,6 +13716,13 @@ function GeneratedPaperView({
                 )}
                 <main
                     data-print-paper
+                    data-paper-forced-page-break={
+                        bubbleSheetVisible &&
+                        !bubbleSheetOnly &&
+                        settings.bubbleSheetMode === 'separate-page'
+                            ? 'true'
+                            : undefined
+                    }
                     style={paperShellStyle}
                     className="relative mx-auto overflow-hidden bg-white shadow-sm shadow-slate-900/10 print:overflow-visible print:shadow-none"
                 >
@@ -13563,16 +13780,21 @@ function GeneratedPaperView({
                                 gap: `${settings.sectionSpacing}mm`,
                             }}
                         >
-                            {showsPaper && settings.bubbleSheetEnabled && (
+                            {showsPaper && bubbleSheetVisible && (
                                 <BubbleSheet
                                     count={settings.bubbleSheetQuestionCount}
-                                    medium={
-                                        paper.sectioning?.medium ?? 'English'
-                                    }
+                                    medium={bubbleSheetMedium}
                                     settings={settings}
+                                    pageBreakAfter={
+                                        !bubbleSheetOnly &&
+                                        settings.bubbleSheetMode ===
+                                            'separate-page' &&
+                                        paper.sections.length > 0
+                                    }
                                 />
                             )}
-                            {activeViewMode === 'answer_key' ? (
+                            {bubbleSheetOnly ? null : activeViewMode ===
+                              'answer_key' ? (
                                 <AnswerKeySheet
                                     paper={paper}
                                     setIndex={activeSetIndex}
@@ -13608,6 +13830,14 @@ function GeneratedPaperView({
                                 <main
                                     key={`variant-${index}`}
                                     data-print-paper
+                                    data-paper-forced-page-break={
+                                        bubbleSheetVisible &&
+                                        !bubbleSheetOnly &&
+                                        settings.bubbleSheetMode ===
+                                            'separate-page'
+                                            ? 'true'
+                                            : undefined
+                                    }
                                     style={paperShellStyle}
                                     className="relative mx-auto overflow-hidden bg-white print:overflow-visible print:shadow-none"
                                 >
@@ -13638,7 +13868,7 @@ function GeneratedPaperView({
                                             }}
                                         >
                                             {showsPaper &&
-                                                settings.bubbleSheetEnabled && (
+                                                bubbleSheetVisible && (
                                                     <BubbleSheet
                                                         count={
                                                             settings.bubbleSheetQuestionCount
@@ -13650,9 +13880,18 @@ function GeneratedPaperView({
                                                             'English'
                                                         }
                                                         settings={settings}
+                                                        pageBreakAfter={
+                                                            !bubbleSheetOnly &&
+                                                            settings.bubbleSheetMode ===
+                                                                'separate-page' &&
+                                                            variantPaper
+                                                                .sections
+                                                                .length > 0
+                                                        }
                                                     />
                                                 )}
-                                            {activeViewMode === 'answer_key' ? (
+                                            {bubbleSheetOnly ? null : activeViewMode ===
+                                              'answer_key' ? (
                                                 <AnswerKeySheet
                                                     paper={variantPaper}
                                                     setIndex={index}
@@ -13725,27 +13964,31 @@ function GeneratedPaperView({
             )}
 
             {/* Floating right-edge gear → opens the live paper settings drawer. */}
-            <button
-                type="button"
-                onClick={() => setIsSettingsDrawerOpen(true)}
-                aria-label="Open paper settings"
-                title="Paper settings"
-                className="fixed top-1/2 right-3 z-30 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg shadow-slate-900/10 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/10 dark:hover:text-brand-300 print:hidden"
-            >
-                <SettingsIcon className="size-5" />
-            </button>
+            {!isStandaloneBubbleSheet && (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => setIsSettingsDrawerOpen(true)}
+                        aria-label="Open paper settings"
+                        title="Paper settings"
+                        className="fixed top-1/2 right-3 z-30 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg shadow-slate-900/10 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/10 dark:hover:text-brand-300 print:hidden"
+                    >
+                        <SettingsIcon className="size-5" />
+                    </button>
 
-            <PaperSettingsDrawer
-                open={isSettingsDrawerOpen}
-                settings={settings}
-                sectioningAvailable={
-                    settings.paperLayout === 'federal-board' ||
-                    Boolean(rawPaper.sectioning?.active)
-                }
-                defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
-                onChange={onSettingsChange}
-                onClose={() => setIsSettingsDrawerOpen(false)}
-            />
+                    <PaperSettingsDrawer
+                        open={isSettingsDrawerOpen}
+                        settings={settings}
+                        sectioningAvailable={
+                            settings.paperLayout === 'federal-board' ||
+                            Boolean(rawPaper.sectioning?.active)
+                        }
+                        defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
+                        onChange={onSettingsChange}
+                        onClose={() => setIsSettingsDrawerOpen(false)}
+                    />
+                </>
+            )}
         </>
     );
 }

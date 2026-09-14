@@ -832,6 +832,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
         page-break-inside: avoid;
     }
 
+    body:has([data-print-paper])
+        [data-print-paper][data-paper-forced-page-break='true'] {
+        break-inside: auto;
+        page-break-inside: auto;
+    }
+
     [data-print-paper] [data-paper-correct-option],
     [data-print-paper] [data-paper-correct-option] * {
         color: #000 !important;

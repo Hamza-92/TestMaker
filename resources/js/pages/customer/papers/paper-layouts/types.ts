@@ -196,6 +196,7 @@ export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
 export type PaperOrGroupLabel = 'auto' | 'english' | 'urdu' | 'bilingual';
 export type PaperWatermarkType = 'text' | 'logo';
 export type PaperBubbleSheetNumberFormat = 'number' | 'question';
+export type PaperBubbleSheetMode = 'inline' | 'separate-page' | 'only';
 
 export interface PaperSettings {
     /** Board-specific rules that control section grouping and question layout. */
@@ -241,6 +242,8 @@ export interface PaperSettings {
     bubbleSheetQuestionCount: number;
     /** Format used for each bubble row label. */
     bubbleSheetNumberFormat: PaperBubbleSheetNumberFormat;
+    /** Whether questions continue below the sheet, begin on the next page, or are hidden. */
+    bubbleSheetMode: PaperBubbleSheetMode;
     /** Divider between question rows inside a section. */
     questionBorderWidth: number;
     questionBorderStyle: PaperBorderStyle;
@@ -328,6 +331,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     bubbleSheetHeadingEnabled: false,
     bubbleSheetQuestionCount: 20,
     bubbleSheetNumberFormat: 'number',
+    bubbleSheetMode: 'inline',
     questionBorderWidth: 1,
     questionBorderStyle: 'solid',
     paperSize: 'A4',
@@ -399,6 +403,11 @@ const OR_GROUP_LABEL_VALUES = new Set<PaperOrGroupLabel>([
     'bilingual',
 ]);
 const WATERMARK_TYPE_VALUES = new Set<PaperWatermarkType>(['text', 'logo']);
+const BUBBLE_SHEET_MODE_VALUES = new Set<PaperBubbleSheetMode>([
+    'inline',
+    'separate-page',
+    'only',
+]);
 const HEADER_TEMPLATE_VALUES = new Set<PaperHeaderTemplate>([
     'classic',
     'banner',
@@ -599,6 +608,11 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             source.bubbleSheetNumberFormat === 'question'
                 ? 'question'
                 : DEFAULT_PAPER_SETTINGS.bubbleSheetNumberFormat,
+        bubbleSheetMode: pickEnum(
+            source.bubbleSheetMode,
+            BUBBLE_SHEET_MODE_VALUES,
+            DEFAULT_PAPER_SETTINGS.bubbleSheetMode,
+        ),
         questionBorderWidth:
             typeof source.questionBorderWidth === 'number'
                 ? source.questionBorderWidth
@@ -742,6 +756,8 @@ export function resolveOrGroupLabel(
 
 export interface GeneratedPaper {
     id: string;
+    /** Standalone answer sheets bypass the normal question-selection workflow. */
+    documentKind?: 'paper' | 'bubble-sheet';
     header: GeneratedPaperHeader;
     sections: GeneratedPaperSection[];
     /** Optional — older papers won't have this. Restore code should fall back to DEFAULT_PAPER_SETTINGS. */

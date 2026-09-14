@@ -26,18 +26,29 @@ export function BubbleSheet({
     count,
     medium,
     settings,
+    pageBreakAfter = false,
 }: {
     count: number;
     medium: PaperMedium;
     settings: PaperSettings;
+    pageBreakAfter?: boolean;
 }) {
     const normalizedCount = Math.min(Math.max(Math.round(count), 1), 200);
 
     return (
         <section
             data-bubble-sheet
+            data-bubble-sheet-page={pageBreakAfter ? 'separate' : 'inline'}
             aria-label="MCQs answer sheet"
             className="w-full"
+            style={
+                pageBreakAfter
+                    ? {
+                          breakAfter: 'page',
+                          pageBreakAfter: 'always',
+                      }
+                    : undefined
+            }
         >
             {settings.bubbleSheetHeadingEnabled && (
                 <h2
