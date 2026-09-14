@@ -13948,18 +13948,22 @@ function GeneratedPaperView({
                     </div>
                 )}
 
-                <div className="flex justify-end gap-2 print:hidden">
-                    <button
-                        type="button"
-                        onClick={handleBackClick}
-                        disabled={isSavingDraft}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                    >
-                        {isSavingDraft && (
-                            <Loader2Icon className="size-4 animate-spin" />
-                        )}
-                        {isSavingDraft ? 'Saving Draft…' : 'Back'}
-                    </button>
+                <div className="sticky bottom-0 z-20 -mx-4 border-y border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur md:-mx-6 md:px-6 dark:border-slate-800 dark:bg-slate-900/95 print:hidden">
+                    <div className="flex w-full justify-end">
+                        <button
+                            type="button"
+                            onClick={handleBackClick}
+                            disabled={isSavingDraft}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        >
+                            {isSavingDraft ? (
+                                <Loader2Icon className="size-4 animate-spin" />
+                            ) : (
+                                <ArrowLeftIcon className="size-4" />
+                            )}
+                            {isSavingDraft ? 'Saving Draft…' : 'Back'}
+                        </button>
+                    </div>
                 </div>
 
                 {isConfirmingBack && (
