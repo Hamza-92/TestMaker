@@ -161,7 +161,10 @@ export function MultipartSection({
                     )}
                 </div>
             )}{' '}
-            <div className="space-y-0.5 px-2">
+            <div
+                data-paper-question-group="multipart"
+                className="space-y-0.5 px-2 py-1"
+            >
                 {multipart.rows.map((row, rowIndex) => (
                     <div
                         key={`multipart-row-${rowIndex}`}
