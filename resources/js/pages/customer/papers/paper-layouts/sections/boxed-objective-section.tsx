@@ -81,6 +81,8 @@ export function BoxedObjectiveSection({
     // Legacy default of 1 preserves the original single-column stacked look
     // for papers saved before per-block columns existed.
     const columns = clampSectionColumns(section.columns, 1);
+    const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
+    const questionsRtl = urduOnly || section.questionTextRtl === true;
 
     return (
         <section className="paper-section">
@@ -102,7 +104,7 @@ export function BoxedObjectiveSection({
                 >1 arrange the boxed rows into a grid instead of one long stack. */}
             <div
                 data-paper-question-group="stacked"
-                dir={section.questionTextRtl ? 'rtl' : undefined}
+                dir={questionsRtl ? 'rtl' : undefined}
                 className={columns > 1 ? 'grid gap-x-6' : undefined}
                 style={
                     columns > 1

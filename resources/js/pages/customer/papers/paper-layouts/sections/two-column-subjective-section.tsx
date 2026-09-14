@@ -76,6 +76,8 @@ export function TwoColumnSubjectiveSection({
     // Legacy default of 2 preserves this template's original fixed 2-column
     // look for papers saved before per-block columns existed.
     const columns = clampSectionColumns(section.columns, 2);
+    const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
+    const questionsRtl = urduOnly || section.questionTextRtl === true;
 
     return (
         <section className="paper-section">
@@ -97,7 +99,7 @@ export function TwoColumnSubjectiveSection({
                 only applies to the "stacked" group variant). */}
             <div
                 data-paper-question-group="grid"
-                dir={section.questionTextRtl ? 'rtl' : undefined}
+                dir={questionsRtl ? 'rtl' : undefined}
                 className="grid gap-0 px-2 py-2"
                 style={{
                     gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
