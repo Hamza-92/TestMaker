@@ -105,6 +105,27 @@ it('resolves each language from pattern to class to subject independently', func
         ->and($this->type->fresh()->heading_en)->toBe('Default English');
 });
 
+it('resolves scoped question behavior without changing the type defaults', function () {
+    $this->actingAs($this->admin)
+        ->put(headingRuleUrl($this->type), [
+            ...$this->scope,
+            'schema_key' => 'subjective_same_statement',
+            'question_text_rtl' => true,
+            'column_per_row' => 2,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $resolved = QuestionTypeHeadingResolver::apply(
+        collect([$this->type]),
+        ...array_values($this->scope),
+    )->first();
+
+    expect($resolved->schema_key)->toBe('subjective_same_statement')
+        ->and($resolved->question_text_rtl)->toBeTrue()
+        ->and($resolved->column_per_row)->toBe(2)
+        ->and($this->type->fresh()->schema_key)->toBe('subjective_standard');
+});
+
 it('updates and removes one scoped rule without affecting broader rules', function () {
     $this->actingAs($this->admin);
     $url = headingRuleUrl($this->type);

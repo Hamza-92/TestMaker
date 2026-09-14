@@ -3,10 +3,11 @@
 namespace App\Http\Requests\Superadmin;
 
 use App\Models\Chapter;
-use App\Models\Question;
 use App\Models\Medium;
+use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\Topic;
+use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -70,8 +71,18 @@ class QuestionUpsertRequest extends FormRequest
                 $validator->errors()->add('topic_id', 'Topic is required.');
             }
 
+            $existingQuestion = $this->route('question');
+            $effectiveType = $existingQuestion instanceof Question && filled($existingQuestion->schema_key)
+                ? QuestionTypeSchemaRegistry::typeForQuestion($existingQuestion, $questionType)
+                : QuestionTypeHeadingResolver::one(
+                    $questionType,
+                    (int) $chapter->pattern_id,
+                    (int) $chapter->class_id,
+                    (int) $chapter->subject_id,
+                );
+
             QuestionTypeSchemaRegistry::validateQuestionContent(
-                $questionType,
+                $effectiveType,
                 $content,
                 $validator,
             );

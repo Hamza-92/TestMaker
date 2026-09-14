@@ -204,7 +204,7 @@ export default function ShowQuestionType({
                                 href={`/superadmin/question-types/${questionType.id}/headings`}
                             >
                                 <HeadingIcon className="size-4" />
-                                Headings
+                                Scoped Settings
                             </Link>
                         </Button>
                         <Button asChild variant="outline" size="sm">

@@ -39,7 +39,18 @@ export function BulkQuestionTypeChangeDialog({
     const [targetTypeId, setTargetTypeId] = useState('');
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
-    const schemaKeys = useMemo(
+    const sourceKinds = useMemo(
+        () =>
+            new Set(
+                questions.map((question) =>
+                    question.question_type.is_objective
+                        ? 'objective'
+                        : 'subjective',
+                ),
+            ),
+        [questions],
+    );
+    const sourceSchemaKeys = useMemo(
         () =>
             new Set(
                 questions.map((question) => question.question_type.schema_key),
@@ -51,19 +62,22 @@ export function BulkQuestionTypeChangeDialog({
         [questions],
     );
     const compatibleTypes = useMemo(() => {
-        if (schemaKeys.size !== 1) {
+        if (sourceKinds.size !== 1) {
             return [];
         }
 
-        const schemaKey = [...schemaKeys][0];
+        const isObjective = [...sourceKinds][0] === 'objective';
 
         return questionTypes.filter(
             (type) =>
                 type.status === 1 &&
-                type.schema_key === schemaKey &&
+                type.is_objective === isObjective &&
+                (!isObjective ||
+                    (sourceSchemaKeys.size === 1 &&
+                        sourceSchemaKeys.has(type.schema_key))) &&
                 !(sourceTypeIds.size === 1 && sourceTypeIds.has(type.id)),
         );
-    }, [questionTypes, schemaKeys, sourceTypeIds]);
+    }, [questionTypes, sourceKinds, sourceSchemaKeys, sourceTypeIds]);
 
     const close = () => {
         if (processing) {
@@ -133,9 +147,10 @@ export function BulkQuestionTypeChangeDialog({
                     </SelectContent>
                 </Select>
 
-                {schemaKeys.size !== 1 ? (
+                {sourceKinds.size !== 1 ? (
                     <p className="text-sm text-destructive">
-                        Select questions with the same question structure.
+                        Select only objective questions or only subjective
+                        questions.
                     </p>
                 ) : compatibleTypes.length === 0 ? (
                     <p className="text-sm text-destructive">

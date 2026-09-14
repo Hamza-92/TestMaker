@@ -903,6 +903,7 @@ class LegacyContentTransferService
                 $this->mediumNameFromPayload($questionPayload),
             ),
             'question_type_id' => $questionType->id,
+            'schema_key' => $schema['key'],
             'chapter_id' => $targetChapterId,
             'topic_id' => $targetTopicId,
             'statement_en' => $questionPayload['statement_en'],

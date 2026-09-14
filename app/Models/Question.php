@@ -27,6 +27,7 @@ class Question extends Model
 
     protected $fillable = [
         'question_type_id',
+        'schema_key',
         'medium_id',
         'topic_id',
         'chapter_id',

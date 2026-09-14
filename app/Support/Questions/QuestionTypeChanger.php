@@ -35,24 +35,35 @@ class QuestionTypeChanger
         }
 
         $targetSchema = $this->schemaKey($targetType);
-        if ($sourceTypes->contains(
-            fn (QuestionType $sourceType) => $this->schemaKey($sourceType) !== $targetSchema,
+        if ($sourceTypes->contains(fn (QuestionType $sourceType) => (bool) $sourceType->is_objective !== (bool) $targetType->is_objective
+            || ((bool) $sourceType->is_objective && $this->schemaKey($sourceType) !== $targetSchema)
         )) {
             throw ValidationException::withMessages([
-                $errorField => 'Choose a question type with the same question structure.',
+                $errorField => 'Choose a question type of the same objective or subjective kind.',
             ]);
         }
 
+        $sourceSchemaKeys = $sourceTypes->mapWithKeys(
+            fn (QuestionType $sourceType) => [$sourceType->id => $this->schemaKey($sourceType)],
+        );
+
         $changed = 0;
 
-        DB::transaction(function () use ($questions, $targetType, &$changed): void {
+        DB::transaction(function () use ($questions, $sourceSchemaKeys, $targetType, &$changed): void {
             (clone $questions)
                 ->where('question_type_id', '!=', $targetType->id)
                 ->select(['id', 'question_type_id'])
                 ->orderBy('id')
-                ->chunkById(500, function ($questionChunk) use ($targetType, &$changed): void {
+                ->chunkById(500, function ($questionChunk) use ($sourceSchemaKeys, $targetType, &$changed): void {
                     $now = now();
                     $questionIds = $questionChunk->pluck('id')->all();
+
+                    foreach ($questionChunk->groupBy('question_type_id') as $sourceTypeId => $sourceQuestions) {
+                        Question::query()
+                            ->whereKey($sourceQuestions->pluck('id'))
+                            ->whereNull('schema_key')
+                            ->update(['schema_key' => $sourceSchemaKeys->get($sourceTypeId)]);
+                    }
 
                     AuditLog::query()->insert(
                         $questionChunk->map(fn (Question $question) => [

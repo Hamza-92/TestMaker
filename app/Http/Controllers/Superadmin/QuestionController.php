@@ -16,6 +16,7 @@ use App\Models\Subject;
 use App\Models\Topic;
 use App\Support\Questions\QuestionBulkImporter;
 use App\Support\Questions\QuestionTypeChanger;
+use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -469,9 +470,22 @@ class QuestionController extends Controller
                 'topic_id' => $question->topic_id,
                 'source' => $question->source,
                 'status' => $question->status,
-                'content' => QuestionTypeSchemaRegistry::contentFromQuestion(
+                'schema_key' => QuestionTypeSchemaRegistry::typeForQuestion(
                     $question,
                     $question->questionType,
+                )->schema_key,
+                'schema' => $this->resolvedQuestionSchema(
+                    QuestionTypeSchemaRegistry::typeForQuestion(
+                        $question,
+                        $question->questionType,
+                    ),
+                ),
+                'content' => QuestionTypeSchemaRegistry::contentFromQuestion(
+                    $question,
+                    QuestionTypeSchemaRegistry::typeForQuestion(
+                        $question,
+                        $question->questionType,
+                    ),
                 ),
             ],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
@@ -499,7 +513,7 @@ class QuestionController extends Controller
             ]);
 
             $oldValues = $this->auditValues($question);
-            [$payload, $options] = $this->buildPayload($validated, $questionType, $chapter);
+            [$payload, $options] = $this->buildPayload($validated, $questionType, $chapter, $question);
 
             $question->update($payload);
             $question->options()->delete();
@@ -563,15 +577,28 @@ class QuestionController extends Controller
             ->with('success', 'Question deleted successfully.');
     }
 
-    private function buildPayload(array $validated, QuestionType $questionType, Chapter $chapter): array
-    {
+    private function buildPayload(
+        array $validated,
+        QuestionType $questionType,
+        Chapter $chapter,
+        ?Question $existingQuestion = null,
+    ): array {
+        $effectiveType = $existingQuestion !== null && filled($existingQuestion->schema_key)
+            ? QuestionTypeSchemaRegistry::typeForQuestion($existingQuestion, $questionType)
+            : QuestionTypeHeadingResolver::one(
+                $questionType,
+                (int) $chapter->pattern_id,
+                (int) $chapter->class_id,
+                (int) $chapter->subject_id,
+            );
         $questionPayload = QuestionTypeSchemaRegistry::buildQuestionPayload(
-            $questionType,
+            $effectiveType,
             $validated['content'] ?? [],
         );
 
         return [[
             'question_type_id' => $questionType->id,
+            'schema_key' => $effectiveType->schema_key,
             'medium_id' => $validated['medium_id'] ?? Medium::query()->where('name', 'Both')->value('id'),
             'chapter_id' => $validated['chapter_id'],
             'topic_id' => $chapter->effectiveSubjectType() === 'topic-wise'
@@ -625,6 +652,13 @@ class QuestionController extends Controller
                 ]);
         }
 
+        $questionType = QuestionTypeHeadingResolver::one(
+            $questionType,
+            (int) $chapter->pattern_id,
+            (int) $chapter->class_id,
+            (int) $chapter->subject_id,
+        );
+
         $report = $importer->importRecords(
             records: $preview['records'] ?? [],
             questionType: $questionType,
@@ -646,6 +680,13 @@ class QuestionController extends Controller
         $topic = isset($validated['topic_id'])
             ? Topic::query()->findOrFail($validated['topic_id'])
             : null;
+
+        $questionType = QuestionTypeHeadingResolver::one(
+            $questionType,
+            (int) $chapter->pattern_id,
+            (int) $chapter->class_id,
+            (int) $chapter->subject_id,
+        );
 
         return [$questionType, $chapter, $topic];
     }
@@ -718,6 +759,7 @@ class QuestionController extends Controller
     private function questionTypeFormOptions(bool $includeInactive = false): Collection
     {
         return QuestionType::query()
+            ->with('headingRules:id,question_type_id,pattern_id,class_id,subject_id,schema_key,question_text_rtl,column_per_row')
             ->when(! $includeInactive, fn ($query) => $query->where('status', 1))
             ->orderBy('name')
             ->get([
@@ -895,13 +937,17 @@ class QuestionController extends Controller
 
     private function transformQuestionListItem(Question $question): array
     {
-        $schema = $this->resolvedQuestionSchema($question->questionType);
-        $content = QuestionTypeSchemaRegistry::contentFromQuestion(
+        $effectiveType = QuestionTypeSchemaRegistry::typeForQuestion(
             $question,
             $question->questionType,
         );
+        $schema = $this->resolvedQuestionSchema($effectiveType);
+        $content = QuestionTypeSchemaRegistry::contentFromQuestion(
+            $question,
+            $effectiveType,
+        );
         $metrics = QuestionTypeSchemaRegistry::metrics(
-            $question->questionType,
+            $effectiveType,
             $content,
             $question->options,
         );
@@ -913,7 +959,7 @@ class QuestionController extends Controller
             'status' => $question->status,
             'created_at' => $question->created_at?->toISOString(),
             'summary_text' => QuestionTypeSchemaRegistry::summarize(
-                $question->questionType,
+                $effectiveType,
                 $content,
             ),
             'content' => $content,
@@ -984,9 +1030,13 @@ class QuestionController extends Controller
 
     private function auditValues(Question $question): array
     {
-        $content = QuestionTypeSchemaRegistry::contentFromQuestion(
+        $effectiveType = QuestionTypeSchemaRegistry::typeForQuestion(
             $question,
             $question->questionType,
+        );
+        $content = QuestionTypeSchemaRegistry::contentFromQuestion(
+            $question,
+            $effectiveType,
         );
 
         return [
@@ -996,13 +1046,13 @@ class QuestionController extends Controller
             'topic' => $question->topic?->name,
             'source' => $question->source,
             'status' => $question->status,
-            'schema' => $this->resolvedQuestionSchema($question->questionType)['label'],
+            'schema' => $this->resolvedQuestionSchema($effectiveType)['label'],
             'summary_text' => QuestionTypeSchemaRegistry::summarize(
-                $question->questionType,
+                $effectiveType,
                 $content,
             ),
             'options_count' => QuestionTypeSchemaRegistry::metrics(
-                $question->questionType,
+                $effectiveType,
                 $content,
                 $question->options,
             )['options_count'],
@@ -1037,6 +1087,20 @@ class QuestionController extends Controller
             'supports_simple_import' => QuestionTypeSchemaRegistry::supportsSimpleImport($questionType),
             'schema_key' => $schema['key'],
             'schema' => $schema,
+            'scope_rules' => $questionType->relationLoaded('headingRules')
+                ? $questionType->headingRules
+                    ->filter(fn ($rule) => filled($rule->schema_key))
+                    ->map(fn ($rule) => [
+                        'pattern_id' => (int) $rule->pattern_id,
+                        'class_id' => $rule->class_id === null ? null : (int) $rule->class_id,
+                        'subject_id' => $rule->subject_id === null ? null : (int) $rule->subject_id,
+                        'schema_key' => $rule->schema_key,
+                        'schema' => QuestionTypeSchemaRegistry::resolve(
+                            $rule->schema_key,
+                            (bool) $questionType->is_objective,
+                        ),
+                    ])->values()
+                : collect(),
             'status' => $questionType->status,
         ];
     }

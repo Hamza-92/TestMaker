@@ -16,6 +16,7 @@ use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -142,7 +143,11 @@ class QuestionTypeController extends Controller
                 'heading_en' => $questionType->heading_en,
                 'heading_ur' => $questionType->heading_ur,
                 'is_objective' => (bool) $questionType->is_objective,
+                'schema_key' => $questionType->schema_key,
+                'question_text_rtl' => (bool) $questionType->question_text_rtl,
+                'column_per_row' => (int) $questionType->column_per_row,
             ],
+            'schemas' => QuestionTypeSchemaRegistry::options((bool) $questionType->is_objective),
             'catalog' => $this->orderCatalog(),
             'rules' => QuestionTypeHeading::query()
                 ->where('question_type_id', $questionType->id)
@@ -151,7 +156,10 @@ class QuestionTypeController extends Controller
                 ->orderBy('class_id')
                 ->orderByRaw('subject_id IS NULL DESC')
                 ->orderBy('subject_id')
-                ->get(['id', 'pattern_id', 'class_id', 'subject_id', 'heading_en', 'heading_ur']),
+                ->get([
+                    'id', 'pattern_id', 'class_id', 'subject_id', 'heading_en', 'heading_ur',
+                    'schema_key', 'question_text_rtl', 'column_per_row',
+                ]),
         ]);
     }
 
@@ -161,14 +169,28 @@ class QuestionTypeController extends Controller
         $validated = $request->validate([
             'heading_en' => ['nullable', 'string', 'max:150'],
             'heading_ur' => ['nullable', 'string', 'max:150'],
+            'schema_key' => [
+                'nullable',
+                'string',
+                Rule::in(collect(QuestionTypeSchemaRegistry::options((bool) $questionType->is_objective))->pluck('key')),
+            ],
+            'question_text_rtl' => ['nullable', 'boolean'],
+            'column_per_row' => ['nullable', 'integer', 'between:1,5'],
         ]);
         $values = [
             'heading_en' => trim((string) ($validated['heading_en'] ?? '')) ?: null,
             'heading_ur' => trim((string) ($validated['heading_ur'] ?? '')) ?: null,
+            'schema_key' => filled($validated['schema_key'] ?? null) ? $validated['schema_key'] : null,
+            'question_text_rtl' => array_key_exists('question_text_rtl', $validated)
+                ? $validated['question_text_rtl']
+                : null,
+            'column_per_row' => filled($validated['column_per_row'] ?? null)
+                ? (int) $validated['column_per_row']
+                : null,
         ];
-        if ($values['heading_en'] === null && $values['heading_ur'] === null) {
+        if (collect($values)->every(fn ($value) => $value === null)) {
             throw ValidationException::withMessages([
-                'heading_en' => 'Enter an English or Urdu heading for this rule.',
+                'heading_en' => 'Choose at least one scoped override.',
             ]);
         }
 
@@ -177,17 +199,18 @@ class QuestionTypeController extends Controller
             'scope_key' => QuestionTypeHeading::scopeKey(...array_values($scope)),
         ];
         $old = QuestionTypeHeading::query()->where($identity)->first();
-        $oldValues = $old?->only(['heading_en', 'heading_ur']) ?? ['heading_en' => null, 'heading_ur' => null];
+        $fields = ['heading_en', 'heading_ur', 'schema_key', 'question_text_rtl', 'column_per_row'];
+        $oldValues = $old?->only($fields) ?? array_fill_keys($fields, null);
         QuestionTypeHeading::query()->updateOrCreate($identity, [...$scope, ...$values]);
         AuditLog::record(
             model: $questionType,
             event: AuditEvent::Updated,
             oldValues: [...$scope, ...$oldValues],
             newValues: [...$scope, ...$values],
-            notes: 'Scoped question type heading rule saved.',
+            notes: 'Scoped question type override saved.',
         );
 
-        return back()->with('success', $old ? 'Heading rule updated.' : 'Heading rule added.');
+        return back()->with('success', $old ? 'Scoped rule updated.' : 'Scoped rule added.');
     }
 
     public function destroyHeadingRule(QuestionType $questionType, QuestionTypeHeading $headingRule)
@@ -195,6 +218,7 @@ class QuestionTypeController extends Controller
         abort_unless((int) $headingRule->question_type_id === (int) $questionType->id, 404);
         $oldValues = $headingRule->only([
             'pattern_id', 'class_id', 'subject_id', 'heading_en', 'heading_ur',
+            'schema_key', 'question_text_rtl', 'column_per_row',
         ]);
         $headingRule->delete();
         AuditLog::record(
@@ -202,10 +226,10 @@ class QuestionTypeController extends Controller
             event: AuditEvent::Updated,
             oldValues: $oldValues,
             newValues: [],
-            notes: 'Scoped question type heading rule removed.',
+            notes: 'Scoped question type override removed.',
         );
 
-        return back()->with('success', 'Heading rule removed.');
+        return back()->with('success', 'Scoped rule removed.');
     }
 
     private function headingScope(Request $request): array

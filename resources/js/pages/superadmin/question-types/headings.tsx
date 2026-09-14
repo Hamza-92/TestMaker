@@ -37,10 +37,10 @@ export default function QuestionTypeHeadings({
 
     return (
         <>
-            <Head title="Type Headings" />
+            <Head title="Type Settings" />
             <div className="mx-auto max-w-3xl space-y-5 p-4 md:p-6">
                 <div>
-                    <h1 className="h1-semibold">Type Headings</h1>
+                    <h1 className="h1-semibold">Type Settings</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         Choose a question type, then manage its headings for
                         different patterns, classes, and subjects.
@@ -85,13 +85,13 @@ export default function QuestionTypeHeadings({
                                 <Link
                                     href={`/superadmin/question-types/${selected.id}/headings`}
                                 >
-                                    Manage headings
+                                    Manage settings
                                     <ArrowRightIcon className="size-4" />
                                 </Link>
                             </Button>
                         ) : (
                             <Button disabled className="h-11 shrink-0">
-                                Manage headings
+                                Manage settings
                                 <ArrowRightIcon className="size-4" />
                             </Button>
                         )}
@@ -135,6 +135,6 @@ export default function QuestionTypeHeadings({
 QuestionTypeHeadings.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Type Headings' },
+        { title: 'Type Settings' },
     ],
 };

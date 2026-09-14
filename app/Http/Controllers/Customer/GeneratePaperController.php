@@ -232,7 +232,7 @@ class GeneratePaperController extends Controller
                     ->where('question_type_orders.subject_id', $scope->subject_id);
             })
             ->where('question_types.status', 1)
-            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.options_only', 'question_types.question_text_rtl', 'question_types.column_per_row', 'question_type_orders.sort_order')
+            ->groupBy('question_types.id', 'question_types.name', 'question_types.name_ur', 'question_types.heading_en', 'question_types.heading_ur', 'question_types.is_objective', 'question_types.options_only', 'question_types.question_text_rtl', 'question_types.schema_key', 'question_types.column_per_row', 'question_type_orders.sort_order')
             ->orderByDesc('question_types.is_objective')
             ->orderByRaw('question_type_orders.sort_order IS NULL')
             ->orderBy('question_type_orders.sort_order')
@@ -246,6 +246,7 @@ class GeneratePaperController extends Controller
                 'question_types.is_objective',
                 'question_types.options_only',
                 'question_types.question_text_rtl',
+                'question_types.schema_key',
                 'question_types.column_per_row',
                 DB::raw('question_type_orders.sort_order as sort_order'),
                 DB::raw('COUNT(questions.id) as available_count'),
@@ -401,7 +402,7 @@ class GeneratePaperController extends Controller
 
     public function questions(Request $request): JsonResponse
     {
-        [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium] = $this->questionScope($request);
+        [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium, $scope] = $this->questionScope($request);
         $data = $request->validate([
             'question_type_id' => ['required', 'integer', 'exists:question_types,id'],
         ]);
@@ -424,18 +425,28 @@ class GeneratePaperController extends Controller
             ->orderBy('questions.topic_id')
             ->orderBy('questions.id')
             ->get()
-            ->map(function (Question $question) use ($displayMedium, $canViewSubjectiveAnswers) {
+            ->map(function (Question $question) use ($displayMedium, $canViewSubjectiveAnswers, $scope) {
+                $effectiveType = QuestionTypeHeadingResolver::one(
+                    $question->questionType,
+                    (int) $scope->pattern_id,
+                    (int) $scope->class_id,
+                    (int) $scope->subject_id,
+                );
+                $effectiveType = QuestionTypeSchemaRegistry::typeForQuestion(
+                    $question,
+                    $effectiveType,
+                );
                 $content = QuestionTypeSchemaRegistry::contentFromQuestion(
                     $question,
-                    $question->questionType,
+                    $effectiveType,
                 );
                 $schema = QuestionTypeSchemaRegistry::resolve(
-                    $question->questionType->schema_key,
-                    $question->questionType->is_objective,
+                    $effectiveType->schema_key,
+                    $effectiveType->is_objective,
                     [
-                        'objective_type_id' => $question->questionType->objective_type_id,
-                        'have_description' => $question->questionType->have_description,
-                        'have_answer' => $question->questionType->have_answer,
+                        'objective_type_id' => $effectiveType->objective_type_id,
+                        'have_description' => $effectiveType->have_description,
+                        'have_answer' => $effectiveType->have_answer,
                     ],
                 );
                 $includeAnswers = (bool) $question->questionType->is_objective
@@ -455,7 +466,7 @@ class GeneratePaperController extends Controller
                         $summaryUr,
                         $displayMedium,
                         QuestionTypeSchemaRegistry::summarize(
-                            $question->questionType,
+                            $effectiveType,
                             $content,
                         ),
                     ),

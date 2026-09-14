@@ -35,14 +35,22 @@ class QuestionTypeHeadingResolver
             $byScope = $overrides->get($type->id, collect())->keyBy('scope_key');
             foreach ($keys as $key) {
                 $override = $byScope->get($key);
-                foreach (['heading_en', 'heading_ur'] as $field) {
+                foreach (['heading_en', 'heading_ur', 'schema_key', 'column_per_row'] as $field) {
                     if ($override !== null && filled($override->{$field})) {
                         $resolved->{$field} = $override->{$field};
                     }
+                }
+                if ($override !== null && $override->question_text_rtl !== null) {
+                    $resolved->question_text_rtl = $override->question_text_rtl;
                 }
             }
 
             return $resolved;
         });
+    }
+
+    public static function one(object $type, int $patternId, ?int $classId = null, ?int $subjectId = null): object
+    {
+        return self::apply(collect([$type]), $patternId, $classId, $subjectId)->first();
     }
 }

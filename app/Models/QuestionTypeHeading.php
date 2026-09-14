@@ -8,8 +8,17 @@ class QuestionTypeHeading extends Model
 {
     protected $fillable = [
         'question_type_id', 'pattern_id', 'class_id', 'subject_id',
-        'scope_key', 'heading_en', 'heading_ur',
+        'scope_key', 'heading_en', 'heading_ur', 'schema_key',
+        'question_text_rtl', 'column_per_row',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'question_text_rtl' => 'boolean',
+            'column_per_row' => 'integer',
+        ];
+    }
 
     public static function scopeKey(int $patternId, ?int $classId = null, ?int $subjectId = null): string
     {

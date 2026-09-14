@@ -8,6 +8,7 @@ use App\Models\QuestionType;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\User;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -128,6 +129,52 @@ it('changes the type of only the selected questions', function () {
         'event' => 'updated',
         'notes' => 'Question type changed in bulk.',
     ]);
+});
+
+it('preserves a same statement question structure when changing to a standard type', function () {
+    $admin = makeTypeChangeAdmin();
+    $context = makeTypeChangeContext($admin, 'SameStatement');
+    $source = makeTypeChangeQuestionType($admin, 'Short Questions Same Statement', 'subjective_same_statement');
+    $target = makeTypeChangeQuestionType($admin, 'Short Questions');
+    $question = Question::create([
+        'question_type_id' => $source->id,
+        'chapter_id' => $context['chapter']->id,
+        'statement_en' => 'English question',
+        'statement_ur' => 'Urdu question',
+        'description_en' => 'Shared statement',
+        'content' => [
+            'prompt_en' => 'English question',
+            'prompt_ur' => 'Urdu question',
+            'shared_en' => 'Shared statement',
+            'shared_ur' => '',
+        ],
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->patch(route('superadmin.questions.type.update'), [
+            'question_ids' => [$question->id],
+            'question_type_id' => $target->id,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($question->refresh()->question_type_id)->toBe($target->id)
+        ->and($question->schema_key)->toBe('subjective_same_statement')
+        ->and($question->content['shared_en'])->toBe('Shared statement');
+
+    $effectiveType = QuestionTypeSchemaRegistry::typeForQuestion(
+        $question,
+        $target,
+    );
+    $paperContent = QuestionTypeSchemaRegistry::contentFromQuestion(
+        $question,
+        $effectiveType,
+    );
+
+    expect($effectiveType->schema_key)->toBe('subjective_same_statement')
+        ->and($paperContent['shared_en'])->toBe('Shared statement');
 });
 
 it('rejects a bulk change to a different question structure', function () {

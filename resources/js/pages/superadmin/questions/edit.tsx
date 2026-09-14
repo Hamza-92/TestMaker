@@ -16,6 +16,8 @@ interface QuestionPayload {
     topic_id: number | null;
     source: string | null;
     status: number;
+    schema_key: string;
+    schema: QuestionTypeOption['schema'];
     content: QuestionFormData['content'];
 }
 
@@ -34,12 +36,27 @@ export default function EditQuestion({
     mediumOptions: MediumOption[];
     backHref: string;
 }) {
+    const effectiveQuestionTypes = questionTypes.map((type) =>
+        type.id === question.question_type_id
+            ? {
+                  ...type,
+                  schema_key: question.schema_key,
+                  schema: question.schema,
+              }
+            : type,
+    );
     const form = useForm<QuestionFormData>({
         question_type_id: String(question.question_type_id),
         chapter_id: String(question.chapter_id),
         topic_id: question.topic_id ? String(question.topic_id) : '',
         source: question.source ?? '',
-        medium_id: question.medium_id ? String(question.medium_id) : String(mediumOptions.find((medium) => medium.name === 'Both')?.id ?? mediumOptions[0]?.id ?? ''),
+        medium_id: question.medium_id
+            ? String(question.medium_id)
+            : String(
+                  mediumOptions.find((medium) => medium.name === 'Both')?.id ??
+                      mediumOptions[0]?.id ??
+                      '',
+              ),
         status: String(question.status),
         content: question.content,
     });
@@ -57,7 +74,7 @@ export default function EditQuestion({
                 submitLabel="Save Changes"
                 backHref={backHref}
                 form={form}
-                questionTypes={questionTypes}
+                questionTypes={effectiveQuestionTypes}
                 chapters={chapters}
                 sourceOptions={sourceOptions}
                 mediumOptions={mediumOptions}

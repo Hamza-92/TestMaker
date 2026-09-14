@@ -44,6 +44,13 @@ export interface QuestionTypeOption {
     supports_simple_import: boolean;
     schema_key: string;
     schema: QuestionSchemaOption;
+    scope_rules: {
+        pattern_id: number;
+        class_id: number | null;
+        subject_id: number | null;
+        schema_key: string;
+        schema: QuestionSchemaOption;
+    }[];
     status: number;
 }
 
@@ -173,7 +180,11 @@ function AutoTextarea({
 
     useEffect(() => {
         const el = ref.current;
-        if (!el) return;
+
+        if (!el) {
+            return;
+        }
+
         el.style.height = 'auto';
         el.style.height = `${el.scrollHeight}px`;
     }, [value]);
@@ -274,7 +285,6 @@ function Field({
     );
 }
 
-
 function chapterTitle(chapter: ChapterOption) {
     const title = chapter.chapter_number
         ? `Chapter ${chapter.chapter_number}`
@@ -300,21 +310,50 @@ export function QuestionForm({
     const isChapterLocked =
         lockedChapterId !== null && lockedChapterId !== undefined;
     const isTopicLocked = lockedTopicId !== null && lockedTopicId !== undefined;
-    const selectedType = useMemo(
-        () =>
-            questionTypes.find(
-                (item) => String(item.id) === form.data.question_type_id,
-            ) ?? null,
-        [form.data.question_type_id, questionTypes],
-    );
-    const selectedSchema = selectedType?.schema ?? null;
-
     const selectedChapter = useMemo(
         () =>
             chapters.find((item) => String(item.id) === form.data.chapter_id) ??
             null,
         [chapters, form.data.chapter_id],
     );
+
+    const selectedType = useMemo(() => {
+        const baseType =
+            questionTypes.find(
+                (item) => String(item.id) === form.data.question_type_id,
+            ) ?? null;
+
+        if (!baseType || !selectedChapter) {
+            return baseType;
+        }
+
+        const scopedRule = baseType.scope_rules
+            .filter(
+                (rule) =>
+                    rule.pattern_id === selectedChapter.pattern.id &&
+                    (rule.class_id === null ||
+                        rule.class_id === selectedChapter.class.id) &&
+                    (rule.subject_id === null ||
+                        rule.subject_id === selectedChapter.subject.id),
+            )
+            .sort(
+                (left, right) =>
+                    Number(left.class_id !== null) -
+                        Number(right.class_id !== null) ||
+                    Number(left.subject_id !== null) -
+                        Number(right.subject_id !== null),
+            )
+            .at(-1);
+
+        return scopedRule
+            ? {
+                  ...baseType,
+                  schema_key: scopedRule.schema_key,
+                  schema: scopedRule.schema,
+              }
+            : baseType;
+    }, [form.data.question_type_id, questionTypes, selectedChapter]);
+    const selectedSchema = selectedType?.schema ?? null;
 
     const [lastSchemaKey, setLastSchemaKey] = useState(
         selectedType?.schema_key ?? '',
@@ -529,51 +568,48 @@ export function QuestionForm({
         control: 'textarea' | 'input' = 'textarea',
     ) => (
         <div className="grid gap-3 sm:grid-cols-2">
-                <Field
-                    label="English"
-                    required={required}
-                    error={errorFor(`content.${String(englishKey)}`)}
-                >
-                    {control === 'input' ? (
-                        <Input
-                            value={String(form.data.content[englishKey] ?? '')}
-                            onChange={(event) =>
-                                setContentValue(englishKey, event.target.value)
-                            }
-                        />
-                    ) : (
-                        <AutoTextarea
-                            value={String(form.data.content[englishKey] ?? '')}
-                            onChange={(event) =>
-                                setContentValue(englishKey, event.target.value)
-                            }
-                        />
-                    )}
-                </Field>
+            <Field
+                label="English"
+                required={required}
+                error={errorFor(`content.${String(englishKey)}`)}
+            >
+                {control === 'input' ? (
+                    <Input
+                        value={String(form.data.content[englishKey] ?? '')}
+                        onChange={(event) =>
+                            setContentValue(englishKey, event.target.value)
+                        }
+                    />
+                ) : (
+                    <AutoTextarea
+                        value={String(form.data.content[englishKey] ?? '')}
+                        onChange={(event) =>
+                            setContentValue(englishKey, event.target.value)
+                        }
+                    />
+                )}
+            </Field>
 
-                <Field
-                    label="Urdu"
-                    error={errorFor(`content.${String(urduKey)}`)}
-                >
-                    {control === 'input' ? (
-                        <Input
-                            dir="rtl"
-                            value={String(form.data.content[urduKey] ?? '')}
-                            onChange={(event) =>
-                                setContentValue(urduKey, event.target.value)
-                            }
-                        />
-                    ) : (
-                        <AutoTextarea
-                            dir="rtl"
-                            value={String(form.data.content[urduKey] ?? '')}
-                            onChange={(event) =>
-                                setContentValue(urduKey, event.target.value)
-                            }
-                        />
-                    )}
-                </Field>
-            </div>
+            <Field label="Urdu" error={errorFor(`content.${String(urduKey)}`)}>
+                {control === 'input' ? (
+                    <Input
+                        dir="rtl"
+                        value={String(form.data.content[urduKey] ?? '')}
+                        onChange={(event) =>
+                            setContentValue(urduKey, event.target.value)
+                        }
+                    />
+                ) : (
+                    <AutoTextarea
+                        dir="rtl"
+                        value={String(form.data.content[urduKey] ?? '')}
+                        onChange={(event) =>
+                            setContentValue(urduKey, event.target.value)
+                        }
+                    />
+                )}
+            </Field>
+        </div>
     );
 
     const renderOptionsEditor = (
@@ -693,7 +729,12 @@ export function QuestionForm({
     const renderPassageItems = () => (
         <div className="space-y-3">
             <div className="flex justify-end">
-                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addItem}
+                >
                     <CirclePlusIcon className="size-3.5" />
                     Add sub-question
                 </Button>
@@ -783,7 +824,12 @@ export function QuestionForm({
     const renderGroupedItems = () => (
         <div className="space-y-3">
             <div className="flex justify-end">
-                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addItem}
+                >
                     <CirclePlusIcon className="size-3.5" />
                     Add item
                 </Button>
@@ -892,7 +938,12 @@ export function QuestionForm({
     const renderPairs = () => (
         <div className="space-y-3">
             <div className="flex justify-end">
-                <Button type="button" variant="outline" size="sm" onClick={addPair}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addPair}
+                >
                     <CirclePlusIcon className="size-3.5" />
                     Add pair
                 </Button>
@@ -1002,7 +1053,13 @@ export function QuestionForm({
             case 'objective_blank_choice':
                 return (
                     <div className="space-y-4">
-                        {selectedType?.options_only ? null : renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        {selectedType?.options_only
+                            ? null
+                            : renderLocalizedEditor(
+                                  'prompt_en',
+                                  'prompt_ur',
+                                  true,
+                              )}
                         {renderOptionsEditor(
                             form.data.content.options,
                             setOptionValue,
@@ -1036,7 +1093,9 @@ export function QuestionForm({
                                     <SelectValue placeholder="Select answer" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">Select answer</SelectItem>
+                                    <SelectItem value="none">
+                                        Select answer
+                                    </SelectItem>
                                     <SelectItem value="true">True</SelectItem>
                                     <SelectItem value="false">False</SelectItem>
                                 </SelectContent>
@@ -1048,13 +1107,22 @@ export function QuestionForm({
                 return (
                     <div className="space-y-4">
                         {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
-                        {renderLocalizedEditor('answer_en', 'answer_ur', true, 'input')}
+                        {renderLocalizedEditor(
+                            'answer_en',
+                            'answer_ur',
+                            true,
+                            'input',
+                        )}
                     </div>
                 );
             case 'objective_passage_mcq':
                 return (
                     <div className="space-y-4">
-                        {renderLocalizedEditor('passage_en', 'passage_ur', true)}
+                        {renderLocalizedEditor(
+                            'passage_en',
+                            'passage_ur',
+                            true,
+                        )}
                         {renderPassageItems()}
                     </div>
                 );
@@ -1062,15 +1130,32 @@ export function QuestionForm({
                 return (
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">Question statement</p>
-                            {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                            <p className="text-sm font-medium">
+                                Question statement
+                            </p>
+                            {renderLocalizedEditor(
+                                'prompt_en',
+                                'prompt_ur',
+                                true,
+                            )}
                         </div>
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">Shared statement / expression</p>
-                            {renderLocalizedEditor('shared_en', 'shared_ur', true)}
+                            <p className="text-sm font-medium">
+                                Shared statement / expression
+                            </p>
+                            {renderLocalizedEditor(
+                                'shared_en',
+                                'shared_ur',
+                                true,
+                            )}
                         </div>
                         {selectedType?.have_answer
-                            ? renderLocalizedEditor('answer_en', 'answer_ur', true, 'input')
+                            ? renderLocalizedEditor(
+                                  'answer_en',
+                                  'answer_ur',
+                                  true,
+                                  'input',
+                              )
                             : null}
                     </div>
                 );
@@ -1093,7 +1178,11 @@ export function QuestionForm({
                     <div className="space-y-4">
                         {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
                         {selectedType?.have_answer
-                            ? renderLocalizedEditor('answer_en', 'answer_ur', true)
+                            ? renderLocalizedEditor(
+                                  'answer_en',
+                                  'answer_ur',
+                                  true,
+                              )
                             : null}
                     </div>
                 );
@@ -1260,7 +1349,6 @@ export function QuestionForm({
                             </Select>
                         </Field>
 
-
                         <Field
                             label="Medium"
                             required
@@ -1328,7 +1416,11 @@ export function QuestionForm({
                     <Button asChild variant="outline">
                         <Link href={backHref}>Cancel</Link>
                     </Button>
-                    <Button type="submit" variant="outline" disabled={form.processing}>
+                    <Button
+                        type="submit"
+                        variant="outline"
+                        disabled={form.processing}
+                    >
                         <CheckCircle2Icon className="size-4" />
                         {form.processing ? 'Saving...' : submitLabel}
                     </Button>

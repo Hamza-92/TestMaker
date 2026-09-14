@@ -239,7 +239,6 @@ class QuestionTypeSchemaRegistry
             && (bool) ($validated['options_only'] ?? false)
             && in_array($schemaKey, [self::OBJECTIVE_MCQ, self::OBJECTIVE_BLANK_CHOICE], true);
 
-
         $legacy = match ($schemaKey) {
             self::OBJECTIVE_TRUE_FALSE => [
                 'have_exercise' => false,
@@ -433,6 +432,19 @@ class QuestionTypeSchemaRegistry
                 'answer_ur' => $question->answer_ur ?? '',
             ],
         };
+    }
+
+    /** Keep a question's stored structure independent from its current grouping type. */
+    public static function typeForQuestion(Question $question, QuestionType $questionType): QuestionType
+    {
+        if (! filled($question->schema_key)) {
+            return $questionType;
+        }
+
+        $resolved = clone $questionType;
+        $resolved->schema_key = $question->schema_key;
+
+        return $resolved;
     }
 
     public static function buildQuestionPayload(

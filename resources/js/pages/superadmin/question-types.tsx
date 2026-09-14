@@ -881,7 +881,7 @@ export default function QuestionTypes({
                                                     <Link
                                                         href={`/superadmin/question-types/${qt.id}/headings`}
                                                         className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                                        title="Headings"
+                                                        title="Scoped settings"
                                                     >
                                                         <HeadingIcon className="size-4" />
                                                     </Link>

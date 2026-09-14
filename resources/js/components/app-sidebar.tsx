@@ -109,7 +109,7 @@ export function AppSidebar() {
                               href: '/superadmin/question-types/subjective',
                           },
                           {
-                              title: 'Type Headings',
+                              title: 'Type Settings',
                               href: '/superadmin/question-types/headings',
                           },
                           ...(can('questions.view')

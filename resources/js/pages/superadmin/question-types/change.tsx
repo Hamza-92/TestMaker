@@ -105,7 +105,9 @@ export default function ChangeQuestionTypes({
                 : questionTypes.filter(
                       (type) =>
                           type.id !== sourceType.id &&
-                          type.schema_key === sourceType.schema_key,
+                          type.is_objective === sourceType.is_objective &&
+                          (!sourceType.is_objective ||
+                              type.schema_key === sourceType.schema_key),
                   ),
         [questionTypes, sourceType],
     );

@@ -12,6 +12,13 @@ import { Button } from '@/components/ui/button';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { usePermission } from '@/hooks/use-permission';
 
 interface QuestionType {
@@ -21,6 +28,14 @@ interface QuestionType {
     heading_en: string;
     heading_ur: string | null;
     is_objective: boolean;
+    schema_key: string;
+    question_text_rtl: boolean;
+    column_per_row: number;
+}
+
+interface QuestionSchema {
+    key: string;
+    label: string;
 }
 
 interface Catalog {
@@ -41,6 +56,9 @@ interface HeadingRule {
     subject_id: number | null;
     heading_en: string | null;
     heading_ur: string | null;
+    schema_key: string | null;
+    question_text_rtl: boolean | null;
+    column_per_row: number | null;
 }
 
 interface RuleForm {
@@ -49,7 +67,12 @@ interface RuleForm {
     subject_id: number | null;
     heading_en: string;
     heading_ur: string;
+    schema_key: string;
+    question_text_rtl: boolean | null;
+    column_per_row: number | null;
 }
+
+const INHERIT = '__inherit__';
 
 function optionFor(options: ComboboxOptionItem[], id: number | null) {
     return options.find((option) => Number(option.id) === id) ?? null;
@@ -57,10 +80,12 @@ function optionFor(options: ComboboxOptionItem[], id: number | null) {
 
 export default function QuestionTypeHeadingRules({
     questionType,
+    schemas,
     catalog,
     rules,
 }: {
     questionType: QuestionType;
+    schemas: QuestionSchema[];
     catalog: Catalog;
     rules: HeadingRule[];
 }) {
@@ -72,6 +97,9 @@ export default function QuestionTypeHeadingRules({
         subject_id: null,
         heading_en: '',
         heading_ur: '',
+        schema_key: '',
+        question_text_rtl: null,
+        column_per_row: null,
     });
     const patternOptions = useMemo<ComboboxOptionItem[]>(
         () =>
@@ -158,6 +186,9 @@ export default function QuestionTypeHeadingRules({
             subject_id: subjectId,
             heading_en: rule?.heading_en ?? '',
             heading_ur: rule?.heading_ur ?? '',
+            schema_key: rule?.schema_key ?? '',
+            question_text_rtl: rule?.question_text_rtl ?? null,
+            column_per_row: rule?.column_per_row ?? null,
         });
     }
 
@@ -180,7 +211,7 @@ export default function QuestionTypeHeadingRules({
     }
 
     function deleteRule(rule: HeadingRule) {
-        if (!window.confirm('Remove this heading rule?')) {
+        if (!window.confirm('Remove this scoped rule?')) {
             return;
         }
 
@@ -215,7 +246,7 @@ export default function QuestionTypeHeadingRules({
 
     return (
         <>
-            <Head title={`${questionType.name} Headings`} />
+            <Head title={`${questionType.name} Scoped Settings`} />
             <div className="space-y-5 p-4 md:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -228,7 +259,7 @@ export default function QuestionTypeHeadingRules({
                         </Link>
                         <div>
                             <h1 className="h1-semibold">
-                                {questionType.name} Headings
+                                {questionType.name} Scoped Settings
                             </h1>
                         </div>
                     </div>
@@ -237,7 +268,7 @@ export default function QuestionTypeHeadingRules({
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border bg-card px-4 py-3 text-sm shadow-sm">
                     <span className="flex items-center gap-2 font-semibold">
                         <HeadingIcon className="size-4 text-primary" />
-                        Default
+                        Defaults
                     </span>
                     <span>{questionType.heading_en}</span>
                     {questionType.heading_ur && (
@@ -252,6 +283,11 @@ export default function QuestionTypeHeadingRules({
                             {questionType.heading_ur}
                         </span>
                     )}
+                    <span className="text-muted-foreground">
+                        {schemas.find(
+                            (schema) => schema.key === questionType.schema_key,
+                        )?.label ?? questionType.schema_key}
+                    </span>
                 </div>
 
                 <div>
@@ -263,8 +299,8 @@ export default function QuestionTypeHeadingRules({
                             <PlusIcon className="size-4 text-primary" />
                             <h2 className="font-semibold">
                                 {exactRule
-                                    ? 'Edit heading rule'
-                                    : 'Add heading rule'}
+                                    ? 'Edit scoped rule'
+                                    : 'Add scoped rule'}
                             </h2>
                         </div>
 
@@ -401,6 +437,122 @@ export default function QuestionTypeHeadingRules({
                             </div>
                         </div>
 
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <div>
+                                <label className="mb-1.5 block text-sm font-medium">
+                                    Question format
+                                </label>
+                                <Select
+                                    value={form.data.schema_key || INHERIT}
+                                    onValueChange={(value) =>
+                                        form.setData(
+                                            'schema_key',
+                                            value === INHERIT ? '' : value,
+                                        )
+                                    }
+                                    disabled={!canEdit || form.processing}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={INHERIT}>
+                                            Inherit default
+                                        </SelectItem>
+                                        {schemas.map((schema) => (
+                                            <SelectItem
+                                                key={schema.key}
+                                                value={schema.key}
+                                            >
+                                                {schema.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {form.errors.schema_key && (
+                                    <p className="mt-1 text-xs text-destructive">
+                                        {form.errors.schema_key}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="mb-1.5 block text-sm font-medium">
+                                    Question direction
+                                </label>
+                                <Select
+                                    value={
+                                        form.data.question_text_rtl === null
+                                            ? INHERIT
+                                            : form.data.question_text_rtl
+                                              ? 'rtl'
+                                              : 'ltr'
+                                    }
+                                    onValueChange={(value) =>
+                                        form.setData(
+                                            'question_text_rtl',
+                                            value === INHERIT
+                                                ? null
+                                                : value === 'rtl',
+                                        )
+                                    }
+                                    disabled={!canEdit || form.processing}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={INHERIT}>
+                                            Inherit default
+                                        </SelectItem>
+                                        <SelectItem value="ltr">
+                                            Left to right
+                                        </SelectItem>
+                                        <SelectItem value="rtl">
+                                            Right to left
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <label className="mb-1.5 block text-sm font-medium">
+                                    Columns per row
+                                </label>
+                                <Select
+                                    value={
+                                        form.data.column_per_row === null
+                                            ? INHERIT
+                                            : String(form.data.column_per_row)
+                                    }
+                                    onValueChange={(value) =>
+                                        form.setData(
+                                            'column_per_row',
+                                            value === INHERIT
+                                                ? null
+                                                : Number(value),
+                                        )
+                                    }
+                                    disabled={!canEdit || form.processing}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={INHERIT}>
+                                            Inherit default
+                                        </SelectItem>
+                                        {[1, 2, 3, 4, 5].map((columns) => (
+                                            <SelectItem
+                                                key={columns}
+                                                value={String(columns)}
+                                            >
+                                                {columns}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
                         {canEdit && (
                             <div className="flex justify-end">
                                 <Button
@@ -409,7 +561,11 @@ export default function QuestionTypeHeadingRules({
                                         form.processing ||
                                         form.data.pattern_id === null ||
                                         (!form.data.heading_en.trim() &&
-                                            !form.data.heading_ur.trim())
+                                            !form.data.heading_ur.trim() &&
+                                            !form.data.schema_key &&
+                                            form.data.question_text_rtl ===
+                                                null &&
+                                            form.data.column_per_row === null)
                                     }
                                 >
                                     <SaveIcon className="size-4" />
@@ -426,28 +582,37 @@ export default function QuestionTypeHeadingRules({
 
                 <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="flex items-center justify-between gap-3 border-b px-5 py-3">
-                        <h2 className="font-semibold">Heading rules</h2>
+                        <h2 className="font-semibold">Scoped rules</h2>
                         <span className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground">
                             {rules.length}
                         </span>
                     </div>
                     {rules.length === 0 ? (
                         <div className="px-5 py-7 text-center text-sm text-muted-foreground">
-                            No heading rules.
+                            No scoped rules.
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[720px] table-fixed text-sm">
+                            <table className="w-full min-w-[1100px] table-fixed text-sm">
                                 <thead className="border-b bg-muted/30 text-left text-xs font-semibold text-muted-foreground">
                                     <tr>
-                                        <th className="w-1/4 px-5 py-2.5">
+                                        <th className="w-1/5 px-5 py-2.5">
                                             Scope
                                         </th>
-                                        <th className="w-[32%] px-5 py-2.5">
+                                        <th className="w-1/5 px-5 py-2.5">
                                             English heading
                                         </th>
-                                        <th className="w-[32%] px-5 py-2.5 text-right">
+                                        <th className="w-1/5 px-5 py-2.5 text-right">
                                             Urdu heading
+                                        </th>
+                                        <th className="w-1/5 px-5 py-2.5">
+                                            Format
+                                        </th>
+                                        <th className="w-28 px-5 py-2.5">
+                                            Direction
+                                        </th>
+                                        <th className="w-24 px-5 py-2.5 text-center">
+                                            Columns
                                         </th>
                                         <th className="w-24 px-5 py-2.5 text-right">
                                             Actions
@@ -475,6 +640,27 @@ export default function QuestionTypeHeadingRules({
                                             >
                                                 {rule.heading_ur ||
                                                     'اردو عنوان وراثت میں'}
+                                            </td>
+                                            <td className="px-5 py-3 text-muted-foreground">
+                                                {rule.schema_key
+                                                    ? (schemas.find(
+                                                          (schema) =>
+                                                              schema.key ===
+                                                              rule.schema_key,
+                                                      )?.label ??
+                                                      rule.schema_key)
+                                                    : 'Inherit'}
+                                            </td>
+                                            <td className="px-5 py-3 text-muted-foreground">
+                                                {rule.question_text_rtl === null
+                                                    ? 'Inherit'
+                                                    : rule.question_text_rtl
+                                                      ? 'RTL'
+                                                      : 'LTR'}
+                                            </td>
+                                            <td className="px-5 py-3 text-center text-muted-foreground">
+                                                {rule.column_per_row ??
+                                                    'Inherit'}
                                             </td>
                                             <td className="px-5 py-3">
                                                 {canEdit && (
@@ -517,7 +703,7 @@ export default function QuestionTypeHeadingRules({
 QuestionTypeHeadingRules.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Type Headings', href: '/superadmin/question-types/headings' },
+        { title: 'Type Settings', href: '/superadmin/question-types/headings' },
         { title: 'Rules' },
     ],
 };
