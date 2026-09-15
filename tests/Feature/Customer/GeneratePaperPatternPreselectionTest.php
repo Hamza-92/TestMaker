@@ -116,6 +116,79 @@ test('a subject assignment medium becomes the generator default without restrict
         ->assertJsonPath('sections.0.title', 'Short Questions');
 });
 
+test('paper question pickers receive questions in their saved scope order', function () {
+    $customer = User::factory()->create([
+        'user_type' => UserType::Customer->value,
+        'status' => UserStatus::Active->value,
+        'account_type' => AccountType::Trial->value,
+    ]);
+    TrialSetting::current()->update(['access_scope' => null]);
+
+    $pattern = Pattern::create(['name' => 'Picker Order Pattern', 'status' => 1]);
+    $class = SchoolClass::create(['name' => 'Picker Order Class', 'status' => 1]);
+    $subject = Subject::create([
+        'name_eng' => 'Picker Order Subject',
+        'subject_type' => 'chapter-wise',
+        'status' => 1,
+    ]);
+
+    DB::table('pattern_classes')->insert([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+    ]);
+    ClassSubject::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+    ]);
+
+    $chapter = Chapter::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'name' => 'Picker Order Chapter',
+        'chapter_number' => 1,
+        'status' => 1,
+    ]);
+    $questionType = QuestionType::create([
+        'name' => 'Picker Order Questions',
+        'heading_en' => 'Picker Order Questions',
+        'have_exercise' => false,
+        'have_statement' => true,
+        'have_description' => false,
+        'have_answer' => true,
+        'is_single' => true,
+        'is_objective' => false,
+        'schema_key' => 'subjective_standard',
+        'column_per_row' => 1,
+        'status' => 1,
+    ]);
+
+    $questions = collect(['First created', 'Second created', 'Third created'])
+        ->map(fn (string $statement) => Question::create([
+            'question_type_id' => $questionType->id,
+            'chapter_id' => $chapter->id,
+            'statement_en' => $statement,
+            'source' => Question::SOURCE_EXERCISE,
+            'status' => 1,
+        ]));
+
+    $questions[0]->update(['sort_order' => 3]);
+    $questions[1]->update(['sort_order' => 1]);
+    $questions[2]->update(['sort_order' => 2]);
+
+    $this->actingAs($customer)
+        ->getJson(route('customer.papers.generate.questions', [
+            'chapter_ids' => [$chapter->id],
+            'sources' => [Question::SOURCE_EXERCISE],
+            'question_type_id' => $questionType->id,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('questions.0.id', $questions[1]->id)
+        ->assertJsonPath('questions.1.id', $questions[2]->id)
+        ->assertJsonPath('questions.2.id', $questions[0]->id);
+});
+
 test('an available dashboard pattern can be preselected on the paper generator', function () {
     $customer = User::factory()->create([
         'user_type' => UserType::Customer->value,
