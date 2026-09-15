@@ -126,6 +126,8 @@ interface ClassSubject {
     class_id: number;
     subject_id: number;
     name: string;
+    name_ur?: string | null;
+    medium?: ContentMedium | null;
 }
 
 interface Topic {
@@ -430,9 +432,21 @@ function rowOrSelectedQuestionIds(
         []
     );
 }
-function englishQuestionTypeTitle(
-    section: Pick<QuestionSelectionSection, 'title' | 'titleEnglish'>,
+function questionTypeTitleForMedium(
+    section: Pick<
+        QuestionSelectionSection,
+        'title' | 'titleEnglish' | 'titleUrdu'
+    >,
+    medium: ContentMedium,
 ): string {
+    if (medium === 'Urdu') {
+        return (
+            section.titleUrdu?.trim() ||
+            section.titleEnglish?.trim() ||
+            section.title
+        );
+    }
+
     return section.titleEnglish?.trim() || section.title;
 }
 
@@ -3031,7 +3045,10 @@ export default function GeneratePaper({
                         side: 'primary',
                         questionTypeId: item.section.questionTypeId,
                         selectedQuestionIds: item.row.selectedQuestionIds,
-                        title: englishQuestionTypeTitle(item.section),
+                        title: questionTypeTitleForMedium(
+                            item.section,
+                            chapterMedium,
+                        ),
                     },
                 ];
 
@@ -3057,7 +3074,10 @@ export default function GeneratePaper({
                                     alternativeTypeId,
                                 ),
                                 title: alternative
-                                    ? englishQuestionTypeTitle(alternative)
+                                    ? questionTypeTitleForMedium(
+                                          alternative,
+                                          chapterMedium,
+                                      )
                                     : 'OR alternative',
                             };
                         },
@@ -3115,7 +3135,12 @@ export default function GeneratePaper({
                             side: 'primary',
                             questionTypeId: part.questionTypeId,
                             selectedQuestionIds: part.selectedQuestionIds,
-                            title: type?.name ?? 'Multipart part',
+                            title:
+                                chapterMedium === 'Urdu'
+                                    ? type?.nameUrdu ||
+                                      type?.name ||
+                                      'Multipart part'
+                                    : (type?.name ?? 'Multipart part'),
                         },
                     ];
                 });
@@ -3124,6 +3149,7 @@ export default function GeneratePaper({
 
         return [...standardRows, ...multipartRows];
     }, [
+        chapterMedium,
         multipartConfig,
         questionSelection.multipart,
         questionSelection.sections,
@@ -4169,6 +4195,21 @@ export default function GeneratePaper({
 
     function handleSubjectChange(value: ComboboxOptionItem | null) {
         setSubject(value);
+        const assignedMedium = classSubjects.find(
+            (item) =>
+                item.pattern_id === pattern?.id &&
+                item.class_id === klass?.id &&
+                item.subject_id === value?.id,
+        )?.medium;
+
+        if (
+            assignedMedium === 'English' ||
+            assignedMedium === 'Urdu' ||
+            assignedMedium === 'Both'
+        ) {
+            setChapterMedium(assignedMedium);
+        }
+
         setChapterLoadError(null);
         setSelected({});
         setStep('chapters');
@@ -7384,10 +7425,11 @@ export default function GeneratePaper({
                                                   )
                                                   .map((typeId) =>
                                                       plainQuestionText(
-                                                          englishQuestionTypeTitle(
+                                                          questionTypeTitleForMedium(
                                                               sectionsByType.get(
                                                                   typeId,
                                                               ) as QuestionSelectionSection,
+                                                              chapterMedium,
                                                           ),
                                                       ),
                                                   )
@@ -7416,6 +7458,7 @@ export default function GeneratePaper({
                             <QuestionSelectionCard
                                 key={section.id}
                                 section={section}
+                                medium={chapterMedium}
                                 alternativeSections={alternativeSections}
                                 orTypeOptions={orTypeOptions}
                                 selectedOrTypeIds={orGroupTypeIds(section)}
@@ -8052,6 +8095,7 @@ export default function GeneratePaper({
                                                 (multipart) => (
                                                     <MultipartSelectionCard
                                                         key={multipart.id}
+                                                        medium={chapterMedium}
                                                         config={multipartConfig}
                                                         value={multipart}
                                                         onChange={(
@@ -9733,6 +9777,7 @@ function AddMultipartPaperSectionModal({
                             <MultipartSelectionCard
                                 key={selection.id}
                                 title={`Multipart question ${index + 1}`}
+                                medium={medium}
                                 config={multipartConfig}
                                 value={selection}
                                 onChange={(nextSelection) =>
@@ -14583,6 +14628,7 @@ function OrGroupSelect({
 }
 function MultipartSelectionCard({
     title = 'Multi Part Questions',
+    medium,
     config,
     value,
     onChange,
@@ -14590,6 +14636,7 @@ function MultipartSelectionCard({
     onOpenManualPicker,
 }: {
     title?: string;
+    medium: ContentMedium;
     config: MultipartConfig;
     value: MultipartSelectionState;
     onChange: (value: MultipartSelectionState) => void;
@@ -14598,7 +14645,7 @@ function MultipartSelectionCard({
 }) {
     const typeOptions = config.partTypes.map((type) => ({
         id: type.id,
-        label: type.name,
+        label: medium === 'Urdu' ? type.nameUrdu || type.name : type.name,
     }));
     const canAddPart = value.rows.length < config.maxParts;
     const canDeletePart = value.rows.length > 2;
@@ -14783,6 +14830,7 @@ function MultipartSelectionCard({
 }
 function QuestionSelectionCard({
     section,
+    medium,
     alternativeSections,
     orTypeOptions,
     selectedOrTypeIds,
@@ -14803,6 +14851,7 @@ function QuestionSelectionCard({
     onDragEnd,
 }: {
     section: QuestionSelectionSection;
+    medium: ContentMedium;
     alternativeSections: QuestionSelectionSection[];
     orTypeOptions: OrTypeOption[];
     selectedOrTypeIds: number[];
@@ -14846,7 +14895,7 @@ function QuestionSelectionCard({
     onDragEnd: () => void;
 }) {
     const canDeleteRow = section.rows.length > 1;
-    const typeHeading = englishQuestionTypeTitle(section);
+    const typeHeading = questionTypeTitleForMedium(section, medium);
     const hasAlternatives = alternativeSections.length > 0;
     const effectiveAvailableCount = hasAlternatives
         ? Math.min(
@@ -15043,7 +15092,10 @@ function QuestionSelectionCard({
                                             alternative.questionTypeId,
                                         );
                                     const alternativeTitle = plainQuestionText(
-                                        englishQuestionTypeTitle(alternative),
+                                        questionTypeTitleForMedium(
+                                            alternative,
+                                            medium,
+                                        ),
                                     );
 
                                     return (

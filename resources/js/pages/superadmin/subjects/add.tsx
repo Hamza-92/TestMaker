@@ -25,10 +25,16 @@ interface PatternWithClasses {
     classes: ClassItem[];
 }
 
+interface MediumOption {
+    id: number;
+    name: 'English' | 'Urdu' | 'Both';
+}
+
 interface Link_ {
     class_id: number;
     pattern_id: number;
     subject_type: string;
+    medium_id: number | null;
 }
 
 interface FormData {
@@ -69,8 +75,10 @@ function Field({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AddSubject({
     patterns,
+    mediums,
 }: {
     patterns: PatternWithClasses[];
+    mediums: MediumOption[];
 }) {
     const { data, setData, post, processing, errors } = useForm<FormData>({
         name_eng: '',
@@ -84,6 +92,11 @@ export default function AddSubject({
         data.links.some(
             (l) => l.class_id === class_id && l.pattern_id === pattern_id,
         );
+
+    const defaultMediumId =
+        mediums.find((medium) => medium.name === 'Both')?.id ??
+        mediums[0]?.id ??
+        null;
 
     const toggleLink = (class_id: number, pattern_id: number) => {
         if (isLinked(class_id, pattern_id)) {
@@ -100,7 +113,12 @@ export default function AddSubject({
         } else {
             setData('links', [
                 ...data.links,
-                { class_id, pattern_id, subject_type: data.subject_type },
+                {
+                    class_id,
+                    pattern_id,
+                    subject_type: data.subject_type,
+                    medium_id: defaultMediumId,
+                },
             ]);
         }
     };
@@ -115,6 +133,21 @@ export default function AddSubject({
             data.links.map((link) =>
                 link.class_id === class_id && link.pattern_id === pattern_id
                     ? { ...link, subject_type }
+                    : link,
+            ),
+        );
+    };
+
+    const setLinkMedium = (
+        class_id: number,
+        pattern_id: number,
+        medium_id: number,
+    ) => {
+        setData(
+            'links',
+            data.links.map((link) =>
+                link.class_id === class_id && link.pattern_id === pattern_id
+                    ? { ...link, medium_id }
                     : link,
             ),
         );
@@ -141,6 +174,7 @@ export default function AddSubject({
                     class_id: c.id,
                     pattern_id: pattern.id,
                     subject_type: data.subject_type,
+                    medium_id: defaultMediumId,
                 }));
             setData('links', [...data.links, ...toAdd]);
         }
@@ -156,7 +190,7 @@ export default function AddSubject({
     return (
         <>
             <Head title="Add Subject" />
-            <div className="mx-auto w-full max-w-2xl min-w-0 space-y-6 p-4 md:p-6">
+            <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
                 {/* ── Header ──────────────────────────────────────────────── */}
                 <div className="flex min-w-0 items-center gap-4">
                     <Link
@@ -365,12 +399,18 @@ export default function AddSubject({
                                             </label>
 
                                             {/* Class checkboxes */}
-                                            <div className="grid gap-px bg-border sm:grid-cols-2">
+                                            <div className="grid gap-px bg-border xl:grid-cols-2">
                                                 {pattern.classes.map((cls) => {
-                                                    const checked = isLinked(
-                                                        cls.id,
-                                                        pattern.id,
-                                                    );
+                                                    const currentLink =
+                                                        data.links.find(
+                                                            (link) =>
+                                                                link.class_id ===
+                                                                    cls.id &&
+                                                                link.pattern_id ===
+                                                                    pattern.id,
+                                                        );
+                                                    const checked =
+                                                        Boolean(currentLink);
 
                                                     return (
                                                         <div
@@ -405,42 +445,80 @@ export default function AddSubject({
                                                                 {cls.name}
                                                             </button>
                                                             {checked && (
-                                                                <Select
-                                                                    value={
-                                                                        data.links.find(
-                                                                            (
-                                                                                link,
-                                                                            ) =>
-                                                                                link.class_id ===
-                                                                                    cls.id &&
-                                                                                link.pattern_id ===
-                                                                                    pattern.id,
-                                                                        )
-                                                                            ?.subject_type ??
-                                                                        data.subject_type
-                                                                    }
-                                                                    onValueChange={(
-                                                                        value,
-                                                                    ) =>
-                                                                        setLinkSubjectType(
-                                                                            cls.id,
-                                                                            pattern.id,
+                                                                <div className="flex shrink-0 items-center gap-2">
+                                                                    <Select
+                                                                        value={
+                                                                            currentLink?.subject_type ??
+                                                                            data.subject_type
+                                                                        }
+                                                                        onValueChange={(
                                                                             value,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <SelectTrigger className="h-8 w-36 bg-background">
-                                                                        <SelectValue />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent>
-                                                                        <SelectItem value="chapter-wise">
-                                                                            Chapter-wise
-                                                                        </SelectItem>
-                                                                        <SelectItem value="topic-wise">
-                                                                            Topic-wise
-                                                                        </SelectItem>
-                                                                    </SelectContent>
-                                                                </Select>
+                                                                        ) =>
+                                                                            setLinkSubjectType(
+                                                                                cls.id,
+                                                                                pattern.id,
+                                                                                value,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <SelectTrigger className="h-8 w-36 bg-background">
+                                                                            <SelectValue />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="chapter-wise">
+                                                                                Chapter-wise
+                                                                            </SelectItem>
+                                                                            <SelectItem value="topic-wise">
+                                                                                Topic-wise
+                                                                            </SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <Select
+                                                                        value={String(
+                                                                            currentLink?.medium_id ??
+                                                                                defaultMediumId ??
+                                                                                '',
+                                                                        )}
+                                                                        onValueChange={(
+                                                                            value,
+                                                                        ) =>
+                                                                            setLinkMedium(
+                                                                                cls.id,
+                                                                                pattern.id,
+                                                                                Number(
+                                                                                    value,
+                                                                                ),
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <SelectTrigger
+                                                                            className="h-8 w-28 bg-background"
+                                                                            aria-label={`Default medium for ${cls.name}`}
+                                                                        >
+                                                                            <SelectValue placeholder="Medium" />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {mediums.map(
+                                                                                (
+                                                                                    medium,
+                                                                                ) => (
+                                                                                    <SelectItem
+                                                                                        key={
+                                                                                            medium.id
+                                                                                        }
+                                                                                        value={String(
+                                                                                            medium.id,
+                                                                                        )}
+                                                                                    >
+                                                                                        {
+                                                                                            medium.name
+                                                                                        }
+                                                                                    </SelectItem>
+                                                                                ),
+                                                                            )}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </div>
                                                             )}
                                                         </div>
                                                     );

@@ -138,3 +138,55 @@ it('updates scoped structures without losing an existing assignment medium', fun
         'subject_type' => 'chapter-wise',
     ]);
 });
+
+it('updates the default medium for a subject assignment', function () {
+    $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value]);
+    $pattern = Pattern::create([
+        'name' => 'Medium Pattern',
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+    $class = SchoolClass::create([
+        'name' => 'Medium Class',
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+    $subject = Subject::create([
+        'name_eng' => 'Medium Subject',
+        'subject_type' => 'chapter-wise',
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+    $english = Medium::query()->firstOrCreate(['name' => 'English']);
+    $urdu = Medium::query()->firstOrCreate(['name' => 'Urdu']);
+
+    ClassSubject::create([
+        'class_id' => $class->id,
+        'pattern_id' => $pattern->id,
+        'subject_id' => $subject->id,
+        'subject_type' => 'chapter-wise',
+        'medium_id' => $english->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->put(route('superadmin.subjects.update', $subject), [
+            'name_eng' => $subject->name_eng,
+            'name_ur' => '',
+            'subject_type' => 'chapter-wise',
+            'status' => true,
+            'links' => [[
+                'class_id' => $class->id,
+                'pattern_id' => $pattern->id,
+                'subject_type' => 'chapter-wise',
+                'medium_id' => $urdu->id,
+            ]],
+        ])
+        ->assertRedirect(route('superadmin.subjects.show', $subject));
+
+    $this->assertDatabaseHas('class_subjects', [
+        'class_id' => $class->id,
+        'pattern_id' => $pattern->id,
+        'subject_id' => $subject->id,
+        'medium_id' => $urdu->id,
+    ]);
+});

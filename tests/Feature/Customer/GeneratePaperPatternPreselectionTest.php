@@ -4,6 +4,8 @@ use App\Enums\AccountType;
 use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\Chapter;
+use App\Models\ClassSubject;
+use App\Models\Medium;
 use App\Models\MultipartQuestionSetting;
 use App\Models\PaperQuestionSection;
 use App\Models\PaperQuestionSectionScope;
@@ -22,6 +24,97 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
+
+test('a subject assignment medium becomes the generator default without restricting other mediums', function () {
+    $customer = User::factory()->create([
+        'user_type' => UserType::Customer->value,
+        'status' => UserStatus::Active->value,
+        'account_type' => AccountType::Trial->value,
+    ]);
+    TrialSetting::current()->update(['access_scope' => null]);
+
+    $pattern = Pattern::create(['name' => 'Medium Pattern', 'status' => 1]);
+    $class = SchoolClass::create(['name' => 'Medium Class', 'status' => 1]);
+    $subject = Subject::create([
+        'name_eng' => 'Computer Science',
+        'name_ur' => 'کمپیوٹر سائنس',
+        'subject_type' => 'chapter-wise',
+        'status' => 1,
+    ]);
+    $urdu = Medium::query()->firstOrCreate(['name' => 'Urdu']);
+
+    DB::table('pattern_classes')->insert([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+    ]);
+    ClassSubject::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'medium_id' => $urdu->id,
+    ]);
+    $chapter = Chapter::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'name' => 'Introduction',
+        'name_ur' => 'تعارف',
+        'chapter_number' => 1,
+        'status' => 1,
+    ]);
+    $questionType = QuestionType::create([
+        'name' => 'Short Questions',
+        'name_ur' => 'مختصر سوالات',
+        'heading_en' => 'Answer the short questions',
+        'heading_ur' => 'مختصر سوالات کے جواب دیں',
+        'have_exercise' => false,
+        'have_statement' => true,
+        'have_description' => false,
+        'have_answer' => true,
+        'is_single' => true,
+        'is_objective' => false,
+        'schema_key' => 'subjective_standard',
+        'column_per_row' => 1,
+        'status' => 1,
+    ]);
+    Question::create([
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'statement_en' => 'What is a computer?',
+        'statement_ur' => 'کمپیوٹر کیا ہے؟',
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => 1,
+    ]);
+
+    $this->actingAs($customer)
+        ->getJson(route('customer.papers.generate.chapters', [
+            'pattern_id' => $pattern->id,
+            'class_id' => $class->id,
+            'subject_id' => $subject->id,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('medium', 'Urdu')
+        ->assertJsonPath('chapters.0.name', 'تعارف');
+
+    $this->actingAs($customer)
+        ->getJson(route('customer.papers.generate.question-types', [
+            'chapter_ids' => [$chapter->id],
+            'sources' => [Question::SOURCE_EXERCISE],
+        ]))
+        ->assertOk()
+        ->assertJsonPath('sections.0.title', 'مختصر سوالات')
+        ->assertJsonPath('sections.0.titleEnglish', 'Short Questions')
+        ->assertJsonPath('sections.0.titleUrdu', 'مختصر سوالات');
+
+    $this->actingAs($customer)
+        ->getJson(route('customer.papers.generate.question-types', [
+            'chapter_ids' => [$chapter->id],
+            'sources' => [Question::SOURCE_EXERCISE],
+            'medium' => 'English',
+        ]))
+        ->assertOk()
+        ->assertJsonPath('sections.0.title', 'Short Questions');
+});
 
 test('an available dashboard pattern can be preselected on the paper generator', function () {
     $customer = User::factory()->create([

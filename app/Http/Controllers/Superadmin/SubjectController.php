@@ -6,6 +6,7 @@ use App\Enums\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ClassSubject;
+use App\Models\Medium;
 use App\Models\Pattern;
 use App\Models\Subject;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class SubjectController extends Controller
         $subjects = Subject::with([
             'classSubjects.schoolClass:id,name',
             'classSubjects.pattern:id,name,short_name',
+            'classSubjects.medium:id,name',
         ])
             ->orderByDesc('created_at')
             ->get(['id', 'name_eng', 'name_ur', 'subject_type', 'status', 'created_at']);
@@ -42,6 +44,7 @@ class SubjectController extends Controller
         $subject->load([
             'classSubjects.schoolClass:id,name,status',
             'classSubjects.pattern:id,name,short_name',
+            'classSubjects.medium:id,name',
             'auditLogs.changedBy:id,name',
             'chapters' => fn ($q) => $q->with($chaptersWith)
                 ->withCount('questions')
@@ -58,6 +61,7 @@ class SubjectController extends Controller
                     'id' => $cs->schoolClass->id,
                     'name' => $cs->schoolClass->name,
                     'subject_type' => $cs->effectiveSubjectType(),
+                    'medium' => $cs->medium?->name,
                 ] : null)->filter()->values(),
             ])
             ->values();
@@ -122,6 +126,7 @@ class SubjectController extends Controller
 
         return Inertia::render('superadmin/subjects/add', [
             'patterns' => $patterns,
+            'mediums' => $this->mediums(),
         ]);
     }
 
@@ -136,6 +141,7 @@ class SubjectController extends Controller
             'links.*.class_id' => ['required', 'integer', 'exists:classes,id'],
             'links.*.pattern_id' => ['required', 'integer', 'exists:patterns,id'],
             'links.*.subject_type' => ['nullable', 'in:chapter-wise,topic-wise'],
+            'links.*.medium_id' => ['nullable', 'integer', 'exists:mediums,id'],
         ]);
 
         $subject = Subject::create([
@@ -175,18 +181,20 @@ class SubjectController extends Controller
             ->values();
 
         $existingLinks = $subject->classSubjects()
-            ->get(['class_id', 'pattern_id', 'subject_type'])
+            ->get(['class_id', 'pattern_id', 'subject_type', 'medium_id'])
             ->map(fn ($cs) => [
                 'class_id' => $cs->class_id,
                 'pattern_id' => $cs->pattern_id,
                 'subject_type' => in_array($cs->subject_type, ClassSubject::SUBJECT_TYPES, true)
                     ? $cs->subject_type
                     : $subject->subject_type,
+                'medium_id' => $cs->medium_id,
             ]);
 
         return Inertia::render('superadmin/subjects/edit', [
             'subject' => $subject->only(['id', 'name_eng', 'name_ur', 'subject_type', 'status']),
             'patterns' => $patterns,
+            'mediums' => $this->mediums(),
             'existingLinks' => $existingLinks,
         ]);
     }
@@ -202,6 +210,7 @@ class SubjectController extends Controller
             'links.*.class_id' => ['required', 'integer', 'exists:classes,id'],
             'links.*.pattern_id' => ['required', 'integer', 'exists:patterns,id'],
             'links.*.subject_type' => ['nullable', 'in:chapter-wise,topic-wise'],
+            'links.*.medium_id' => ['nullable', 'integer', 'exists:mediums,id'],
         ]);
 
         $oldValues = $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']);
@@ -268,8 +277,19 @@ class SubjectController extends Controller
                 ],
                 [
                     'subject_type' => $link['subject_type'] ?? $subject->subject_type,
+                    ...(array_key_exists('medium_id', $link)
+                        ? ['medium_id' => $link['medium_id']]
+                        : []),
                 ],
             );
         }
+    }
+
+    private function mediums()
+    {
+        return Medium::query()
+            ->whereIn('name', ['English', 'Urdu', 'Both'])
+            ->orderByRaw("CASE name WHEN 'Both' THEN 1 WHEN 'English' THEN 2 WHEN 'Urdu' THEN 3 ELSE 4 END")
+            ->get(['id', 'name']);
     }
 }
