@@ -5,7 +5,9 @@ import {
     ChevronsLeftIcon,
     ChevronsRightIcon,
     ArrowRightLeftIcon,
+    ArrowUpDownIcon,
     EyeIcon,
+    GripVerticalIcon,
     PencilIcon,
     SearchIcon,
     Trash2Icon,
@@ -43,6 +45,7 @@ interface QuestionRow {
     source: string | null;
     source_label?: string | null;
     status: number;
+    sort_order: number;
     created_at: string | null;
     question_type: QuestionTypeOption;
     chapter: {
@@ -173,6 +176,11 @@ export default function Questions({
     const [deleting, setDeleting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [changeTypeOpen, setChangeTypeOpen] = useState(false);
+    const [sortingEnabled, setSortingEnabled] = useState(false);
+    const [sortingItems, setSortingItems] = useState<QuestionRow[]>([]);
+    const [draggedId, setDraggedId] = useState<number | null>(null);
+    const [sortDirty, setSortDirty] = useState(false);
+    const [sortSaving, setSortSaving] = useState(false);
 
     // ── Cascaded dropdown options ─────────────────────────────────────────────
     const patterns = useMemo(
@@ -350,6 +358,7 @@ export default function Questions({
         (safePage - 1) * pageSize,
         safePage * pageSize,
     );
+    const rows = sortingEnabled ? sortingItems : paginated;
     const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
     const selectedQuestions = (questions ?? []).filter((question) =>
         selectedIds.has(question.id),
@@ -422,6 +431,92 @@ export default function Questions({
 
     const canAddQuestion = !!chapterId && (!isTopicWise || !!topicId);
     const showTable = questions !== null;
+    const selectedSortType = availableQuestionTypes.find(
+        (type) => String(type.id) === typeFilter,
+    );
+    const canSortQuestions =
+        showTable &&
+        canEditQuestions &&
+        typeFilter !== 'all' &&
+        (!isTopicWise || topicId !== '');
+
+    const beginSorting = () => {
+        if (!questions || !canSortQuestions) {
+            return;
+        }
+
+        const scopedTopicId = isTopicWise ? Number(topicId) : null;
+        setSortingItems(
+            questions.filter(
+                (question) =>
+                    String(question.question_type.id) === typeFilter &&
+                    (isTopicWise
+                        ? question.topic?.id === scopedTopicId
+                        : question.topic === null),
+            ),
+        );
+        setSelectedIds(new Set());
+        setSortDirty(false);
+        setSortingEnabled(true);
+    };
+
+    const cancelSorting = () => {
+        setSortingEnabled(false);
+        setSortingItems([]);
+        setDraggedId(null);
+        setSortDirty(false);
+    };
+
+    const handleSortDrop = (targetId: number) => {
+        if (draggedId === null || draggedId === targetId) {
+            setDraggedId(null);
+
+            return;
+        }
+
+        setSortingItems((current) => {
+            const fromIndex = current.findIndex(
+                (question) => question.id === draggedId,
+            );
+            const toIndex = current.findIndex(
+                (question) => question.id === targetId,
+            );
+
+            if (fromIndex < 0 || toIndex < 0) {
+                return current;
+            }
+
+            const next = [...current];
+            const [moved] = next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, moved);
+
+            return next;
+        });
+        setSortDirty(true);
+        setDraggedId(null);
+    };
+
+    const saveSorting = () => {
+        if (!selectedSortType || sortingItems.length === 0) {
+            return;
+        }
+
+        setSortSaving(true);
+        router.post(
+            '/superadmin/questions/reorder',
+            {
+                chapter_id: Number(chapterId),
+                topic_id: isTopicWise ? Number(topicId) : null,
+                question_type_id: selectedSortType.id,
+                order: sortingItems.map((question) => question.id),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: cancelSorting,
+                onFinish: () => setSortSaving(false),
+            },
+        );
+    };
 
     return (
         <>
@@ -440,7 +535,26 @@ export default function Questions({
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        {showTable && canEditQuestions && (
+                        {sortingEnabled ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={cancelSorting}
+                                    disabled={sortSaving}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={saveSorting}
+                                    disabled={!sortDirty || sortSaving}
+                                >
+                                    {sortSaving ? 'Saving...' : 'Save order'}
+                                </Button>
+                            </>
+                        ) : null}
+                        {!sortingEnabled && showTable && canEditQuestions && (
                             <Button
                                 type="button"
                                 variant="outline"
@@ -453,17 +567,37 @@ export default function Questions({
                                     ` (${selectedQuestions.length})`}
                             </Button>
                         )}
-                        {canAddQuestion && can('questions.create') && (
-                            <Link
-                                href={addHref}
-                                className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                        {!sortingEnabled && showTable && canEditQuestions && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={!canSortQuestions}
+                                onClick={beginSorting}
+                                title={
+                                    typeFilter === 'all'
+                                        ? 'Select a question type first'
+                                        : isTopicWise && !topicId
+                                          ? 'Select a topic first'
+                                          : 'Sort questions'
+                                }
                             >
-                                <PlusIcon size={16} color="currentColor" />
-                                <span className="hidden sm:inline">
-                                    Add Question
-                                </span>
-                            </Link>
+                                <ArrowUpDownIcon className="size-4" />
+                                Sort
+                            </Button>
                         )}
+                        {!sortingEnabled &&
+                            canAddQuestion &&
+                            can('questions.create') && (
+                                <Link
+                                    href={addHref}
+                                    className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                                >
+                                    <PlusIcon size={16} color="currentColor" />
+                                    <span className="hidden sm:inline">
+                                        Add Question
+                                    </span>
+                                </Link>
+                            )}
                     </div>
                 </div>
 
@@ -609,6 +743,7 @@ export default function Questions({
                                     type="text"
                                     placeholder="Search questions…"
                                     value={search}
+                                    disabled={sortingEnabled}
                                     onChange={(e) => {
                                         setSearch(e.target.value);
                                         setPage(1);
@@ -618,6 +753,7 @@ export default function Questions({
                             </div>
                             <Select
                                 value={typeFilter}
+                                disabled={sortingEnabled}
                                 onValueChange={(value) => {
                                     setTypeFilter(value);
                                     setPage(1);
@@ -642,6 +778,7 @@ export default function Questions({
                             </Select>
                             <Select
                                 value={statusFilter}
+                                disabled={sortingEnabled}
                                 onValueChange={(value) => {
                                     setStatusFilter(value);
                                     setPage(1);
@@ -664,6 +801,7 @@ export default function Questions({
                             </Select>
                             <Select
                                 value={String(pageSize)}
+                                disabled={sortingEnabled}
                                 onValueChange={(value) => {
                                     setPageSize(Number(value));
                                     setPage(1);
@@ -690,28 +828,29 @@ export default function Questions({
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/40">
-                                            {canEditQuestions && (
-                                                <th className="w-10 px-3 py-3 text-center">
-                                                    <Checkbox
-                                                        aria-label="Select all questions"
-                                                        checked={
-                                                            allFilteredSelected
-                                                                ? true
-                                                                : someFilteredSelected
-                                                                  ? 'indeterminate'
-                                                                  : false
-                                                        }
-                                                        onCheckedChange={(
-                                                            checked,
-                                                        ) =>
-                                                            toggleAllFiltered(
-                                                                checked ===
-                                                                    true,
-                                                            )
-                                                        }
-                                                    />
-                                                </th>
-                                            )}
+                                            {canEditQuestions &&
+                                                !sortingEnabled && (
+                                                    <th className="w-10 px-3 py-3 text-center">
+                                                        <Checkbox
+                                                            aria-label="Select all questions"
+                                                            checked={
+                                                                allFilteredSelected
+                                                                    ? true
+                                                                    : someFilteredSelected
+                                                                      ? 'indeterminate'
+                                                                      : false
+                                                            }
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
+                                                                toggleAllFiltered(
+                                                                    checked ===
+                                                                        true,
+                                                                )
+                                                            }
+                                                        />
+                                                    </th>
+                                                )}
                                             <th className="w-10 px-3 py-3 text-left font-medium text-muted-foreground">
                                                 #
                                             </th>
@@ -733,7 +872,7 @@ export default function Questions({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
-                                        {paginated.length === 0 ? (
+                                        {rows.length === 0 ? (
                                             <tr>
                                                 <td
                                                     colSpan={
@@ -751,35 +890,60 @@ export default function Questions({
                                                 </td>
                                             </tr>
                                         ) : (
-                                            paginated.map((q, i) => (
+                                            rows.map((q, i) => (
                                                 <tr
                                                     key={q.id}
-                                                    className={`transition-colors ${i % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
+                                                    draggable={sortingEnabled}
+                                                    onDragStart={() =>
+                                                        sortingEnabled &&
+                                                        setDraggedId(q.id)
+                                                    }
+                                                    onDragOver={(event) =>
+                                                        sortingEnabled &&
+                                                        event.preventDefault()
+                                                    }
+                                                    onDrop={() =>
+                                                        sortingEnabled &&
+                                                        handleSortDrop(q.id)
+                                                    }
+                                                    onDragEnd={() =>
+                                                        setDraggedId(null)
+                                                    }
+                                                    className={`transition-colors ${draggedId === q.id ? 'bg-primary/10 opacity-60' : i % 2 === 0 ? 'bg-background' : 'bg-muted/20'} ${sortingEnabled ? 'cursor-grab active:cursor-grabbing' : 'hover:bg-accent/50'}`}
                                                 >
-                                                    {canEditQuestions && (
-                                                        <td className="px-3 py-3 text-center">
-                                                            <Checkbox
-                                                                aria-label={`Select question ${q.id}`}
-                                                                checked={selectedIds.has(
-                                                                    q.id,
-                                                                )}
-                                                                onCheckedChange={(
-                                                                    checked,
-                                                                ) =>
-                                                                    toggleQuestion(
+                                                    {canEditQuestions &&
+                                                        !sortingEnabled && (
+                                                            <td className="px-3 py-3 text-center">
+                                                                <Checkbox
+                                                                    aria-label={`Select question ${q.id}`}
+                                                                    checked={selectedIds.has(
                                                                         q.id,
-                                                                        checked ===
-                                                                            true,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </td>
-                                                    )}
+                                                                    )}
+                                                                    onCheckedChange={(
+                                                                        checked,
+                                                                    ) =>
+                                                                        toggleQuestion(
+                                                                            q.id,
+                                                                            checked ===
+                                                                                true,
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </td>
+                                                        )}
                                                     <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                                                        {(safePage - 1) *
-                                                            pageSize +
-                                                            i +
-                                                            1}
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            {sortingEnabled && (
+                                                                <GripVerticalIcon className="size-4" />
+                                                            )}
+                                                            {sortingEnabled
+                                                                ? i + 1
+                                                                : (safePage -
+                                                                      1) *
+                                                                      pageSize +
+                                                                  i +
+                                                                  1}
+                                                        </span>
                                                     </td>
                                                     <td className="max-w-sm px-3 py-3">
                                                         <p className="line-clamp-2 text-sm">
@@ -818,7 +982,13 @@ export default function Questions({
                                                         />
                                                     </td>
                                                     <td className="px-3 py-3">
-                                                        <div className="flex items-center justify-end gap-1">
+                                                        <div
+                                                            className={
+                                                                sortingEnabled
+                                                                    ? 'hidden'
+                                                                    : 'flex items-center justify-end gap-1'
+                                                            }
+                                                        >
                                                             <Link
                                                                 href={`/superadmin/questions/${q.id}`}
                                                                 className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -865,11 +1035,19 @@ export default function Questions({
                             {/* Pagination */}
                             <div className="flex flex-col gap-3 border-t bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
                                 <p className="text-sm text-muted-foreground">
-                                    {filtered.length === 0
-                                        ? 'No results'
-                                        : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
+                                    {sortingEnabled
+                                        ? `${sortingItems.length} ${selectedSortType?.name ?? ''} questions`
+                                        : filtered.length === 0
+                                          ? 'No results'
+                                          : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
                                 </p>
-                                <div className="flex items-center gap-1">
+                                <div
+                                    className={
+                                        sortingEnabled
+                                            ? 'hidden'
+                                            : 'flex items-center gap-1'
+                                    }
+                                >
                                     <button
                                         type="button"
                                         onClick={() => goTo(1)}

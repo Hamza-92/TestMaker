@@ -2,12 +2,14 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     ArrowRightLeftIcon,
+    ArrowUpDownIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
     ChevronsLeftIcon,
     ChevronsRightIcon,
     EyeIcon,
     FileUpIcon,
+    GripVerticalIcon,
     PencilIcon,
     PlusIcon,
     SearchIcon,
@@ -80,6 +82,7 @@ interface QuestionRow {
     source: string | null;
     source_label?: string | null;
     status: number;
+    sort_order: number;
     created_at: string | null;
     question_type: QuestionTypeOption;
     topic: {
@@ -173,6 +176,11 @@ export default function ChapterQuestions({
     const [deleting, setDeleting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [changeTypeOpen, setChangeTypeOpen] = useState(false);
+    const [sortingEnabled, setSortingEnabled] = useState(false);
+    const [sortingItems, setSortingItems] = useState<QuestionRow[]>([]);
+    const [draggedId, setDraggedId] = useState<number | null>(null);
+    const [sortDirty, setSortDirty] = useState(false);
+    const [sortSaving, setSortSaving] = useState(false);
 
     const baseHref = `/superadmin/subjects/${chapter.subject.id}/chapters/${chapter.id}/questions`;
     const topicBase = scopedTopic
@@ -267,6 +275,7 @@ export default function ChapterQuestions({
         (safePage - 1) * pageSize,
         safePage * pageSize,
     );
+    const rows = sortingEnabled ? sortingItems : paginated;
     const selectedQuestions = questions.filter((question) =>
         selectedIds.has(question.id),
     );
@@ -334,6 +343,94 @@ export default function ChapterQuestions({
         });
     };
 
+    const selectedSortType = typeOptions.find(
+        (type) => String(type.id) === typeFilter,
+    );
+    const selectedSortTopicId =
+        scopedTopic?.id ??
+        (isTopicWise && topicFilter !== 'all' ? Number(topicFilter) : null);
+    const canSortQuestions =
+        canEditQuestions &&
+        typeFilter !== 'all' &&
+        (!isTopicWise || selectedSortTopicId !== null);
+
+    const beginSorting = () => {
+        if (!canSortQuestions) {
+            return;
+        }
+
+        setSortingItems(
+            questions.filter(
+                (question) =>
+                    String(question.question_type.id) === typeFilter &&
+                    (isTopicWise
+                        ? question.topic?.id === selectedSortTopicId
+                        : question.topic === null),
+            ),
+        );
+        setSelectedIds(new Set());
+        setSortDirty(false);
+        setSortingEnabled(true);
+    };
+
+    const cancelSorting = () => {
+        setSortingEnabled(false);
+        setSortingItems([]);
+        setDraggedId(null);
+        setSortDirty(false);
+    };
+
+    const handleSortDrop = (targetId: number) => {
+        if (draggedId === null || draggedId === targetId) {
+            setDraggedId(null);
+
+            return;
+        }
+
+        setSortingItems((current) => {
+            const fromIndex = current.findIndex(
+                (question) => question.id === draggedId,
+            );
+            const toIndex = current.findIndex(
+                (question) => question.id === targetId,
+            );
+
+            if (fromIndex < 0 || toIndex < 0) {
+                return current;
+            }
+
+            const next = [...current];
+            const [moved] = next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, moved);
+
+            return next;
+        });
+        setSortDirty(true);
+        setDraggedId(null);
+    };
+
+    const saveSorting = () => {
+        if (!selectedSortType || sortingItems.length === 0) {
+            return;
+        }
+
+        setSortSaving(true);
+        router.post(
+            '/superadmin/questions/reorder',
+            {
+                chapter_id: chapter.id,
+                topic_id: selectedSortTopicId,
+                question_type_id: selectedSortType.id,
+                order: sortingItems.map((question) => question.id),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: cancelSorting,
+                onFinish: () => setSortSaving(false),
+            },
+        );
+    };
+
     return (
         <>
             <Head title={`${chapterTitle(chapter)} Questions`} />
@@ -387,7 +484,13 @@ export default function ChapterQuestions({
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div
+                        className={
+                            sortingEnabled
+                                ? 'hidden'
+                                : 'flex items-center gap-2'
+                        }
+                    >
                         <Button asChild variant="outline" size="sm">
                             <Link href={importHref}>
                                 <FileUpIcon className="size-4" />
@@ -412,6 +515,7 @@ export default function ChapterQuestions({
                             <Input
                                 placeholder="Search questions"
                                 value={search}
+                                disabled={sortingEnabled}
                                 onChange={(event) => {
                                     setSearch(event.target.value);
                                     setPage(1);
@@ -423,6 +527,7 @@ export default function ChapterQuestions({
                         {isTopicWise && !scopedTopic ? (
                             <Select
                                 value={topicFilter}
+                                disabled={sortingEnabled}
                                 onValueChange={(value) => {
                                     setTopicFilter(value);
                                     setPage(1);
@@ -449,6 +554,7 @@ export default function ChapterQuestions({
 
                         <Select
                             value={typeFilter}
+                            disabled={sortingEnabled}
                             onValueChange={(value) => {
                                 setTypeFilter(value);
                                 setPage(1);
@@ -472,6 +578,7 @@ export default function ChapterQuestions({
 
                         <Select
                             value={sourceFilter}
+                            disabled={sortingEnabled}
                             onValueChange={(value) => {
                                 setSourceFilter(value);
                                 setPage(1);
@@ -495,6 +602,7 @@ export default function ChapterQuestions({
 
                         <Select
                             value={statusFilter}
+                            disabled={sortingEnabled}
                             onValueChange={(value) => {
                                 setStatusFilter(value);
                                 setPage(1);
@@ -514,6 +622,7 @@ export default function ChapterQuestions({
 
                         <Select
                             value={String(pageSize)}
+                            disabled={sortingEnabled}
                             onValueChange={(value) => {
                                 setPageSize(Number(value));
                                 setPage(1);
@@ -539,7 +648,7 @@ export default function ChapterQuestions({
                             variant="outline"
                             size="sm"
                             onClick={clearFilters}
-                            disabled={!hasActiveFilters}
+                            disabled={sortingEnabled || !hasActiveFilters}
                         >
                             Clear
                         </Button>
@@ -547,19 +656,61 @@ export default function ChapterQuestions({
                 </div>
 
                 {canEditQuestions && (
-                    <div className="flex justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={selectedQuestions.length === 0}
-                            onClick={() => setChangeTypeOpen(true)}
-                        >
-                            <ArrowRightLeftIcon className="size-4" />
-                            Change type
-                            {selectedQuestions.length > 0 &&
-                                ` (${selectedQuestions.length})`}
-                        </Button>
+                    <div className="flex justify-end gap-2">
+                        {sortingEnabled ? (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={cancelSorting}
+                                    disabled={sortSaving}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={saveSorting}
+                                    disabled={!sortDirty || sortSaving}
+                                >
+                                    {sortSaving ? 'Saving...' : 'Save order'}
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={selectedQuestions.length === 0}
+                                    onClick={() => setChangeTypeOpen(true)}
+                                >
+                                    <ArrowRightLeftIcon className="size-4" />
+                                    Change type
+                                    {selectedQuestions.length > 0 &&
+                                        ` (${selectedQuestions.length})`}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!canSortQuestions}
+                                    onClick={beginSorting}
+                                    title={
+                                        typeFilter === 'all'
+                                            ? 'Select a question type first'
+                                            : isTopicWise &&
+                                                selectedSortTopicId === null
+                                              ? 'Select a topic first'
+                                              : 'Sort questions'
+                                    }
+                                >
+                                    <ArrowUpDownIcon className="size-4" />
+                                    Sort
+                                </Button>
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -568,7 +719,7 @@ export default function ChapterQuestions({
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b bg-muted/40">
-                                    {canEditQuestions && (
+                                    {canEditQuestions && !sortingEnabled && (
                                         <th className="w-10 px-3 py-2.5 text-center">
                                             <Checkbox
                                                 aria-label="Select all questions"
@@ -608,7 +759,7 @@ export default function ChapterQuestions({
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {paginated.length === 0 ? (
+                                {rows.length === 0 ? (
                                     <tr>
                                         <td
                                             colSpan={
@@ -623,36 +774,56 @@ export default function ChapterQuestions({
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginated.map((question, index) => (
+                                    rows.map((question, index) => (
                                         <tr
                                             key={question.id}
-                                            className={`transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
+                                            draggable={sortingEnabled}
+                                            onDragStart={() =>
+                                                sortingEnabled &&
+                                                setDraggedId(question.id)
+                                            }
+                                            onDragOver={(event) =>
+                                                sortingEnabled &&
+                                                event.preventDefault()
+                                            }
+                                            onDrop={() =>
+                                                sortingEnabled &&
+                                                handleSortDrop(question.id)
+                                            }
+                                            onDragEnd={() => setDraggedId(null)}
+                                            className={`transition-colors ${draggedId === question.id ? 'bg-primary/10 opacity-60' : index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} ${sortingEnabled ? 'cursor-grab active:cursor-grabbing' : 'hover:bg-accent/50'}`}
                                         >
-                                            {canEditQuestions && (
-                                                <td className="px-3 py-2.5 text-center">
-                                                    <Checkbox
-                                                        aria-label={`Select question ${question.id}`}
-                                                        checked={selectedIds.has(
-                                                            question.id,
-                                                        )}
-                                                        onCheckedChange={(
-                                                            checked,
-                                                        ) =>
-                                                            toggleQuestion(
+                                            {canEditQuestions &&
+                                                !sortingEnabled && (
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        <Checkbox
+                                                            aria-label={`Select question ${question.id}`}
+                                                            checked={selectedIds.has(
                                                                 question.id,
-                                                                checked ===
-                                                                    true,
-                                                            )
-                                                        }
-                                                    />
-                                                </td>
-                                            )}
+                                                            )}
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
+                                                                toggleQuestion(
+                                                                    question.id,
+                                                                    checked ===
+                                                                        true,
+                                                                )
+                                                            }
+                                                        />
+                                                    </td>
+                                                )}
                                             <td className="px-3 py-2.5">
-                                                <p className="font-medium">
-                                                    {truncateText(
-                                                        question.summary_text,
+                                                <div className="flex items-start gap-2">
+                                                    {sortingEnabled && (
+                                                        <GripVerticalIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                                                     )}
-                                                </p>
+                                                    <p className="font-medium">
+                                                        {truncateText(
+                                                            question.summary_text,
+                                                        )}
+                                                    </p>
+                                                </div>
                                             </td>
                                             <td className="px-3 py-2.5">
                                                 {question.question_type.name}
@@ -672,7 +843,13 @@ export default function ChapterQuestions({
                                                 {statusBadge(question.status)}
                                             </td>
                                             <td className="px-3 py-2.5">
-                                                <div className="flex items-center justify-end gap-1">
+                                                <div
+                                                    className={
+                                                        sortingEnabled
+                                                            ? 'hidden'
+                                                            : 'flex items-center justify-end gap-1'
+                                                    }
+                                                >
                                                     <Link
                                                         href={`/superadmin/questions/${question.id}`}
                                                         className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -707,11 +884,19 @@ export default function ChapterQuestions({
 
                     <div className="flex items-center justify-between border-t bg-muted/20 px-3 py-2.5">
                         <p className="text-xs text-muted-foreground">
-                            {filtered.length === 0
-                                ? 'No results'
-                                : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
+                            {sortingEnabled
+                                ? `${sortingItems.length} ${selectedSortType?.name ?? ''} questions`
+                                : filtered.length === 0
+                                  ? 'No results'
+                                  : `${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
                         </p>
-                        <div className="flex items-center gap-1">
+                        <div
+                            className={
+                                sortingEnabled
+                                    ? 'hidden'
+                                    : 'flex items-center gap-1'
+                            }
+                        >
                             <button
                                 type="button"
                                 onClick={() => goTo(1)}

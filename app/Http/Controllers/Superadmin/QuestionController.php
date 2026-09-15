@@ -60,6 +60,61 @@ class QuestionController extends Controller
         );
     }
 
+    public function reorder(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'chapter_id' => ['required', 'integer', 'exists:chapters,id'],
+            'topic_id' => ['nullable', 'integer', 'exists:topics,id'],
+            'question_type_id' => ['required', 'integer', 'exists:question_types,id'],
+            'order' => ['required', 'array', 'min:1'],
+            'order.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        if (isset($validated['topic_id'])) {
+            abort_unless(
+                Topic::query()
+                    ->whereKey($validated['topic_id'])
+                    ->where('chapter_id', $validated['chapter_id'])
+                    ->exists(),
+                422,
+                'The selected topic does not belong to this chapter.',
+            );
+        }
+
+        $scope = Question::query()
+            ->where('chapter_id', $validated['chapter_id'])
+            ->where('question_type_id', $validated['question_type_id'])
+            ->when(
+                isset($validated['topic_id']),
+                fn ($query) => $query->where('topic_id', $validated['topic_id']),
+                fn ($query) => $query->whereNull('topic_id'),
+            );
+        $questionIds = (clone $scope)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $submittedIds = collect($validated['order'])
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        abort_unless(
+            $submittedIds->count() === $questionIds->count()
+                && $submittedIds->diff($questionIds)->isEmpty(),
+            422,
+            'The question order is out of date. Please refresh and try again.',
+        );
+
+        DB::transaction(function () use ($scope, $submittedIds): void {
+            foreach ($submittedIds as $index => $questionId) {
+                (clone $scope)
+                    ->whereKey($questionId)
+                    ->update(['sort_order' => $index + 1]);
+            }
+        });
+
+        return back()->with('success', 'Question order saved.');
+    }
+
     public function chapterFilter(Chapter $chapter)
     {
         return $this->renderQuestionsIndex($chapter->id, null);
@@ -86,7 +141,10 @@ class QuestionController extends Controller
                     'topic:id,name,name_ur,chapter_id',
                     'options',
                 ])
-                ->orderByDesc('created_at');
+                ->orderBy('question_type_id')
+                ->orderBy('topic_id')
+                ->orderBy('sort_order')
+                ->orderBy('id');
 
             if ($topicId) {
                 $query->where('topic_id', $topicId);
@@ -120,7 +178,10 @@ class QuestionController extends Controller
                 'topic:id,name,name_ur,chapter_id',
                 'options',
             ])
-            ->orderByDesc('created_at')
+            ->orderBy('question_type_id')
+            ->orderBy('topic_id')
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get();
 
         return Inertia::render('superadmin/questions/chapter', [
@@ -224,7 +285,9 @@ class QuestionController extends Controller
                 'topic:id,name,name_ur,chapter_id',
                 'options',
             ])
-            ->orderByDesc('created_at')
+            ->orderBy('question_type_id')
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get();
 
         return Inertia::render('superadmin/questions/chapter', [
@@ -957,6 +1020,7 @@ class QuestionController extends Controller
             'source' => $question->source,
             'source_label' => Question::sourceLabel($question->source),
             'status' => $question->status,
+            'sort_order' => $question->sort_order,
             'created_at' => $question->created_at?->toISOString(),
             'summary_text' => QuestionTypeSchemaRegistry::summarize(
                 $effectiveType,

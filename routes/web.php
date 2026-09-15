@@ -264,6 +264,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('superadmin/questions/import', [QuestionController::class, 'storeImport'])->name('superadmin.questions.import.store')->middleware('permission:questions.import');
         Route::get('superadmin/questions/import/template', [QuestionController::class, 'downloadImportTemplate'])->name('superadmin.questions.import.template')->middleware('permission:questions.import');
         Route::patch('superadmin/questions/type', [QuestionController::class, 'bulkUpdateType'])->name('superadmin.questions.type.update')->middleware('permission:questions.edit');
+        Route::post('superadmin/questions/reorder', [QuestionController::class, 'reorder'])->name('superadmin.questions.reorder')->middleware('permission:questions.edit');
         Route::get('superadmin/questions/chapters/{chapter}/add', [QuestionController::class, 'createForChapterClean'])->name('superadmin.questions.chapters.add')->middleware('permission:questions.create');
         Route::get('superadmin/questions/chapters/{chapter}/topics/{topic}/add', [QuestionController::class, 'createForTopicClean'])->name('superadmin.questions.chapters.topics.add')->middleware('permission:questions.create');
         Route::get('superadmin/questions/chapters/{chapter}/topics/{topic}', [QuestionController::class, 'topicFilter'])->name('superadmin.questions.topic')->middleware('permission:questions.view');

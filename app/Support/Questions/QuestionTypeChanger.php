@@ -48,13 +48,14 @@ class QuestionTypeChanger
         );
 
         $changed = 0;
+        $nextOrders = [];
 
-        DB::transaction(function () use ($questions, $sourceSchemaKeys, $targetType, &$changed): void {
+        DB::transaction(function () use ($questions, $sourceSchemaKeys, $targetType, &$changed, &$nextOrders): void {
             (clone $questions)
                 ->where('question_type_id', '!=', $targetType->id)
-                ->select(['id', 'question_type_id'])
+                ->select(['id', 'question_type_id', 'chapter_id', 'topic_id'])
                 ->orderBy('id')
-                ->chunkById(500, function ($questionChunk) use ($sourceSchemaKeys, $targetType, &$changed): void {
+                ->chunkById(500, function ($questionChunk) use ($sourceSchemaKeys, $targetType, &$changed, &$nextOrders): void {
                     $now = now();
                     $questionIds = $questionChunk->pluck('id')->all();
 
@@ -83,9 +84,36 @@ class QuestionTypeChanger
                         ])->all(),
                     );
 
-                    Question::query()
-                        ->whereKey($questionIds)
-                        ->update(['question_type_id' => $targetType->id]);
+                    $sortOrders = [];
+                    foreach ($questionChunk as $question) {
+                        $scope = implode(':', [
+                            (int) $question->chapter_id,
+                            $question->topic_id === null ? 'none' : (int) $question->topic_id,
+                        ]);
+
+                        if (! isset($nextOrders[$scope])) {
+                            $nextOrders[$scope] = (int) Question::query()
+                                ->where('chapter_id', $question->chapter_id)
+                                ->where('question_type_id', $targetType->id)
+                                ->when(
+                                    $question->topic_id === null,
+                                    fn ($query) => $query->whereNull('topic_id'),
+                                    fn ($query) => $query->where('topic_id', $question->topic_id),
+                                )
+                                ->max('sort_order');
+                        }
+
+                        $sortOrders[(int) $question->id] = ++$nextOrders[$scope];
+                    }
+
+                    $sortOrderCase = collect($sortOrders)
+                        ->map(fn (int $sortOrder, int $id) => "WHEN {$id} THEN {$sortOrder}")
+                        ->implode(' ');
+
+                    Question::query()->whereKey($questionIds)->update([
+                        'question_type_id' => $targetType->id,
+                        'sort_order' => DB::raw("CASE id {$sortOrderCase} ELSE sort_order END"),
+                    ]);
 
                     $changed += count($questionIds);
                 });

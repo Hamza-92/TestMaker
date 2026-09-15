@@ -423,6 +423,7 @@ class GeneratePaperController extends Controller
             ])
             ->orderBy('questions.chapter_id')
             ->orderBy('questions.topic_id')
+            ->orderBy('questions.sort_order')
             ->orderBy('questions.id')
             ->get()
             ->map(function (Question $question) use ($displayMedium, $canViewSubjectiveAnswers, $scope) {

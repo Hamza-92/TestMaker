@@ -41,6 +41,7 @@ class Question extends Model
         'source',
         'difficulty',
         'status',
+        'sort_order',
         'created_by',
     ];
 
@@ -49,7 +50,37 @@ class Question extends Model
         return [
             'content' => 'array',
             'status' => 'integer',
+            'sort_order' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Question $question): void {
+            if ((int) $question->sort_order < 1) {
+                $question->sort_order = $question->nextSortOrder();
+            }
+        });
+
+        static::updating(function (Question $question): void {
+            if ($question->isDirty(['chapter_id', 'topic_id', 'question_type_id'])) {
+                $question->sort_order = $question->nextSortOrder();
+            }
+        });
+    }
+
+    private function nextSortOrder(): int
+    {
+        return ((int) static::query()
+            ->where('chapter_id', $this->chapter_id)
+            ->where('question_type_id', $this->question_type_id)
+            ->when(
+                $this->topic_id === null,
+                fn ($query) => $query->whereNull('topic_id'),
+                fn ($query) => $query->where('topic_id', $this->topic_id),
+            )
+            ->when($this->exists, fn ($query) => $query->where('id', '!=', $this->getKey()))
+            ->max('sort_order')) + 1;
     }
 
     public function questionType(): BelongsTo

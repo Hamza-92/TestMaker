@@ -128,6 +128,62 @@ it('creates an objective question with options', function () {
         ]);
 });
 
+it('sorts questions within one chapter topic and question type scope', function () {
+    $admin = makeQuestionAdmin();
+    $questionType = makeObjectiveQuestionTypeForManagement($admin);
+    $otherType = makeObjectiveQuestionTypeForManagement($admin);
+    $context = makeQuestionContextForManagement($admin);
+
+    $questions = collect(['First', 'Second', 'Third'])->map(
+        fn (string $statement) => Question::create([
+            'question_type_id' => $questionType->id,
+            'chapter_id' => $context['chapter']->id,
+            'topic_id' => null,
+            'statement_en' => $statement,
+            'source' => Question::SOURCE_EXERCISE,
+            'status' => 1,
+            'created_by' => $admin->id,
+        ]),
+    );
+    $otherQuestion = Question::create([
+        'question_type_id' => $otherType->id,
+        'chapter_id' => $context['chapter']->id,
+        'topic_id' => null,
+        'statement_en' => 'Other type',
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => 1,
+        'created_by' => $admin->id,
+    ]);
+
+    expect($questions->pluck('sort_order')->all())->toBe([1, 2, 3])
+        ->and($otherQuestion->sort_order)->toBe(1);
+
+    $order = [
+        $questions[2]->id,
+        $questions[0]->id,
+        $questions[1]->id,
+    ];
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.questions.reorder'), [
+            'chapter_id' => $context['chapter']->id,
+            'topic_id' => null,
+            'question_type_id' => $questionType->id,
+            'order' => $order,
+        ])
+        ->assertRedirect();
+
+    expect(
+        Question::query()
+            ->where('chapter_id', $context['chapter']->id)
+            ->where('question_type_id', $questionType->id)
+            ->orderBy('sort_order')
+            ->pluck('id')
+            ->all(),
+    )->toBe($order)
+        ->and($otherQuestion->fresh()->sort_order)->toBe(1);
+});
+
 it('updates an objective question and replaces its options', function () {
     $admin = makeQuestionAdmin();
     $questionType = makeObjectiveQuestionTypeForManagement($admin);

@@ -433,6 +433,7 @@ class OnlineTestController extends Controller
             ->with(['questionType:id,name,schema_key,is_objective', 'options', 'chapter:id,name', 'topic:id,name'])
             ->orderBy('chapter_id')
             ->orderBy('topic_id')
+            ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
             ->filter(fn (Question $question) => OnlineTestQuestionMapper::supports($question))
