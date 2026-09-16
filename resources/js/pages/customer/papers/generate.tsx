@@ -49,6 +49,11 @@ import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
 import {
+    createBalancedQuestionSelectionState,
+    pickBalancedQuestions,
+    recordBalancedQuestion,
+} from './balanced-question-picker';
+import {
     AnswerKeySheet,
     SubjectiveAnswerSheet,
 } from './paper-layouts/answer-key-sheet';
@@ -1302,6 +1307,20 @@ function federalizeGeneratedSections(
         ),
     );
     const federalSections: GeneratedPaperSection[] = [];
+    const balanceState = createBalancedQuestionSelectionState();
+    const questionsById = new Map(
+        Object.values(questionPools)
+            .flat()
+            .map((question) => [question.id, question] as const),
+    );
+
+    reservedQuestionIds.forEach((questionId) => {
+        const question = questionsById.get(questionId);
+
+        if (question) {
+            recordBalancedQuestion(balanceState, question);
+        }
+    });
 
     for (const section of sections) {
         const alreadyPaired = Boolean(
@@ -1324,7 +1343,7 @@ function federalizeGeneratedSections(
             continue;
         }
 
-        const candidates = shuffledQuestions(
+        const candidates = pickBalancedQuestions(
             (questionPools[section.questionTypeId] ?? []).filter(
                 (question) =>
                     !reservedQuestionIds.has(question.id) &&
@@ -1333,7 +1352,9 @@ function federalizeGeneratedSections(
                         parseChapterNumbers(chapterNumberInputs[section.id]),
                     ),
             ),
-        ).slice(0, section.questions.length);
+            section.questions.length,
+            balanceState,
+        );
 
         if (candidates.length < section.questions.length) {
             return {
@@ -4801,6 +4822,7 @@ export default function GeneratePaper({
                 ManualQuestion[]
             >;
             const usedQuestionIds = new Set<number>();
+            const balanceState = createBalancedQuestionSelectionState();
             const sectionsByType = new Map(
                 questionSelection.sections.map((section) => [
                     section.questionTypeId,
@@ -4835,12 +4857,14 @@ export default function GeneratePaper({
                               .filter((question): question is ManualQuestion =>
                                   Boolean(question),
                               )
-                        : shuffledQuestions(
+                        : pickBalancedQuestions(
                               pool.filter(
                                   (question) =>
                                       !usedQuestionIds.has(question.id),
                               ),
-                          ).slice(0, target);
+                              target,
+                              balanceState,
+                          );
 
                 if (selectedQuestions.length < target) {
                     throw new Error(
@@ -4850,9 +4874,13 @@ export default function GeneratePaper({
                     );
                 }
 
-                selectedQuestions.forEach((question) =>
-                    usedQuestionIds.add(question.id),
-                );
+                selectedQuestions.forEach((question) => {
+                    usedQuestionIds.add(question.id);
+
+                    if (mode === 'manual') {
+                        recordBalancedQuestion(balanceState, question);
+                    }
+                });
 
                 return selectedQuestions;
             }
@@ -6777,8 +6805,12 @@ export default function GeneratePaper({
             questionType.category === 'Subjective Questions' &&
             normalizePaperSettings(generatedPaper?.settings).paperLayout ===
                 'federal-board';
+        const federalBalanceState = createBalancedQuestionSelectionState();
+        selectedQuestions.forEach((question) =>
+            recordBalancedQuestion(federalBalanceState, question),
+        );
         const federalAlternatives = usesFederalAutoOr
-            ? shuffledQuestions(
+            ? pickBalancedQuestions(
                   values.poolQuestions.filter(
                       (question) =>
                           !generatedSourceQuestionIds.has(question.id) &&
@@ -6786,7 +6818,9 @@ export default function GeneratePaper({
                               (selected) => selected.id === question.id,
                           ),
                   ),
-              ).slice(0, totalQuestions)
+                  totalQuestions,
+                  federalBalanceState,
+              )
             : [];
 
         if (usesFederalAutoOr && federalAlternatives.length < totalQuestions) {
@@ -9065,7 +9099,7 @@ function AddPaperSectionModal({
             return;
         }
 
-        const picked = shuffledQuestions(candidates).slice(0, targetCount);
+        const picked = pickBalancedQuestions(candidates, targetCount);
 
         setTotalQuestions(String(targetCount));
         setRequiredQuestions((current) =>
@@ -9760,6 +9794,7 @@ function AddMultipartPaperSectionModal({
 
         try {
             const reserved = new Set(usedQuestionIds);
+            const balanceState = createBalancedQuestionSelectionState();
             const nextPools = { ...questionPools };
             const cards: AddPaperMultipartCardValues[] = [];
 
@@ -9807,7 +9842,11 @@ function AddMultipartPaperSectionModal({
                                       ) &&
                                       !reserved.has(question.id),
                               )
-                            : shuffledQuestions(available)[0];
+                            : pickBalancedQuestions(
+                                  available,
+                                  1,
+                                  balanceState,
+                              )[0];
 
                     if (!selectedQuestion) {
                         throw new Error(
@@ -9816,6 +9855,11 @@ function AddMultipartPaperSectionModal({
                     }
 
                     reserved.add(selectedQuestion.id);
+
+                    if (selection.selectionMode === 'manual') {
+                        recordBalancedQuestion(balanceState, selectedQuestion);
+                    }
+
                     parts.push({
                         questionTypeId: row.questionTypeId,
                         marksEach: toNumber(row.marksPerQuestion),
@@ -10398,6 +10442,7 @@ function AddOrPaperSectionModal({
 
         try {
             const reserved = new Set(usedQuestionIds);
+            const balanceState = createBalancedQuestionSelectionState();
             const members: AddPaperOrSectionValues['members'] = [];
 
             for (const section of pairedSections) {
@@ -10415,11 +10460,13 @@ function AddOrPaperSectionModal({
                     selectedQuestionIds[String(section.questionTypeId)] ?? [];
                 const selected =
                     selectionMode === 'automatic'
-                        ? shuffledQuestions(
+                        ? pickBalancedQuestions(
                               pool.filter(
                                   (question) => !reserved.has(question.id),
                               ),
-                          ).slice(0, totalNumber)
+                              totalNumber,
+                              balanceState,
+                          )
                         : manuallySelected
                               .map((id) =>
                                   pool.find((question) => question.id === id),
@@ -10436,7 +10483,13 @@ function AddOrPaperSectionModal({
                     );
                 }
 
-                selected.forEach((question) => reserved.add(question.id));
+                selected.forEach((question) => {
+                    reserved.add(question.id);
+
+                    if (selectionMode === 'manual') {
+                        recordBalancedQuestion(balanceState, question);
+                    }
+                });
                 members.push({
                     questionTypeId: section.questionTypeId,
                     selectedQuestions: selected,
@@ -11262,6 +11315,7 @@ function AddSpecialPaperSectionModal({
 
         try {
             const reserved = new Set(usedQuestionIds);
+            const balanceState = createBalancedQuestionSelectionState();
             const nextResults = { ...resultQuestionsByTarget };
             const nextOrSelections = { ...orSelectedQuestionIds };
             const nextPartSelections = new Map<string, number[]>();
@@ -11275,9 +11329,11 @@ function AddSpecialPaperSectionModal({
                         sources: selectedSourceValues,
                     },
                 );
-                const picked = shuffledQuestions(
+                const picked = pickBalancedQuestions(
                     questions.filter((question) => !reserved.has(question.id)),
-                ).slice(0, target.count);
+                    target.count,
+                    balanceState,
+                );
 
                 if (picked.length < target.count) {
                     throw new Error(
