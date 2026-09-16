@@ -5,6 +5,7 @@ import {
     CheckIcon,
     CheckSquareIcon,
     CopyIcon,
+    DownloadIcon,
     FileTextIcon,
     FolderIcon,
     FolderPlusIcon,
@@ -844,6 +845,21 @@ export default function PapersIndex({
                                                     selectionMode && 'hidden',
                                                 )}
                                             >
+                                                {activeTab === 'papers' && (
+                                                    <Button
+                                                        asChild
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                    >
+                                                        <a
+                                                            href={`/papers/${paper.id}/pdf`}
+                                                            aria-label="Download PDF"
+                                                            title="Download PDF"
+                                                        >
+                                                            <DownloadIcon />
+                                                        </a>
+                                                    </Button>
+                                                )}
                                                 {paper.is_mine !== false ? (
                                                     <>
                                                         <Button

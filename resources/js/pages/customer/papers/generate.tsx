@@ -15,6 +15,7 @@ import {
     CheckIcon,
     CircleDotIcon,
     ClockIcon,
+    DownloadIcon,
     FileTextIcon,
     GraduationCapIcon,
     GripVerticalIcon,
@@ -169,6 +170,13 @@ interface SavedPaperProp {
         klass: ComboboxOptionItem;
         subject: ComboboxOptionItem;
     } | null;
+    pdfState?: Partial<PaperPdfState> | null;
+}
+
+interface PaperPdfState {
+    activeSetIndex: number;
+    numSets: number;
+    viewMode: PaperViewMode;
 }
 
 function serializeChapterSelection(
@@ -262,6 +270,7 @@ interface Props {
     appliedTemplate?: AppliedTemplate;
     initialPatternId?: number | null;
     canViewSubjectiveAnswers: boolean;
+    pdfExport?: boolean;
 }
 
 interface SourceOption {
@@ -2773,6 +2782,7 @@ export default function GeneratePaper({
     appliedTemplate,
     initialPatternId,
     canViewSubjectiveAnswers,
+    pdfExport = false,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
@@ -2904,6 +2914,7 @@ export default function GeneratePaper({
     const [numSets, setNumSets] = useState(1);
     const [viewMode, setViewMode] = useState<PaperViewMode>('paper');
     const [printAllSets, setPrintAllSets] = useState(false);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const [savedPaperId, setSavedPaperId] = useState<number | null>(null);
     const [savedPaperName, setSavedPaperName] = useState('');
     const [savedPaperIsDraft, setSavedPaperIsDraft] = useState(false);
@@ -4114,6 +4125,31 @@ export default function GeneratePaper({
         );
         setSelected(deserializeChapterSelection(savedPaper.chapterSelection));
 
+        const restoredNumSets = Math.max(
+            1,
+            Math.min(3, Number(savedPaper.pdfState?.numSets) || 1),
+        );
+        const restoredActiveSet = Math.max(
+            0,
+            Math.min(
+                restoredNumSets - 1,
+                Number(savedPaper.pdfState?.activeSetIndex) || 0,
+            ),
+        );
+        const restoredViewMode = savedPaper.pdfState?.viewMode;
+        const allowedViewMode: PaperViewMode =
+            restoredViewMode === 'answer_key' ||
+            restoredViewMode === 'answers_on_paper' ||
+            (restoredViewMode === 'subjective_answers' &&
+                canViewSubjectiveAnswers)
+                ? restoredViewMode
+                : 'paper';
+
+        setNumSets(restoredNumSets);
+        setActiveSetIndex(restoredActiveSet);
+        setViewMode(allowedViewMode);
+        setPrintAllSets(pdfExport && restoredNumSets > 1);
+
         if (savedPaper.meta) {
             setPattern(savedPaper.meta.pattern ?? null);
             setKlass(savedPaper.meta.klass ?? null);
@@ -4126,6 +4162,34 @@ export default function GeneratePaper({
         lastSavedRef.current = Date.now();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (!pdfExport || !generatedPaper || (numSets > 1 && !printAllSets)) {
+            return;
+        }
+
+        let cancelled = false;
+
+        void (async () => {
+            await new Promise<void>((resolve) =>
+                requestAnimationFrame(() =>
+                    requestAnimationFrame(() => resolve()),
+                ),
+            );
+
+            if (!cancelled) {
+                document.documentElement.setAttribute(
+                    'data-paper-pdf-ready',
+                    'true',
+                );
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            document.documentElement.removeAttribute('data-paper-pdf-ready');
+        };
+    }, [generatedPaper, numSets, pdfExport, printAllSets]);
 
     useEffect(() => {
         if (generatedPaper === null) {
@@ -5333,6 +5397,11 @@ export default function GeneratePaper({
                     pattern && klass && subject
                         ? serializablePaperMeta(pattern, klass, subject)
                         : null,
+                pdfState: {
+                    activeSetIndex,
+                    numSets,
+                    viewMode,
+                } satisfies PaperPdfState,
             },
         };
 
@@ -5435,6 +5504,11 @@ export default function GeneratePaper({
                     pattern && klass && subject
                         ? serializablePaperMeta(pattern, klass, subject)
                         : null,
+                pdfState: {
+                    activeSetIndex,
+                    numSets,
+                    viewMode,
+                } satisfies PaperPdfState,
             },
         };
 
@@ -5513,6 +5587,91 @@ export default function GeneratePaper({
                 .filter(Boolean)
                 .join(' – ') || 'My Paper'
         );
+    }
+
+    async function downloadGeneratedPaperPdf() {
+        if (!generatedPaper || isDownloadingPdf) {
+            return;
+        }
+
+        setIsDownloadingPdf(true);
+
+        const name = savedPaperName || defaultPaperName() || 'Paper';
+        const csrfToken =
+            (
+                document.querySelector(
+                    'meta[name="csrf-token"]',
+                ) as HTMLMetaElement
+            )?.content ?? '';
+
+        try {
+            const response = await fetch('/papers/pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/pdf, application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    name,
+                    paper_data: {
+                        paper: generatedPaper,
+                        questionPoolsByType: {},
+                        questionSelection,
+                        chapterSelection: serializeChapterSelection(selected),
+                        meta:
+                            pattern && klass && subject
+                                ? serializablePaperMeta(pattern, klass, subject)
+                                : null,
+                        pdfState: {
+                            activeSetIndex,
+                            numSets,
+                            viewMode,
+                        } satisfies PaperPdfState,
+                    },
+                }),
+            });
+
+            if (!response.ok) {
+                const error = (await response.json().catch(() => null)) as {
+                    message?: string;
+                } | null;
+
+                throw new Error(error?.message || 'Could not generate PDF.');
+            }
+
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const safeName =
+                Array.from(name)
+                    .map((character) =>
+                        character.charCodeAt(0) < 32 ? '-' : character,
+                    )
+                    .join('')
+                    .replace(/[<>:"/\\|?*]/g, '-')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .slice(0, 140) || 'Paper';
+
+            link.href = objectUrl;
+            link.download = `${safeName}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+            toast.success('PDF downloaded');
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not generate PDF.',
+            );
+        } finally {
+            setIsDownloadingPdf(false);
+        }
     }
 
     async function saveAsTemplateToServer(values: SaveAsTemplateValues) {
@@ -7568,6 +7727,8 @@ export default function GeneratePaper({
                                 setPrintAllSets(false);
                             }, 50);
                         }}
+                        isDownloadingPdf={isDownloadingPdf}
+                        onDownloadPdf={() => void downloadGeneratedPaperPdf()}
                         totalMarks={paperTotalMarks(generatedPaper)}
                         defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                         schoolAddress={schoolAddress}
@@ -12421,6 +12582,8 @@ function GeneratedPaperView({
     onViewModeChange,
     printAllSets,
     onPrintAllSets,
+    isDownloadingPdf,
+    onDownloadPdf,
     totalMarks,
     defaultWatermarkLogoUrl,
     schoolAddress,
@@ -12474,6 +12637,8 @@ function GeneratedPaperView({
     onViewModeChange: (mode: PaperViewMode) => void;
     printAllSets: boolean;
     onPrintAllSets: () => void;
+    isDownloadingPdf: boolean;
+    onDownloadPdf: () => void;
     totalMarks: number;
     defaultWatermarkLogoUrl: string;
     schoolAddress: string;
@@ -13182,8 +13347,8 @@ function GeneratedPaperView({
     return (
         <>
             <div data-paper-shell className="w-full space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-1.5 print:hidden">
-                    <div className="flex items-center gap-1.5">
+                <div className="mx-auto flex w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/70 print:hidden">
+                    <div className="contents">
                         {!isStandaloneBubbleSheet && (
                             <>
                                 <button
@@ -13684,7 +13849,7 @@ function GeneratedPaperView({
                                 </span>
                             )}
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="contents">
                         {!isStandaloneBubbleSheet && (
                             <>
                                 <button
@@ -13752,6 +13917,21 @@ function GeneratedPaperView({
                                 </button>
                             </>
                         )}
+                        <button
+                            type="button"
+                            onClick={onDownloadPdf}
+                            disabled={isDownloadingPdf}
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
+                        >
+                            {isDownloadingPdf ? (
+                                <Loader2Icon className="size-3.5 animate-spin" />
+                            ) : (
+                                <DownloadIcon className="size-3.5" />
+                            )}
+                            {isDownloadingPdf
+                                ? 'Preparing PDF'
+                                : 'Download PDF'}
+                        </button>
                         <button
                             type="button"
                             onClick={() =>

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\PaperFolder;
+use App\Support\PaperPdfExporter;
 use App\Support\SubjectiveAnswerAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PaperController extends Controller
 {
@@ -299,6 +301,51 @@ class PaperController extends Controller
         ]);
     }
 
+    public function downloadPdf(Request $request, PaperPdfExporter $exporter): BinaryFileResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'paper_data' => ['required', 'array'],
+            'paper_data.paper' => ['required', 'array'],
+        ]);
+        $paperData = (array) $request->input('paper_data');
+
+        if (! SubjectiveAnswerAccess::allows($request->user())) {
+            $paperData = SubjectiveAnswerAccess::redactPaperData($paperData);
+        }
+
+        return $exporter->download(
+            $request,
+            $paperData,
+            $data['name'],
+        );
+    }
+
+    public function downloadSavedPdf(
+        Request $request,
+        Paper $paper,
+        PaperPdfExporter $exporter,
+    ): BinaryFileResponse {
+        abort_unless($this->canView($paper), 403);
+
+        $paperData = $paper->paper_data;
+
+        if (! SubjectiveAnswerAccess::allows($request->user())) {
+            $paperData = SubjectiveAnswerAccess::redactPaperData($paperData);
+        }
+
+        $pdfState = is_array($paperData['pdfState'] ?? null)
+            ? $paperData['pdfState']
+            : [];
+        $paperData['pdfState'] = [
+            'activeSetIndex' => 0,
+            'numSets' => max(1, min(3, (int) ($pdfState['numSets'] ?? 1))),
+            'viewMode' => 'paper',
+        ];
+
+        return $exporter->download($request, $paperData, $paper->name);
+    }
+
     /**
      * Returns JSON, like every other write method here.
      *
@@ -338,6 +385,7 @@ class PaperController extends Controller
             'questionSelection' => $paperData['questionSelection'] ?? null,
             'chapterSelection' => $paperData['chapterSelection'] ?? null,
             'meta' => $paperData['meta'] ?? null,
+            'pdfState' => $paperData['pdfState'] ?? null,
         ];
 
         return Inertia::render('customer/papers/generate', array_merge(

@@ -69,17 +69,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // â”€â”€â”€ Customer / Teacher app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::middleware('app.user')->group(function () {
+
         Route::middleware('teacher.feature:generate_papers')->group(function () {
             Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
             Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
             Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
             Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
+            Route::post('papers/pdf', [PaperController::class, 'downloadPdf'])->name('customer.papers.pdf.download');
             Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
             Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
         });
 
         Route::middleware('teacher.feature:manage_own_papers,view_school_papers')->group(function () {
             Route::get('papers', [PaperController::class, 'index'])->name('customer.papers.index');
+            Route::get('papers/{paper}/pdf', [PaperController::class, 'downloadSavedPdf'])->name('customer.papers.pdf.saved');
         });
 
         Route::middleware('teacher.feature:manage_own_papers')->group(function () {
