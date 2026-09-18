@@ -7,36 +7,58 @@ import type { PaperSettings } from './types';
 
 const PX_PER_MM = 96 / 25.4;
 const PIXEL_RATIO = 300 / 96;
+const TRANSPARENT_IMAGE =
+    'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+const IMAGE_LOAD_TIMEOUT_MS = 12000;
 
-function timeout<T>(promise: Promise<T>, message: string): Promise<T> {
+function timeout<T>(
+    promise: Promise<T>,
+    message: string,
+    duration = 45000,
+): Promise<T> {
     let timer: ReturnType<typeof setTimeout>;
 
     return Promise.race([
         promise,
         new Promise<never>((_, reject) => {
-            timer = setTimeout(() => reject(new Error(message)), 45000);
+            timer = setTimeout(() => reject(new Error(message)), duration);
         }),
     ]).finally(() => clearTimeout(timer));
 }
 
-async function loadAssets(root: HTMLElement): Promise<void> {
+async function loadAssets(root: HTMLElement): Promise<number> {
     await timeout(
         document.fonts.ready,
         'Paper fonts took too long to load. Please retry.',
     );
-    await Promise.all(
+    const loaded = await Promise.all(
         Array.from(root.querySelectorAll('img')).map(async (img) => {
             img.loading = 'eager';
 
             try {
-                await timeout(img.decode(), 'An image took too long to load.');
-            } catch {
-                throw new Error(
-                    'A paper image could not be loaded. Fix the missing image and try again.',
+                await timeout(
+                    img.decode(),
+                    'Image load timed out',
+                    IMAGE_LOAD_TIMEOUT_MS,
                 );
+
+                return true;
+            } catch {
+                if (img.complete && img.naturalWidth > 0) {
+                    return true;
+                }
+
+                // A missing diagram must not discard the entire paper. Remove
+                // it from this export clone so the capture library never tries
+                // to fetch or decode the broken source again.
+                img.remove();
+
+                return false;
             }
         }),
     );
+
+    return loaded.filter((valid) => !valid).length;
 }
 
 function cleanClone(source: HTMLElement): HTMLElement {
@@ -147,6 +169,7 @@ interface ExportOptions {
     settings: PaperSettings;
     name: string;
     onProgress?: (message: string) => void;
+    onMissingImages?: (count: number) => void;
     /** Used by browser regression checks without triggering a download. */
     save?: boolean;
 }
@@ -157,6 +180,7 @@ export async function downloadPaperPdf({
     settings,
     name,
     onProgress,
+    onMissingImages,
     save = true,
 }: ExportOptions): Promise<jsPDF> {
     if (!papers.length) {
@@ -211,7 +235,12 @@ export async function downloadPaperPdf({
             return clone;
         });
         onProgress?.('Loading paper fonts and images…');
-        await loadAssets(holder);
+        const missingImages = await loadAssets(holder);
+
+        if (missingImages) {
+            onMissingImages?.(missingImages);
+        }
+
         // html-to-image rounds font sizes down by default. Preserve the
         // measured typography so pagination and captured line wraps agree.
         const fontSizes = Array.from(
@@ -273,6 +302,8 @@ export async function downloadPaperPdf({
                           height: headerHeight,
                           pixelRatio: PIXEL_RATIO,
                           backgroundColor: '#ffffff',
+                          imagePlaceholder: TRANSPARENT_IMAGE,
+                          onImageErrorHandler: () => undefined,
                           fontEmbedCSS,
                           includeStyleProperties: captureStyleProperties,
                           preferredFontFormat: 'woff2',
@@ -397,6 +428,8 @@ export async function downloadPaperPdf({
                             height,
                             pixelRatio: PIXEL_RATIO,
                             backgroundColor: '#ffffff',
+                            imagePlaceholder: TRANSPARENT_IMAGE,
+                            onImageErrorHandler: () => undefined,
                             fontEmbedCSS,
                             includeStyleProperties: captureStyleProperties,
                             preferredFontFormat: 'woff2',

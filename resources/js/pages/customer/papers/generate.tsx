@@ -5635,6 +5635,7 @@ export default function GeneratePaper({
         setIsDownloadingPdf(true);
         const name = savedPaperName || defaultPaperName() || 'Paper';
         const progress = toast.loading('Preparing PDF…');
+        let missingImages = 0;
 
         try {
             const { downloadPaperPdf } = await import('./paper-layouts/download-paper-pdf');
@@ -5648,8 +5649,16 @@ export default function GeneratePaper({
                 settings: normalizePaperSettings(generatedPaper.settings),
                 name,
                 onProgress: (message) => toast.loading(message, { id: progress }),
+                onMissingImages: (count) => {
+                    missingImages = count;
+                },
             });
-            toast.success('PDF downloaded', { id: progress });
+            toast.success(
+                missingImages
+                    ? 'PDF downloaded. Unavailable images were omitted.'
+                    : 'PDF downloaded',
+                { id: progress },
+            );
         } catch (error) {
             toast.error(
                 error instanceof Error
@@ -7676,15 +7685,6 @@ export default function GeneratePaper({
                           : 'Generate Paper'
                 }
             />
-
-            {isDownloadingPdf && (
-                <div role="status" aria-live="polite" className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 text-slate-900 print:hidden">
-                    <div className="flex items-center gap-3 rounded-xl border bg-white p-5 shadow-lg">
-                        <Loader2Icon className="size-5 animate-spin" />
-                        Creating your PDF. Please keep this page open.
-                    </div>
-                </div>
-            )}
 
             {generatedPaper ? (
                 <>
