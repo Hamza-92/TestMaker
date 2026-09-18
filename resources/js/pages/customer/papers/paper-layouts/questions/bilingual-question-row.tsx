@@ -5,6 +5,8 @@ interface BilingualQuestionRowProps {
     value: string;
     indexLabel: string;
     urduIndexLabel?: string;
+    indexPrefix?: string;
+    urduIndexPrefix?: string;
     marks: number;
     urduOnly?: boolean;
     forceRtl?: boolean;
@@ -57,6 +59,8 @@ export function BilingualQuestionRow({
     value,
     indexLabel,
     urduIndexLabel = indexLabel,
+    indexPrefix = '',
+    urduIndexPrefix = '',
     marks,
     urduOnly = false,
     forceRtl = false,
@@ -67,6 +71,16 @@ export function BilingualQuestionRow({
     const sharedParts = sameStatement
         ? splitBilingualParts(sameStatement)
         : null;
+    const label = (text: string, prefix: string) => (
+        <>
+            {prefix && (
+                <span aria-hidden="true" className="invisible whitespace-pre">
+                    {prefix}
+                </span>
+            )}
+            {text})
+        </>
+    );
 
     if (sameStatement && parts) {
         return (
@@ -75,7 +89,9 @@ export function BilingualQuestionRow({
                     dir="ltr"
                     className="flex min-w-0 items-baseline text-left"
                 >
-                    <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
+                    <span className="shrink-0 font-bold">
+                        {label(indexLabel, indexPrefix)}
+                    </span>{' '}
                     <QuestionContent
                         value={parts.english}
                         inline
@@ -98,7 +114,7 @@ export function BilingualQuestionRow({
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
                     <span className="shrink-0 font-bold">
-                        {urduIndexLabel})
+                        {label(urduIndexLabel, urduIndexPrefix)}
                     </span>{' '}
                     <QuestionContent
                         value={parts.urdu}
@@ -120,7 +136,7 @@ export function BilingualQuestionRow({
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
                     <span className="shrink-0 font-bold">
-                        {urduIndexLabel})
+                        {label(urduIndexLabel, urduIndexPrefix)}
                     </span>{' '}
                     <QuestionContent
                         value={value}
@@ -143,7 +159,9 @@ export function BilingualQuestionRow({
 
         return (
             <div className="flex min-w-0 items-baseline text-left">
-                <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
+                <span className="shrink-0 font-bold">
+                    {label(indexLabel, indexPrefix)}
+                </span>{' '}
                 <QuestionContent
                     value={value}
                     inline
@@ -172,7 +190,9 @@ export function BilingualQuestionRow({
             }
         >
             <div dir="ltr" className="flex min-w-0 items-baseline text-left">
-                <span className="shrink-0 font-bold">{indexLabel})</span>{' '}
+                <span className="shrink-0 font-bold">
+                    {label(indexLabel, indexPrefix)}
+                </span>{' '}
                 <QuestionContent
                     value={parts.english}
                     inline
@@ -192,7 +212,9 @@ export function BilingualQuestionRow({
                 className="flex min-w-0 items-baseline text-right"
                 style={{ fontFamily: 'var(--paper-urdu-font)' }}
             >
-                <span className="shrink-0 font-bold">{urduIndexLabel})</span>{' '}
+                <span className="shrink-0 font-bold">
+                    {label(urduIndexLabel, urduIndexPrefix)}
+                </span>{' '}
                 <QuestionContent
                     value={parts.urdu}
                     inline

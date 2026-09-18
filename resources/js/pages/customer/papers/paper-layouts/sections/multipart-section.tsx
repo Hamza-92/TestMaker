@@ -185,6 +185,16 @@ export function MultipartSection({
                                     value={questionValue}
                                     indexLabel={indexLabel}
                                     urduIndexLabel={urduIndexLabel}
+                                    indexPrefix={
+                                        partIndex > 0 && headingNumber !== null
+                                            ? `Q.${headingNumber}:- `
+                                            : ''
+                                    }
+                                    urduIndexPrefix={
+                                        partIndex > 0 && headingNumber !== null
+                                            ? `سوال نمبر ${headingNumber}:- `
+                                            : ''
+                                    }
                                     marks={part.marksEach}
                                     urduOnly={urduOnly}
                                     forceRtl={part.questionTextRtl}
