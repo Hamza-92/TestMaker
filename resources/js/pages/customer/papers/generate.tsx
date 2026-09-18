@@ -7524,10 +7524,14 @@ export default function GeneratePaper({
     }
 
     function renderQuestionCategory(category: SectionCategory) {
+        const multipartTypeIds = new Set(
+            multipartConfig?.partTypes.map((type) => type.id) ?? [],
+        );
         const sections = questionSelection.sections.filter(
             (section) =>
                 section.category === category &&
-                !foldedAlternativeTypeIds.has(section.questionTypeId),
+                !foldedAlternativeTypeIds.has(section.questionTypeId) &&
+                !multipartTypeIds.has(section.questionTypeId),
         );
         const sectionsByType = new Map(
             questionSelection.sections.map((section) => [
@@ -8795,9 +8799,18 @@ function AddPaperSectionModal({
     const [localTopicIds, setLocalTopicIds] = useState<Set<number>>(
         () => new Set(initialTopicIds),
     );
+    const standardQuestionTypes = useMemo(() => {
+        const multipartTypeIds = new Set(
+            multipartConfig?.partTypes.map((type) => type.id) ?? [],
+        );
+
+        return questionTypes.filter(
+            (type) => !multipartTypeIds.has(type.questionTypeId),
+        );
+    }, [multipartConfig, questionTypes]);
     const typeOptions = useMemo<ComboboxOptionItem[]>(
         () =>
-            questionTypes.map((type) => ({
+            standardQuestionTypes.map((type) => ({
                 id: type.questionTypeId,
                 label: type.title,
                 searchLabel: plainQuestionText(type.title),
@@ -8806,7 +8819,7 @@ function AddPaperSectionModal({
                 ),
                 hint: type.category,
             })),
-        [questionTypes],
+        [standardQuestionTypes],
     );
     const availableSources = sourceOptions.length
         ? sourceOptions
@@ -8820,10 +8833,10 @@ function AddPaperSectionModal({
     );
     const selectedType = useMemo(
         () =>
-            questionTypes.find(
+            standardQuestionTypes.find(
                 (type) => type.questionTypeId === toNumber(questionTypeId),
             ) ?? null,
-        [questionTypeId, questionTypes],
+        [questionTypeId, standardQuestionTypes],
     );
     const selectedSourceValues = availableSources
         .filter((source) => selectedSources.has(source.value))
@@ -9148,7 +9161,7 @@ function AddPaperSectionModal({
             <AddOrPaperSectionModal
                 medium={medium}
                 onKindChange={setSectionKind}
-                questionTypes={questionTypes}
+                questionTypes={standardQuestionTypes}
                 pairings={pairings}
                 hasMultipart={
                     multipartConfig !== null &&
@@ -9208,7 +9221,7 @@ function AddPaperSectionModal({
                                 pairing.questionTypeIds.length >= 2 &&
                                 pairing.questionTypeIds.every(
                                     (questionTypeId) =>
-                                        questionTypes.some(
+                                        standardQuestionTypes.some(
                                             (section) =>
                                                 section.questionTypeId ===
                                                 questionTypeId,
@@ -9233,7 +9246,7 @@ function AddPaperSectionModal({
                                     option ? String(option.id) : '',
                                 )
                             }
-                            disabled={questionTypes.length === 0}
+                            disabled={standardQuestionTypes.length === 0}
                             disabledHint="No question types available"
                         />
 

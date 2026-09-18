@@ -56,7 +56,7 @@ export function MultipartSection({
               ')';
     const choiceLabelEnglish =
         showChoice && typeof groupChoiceCount === 'number'
-            ? '[Any ' + groupChoiceCount + ']' + choiceMarksLabel
+            ? '[Any ' + groupChoiceCount + ']'
             : '';
     const choiceLabelUrdu =
         showChoice && typeof groupChoiceCount === 'number'
@@ -122,12 +122,20 @@ export function MultipartSection({
                                         )}
                                     </>
                                 ) : (
-                                    choiceLabelEnglish
+                                    <>
+                                        {choiceLabelEnglish}
+                                        {!isBilingualHeading &&
+                                            choiceMarksLabel}
+                                    </>
                                 )}
                             </span>
                         )}
                     </div>
-                    {isBilingualHeading && <div />}
+                    {isBilingualHeading && (
+                        <div className="shrink-0 text-center whitespace-nowrap">
+                            {choiceMarksLabel}
+                        </div>
+                    )}
                     {isBilingualHeading && (
                         <div
                             className="min-w-0 text-right"
@@ -143,18 +151,6 @@ export function MultipartSection({
                             {showChoice && (
                                 <span className="mr-1 align-baseline whitespace-nowrap">
                                     {choiceLabelUrdu}
-                                    {choiceMarksLabel !== '' && (
-                                        <span
-                                            dir="ltr"
-                                            className="inline-block"
-                                            style={{
-                                                direction: 'ltr',
-                                                unicodeBidi: 'isolate',
-                                            }}
-                                        >
-                                            {choiceMarksLabel}
-                                        </span>
-                                    )}
                                 </span>
                             )}
                         </div>

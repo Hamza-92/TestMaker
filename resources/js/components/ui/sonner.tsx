@@ -1,12 +1,11 @@
-import { Toaster as Sonner, type ToasterProps } from 'sonner';
+import { Toaster as Sonner } from 'sonner';
+import type { ToasterProps } from 'sonner';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 
 /**
- * Sonner is kept purely as the engine — stacking, timers, pause-on-hover,
- * swipe-to-dismiss. Every toast is rendered by our own component via
- * `notify` in components/tm/toast, so `unstyled` turns off sonner's own
- * chrome; without it our card would sit inside a second bordered box.
+ * Sonner manages toast placement and timing. `notify` renders custom cards;
+ * direct Sonner calls use its built-in coloured styles.
  */
 function Toaster({ ...props }: ToasterProps) {
     const { appearance } = useAppearance();
@@ -23,13 +22,11 @@ function Toaster({ ...props }: ToasterProps) {
             gap={10}
             visibleToasts={4}
             style={{ '--width': '400px' } as React.CSSProperties}
-            // Sonner's own chrome is neutralised rather than switched off
-            // with `unstyled`: its layout rules (width, absolute position,
-            // stack transforms) live in the same styled block, so unstyled
-            // collapsed every toast into the container's top-left corner.
+            richColors
             toastOptions={{
                 classNames: {
-                    toast: '!bg-transparent !border-0 !shadow-none !p-0 !w-full',
+                    loading:
+                        '!border-blue-200 !bg-blue-50 !text-blue-900 dark:!border-blue-800 dark:!bg-blue-950 dark:!text-blue-100',
                 },
             }}
             {...props}
