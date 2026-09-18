@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\PaperFolder;
-use App\Support\PaperPdfExporter;
 use App\Support\SubjectiveAnswerAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +15,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PaperController extends Controller
 {
@@ -237,7 +235,7 @@ class PaperController extends Controller
             'name' => 'required|string|max:255',
             'subject' => 'nullable|string|max:150',
             'class_name' => 'nullable|string|max:150',
-            'total_marks' => 'required|integer|min:0',
+            'total_marks' => 'required|numeric|decimal:0,2|min:0|max:99999999.99',
             'paper_data' => 'required|array',
             'is_draft' => 'boolean',
         ]);
@@ -268,7 +266,7 @@ class PaperController extends Controller
             'name' => 'required|string|max:255',
             'subject' => 'nullable|string|max:150',
             'class_name' => 'nullable|string|max:150',
-            'total_marks' => 'required|integer|min:0',
+            'total_marks' => 'required|numeric|decimal:0,2|min:0|max:99999999.99',
             'paper_data' => 'required|array',
             'is_draft' => 'boolean',
         ]);
@@ -301,31 +299,10 @@ class PaperController extends Controller
         ]);
     }
 
-    public function downloadPdf(Request $request, PaperPdfExporter $exporter): BinaryFileResponse
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'paper_data' => ['required', 'array'],
-            'paper_data.paper' => ['required', 'array'],
-        ]);
-        $paperData = (array) $request->input('paper_data');
-
-        if (! SubjectiveAnswerAccess::allows($request->user())) {
-            $paperData = SubjectiveAnswerAccess::redactPaperData($paperData);
-        }
-
-        return $exporter->download(
-            $request,
-            $paperData,
-            $data['name'],
-        );
-    }
-
     public function downloadSavedPdf(
         Request $request,
         Paper $paper,
-        PaperPdfExporter $exporter,
-    ): BinaryFileResponse {
+    ): Response {
         abort_unless($this->canView($paper), 403);
 
         $paperData = $paper->paper_data;
@@ -343,7 +320,25 @@ class PaperController extends Controller
             'viewMode' => 'paper',
         ];
 
-        return $exporter->download($request, $paperData, $paper->name);
+        abort_unless(is_array($paperData['paper'] ?? null), 422, 'This paper has no printable content.');
+
+        return Inertia::render('customer/papers/generate', array_merge(
+            GeneratePaperController::pageData(),
+            [
+                'autoDownloadPdf' => true,
+                'savedPaper' => [
+                    'id' => $paper->id,
+                    'name' => $paper->name,
+                    'is_draft' => $paper->is_draft,
+                    'paper' => $paperData['paper'],
+                    'questionPoolsByType' => [],
+                    'questionSelection' => $paperData['questionSelection'] ?? null,
+                    'chapterSelection' => $paperData['chapterSelection'] ?? null,
+                    'meta' => $paperData['meta'] ?? null,
+                    'pdfState' => $paperData['pdfState'],
+                ],
+            ],
+        ));
     }
 
     /**

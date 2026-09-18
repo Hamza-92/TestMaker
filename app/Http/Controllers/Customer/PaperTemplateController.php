@@ -25,14 +25,14 @@ class PaperTemplateController extends Controller
         $search = trim((string) $request->query('q', ''));
 
         $map = fn (PaperTemplate $template) => [
-            'id'            => $template->id,
-            'name'          => $template->name,
-            'description'   => $template->description,
+            'id' => $template->id,
+            'name' => $template->name,
+            'description' => $template->description,
             'section_count' => is_array($template->structure['sections'] ?? null)
                 ? count($template->structure['sections'])
                 : 0,
-            'total_marks'   => (int) ($template->structure['total_marks'] ?? 0),
-            'updated_at'    => $template->updated_at?->toISOString(),
+            'total_marks' => (float) ($template->structure['total_marks'] ?? 0),
+            'updated_at' => $template->updated_at?->toISOString(),
         ];
 
         $items = PaperTemplate::query()
@@ -49,17 +49,17 @@ class PaperTemplateController extends Controller
 
         return Inertia::render('customer/templates/index', [
             'items' => [
-                'data'         => collect($items->items())->map($map)->values(),
+                'data' => collect($items->items())->map($map)->values(),
                 'current_page' => $items->currentPage(),
-                'last_page'    => $items->lastPage(),
-                'per_page'     => $items->perPage(),
-                'total'        => $items->total(),
-                'from'         => $items->firstItem(),
-                'to'           => $items->lastItem(),
+                'last_page' => $items->lastPage(),
+                'per_page' => $items->perPage(),
+                'total' => $items->total(),
+                'from' => $items->firstItem(),
+                'to' => $items->lastItem(),
             ],
             // Unfiltered total, so the header count does not move as you search.
             'totalCount' => PaperTemplate::where('user_id', $user->id)->count(),
-            'filters'    => ['q' => $search],
+            'filters' => ['q' => $search],
         ]);
     }
 
@@ -78,7 +78,7 @@ class PaperTemplateController extends Controller
     public function bulkDestroy(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'ids'   => ['required', 'array', 'min:1', 'max:' . self::MAX_BULK],
+            'ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_BULK],
             'ids.*' => ['integer'],
         ]);
 
@@ -115,39 +115,39 @@ class PaperTemplateController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'                       => ['required', 'string', 'max:255'],
-            'description'                => ['nullable', 'string', 'max:500'],
-            'settings'                   => ['required', 'array'],
-            'structure'                  => ['required', 'array'],
-            'structure.sections'         => ['required', 'array'],
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'settings' => ['required', 'array'],
+            'structure' => ['required', 'array'],
+            'structure.sections' => ['required', 'array'],
             'structure.sections.*.questionTypeId' => ['nullable', 'integer'],
-            'structure.sections.*.category'       => ['required', 'string', 'max:60'],
-            'structure.sections.*.title'          => ['required', 'string', 'max:200'],
+            'structure.sections.*.category' => ['required', 'string', 'max:60'],
+            'structure.sections.*.title' => ['required', 'string', 'max:200'],
             'structure.sections.*.requiredQuestions' => ['required', 'integer', 'min:0'],
-            'structure.sections.*.totalQuestions'    => ['required', 'integer', 'min:0'],
-            'structure.sections.*.marksEach'         => ['required', 'integer', 'min:0'],
-            'structure.sections.*.columns'           => ['nullable', 'integer', 'min:1', 'max:5'],
-            'structure.sections.*.orPairingId'        => ['nullable', 'integer'],
-            'structure.sections.*.orQuestionTypeId'   => ['nullable', 'integer'],
-            'structure.sections.*.orGroupTypeIds'     => ['nullable', 'array', 'min:2'],
-            'structure.sections.*.orGroupTypeIds.*'   => ['integer', 'distinct'],
-            'structure.sections.*.orRole'             => ['nullable', Rule::in(['primary', 'alternative'])],
+            'structure.sections.*.totalQuestions' => ['required', 'integer', 'min:0'],
+            'structure.sections.*.marksEach' => ['required', 'numeric', 'decimal:0,2', 'min:0'],
+            'structure.sections.*.columns' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'structure.sections.*.orPairingId' => ['nullable', 'integer'],
+            'structure.sections.*.orQuestionTypeId' => ['nullable', 'integer'],
+            'structure.sections.*.orGroupTypeIds' => ['nullable', 'array', 'min:2'],
+            'structure.sections.*.orGroupTypeIds.*' => ['integer', 'distinct'],
+            'structure.sections.*.orRole' => ['nullable', Rule::in(['primary', 'alternative'])],
         ]);
 
-        $data['structure']['total_marks'] = collect($data['structure']['sections'])
+        $data['structure']['total_marks'] = round(collect($data['structure']['sections'])
             ->reject(fn ($section) => ($section['orRole'] ?? null) === 'alternative')
-            ->sum(fn ($section) => (int) $section['requiredQuestions'] * (int) $section['marksEach']);
+            ->sum(fn ($section) => (int) $section['requiredQuestions'] * (float) $section['marksEach']), 2);
 
         $template = PaperTemplate::create([
-            'user_id'     => $request->user()->id,
-            'name'        => $data['name'],
+            'user_id' => $request->user()->id,
+            'name' => $data['name'],
             'description' => $data['description'] ?? null,
-            'settings'    => $data['settings'],
-            'structure'   => $data['structure'],
+            'settings' => $data['settings'],
+            'structure' => $data['structure'],
         ]);
 
         return response()->json([
-            'id'   => $template->id,
+            'id' => $template->id,
             'name' => $template->name,
         ], 201);
     }
@@ -157,7 +157,7 @@ class PaperTemplateController extends Controller
         abort_if($template->user_id !== $request->user()->id, 403);
 
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:500'],
         ]);
 

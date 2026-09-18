@@ -33,7 +33,7 @@ export function QuestionTypeHeading({
         : titleUrdu?.trim() || '';
     const visibleTitle = hideInternalSchemaLabel(title) ? '' : title;
     const isBilingual = english !== '' && urdu !== '';
-    const totalMarks = requiredQuestions * marksEach;
+    const totalMarks = Number((requiredQuestions * marksEach).toFixed(2));
     const showRequiredChoice = requiredQuestions < choiceQuestions;
     const englishChoiceLabel = showRequiredChoice
         ? `[Any ${requiredQuestions}]`

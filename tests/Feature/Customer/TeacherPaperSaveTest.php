@@ -27,7 +27,7 @@ test('a teacher who can generate papers can save and update their paper', functi
         'name' => 'Generated Physics Paper',
         'subject' => 'Physics',
         'class_name' => '10th',
-        'total_marks' => 20,
+        'total_marks' => 20.5,
         'is_draft' => false,
         'paper_data' => ['paper' => ['sections' => []]],
     ];
@@ -42,6 +42,7 @@ test('a teacher who can generate papers can save and update their paper', functi
 
     $paper = Paper::findOrFail($response->json('id'));
     expect($paper->user_id)->toBe($teacher->id);
+    expect($paper->total_marks)->toBe(20.5);
 
     expect(DB::table('papers')->where('id', $paper->id)->value('paper_data'))
         ->toContain('__tm_compressed');
@@ -51,8 +52,10 @@ test('a teacher who can generate papers can save and update their paper', functi
         ->putJson(route('customer.papers.update', $paper), [
             ...$payload,
             'name' => 'Updated Physics Paper',
+            'total_marks' => 21.25,
         ])
         ->assertOk();
 
     expect($paper->fresh()->name)->toBe('Updated Physics Paper');
+    expect($paper->fresh()->total_marks)->toBe(21.25);
 });

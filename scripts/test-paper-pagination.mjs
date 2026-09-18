@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const source = readFileSync(new URL('../resources/js/pages/customer/papers/paper-layouts/pdf-pagination.ts', import.meta.url), 'utf8');
+const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
+const { nextPaperPageEnd: end } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+assert.equal(end(0, 100, 250, [{ top: 80, bottom: 130 }], [], []), 80, 'Keep questions together');
+assert.equal(end(80, 100, 250, [{ top: 80, bottom: 130 }], [], []), 180, 'Make progress');
+assert.equal(end(0, 100, 250, [{ top: 0, bottom: 220 }], [{ top: 92, bottom: 107 }], []), 92, 'Split oversized questions between lines');
+assert.equal(end(0, 100, 250, [{ top: 90, bottom: 130 }, { top: 70, bottom: 95 }], [], []), 70, 'Respect overlapping columns');
+assert.equal(end(0, 100, 250, [], [], [45]), 45, 'Honor bubble-sheet breaks');
+assert.equal(end(45, 100, 250, [], [], [45]), 145, 'Do not repeat a forced break');
+assert.equal(end(180, 100, 250, [], [], []), 250, 'Keep final page');
+assert.throws(() => end(0, 100, 250, [], [{ top: 0, bottom: 150 }], []), /taller/);
+console.log('8 pagination regression checks passed.');

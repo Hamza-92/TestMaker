@@ -40,8 +40,8 @@ export function SavePaperModal({
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
             if (event.key === 'Escape') {
-onCancel();
-}
+                onCancel();
+            }
         }
         window.addEventListener('keydown', onKeyDown);
 
@@ -57,8 +57,8 @@ onCancel();
         e.preventDefault();
 
         if (!values.name.trim() || isSaving) {
-return;
-}
+            return;
+        }
 
         onSave({ ...values, name: values.name.trim() });
     }
@@ -97,10 +97,11 @@ return;
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
                     {/* Paper Name — full width */}
                     <Field label="Paper Name" required>
-                        <input autoComplete="off"
+                        <input
+                            autoComplete="off"
                             ref={nameRef}
                             type="text"
                             value={values.name}
@@ -114,7 +115,8 @@ return;
                     {/* Row: Exam Type | Section Name */}
                     <div className="grid grid-cols-2 gap-4">
                         <Field label="Exam Type">
-                            <input autoComplete="off"
+                            <input
+                                autoComplete="off"
                                 type="text"
                                 value={values.examType}
                                 onChange={set('examType')}
@@ -124,7 +126,8 @@ return;
                             />
                         </Field>
                         <Field label="Section Name">
-                            <input autoComplete="off"
+                            <input
+                                autoComplete="off"
                                 type="text"
                                 value={values.section}
                                 onChange={set('section')}
@@ -138,13 +141,16 @@ return;
                     {/* Row: Paper Date | Time Allowed */}
                     <div className="grid grid-cols-2 gap-4">
                         <Field label="Paper Date">
-                            <input autoComplete="off"
+                            <input
+                                autoComplete="off"
                                 type="date"
                                 value={values.date}
                                 onChange={set('date')}
                                 onClick={(e) => {
                                     try {
-                                        (e.target as HTMLInputElement).showPicker();
+                                        (
+                                            e.target as HTMLInputElement
+                                        ).showPicker();
                                     } catch {
                                         // showPicker not supported in this browser
                                     }
@@ -154,7 +160,8 @@ return;
                             />
                         </Field>
                         <Field label="Time Allowed">
-                            <input autoComplete="off"
+                            <input
+                                autoComplete="off"
                                 type="text"
                                 value={values.timeAllowed}
                                 onChange={set('timeAllowed')}
@@ -168,9 +175,11 @@ return;
                     {/* Row: Exam Marks | Passing Marks */}
                     <div className="grid grid-cols-2 gap-4">
                         <Field label="Exam Marks">
-                            <input autoComplete="off"
+                            <input
+                                autoComplete="off"
                                 type="number"
                                 min={0}
+                                step="0.01"
                                 value={values.examMarks}
                                 onChange={set('examMarks')}
                                 placeholder="Total marks"
@@ -179,9 +188,11 @@ return;
                             />
                         </Field>
                         <Field label="Passing Marks">
-                            <input autoComplete="off"
+                            <input
+                                autoComplete="off"
                                 type="number"
                                 min={0}
+                                step="0.01"
                                 value={values.passingMarks}
                                 onChange={set('passingMarks')}
                                 placeholder="Minimum to pass"
@@ -192,7 +203,9 @@ return;
                     </div>
 
                     {error && (
-                        <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+                        <p className="text-xs text-rose-600 dark:text-rose-400">
+                            {error}
+                        </p>
                     )}
 
                     {/* Actions */}
@@ -210,7 +223,11 @@ return;
                             disabled={!values.name.trim() || isSaving}
                             className="flex-1 cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                         >
-                            {isSaving ? 'Saving…' : isUpdate ? 'Update' : 'Save Paper'}
+                            {isSaving
+                                ? 'Saving…'
+                                : isUpdate
+                                  ? 'Update'
+                                  : 'Save Paper'}
                         </button>
                     </div>
                 </form>

@@ -42,7 +42,7 @@ export function MultipartSection({
         groupChoiceCount <= groupQuestionCount;
     const choiceMarks =
         showChoice && typeof groupChoiceCount === 'number'
-            ? groupChoiceCount * multipart.marksEach
+            ? Number((groupChoiceCount * multipart.marksEach).toFixed(2))
             : null;
     const choiceMarksLabel =
         choiceMarks === null || typeof groupChoiceCount !== 'number'

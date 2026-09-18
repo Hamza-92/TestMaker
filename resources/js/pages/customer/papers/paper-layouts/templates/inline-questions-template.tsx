@@ -126,6 +126,13 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                     {options.map((option, optionIndex) => (
                                         <span
                                             key={option.id}
+                                            data-paper-correct-option={
+                                                isObjective &&
+                                                showCorrectAnswers &&
+                                                option.isCorrect === true
+                                                    ? true
+                                                    : undefined
+                                            }
                                             className="ml-2 align-baseline"
                                         >
                                             <BilingualOptionContent

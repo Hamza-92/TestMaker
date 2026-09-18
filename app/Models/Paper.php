@@ -20,7 +20,7 @@ class Paper extends Model
     ];
 
     protected $casts = [
-        'total_marks' => 'integer',
+        'total_marks' => 'float',
         'is_draft' => 'boolean',
     ];
 

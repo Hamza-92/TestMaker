@@ -692,6 +692,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: inherit;
 }
 
+[data-print-paper] [data-paper-correct-option] {
+    background-color: #dcfce7 !important;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
 [data-print-paper] [data-paper-correct-option],
 [data-print-paper] [data-paper-correct-option] * {
     color: #15803d !important;
@@ -836,6 +842,10 @@ input[type='date']::-webkit-calendar-picker-indicator {
         [data-print-paper][data-paper-forced-page-break='true'] {
         break-inside: auto;
         page-break-inside: auto;
+    }
+
+    [data-print-paper] [data-paper-correct-option] {
+        background-color: transparent !important;
     }
 
     [data-print-paper] [data-paper-correct-option],

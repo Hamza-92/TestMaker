@@ -165,6 +165,13 @@ function BoardObjectiveTableRow({
                 return (
                     <td
                         key={option?.id ?? `empty-${optionIndex}`}
+                        data-paper-correct-option={
+                            option &&
+                            props.showCorrectAnswers === true &&
+                            option.isCorrect === true
+                                ? true
+                                : undefined
+                        }
                         className="px-2 py-1 text-center align-middle font-normal"
                     >
                         {option && (

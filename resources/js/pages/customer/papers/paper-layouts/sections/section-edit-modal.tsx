@@ -70,7 +70,8 @@ export function SectionEditModal({
                         <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                             Title
                         </span>
-                        <input autoComplete="off"
+                        <input
+                            autoComplete="off"
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
                             className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
@@ -81,7 +82,8 @@ export function SectionEditModal({
                             <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                                 Required
                             </span>
-                            <input autoComplete="off"
+                            <input
+                                autoComplete="off"
                                 type="number"
                                 min="0"
                                 max={section.questions.length}
@@ -98,13 +100,19 @@ export function SectionEditModal({
                             <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
                                 Marks each
                             </span>
-                            <input autoComplete="off"
-                                type="number"
-                                min="0"
+                            <input
+                                autoComplete="off"
+                                type="text"
+                                inputMode="decimal"
                                 value={marksEach}
                                 onChange={(event) =>
                                     setMarksEach(
-                                        event.target.value.replace(/\D/g, ''),
+                                        event.target.value
+                                            .replace(/[^\d.]/g, '')
+                                            .replace(
+                                                /^(\d*\.\d{0,2}).*$/,
+                                                '$1',
+                                            ),
                                     )
                                 }
                                 className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"

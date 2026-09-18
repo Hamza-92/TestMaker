@@ -411,7 +411,7 @@ test('paper templates preserve OR metadata without double counting alternative m
                         'title' => 'Primary type',
                         'requiredQuestions' => 2,
                         'totalQuestions' => 3,
-                        'marksEach' => 5,
+                        'marksEach' => 1.25,
                         'columns' => 1,
                         'orPairingId' => 4,
                         'orQuestionTypeId' => 11,
@@ -423,7 +423,7 @@ test('paper templates preserve OR metadata without double counting alternative m
                         'title' => 'Alternative type',
                         'requiredQuestions' => 2,
                         'totalQuestions' => 3,
-                        'marksEach' => 5,
+                        'marksEach' => 1.25,
                         'columns' => 1,
                         'orPairingId' => 4,
                         'orQuestionTypeId' => 10,
@@ -436,7 +436,7 @@ test('paper templates preserve OR metadata without double counting alternative m
 
     $template = PaperTemplate::query()->where('user_id', $customer->id)->sole();
 
-    expect($template->structure['total_marks'])->toBe(10)
+    expect($template->structure['total_marks'])->toBe(2.5)
         ->and($template->structure['sections'][0]['orRole'])->toBe('primary')
         ->and($template->structure['sections'][1]['orRole'])->toBe('alternative');
 });

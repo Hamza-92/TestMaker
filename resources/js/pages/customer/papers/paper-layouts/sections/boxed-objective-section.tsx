@@ -291,6 +291,12 @@ function ObjectiveQuestionRow({
                             <div
                                 key={option.id}
                                 data-paper-question-divider="r"
+                                data-paper-correct-option={
+                                    showCorrectAnswers &&
+                                    option.isCorrect === true
+                                        ? true
+                                        : undefined
+                                }
                                 className={
                                     urduOnly
                                         ? 'min-w-0 px-2 py-1 text-right'

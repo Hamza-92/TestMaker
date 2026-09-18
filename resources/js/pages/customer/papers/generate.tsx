@@ -42,6 +42,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { toast } from 'sonner';
 import { Button, Card } from '@/components/tm';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
@@ -272,10 +273,10 @@ interface Props {
     classSubjects: ClassSubject[];
     sourceOptions: SourceOption[];
     savedPaper?: SavedPaperProp;
+    autoDownloadPdf?: boolean;
     appliedTemplate?: AppliedTemplate;
     initialPatternId?: number | null;
     canViewSubjectiveAnswers: boolean;
-    pdfExport?: boolean;
 }
 
 interface SourceOption {
@@ -840,6 +841,22 @@ function onlyDigits(value: string): string {
     return value.replace(/\D/g, '');
 }
 
+function decimalMarks(value: string): string {
+    const cleaned = value.replace(/[^\d.]/g, '');
+    const point = cleaned.indexOf('.');
+
+    return point === -1
+        ? cleaned
+        : `${cleaned.slice(0, point)}.${cleaned
+              .slice(point + 1)
+              .replace(/\./g, '')
+              .slice(0, 2)}`;
+}
+
+function roundMarks(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function onlyChapterNumbers(value: string): string {
     return value.replace(/[^\d,\s]/g, '');
 }
@@ -1037,7 +1054,9 @@ function rowTarget(row: QuestionSelectionRow): number {
 }
 
 function lineTotal(row: QuestionSelectionRow): number {
-    return toNumber(row.requiredQuestions) * toNumber(row.marksPerQuestion);
+    return roundMarks(
+        toNumber(row.requiredQuestions) * toNumber(row.marksPerQuestion),
+    );
 }
 
 function trimmedCount(value: string, maximum: number): string {
@@ -1596,9 +1615,11 @@ function paperOptionsFromContent(
 }
 
 function multipartSelectionMarks(selection: MultipartSelectionState): number {
-    return selection.rows.reduce(
-        (sum, row) => sum + toNumber(row.marksPerQuestion),
-        0,
+    return roundMarks(
+        selection.rows.reduce(
+            (sum, row) => sum + toNumber(row.marksPerQuestion),
+            0,
+        ),
     );
 }
 
@@ -1619,9 +1640,11 @@ function multipartChoiceMarks(state: QuestionSelectionState): number {
             : marks.length;
     const allMarksMatch = marks.every((value) => value === marks[0]);
 
-    return requiredCount < marks.length && allMarksMatch
-        ? requiredCount * marks[0]
-        : marks.reduce((sum, value) => sum + value, 0);
+    return roundMarks(
+        requiredCount < marks.length && allMarksMatch
+            ? requiredCount * marks[0]
+            : marks.reduce((sum, value) => sum + value, 0),
+    );
 }
 
 function multipartChoiceMarksMismatch(state: QuestionSelectionState): boolean {
@@ -1649,55 +1672,59 @@ function multipartChoiceMarksMismatch(state: QuestionSelectionState): boolean {
 function paperTotalMarks(paper: GeneratedPaper): number {
     const countedMultipartGroups = new Set<string>();
 
-    return paper.sections.reduce((sum, section) => {
-        if (section.orRole === 'alternative') {
-            return sum;
-        }
+    return roundMarks(
+        paper.sections.reduce((sum, section) => {
+            if (section.orRole === 'alternative') {
+                return sum;
+            }
 
-        if (!section.multipart) {
-            return sum + section.requiredQuestions * section.marksEach;
-        }
+            if (!section.multipart) {
+                return sum + section.requiredQuestions * section.marksEach;
+            }
 
-        const groupId = section.multipart.groupId;
+            const groupId = section.multipart.groupId;
 
-        if (!groupId) {
-            return (
-                sum +
-                section.multipart.rows.length *
-                    section.multipart.choiceCount *
-                    section.multipart.marksEach
+            if (!groupId) {
+                return (
+                    sum +
+                    section.multipart.rows.length *
+                        section.multipart.choiceCount *
+                        section.multipart.marksEach
+                );
+            }
+
+            if (countedMultipartGroups.has(groupId)) {
+                return sum;
+            }
+
+            countedMultipartGroups.add(groupId);
+            const groupSections = paper.sections.filter(
+                (candidate) => candidate.multipart?.groupId === groupId,
             );
-        }
+            const marks = groupSections.map(
+                (candidate) => candidate.multipart?.marksEach ?? 0,
+            );
+            const allMarksMatch = marks.every((value) => value === marks[0]);
+            const choiceCount = groupSections[0]?.multipart?.groupChoiceCount;
 
-        if (countedMultipartGroups.has(groupId)) {
-            return sum;
-        }
+            if (
+                typeof choiceCount === 'number' &&
+                choiceCount > 0 &&
+                choiceCount < marks.length &&
+                allMarksMatch
+            ) {
+                return sum + choiceCount * marks[0];
+            }
 
-        countedMultipartGroups.add(groupId);
-        const groupSections = paper.sections.filter(
-            (candidate) => candidate.multipart?.groupId === groupId,
-        );
-        const marks = groupSections.map(
-            (candidate) => candidate.multipart?.marksEach ?? 0,
-        );
-        const allMarksMatch = marks.every((value) => value === marks[0]);
-        const choiceCount = groupSections[0]?.multipart?.groupChoiceCount;
-
-        if (
-            typeof choiceCount === 'number' &&
-            choiceCount > 0 &&
-            choiceCount < marks.length &&
-            allMarksMatch
-        ) {
-            return sum + choiceCount * marks[0];
-        }
-
-        return sum + marks.reduce((total, value) => total + value, 0);
-    }, 0);
+            return sum + marks.reduce((total, value) => total + value, 0);
+        }, 0),
+    );
 }
 
 function sectionTotal(section: QuestionSelectionSection): number {
-    return section.rows.reduce((sum, row) => sum + lineTotal(row), 0);
+    return roundMarks(
+        section.rows.reduce((sum, row) => sum + lineTotal(row), 0),
+    );
 }
 
 function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
@@ -1707,7 +1734,7 @@ function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
 
     return {
         ...state,
-        totalMarks:
+        totalMarks: roundMarks(
             state.sections.reduce(
                 (sum, section) =>
                     alternativeTypeIds.has(section.questionTypeId)
@@ -1715,6 +1742,7 @@ function withTotalMarks(state: QuestionSelectionState): QuestionSelectionState {
                         : sum + sectionTotal(section),
                 0,
             ) + multipartChoiceMarks(state),
+        ),
     };
 }
 function sortIncomingQuestionTypes(
@@ -2615,6 +2643,7 @@ function NumberField({
     label,
     placeholder,
     max,
+    decimal = false,
     disabled = false,
     onChange,
 }: {
@@ -2622,6 +2651,7 @@ function NumberField({
     label: string;
     placeholder: string;
     max?: number;
+    decimal?: boolean;
     disabled?: boolean;
     onChange: (value: string) => void;
 }) {
@@ -2632,14 +2662,20 @@ function NumberField({
             </span>
             <input
                 autoComplete="off"
-                type="number"
-                inputMode="numeric"
+                type={decimal ? 'text' : 'number'}
+                inputMode={decimal ? 'decimal' : 'numeric'}
                 min="0"
                 max={max}
                 disabled={disabled}
                 value={value}
                 placeholder={placeholder}
-                onChange={(event) => onChange(onlyDigits(event.target.value))}
+                onChange={(event) =>
+                    onChange(
+                        decimal
+                            ? decimalMarks(event.target.value)
+                            : onlyDigits(event.target.value),
+                    )
+                }
                 className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-brand-400 dark:focus:ring-brand-400/20 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
             />
         </label>
@@ -2800,10 +2836,10 @@ export default function GeneratePaper({
     classSubjects,
     sourceOptions,
     savedPaper,
+    autoDownloadPdf = false,
     appliedTemplate,
     initialPatternId,
     canViewSubjectiveAnswers,
-    pdfExport = false,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
@@ -2936,6 +2972,8 @@ export default function GeneratePaper({
     const [viewMode, setViewMode] = useState<PaperViewMode>('paper');
     const [printAllSets, setPrintAllSets] = useState(false);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+    const pdfDownloadStarted = useRef(false);
+    const pdfDownloadBusy = useRef(false);
     const [savedPaperId, setSavedPaperId] = useState<number | null>(null);
     const [savedPaperName, setSavedPaperName] = useState('');
     const [savedPaperIsDraft, setSavedPaperIsDraft] = useState(false);
@@ -4169,7 +4207,7 @@ export default function GeneratePaper({
         setNumSets(restoredNumSets);
         setActiveSetIndex(restoredActiveSet);
         setViewMode(allowedViewMode);
-        setPrintAllSets(pdfExport && restoredNumSets > 1);
+        setPrintAllSets(false);
 
         if (savedPaper.meta) {
             setPattern(savedPaper.meta.pattern ?? null);
@@ -4183,34 +4221,6 @@ export default function GeneratePaper({
         lastSavedRef.current = Date.now();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    useEffect(() => {
-        if (!pdfExport || !generatedPaper || (numSets > 1 && !printAllSets)) {
-            return;
-        }
-
-        let cancelled = false;
-
-        void (async () => {
-            await new Promise<void>((resolve) =>
-                requestAnimationFrame(() =>
-                    requestAnimationFrame(() => resolve()),
-                ),
-            );
-
-            if (!cancelled) {
-                document.documentElement.setAttribute(
-                    'data-paper-pdf-ready',
-                    'true',
-                );
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-            document.documentElement.removeAttribute('data-paper-pdf-ready');
-        };
-    }, [generatedPaper, numSets, pdfExport, printAllSets]);
 
     useEffect(() => {
         if (generatedPaper === null) {
@@ -5077,9 +5087,8 @@ export default function GeneratePaper({
                               ),
                           };
                       });
-                      const marksEach = parts.reduce(
-                          (sum, part) => sum + part.marksEach,
-                          0,
+                      const marksEach = roundMarks(
+                          parts.reduce((sum, part) => sum + part.marksEach, 0),
                       );
 
                       return {
@@ -5618,89 +5627,56 @@ export default function GeneratePaper({
     }
 
     async function downloadGeneratedPaperPdf() {
-        if (!generatedPaper || isDownloadingPdf) {
+        if (!generatedPaper || pdfDownloadBusy.current) {
             return;
         }
 
+        pdfDownloadBusy.current = true;
         setIsDownloadingPdf(true);
-
         const name = savedPaperName || defaultPaperName() || 'Paper';
-        const csrfToken =
-            (
-                document.querySelector(
-                    'meta[name="csrf-token"]',
-                ) as HTMLMetaElement
-            )?.content ?? '';
+        const progress = toast.loading('Preparing PDF…');
 
         try {
-            const response = await fetch('/papers/pdf', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/pdf, application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    name,
-                    paper_data: {
-                        paper: generatedPaper,
-                        questionPoolsByType: {},
-                        questionSelection,
-                        chapterSelection: serializeChapterSelection(selected),
-                        meta:
-                            pattern && klass && subject
-                                ? serializablePaperMeta(pattern, klass, subject)
-                                : null,
-                        pdfState: {
-                            activeSetIndex,
-                            numSets,
-                            viewMode,
-                        } satisfies PaperPdfState,
-                    },
-                }),
+            const { downloadPaperPdf } = await import('./paper-layouts/download-paper-pdf');
+            // Mount the existing print variants; use their DOM, never a second
+            // implementation of question selection or paper layout.
+            flushSync(() => setPrintAllSets(true));
+            const papers = Array.from(document.querySelectorAll<HTMLElement>('[data-print-paper]'))
+                .sort((left, right) => Number(left.dataset.paperSetIndex) - Number(right.dataset.paperSetIndex));
+            await downloadPaperPdf({
+                papers,
+                settings: normalizePaperSettings(generatedPaper.settings),
+                name,
+                onProgress: (message) => toast.loading(message, { id: progress }),
             });
-
-            if (!response.ok) {
-                const error = (await response.json().catch(() => null)) as {
-                    message?: string;
-                } | null;
-
-                throw new Error(error?.message || 'Could not generate PDF.');
-            }
-
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            const safeName =
-                Array.from(name)
-                    .map((character) =>
-                        character.charCodeAt(0) < 32 ? '-' : character,
-                    )
-                    .join('')
-                    .replace(/[<>:"/\\|?*]/g, '-')
-                    .replace(/\s+/g, ' ')
-                    .trim()
-                    .slice(0, 140) || 'Paper';
-
-            link.href = objectUrl;
-            link.download = `${safeName}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(objectUrl);
-            toast.success('PDF downloaded');
+            toast.success('PDF downloaded', { id: progress });
         } catch (error) {
             toast.error(
                 error instanceof Error
                     ? error.message
                     : 'Could not generate PDF.',
+                { id: progress },
             );
         } finally {
+            setPrintAllSets(false);
+            pdfDownloadBusy.current = false;
             setIsDownloadingPdf(false);
         }
     }
+
+    // Saved-paper links open the same renderer and download after hydration.
+    useEffect(() => {
+        if (!autoDownloadPdf || !generatedPaper || savedPaperId !== savedPaper?.id || pdfDownloadStarted.current) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            pdfDownloadStarted.current = true;
+            void downloadGeneratedPaperPdf();
+        }, 0);
+
+        return () => clearTimeout(timer);
+    });
 
     async function saveAsTemplateToServer(values: SaveAsTemplateValues) {
         if (!generatedPaper || isSavingTemplate) {
@@ -6665,9 +6641,8 @@ export default function GeneratePaper({
                     });
                 }
 
-                const marksEach = parts.reduce(
-                    (total, part) => total + part.marksEach,
-                    0,
+                const marksEach = roundMarks(
+                    parts.reduce((total, part) => total + part.marksEach, 0),
                 );
 
                 newSections.push({
@@ -7701,6 +7676,15 @@ export default function GeneratePaper({
                           : 'Generate Paper'
                 }
             />
+
+            {isDownloadingPdf && (
+                <div role="status" aria-live="polite" className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 text-slate-900 print:hidden">
+                    <div className="flex items-center gap-3 rounded-xl border bg-white p-5 shadow-lg">
+                        <Loader2Icon className="size-5 animate-spin" />
+                        Creating your PDF. Please keep this page open.
+                    </div>
+                </div>
+            )}
 
             {generatedPaper ? (
                 <>
@@ -9290,11 +9274,13 @@ function AddPaperSectionModal({
                         <FloatingField label="Marks">
                             <input
                                 autoComplete="off"
-                                type="number"
-                                min={1}
+                                type="text"
+                                inputMode="decimal"
                                 value={marksEach}
                                 onChange={(event) =>
-                                    setMarksEach(onlyDigits(event.target.value))
+                                    setMarksEach(
+                                        decimalMarks(event.target.value),
+                                    )
                                 }
                                 className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:focus:border-brand-400 dark:focus:ring-brand-400/15"
                             />
@@ -10608,12 +10594,12 @@ function AddOrPaperSectionModal({
                                     <FloatingField label="Marks each">
                                         <input
                                             autoComplete="off"
-                                            type="number"
-                                            min={1}
+                                            type="text"
+                                            inputMode="decimal"
                                             value={marksEach}
                                             onChange={(event) => {
                                                 setMarksEach(
-                                                    onlyDigits(
+                                                    decimalMarks(
                                                         event.target.value,
                                                     ),
                                                 );
@@ -11584,12 +11570,14 @@ function AddSpecialPaperSectionModal({
                                 <FloatingField label="Marks">
                                     <input
                                         autoComplete="off"
-                                        type="number"
-                                        min={1}
+                                        type="text"
+                                        inputMode="decimal"
                                         value={marksEach}
                                         onChange={(event) =>
                                             setMarksEach(
-                                                onlyDigits(event.target.value),
+                                                decimalMarks(
+                                                    event.target.value,
+                                                ),
                                             )
                                         }
                                         className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 pt-2 text-sm font-medium text-slate-900 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
@@ -11673,6 +11661,7 @@ function AddSpecialPaperSectionModal({
                                         />
                                         <NumberField
                                             label="Marks"
+                                            decimal
                                             value={part.marksEach}
                                             placeholder="0"
                                             onChange={(value) =>
@@ -12627,7 +12616,7 @@ function PaperSectionHeading({
     );
 }
 
-function GeneratedPaperView({
+export function GeneratedPaperView({
     paper,
     rawPaper,
     activeSetIndex,
@@ -14020,6 +14009,7 @@ function GeneratedPaperView({
                 )}
                 <main
                     data-print-paper
+                    data-paper-set-index={activeSetIndex}
                     data-paper-forced-page-break={
                         bubbleSheetVisible &&
                         !bubbleSheetOnly &&
@@ -14033,6 +14023,7 @@ function GeneratedPaperView({
                     {/* Watermark — sits behind everything; hidden when inactive. */}
                     {(shouldShowTextWatermark || shouldShowLogoWatermark) && (
                         <div
+                            data-paper-watermark
                             aria-hidden="true"
                             className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
                             style={{
@@ -14137,6 +14128,7 @@ function GeneratedPaperView({
                                 <main
                                     key={`variant-${index}`}
                                     data-print-paper
+                                    data-paper-set-index={index}
                                     data-paper-forced-page-break={
                                         bubbleSheetVisible &&
                                         !bubbleSheetOnly &&
@@ -15003,6 +14995,7 @@ function MultipartSelectionCard({
                         />
                         <NumberField
                             label="Marks"
+                            decimal
                             value={row.marksPerQuestion}
                             placeholder="0"
                             onChange={(value) =>
@@ -15281,6 +15274,7 @@ function QuestionSelectionCard({
                         )}
                         <NumberField
                             label="Marks"
+                            decimal
                             value={row.marksPerQuestion}
                             placeholder="0"
                             disabled={toNumber(row.requiredQuestions) === 0}
