@@ -129,6 +129,10 @@ export function AppSidebar() {
                               href: '/superadmin/paper-question-sections',
                           },
                           {
+                              title: 'Custom Paper Layout',
+                              href: '/superadmin/custom-paper-layouts',
+                          },
+                          {
                               title: 'Multipart Settings',
                               href: '/superadmin/multipart-question-settings',
                           },

@@ -101,6 +101,7 @@ import {
     getPageDimensions,
     PAPER_URDU_FONT_METRICS,
     normalizePaperSettings,
+    paperPartLabel,
     resolveOrGroupLabel,
 } from './paper-layouts/types';
 import type { PaperHeaderTemplate, PaperLayout } from './paper-layouts/types';
@@ -219,8 +220,27 @@ function sectionHeadingNumber(
 ): number | null {
     const section = sections[sectionIndex];
 
-    if (section.orRole === 'alternative') {
-        return null;
+    if (section.category === 'Subjective Questions') {
+        if (section.orRole === 'alternative' && !section.layoutNumberGroup) {
+            return null;
+        }
+
+        const currentKey =
+            section.layoutNumberGroup ?? section.orGroupId ?? section.id;
+        const numberKeys = sections
+            .slice(0, sectionIndex)
+            .filter(
+                (candidate) => candidate.category === 'Subjective Questions',
+            )
+            .map(
+                (candidate) =>
+                    candidate.layoutNumberGroup ??
+                    candidate.orGroupId ??
+                    candidate.id,
+            )
+            .filter((key) => key !== currentKey);
+
+        return 2 + new Set(numberKeys).size;
     }
 
     if (section.category === 'Objective Questions') {
@@ -233,16 +253,45 @@ function sectionHeadingNumber(
             : null;
     }
 
-    return (
-        2 +
-        sections
-            .slice(0, sectionIndex)
-            .filter(
-                (candidate) =>
-                    candidate.category === 'Subjective Questions' &&
-                    candidate.orRole !== 'alternative',
-            ).length
+    return null;
+}
+
+function sharedNumberPresentation(
+    sections: GeneratedPaperSection[],
+    sectionIndex: number,
+): {
+    showNumber: boolean;
+    englishPart: string | null;
+    urduPart: string | null;
+} {
+    const section = sections[sectionIndex];
+    const group = section.layoutNumberGroup;
+
+    if (!group) {
+        return { showNumber: true, englishPart: null, urduPart: null };
+    }
+
+    const members = sections
+        .filter((candidate) => candidate.layoutNumberGroup === group)
+        .sort(
+            (left, right) =>
+                (left.layoutItemOrder ?? Number.MAX_SAFE_INTEGER) -
+                (right.layoutItemOrder ?? Number.MAX_SAFE_INTEGER),
+        );
+    const typeIds = Array.from(
+        new Set(members.map((candidate) => candidate.questionTypeId)),
     );
+    const partIndex = Math.max(0, typeIds.indexOf(section.questionTypeId));
+    const englishPart = paperPartLabel(partIndex, 'English');
+
+    return {
+        showNumber:
+            sections.findIndex(
+                (candidate) => candidate.layoutNumberGroup === group,
+            ) === sectionIndex,
+        englishPart,
+        urduPart: paperPartLabel(partIndex, 'Urdu'),
+    };
 }
 
 interface AppliedTemplate {
@@ -262,6 +311,8 @@ interface AppliedTemplate {
             orQuestionTypeId?: number | null;
             orGroupTypeIds?: number[] | null;
             orRole?: 'primary' | 'alternative' | null;
+            layoutNumberGroup?: string | null;
+            layoutItemOrder?: number | null;
         }>;
         total_marks?: number;
     };
@@ -332,7 +383,7 @@ interface MultipartConfig {
 
 type PaperSectioningConfig = Pick<
     GeneratedPaperSectioning,
-    'active' | 'groups'
+    'active' | 'groups' | 'custom'
 >;
 
 const INACTIVE_PAPER_SECTIONING: PaperSectioningConfig = {
@@ -388,6 +439,11 @@ interface QuestionSelectionSection {
     /** Default column count (1–5) for this question type, from the DB. */
     columnPerRow: number;
     sortOrder?: number | null;
+    layoutNumberGroup?: string | null;
+    layoutItemOrder?: number | null;
+    layoutOrGroupId?: number | null;
+    /** User disabled the scoped OR group for this generated paper only. */
+    layoutOrGroupDisabled?: boolean;
     selectionMode?: SelectionMode;
     showChapterField?: boolean;
     orPairingId?: number | null;
@@ -409,6 +465,14 @@ function orAlternativeTypeIds(
         | 'orGroupTypeIds'
     >,
 ): number[] {
+    if (
+        Array.isArray(section.orGroupTypeIds) &&
+        section.orGroupTypeIds.length > 1 &&
+        section.orGroupTypeIds[0] !== section.questionTypeId
+    ) {
+        return [];
+    }
+
     if (Array.isArray(section.orAlternativeQuestionTypeIds)) {
         return section.orAlternativeQuestionTypeIds.filter(
             (id) => id !== section.questionTypeId,
@@ -492,6 +556,9 @@ interface QuestionTypeCount {
     availableCount: number;
     columnPerRow: number;
     sortOrder?: number | null;
+    layoutNumberGroup?: string | null;
+    layoutItemOrder?: number | null;
+    layoutOrGroupId?: number | null;
 }
 
 type ContentMedium = 'English' | 'Urdu' | 'Both';
@@ -818,6 +885,31 @@ function questionSourceItemLabel(
 
 function normalizeSourceOptions(sourceOptions: SourceOption[]): SourceOption[] {
     return sourceOptions.length > 0 ? sourceOptions : fallbackSourceOptions;
+}
+
+function questionSelectionSourceLabel(source: SourceOption): string {
+    const normalizedValue = source.value.trim().toLowerCase();
+    const normalizedLabel = source.label.trim().toLowerCase();
+
+    if (
+        normalizedValue === 'exercise example' ||
+        normalizedValue === 'exercise examples' ||
+        normalizedLabel === 'exercise example' ||
+        normalizedLabel === 'exercise examples'
+    ) {
+        return 'Ex. Examples';
+    }
+
+    if (
+        normalizedValue === 'conceptual question' ||
+        normalizedValue === 'conceptual questions' ||
+        normalizedLabel === 'conceptual question' ||
+        normalizedLabel === 'conceptual questions'
+    ) {
+        return 'Conceptual';
+    }
+
+    return source.label;
 }
 
 function createGlobalFilters(
@@ -1937,7 +2029,22 @@ function insertGeneratedPaperSections(
         }
 
         if (primary.multipart) {
-            return [sectionRank, Number.MAX_SAFE_INTEGER];
+            const multipartRanks = primary.multipart.rows
+                .flatMap((row) => row.parts)
+                .map((part) => part.typeId)
+                .filter((id): id is number => typeof id === 'number')
+                .map(
+                    (questionTypeId) =>
+                        typeRanks.get(questionTypeId) ??
+                        Number.MAX_SAFE_INTEGER - 1,
+                );
+
+            return [
+                sectionRank,
+                multipartRanks.length > 0
+                    ? Math.min(...multipartRanks)
+                    : Number.MAX_SAFE_INTEGER,
+            ];
         }
 
         const ranks = block
@@ -1990,9 +2097,15 @@ function mergeQuestionSections(
     const merged = orderedIncoming.map((item) => {
         const current = existingByType.get(item.questionTypeId);
         const sectionId = current?.id ?? `sec_type_${item.questionTypeId}`;
+        const layoutOrGroupDisabled =
+            current?.layoutOrGroupDisabled === true &&
+            current.layoutOrGroupId === item.layoutOrGroupId;
+        const requestedGroupId = layoutOrGroupDisabled
+            ? null
+            : (item.layoutOrGroupId ?? current?.orPairingId ?? null);
         const group =
-            typeof current?.orPairingId === 'number'
-                ? groupById.get(current.orPairingId)
+            typeof requestedGroupId === 'number'
+                ? groupById.get(requestedGroupId)
                 : null;
         const memberIds =
             group?.questionTypeIds ?? current?.orGroupTypeIds ?? [];
@@ -2001,7 +2114,9 @@ function mergeQuestionSections(
             group !== undefined &&
             memberIds.includes(item.questionTypeId) &&
             memberIds.every((id) => incomingIds.has(id));
-        const alternativeIds = keepsGroup
+        const isGroupPrimary =
+            keepsGroup && memberIds[0] === item.questionTypeId;
+        const alternativeIds = isGroupPrimary
             ? memberIds.filter((id) => id !== item.questionTypeId)
             : [];
 
@@ -2019,12 +2134,18 @@ function mergeQuestionSections(
             availableCount: item.availableCount,
             columnPerRow: item.columnPerRow,
             sortOrder: item.sortOrder,
+            layoutNumberGroup: item.layoutNumberGroup,
+            layoutItemOrder: item.layoutItemOrder,
+            layoutOrGroupId: item.layoutOrGroupId,
+            layoutOrGroupDisabled,
             selectionMode: current?.selectionMode ?? 'automatic',
             showChapterField: current?.showChapterField ?? false,
-            orPairingId: keepsGroup ? group?.id : null,
-            orQuestionTypeId: keepsGroup ? (alternativeIds[0] ?? null) : null,
-            orGroupTypeIds: keepsGroup ? memberIds : undefined,
-            orAlternativeQuestionTypeIds: keepsGroup
+            orPairingId: isGroupPrimary ? group?.id : null,
+            orQuestionTypeId: isGroupPrimary
+                ? (alternativeIds[0] ?? null)
+                : null,
+            orGroupTypeIds: isGroupPrimary ? memberIds : undefined,
+            orAlternativeQuestionTypeIds: isGroupPrimary
                 ? alternativeIds
                 : undefined,
             rows: normalizeSectionRows(
@@ -3277,6 +3398,7 @@ export default function GeneratePaper({
         (standardSelectionReady || configuredMultipartSelections.length > 0) &&
         multipartReady;
     const canGeneratePaper =
+        !loadingQuestionSections &&
         questionSelection.totalMarks > 0 &&
         isQuestionSelectionReady &&
         isManualSelectionComplete &&
@@ -3867,6 +3989,11 @@ export default function GeneratePaper({
                         orAlternativeQuestionTypeIds: validPairing
                             ? alternativeTypeIds
                             : section.orAlternativeQuestionTypeIds,
+                        layoutNumberGroup:
+                            match.layoutNumberGroup ??
+                            section.layoutNumberGroup,
+                        layoutItemOrder:
+                            match.layoutItemOrder ?? section.layoutItemOrder,
                         rows,
                     };
                 }),
@@ -4779,6 +4906,11 @@ export default function GeneratePaper({
         setPaperGenerationError(null);
 
         try {
+            const usesCustomLayout =
+                paperSectioning.custom === true ||
+                questionSelection.sections.some(
+                    (section) => typeof section.layoutItemOrder === 'number',
+                );
             const alternativeTypeIds = new Set(
                 questionSelection.sections.flatMap((section) =>
                     orAlternativeTypeIds(section),
@@ -4938,6 +5070,8 @@ export default function GeneratePaper({
                         ),
                     ),
                     columns: clampSectionColumns(sourceSection.columnPerRow, 1),
+                    layoutNumberGroup: sourceSection.layoutNumberGroup,
+                    layoutItemOrder: sourceSection.layoutItemOrder,
                     ...metadata,
                 };
             }
@@ -5142,8 +5276,11 @@ export default function GeneratePaper({
             const assignedPaperLayout =
                 patterns.find((item) => item.id === pattern?.id)
                     ?.paper_layout ?? 'standard';
+            const effectivePaperLayout = usesCustomLayout
+                ? 'standard'
+                : assignedPaperLayout;
 
-            if (assignedPaperLayout === 'federal-board') {
+            if (assignedPaperLayout === 'federal-board' && !usesCustomLayout) {
                 const federalized = federalizeGeneratedSections(
                     sections,
                     pools,
@@ -5192,13 +5329,17 @@ export default function GeneratePaper({
                 sections,
                 sectioning: {
                     ...paperSectioning,
+                    active: usesCustomLayout ? true : paperSectioning.active,
+                    custom: usesCustomLayout ? true : paperSectioning.custom,
                     medium: chapterMedium,
                 },
                 settings: {
                     ...DEFAULT_PAPER_SETTINGS,
-                    paperLayout: assignedPaperLayout,
+                    paperLayout: effectivePaperLayout,
                     showSections:
-                        assignedPaperLayout === 'federal-board'
+                        usesCustomLayout ||
+                        paperSectioning.active ||
+                        effectivePaperLayout === 'federal-board'
                             ? true
                             : DEFAULT_PAPER_SETTINGS.showSections,
                 },
@@ -5638,17 +5779,24 @@ export default function GeneratePaper({
         let missingImages = 0;
 
         try {
-            const { downloadPaperPdf } = await import('./paper-layouts/download-paper-pdf');
+            const { downloadPaperPdf } =
+                await import('./paper-layouts/download-paper-pdf');
             // Mount the existing print variants; use their DOM, never a second
             // implementation of question selection or paper layout.
             flushSync(() => setPrintAllSets(true));
-            const papers = Array.from(document.querySelectorAll<HTMLElement>('[data-print-paper]'))
-                .sort((left, right) => Number(left.dataset.paperSetIndex) - Number(right.dataset.paperSetIndex));
+            const papers = Array.from(
+                document.querySelectorAll<HTMLElement>('[data-print-paper]'),
+            ).sort(
+                (left, right) =>
+                    Number(left.dataset.paperSetIndex) -
+                    Number(right.dataset.paperSetIndex),
+            );
             await downloadPaperPdf({
                 papers,
                 settings: normalizePaperSettings(generatedPaper.settings),
                 name,
-                onProgress: (message) => toast.loading(message, { id: progress }),
+                onProgress: (message) =>
+                    toast.loading(message, { id: progress }),
                 onMissingImages: (count) => {
                     missingImages = count;
                 },
@@ -5675,7 +5823,12 @@ export default function GeneratePaper({
 
     // Saved-paper links open the same renderer and download after hydration.
     useEffect(() => {
-        if (!autoDownloadPdf || !generatedPaper || savedPaperId !== savedPaper?.id || pdfDownloadStarted.current) {
+        if (
+            !autoDownloadPdf ||
+            !generatedPaper ||
+            savedPaperId !== savedPaper?.id ||
+            pdfDownloadStarted.current
+        ) {
             return;
         }
 
@@ -5715,6 +5868,8 @@ export default function GeneratePaper({
                 orQuestionTypeId: section.orQuestionTypeId ?? null,
                 orGroupTypeIds: section.orGroupTypeIds ?? null,
                 orRole: section.orRole ?? null,
+                layoutNumberGroup: section.layoutNumberGroup ?? null,
+                layoutItemOrder: section.layoutItemOrder ?? null,
             })),
         };
 
@@ -5788,6 +5943,7 @@ export default function GeneratePaper({
         let sections = generatedPaper.sections;
 
         if (
+            !generatedPaper.sectioning?.custom &&
             previousSettings.paperLayout !== 'federal-board' &&
             nextSettings.paperLayout === 'federal-board'
         ) {
@@ -5816,6 +5972,7 @@ export default function GeneratePaper({
 
             sections = federalized.sections;
         } else if (
+            !generatedPaper.sectioning?.custom &&
             previousSettings.paperLayout === 'federal-board' &&
             nextSettings.paperLayout !== 'federal-board'
         ) {
@@ -5857,8 +6014,7 @@ export default function GeneratePaper({
                 ? {
                       ...current,
                       sectioning: {
-                          active: current.sectioning?.active ?? false,
-                          groups: current.sectioning?.groups ?? [],
+                          ...(current.sectioning ?? INACTIVE_PAPER_SECTIONING),
                           medium,
                       },
                   }
@@ -7122,7 +7278,10 @@ export default function GeneratePaper({
                         groupMemberIds.has(section.questionTypeId) ||
                         (typeof currentGroupId === 'number' &&
                             section.orPairingId === currentGroupId)
-                            ? clearGroupState(section)
+                            ? {
+                                  ...clearGroupState(section),
+                                  layoutOrGroupDisabled: false,
+                              }
                             : section,
                     )
                     .map((section) =>
@@ -7133,6 +7292,7 @@ export default function GeneratePaper({
                                   orQuestionTypeId: alternativeIds[0] ?? null,
                                   orGroupTypeIds: selectedMemberIds,
                                   orAlternativeQuestionTypeIds: alternativeIds,
+                                  layoutOrGroupDisabled: false,
                                   rows: normalizeSectionRows(
                                       section.rows,
                                       availableCount,
@@ -7185,7 +7345,12 @@ export default function GeneratePaper({
                         section.id === primary.id ||
                         currentMemberIds.has(section.questionTypeId) ||
                         section.orPairingId === primary.orPairingId
-                            ? clearGroupState(section)
+                            ? {
+                                  ...clearGroupState(section),
+                                  layoutOrGroupDisabled:
+                                      typeof section.layoutOrGroupId ===
+                                      'number',
+                              }
                             : section,
                     ),
                 });
@@ -7246,7 +7411,10 @@ export default function GeneratePaper({
                             typeof primary.orPairingId === 'number';
 
                         if (isMember || isCurrentGroup) {
-                            return clearGroupState(section);
+                            return {
+                                ...clearGroupState(section),
+                                layoutOrGroupDisabled: false,
+                            };
                         }
 
                         return section;
@@ -7259,6 +7427,7 @@ export default function GeneratePaper({
                                   orQuestionTypeId: alternativeIds[0] ?? null,
                                   orGroupTypeIds: memberIds,
                                   orAlternativeQuestionTypeIds: alternativeIds,
+                                  layoutOrGroupDisabled: false,
                                   rows: normalizeSectionRows(
                                       section.rows,
                                       availableCount,
@@ -7297,6 +7466,44 @@ export default function GeneratePaper({
                 })),
             })),
         }));
+    }
+
+    function updateAllGlobalFilters() {
+        setQuestionSelection((current) => {
+            const selectAll = sourceFilters.some(
+                (source) =>
+                    !(
+                        current.globalFilters[source.value] ??
+                        source.value === 'exercise'
+                    ),
+            );
+            const globalFilters = { ...current.globalFilters };
+
+            sourceFilters.forEach((source) => {
+                globalFilters[source.value] = selectAll;
+            });
+
+            return {
+                ...current,
+                globalFilters,
+                sections: current.sections.map((section) => ({
+                    ...section,
+                    rows: section.rows.map((row) => ({
+                        ...row,
+                        selectedQuestionIds: [],
+                        orSelectedQuestionIds: [],
+                        orSelectedQuestionIdsByType: {},
+                    })),
+                })),
+                multipart: current.multipart?.map((selection) => ({
+                    ...selection,
+                    rows: selection.rows.map((part) => ({
+                        ...part,
+                        selectedQuestionIds: [],
+                    })),
+                })),
+            };
+        });
     }
 
     function clearManualQuestionSelections() {
@@ -8151,13 +8358,25 @@ export default function GeneratePaper({
                                                     onChange={setChapterMedium}
                                                 />
                                                 <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-3 dark:md:border-slate-800">
+                                                    <SourceCheckbox
+                                                        label="Select all"
+                                                        checked={sourceFilters.every(
+                                                            (source) =>
+                                                                sourceChecked(
+                                                                    source.value,
+                                                                ),
+                                                        )}
+                                                        onChange={
+                                                            updateAllGlobalFilters
+                                                        }
+                                                    />
                                                     {sourceFilters.map(
                                                         (item) => (
                                                             <SourceCheckbox
                                                                 key={item.value}
-                                                                label={
-                                                                    item.label
-                                                                }
+                                                                label={questionSelectionSourceLabel(
+                                                                    item,
+                                                                )}
                                                                 checked={sourceChecked(
                                                                     item.value,
                                                                 )}
@@ -12931,6 +13150,10 @@ export function GeneratedPaperView({
         canMoveUp: boolean,
         canMoveDown: boolean,
     ): ReactNode {
+        const useFederalStructure =
+            settings.paperLayout === 'federal-board' &&
+            !targetPaper.sectioning?.custom;
+
         if (section.multipart) {
             const firstMultipartIndex = targetPaper.sections.findIndex(
                 (candidate) =>
@@ -12953,9 +13176,11 @@ export function GeneratedPaperView({
         const Template = pickSectionTemplate(
             settings.questionLayout,
             section.category,
-            settings.paperLayout === 'federal-board'
-                ? 'board-table'
-                : settings.objectiveLayout,
+            useFederalStructure ? 'board-table' : settings.objectiveLayout,
+        );
+        const sharedNumber = sharedNumberPresentation(
+            targetPaper.sections,
+            sectionIndex,
         );
         const questionNumberOffset =
             section.category === 'Objective Questions'
@@ -12981,9 +13206,12 @@ export function GeneratedPaperView({
                     targetPaper.sections,
                     sectionIndex,
                 )}
+                showHeadingNumber={sharedNumber.showNumber}
+                partLabelEnglish={sharedNumber.englishPart}
+                partLabelUrdu={sharedNumber.urduPart}
                 questionNumberOffset={questionNumberOffset}
                 numberingFormat={settings.questionNumberingFormat}
-                hideHeadingMarks={settings.paperLayout === 'federal-board'}
+                hideHeadingMarks={useFederalStructure}
                 showCorrectAnswers={
                     activeViewMode === 'answers_on_paper' &&
                     section.category === 'Objective Questions'
@@ -13037,6 +13265,10 @@ export function GeneratedPaperView({
         const sectionIndex = targetPaper.sections.findIndex(
             (candidate) => candidate.id === section.id,
         );
+        const sharedNumber = sharedNumberPresentation(
+            targetPaper.sections,
+            sectionIndex,
+        );
 
         return {
             section,
@@ -13045,6 +13277,9 @@ export function GeneratedPaperView({
                 targetPaper.sections,
                 sectionIndex,
             ),
+            showHeadingNumber: sharedNumber.showNumber,
+            partLabelEnglish: sharedNumber.englishPart,
+            partLabelUrdu: sharedNumber.urduPart,
             questionNumberOffset: 0,
             numberingFormat: 'numeric',
             hideHeadingMarks: true,
@@ -13232,7 +13467,10 @@ export function GeneratedPaperView({
         targetPaper: GeneratedPaper,
         interactive: boolean,
     ): ReactNode[] {
-        if (settings.paperLayout === 'federal-board') {
+        if (
+            settings.paperLayout === 'federal-board' &&
+            !targetPaper.sectioning?.custom
+        ) {
             return renderFederalPaperSections(targetPaper, interactive);
         }
 

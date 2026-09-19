@@ -3,6 +3,7 @@ import {
     splitBilingualParts,
 } from '../questions/bilingual-question-row';
 import { QuestionContent } from '../questions/question-content';
+import { paperPartLabel } from '../types';
 import type { GeneratedPaperSection } from '../types';
 
 interface Props {
@@ -168,16 +169,17 @@ export function MultipartSection({
                         className="break-inside-avoid"
                     >
                         {row.parts.map((part, partIndex) => {
-                            const partLabel = `(${String.fromCharCode(97 + partIndex)}`;
+                            const englishPartLabel = `(${paperPartLabel(partIndex, 'English')}`;
+                            const urduPartLabel = `(${paperPartLabel(partIndex, 'Urdu')}`;
                             const indexLabel =
                                 partIndex === 0 && headingNumber !== null
-                                    ? `Q.${headingNumber}:- ${partLabel}`
-                                    : partLabel;
+                                    ? `Q.${headingNumber}:- ${englishPartLabel}`
+                                    : englishPartLabel;
 
                             const urduIndexLabel =
                                 partIndex === 0 && headingNumber !== null
-                                    ? `سوال نمبر ${headingNumber}:- ${partLabel}`
-                                    : partLabel;
+                                    ? `سوال نمبر ${headingNumber}:- ${urduPartLabel}`
+                                    : urduPartLabel;
 
                             const questionValue = part.question.text || ' ';
                             const questionRow = (

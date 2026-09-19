@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
+use App\Models\CustomPaperLayout;
 use App\Models\MultipartQuestionSetting;
 use App\Models\PaperQuestionSection;
 use App\Models\PaperQuestionSectionScope;
@@ -213,13 +214,14 @@ class GeneratePaperController extends Controller
     {
         [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium, $scope] = $this->questionScope($request);
         $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
+        $customLayout = $this->customPaperLayout($scope);
 
         if ($sources->isEmpty()) {
             return response()->json([
                 'sections' => [],
                 'groups' => [],
                 'multipart' => null,
-                'paperSectioning' => $this->paperSectioning($scope),
+                'paperSectioning' => $customLayout['sectioning'] ?? $this->paperSectioning($scope),
             ]);
         }
 
@@ -256,11 +258,13 @@ class GeneratePaperController extends Controller
 
         $rows = QuestionTypeHeadingResolver::apply($rows, (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id);
 
+        $customItemsByType = collect($customLayout['items'] ?? [])->keyBy('questionTypeId');
         $sections = $rows->map(fn ($row, int $index) => [
             'id' => 'sec_'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
             'questionTypeId' => (int) $row->id,
             'category' => (bool) $row->is_objective ? 'Objective Questions' : 'Subjective Questions',
-            'sortOrder' => $row->sort_order === null ? null : (int) $row->sort_order,
+            'sortOrder' => $customItemsByType->get((int) $row->id)['itemOrder']
+                ?? ($row->sort_order === null ? null : (int) $row->sort_order),
             'title' => $this->localizedLabel(
                 $this->visibleQuestionTypeLabel($row->name),
                 $this->visibleQuestionTypeLabel($row->name_ur),
@@ -282,6 +286,9 @@ class GeneratePaperController extends Controller
             'availableCount' => (int) $row->available_count,
             'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
             'questionTextRtl' => (bool) $row->question_text_rtl,
+            'layoutNumberGroup' => $customItemsByType->get((int) $row->id)['numberGroup'] ?? null,
+            'layoutItemOrder' => $customItemsByType->get((int) $row->id)['itemOrder'] ?? null,
+            'layoutOrGroupId' => $customItemsByType->get((int) $row->id)['orGroupId'] ?? null,
         ]);
 
         $availableSubjectiveTypeIds = $rows
@@ -289,7 +296,7 @@ class GeneratePaperController extends Controller
             ->pluck('id')
             ->map(fn ($id) => (int) $id);
 
-        $groups = QuestionTypeOrGroup::query()
+        $groups = $customLayout !== null ? collect($customLayout['orGroups']) : QuestionTypeOrGroup::query()
             ->with('members')
             ->where('pattern_id', (int) $scope->pattern_id)
             ->where('class_id', (int) $scope->class_id)
@@ -316,8 +323,56 @@ class GeneratePaperController extends Controller
             'sections' => $sections,
             'groups' => $groups,
             'multipart' => $this->multipartSetting($scope, $availableSubjectiveTypeIds),
-            'paperSectioning' => $this->paperSectioning($scope),
+            'paperSectioning' => $customLayout['sectioning'] ?? $this->paperSectioning($scope),
         ]);
+    }
+
+    private function customPaperLayout(object $scope): ?array
+    {
+        $layout = CustomPaperLayout::query()
+            ->with('sections.items')
+            ->where('pattern_id', (int) $scope->pattern_id)
+            ->where('class_id', (int) $scope->class_id)
+            ->where('subject_id', (int) $scope->subject_id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($layout === null) {
+            return null;
+        }
+
+        $items = $layout->sections->flatMap(fn ($section, int $sectionIndex) => $section->items->map(
+            fn ($item, int $itemIndex) => [
+                'questionTypeId' => (int) $item->question_type_id,
+                'numberGroup' => $item->shared_number_group === null
+                    ? null
+                    : "custom:{$layout->id}:number:{$item->shared_number_group}",
+                'itemOrder' => ($sectionIndex * 1000) + $itemIndex,
+                'orGroup' => $item->or_group,
+                'orGroupId' => $item->or_group === null
+                    ? null
+                    : -(($layout->id * 100000) + $item->or_group),
+                'sectionIndex' => $sectionIndex,
+            ],
+        ))->values();
+
+        return [
+            'items' => $items->all(),
+            'orGroups' => $items->whereNotNull('orGroup')->groupBy('orGroup')->map(
+                fn ($members) => [
+                    'id' => $members->first()['orGroupId'],
+                    'questionTypeIds' => $members->pluck('questionTypeId')->values()->all(),
+                ],
+            )->values()->all(),
+            'sectioning' => [
+                'active' => true,
+                'groups' => $layout->sections->map(fn ($section) => [
+                    'id' => $section->id,
+                    'questionTypeIds' => $section->items->pluck('question_type_id')->map(fn ($id) => (int) $id)->values()->all(),
+                ])->values()->all(),
+                'custom' => true,
+            ],
+        ];
     }
 
     private function paperSectioning(object $scope): array

@@ -18,6 +18,9 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     section,
     index,
     headingNumber,
+    showHeadingNumber,
+    partLabelEnglish,
+    partLabelUrdu,
     questionNumberOffset,
     numberingFormat,
     hideHeadingMarks,
@@ -46,6 +49,9 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
             <QuestionTypeHeading
                 index={index}
                 headingNumber={headingNumber}
+                showHeadingNumber={showHeadingNumber}
+                partLabelEnglish={partLabelEnglish}
+                partLabelUrdu={partLabelUrdu}
                 title={section.title}
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}

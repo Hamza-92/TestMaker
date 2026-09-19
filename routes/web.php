@@ -18,6 +18,7 @@ use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
+use App\Http\Controllers\Superadmin\CustomPaperLayoutController;
 use App\Http\Controllers\Superadmin\DataTransferController;
 use App\Http\Controllers\Superadmin\MultipartQuestionSettingController;
 use App\Http\Controllers\Superadmin\PaperLayoutController;
@@ -238,6 +239,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('superadmin/paper-question-sections/scope', [PaperQuestionSectionController::class, 'updateScope'])->name('superadmin.paper-question-sections.scope')->middleware('permission:question_types.edit');
         Route::patch('superadmin/paper-question-sections/{section}', [PaperQuestionSectionController::class, 'update'])->name('superadmin.paper-question-sections.update')->middleware('permission:question_types.edit');
         Route::delete('superadmin/paper-question-sections/{section}', [PaperQuestionSectionController::class, 'destroy'])->name('superadmin.paper-question-sections.destroy')->middleware('permission:question_types.edit');
+        Route::get('superadmin/custom-paper-layouts', [CustomPaperLayoutController::class, 'index'])->name('superadmin.custom-paper-layouts')->middleware('permission:question_types.view');
+        Route::put('superadmin/custom-paper-layouts', [CustomPaperLayoutController::class, 'save'])->name('superadmin.custom-paper-layouts.save')->middleware('permission:question_types.edit');
         Route::get('superadmin/multipart-question-settings', [MultipartQuestionSettingController::class, 'index'])->name('superadmin.multipart-question-settings')->middleware('permission:question_types.view');
         Route::post('superadmin/multipart-question-settings', [MultipartQuestionSettingController::class, 'store'])->name('superadmin.multipart-question-settings.store')->middleware('permission:question_types.edit');
         Route::patch('superadmin/multipart-question-settings/{setting}', [MultipartQuestionSettingController::class, 'update'])->name('superadmin.multipart-question-settings.update')->middleware('permission:question_types.edit');

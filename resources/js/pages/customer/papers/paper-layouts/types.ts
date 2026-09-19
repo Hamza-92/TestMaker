@@ -97,6 +97,10 @@ export interface GeneratedPaperSection {
     multipart?: GeneratedMultipartSection | null;
     /** Stable grouping key used only to place the visible Section A/B/C heading. */
     paperSectionKey?: string | null;
+    /** Custom-layout members with the same key share one printed question number. */
+    layoutNumberGroup?: string | null;
+    /** Stable order used to calculate dynamic English and Urdu part labels. */
+    layoutItemOrder?: number | null;
 }
 
 export interface GeneratedPaperSectionGroup {
@@ -108,6 +112,50 @@ export interface GeneratedPaperSectioning {
     active: boolean;
     groups: GeneratedPaperSectionGroup[];
     medium?: 'English' | 'Urdu' | 'Both';
+    /** True when a scoped custom layout is authoritative for this paper. */
+    custom?: boolean;
+}
+
+const PAPER_URDU_PART_LABELS = [
+    'الف',
+    'ب',
+    'ج',
+    'د',
+    'ہ',
+    'و',
+    'ز',
+    'ح',
+    'ط',
+    'ی',
+    'ک',
+    'ل',
+    'م',
+    'ن',
+    'س',
+    'ع',
+    'ف',
+    'ص',
+    'ق',
+    'ر',
+    'ش',
+    'ت',
+    'ث',
+    'خ',
+    'ذ',
+    'ض',
+    'ظ',
+    'غ',
+] as const;
+
+export function paperPartLabel(
+    index: number,
+    language: 'English' | 'Urdu',
+): string {
+    const englishLabel = String.fromCharCode(97 + (Math.max(0, index) % 26));
+
+    return language === 'Urdu'
+        ? (PAPER_URDU_PART_LABELS[index] ?? englishLabel)
+        : englishLabel;
 }
 
 export const MIN_SECTION_COLUMNS = 1;

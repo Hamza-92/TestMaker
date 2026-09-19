@@ -41,7 +41,11 @@ function NavCollapsibleItem({ item }: { item: NavItem }) {
                     <SidebarMenuSub>
                         {(item.items ?? []).map((sub) => (
                             <SidebarMenuSubItem key={sub.title}>
-                                <SidebarMenuSubButton asChild isActive={isSubActive(sub.href)}>
+                                <SidebarMenuSubButton
+                                    asChild
+                                    isActive={isSubActive(sub.href)}
+                                    className="h-auto min-h-7 py-1.5 leading-snug"
+                                >
                                     <Link href={sub.href} prefetch>
                                         {sub.title}
                                     </Link>

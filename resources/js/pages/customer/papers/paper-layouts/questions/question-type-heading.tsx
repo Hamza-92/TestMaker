@@ -3,6 +3,9 @@ import { QuestionContent } from './question-content';
 interface QuestionTypeHeadingProps {
     index: number;
     headingNumber?: number | null;
+    showHeadingNumber?: boolean;
+    partLabelEnglish?: string | null;
+    partLabelUrdu?: string | null;
     title: string;
     titleEnglish?: string | null;
     titleUrdu?: string | null;
@@ -15,6 +18,9 @@ interface QuestionTypeHeadingProps {
 export function QuestionTypeHeading({
     index,
     headingNumber,
+    showHeadingNumber = true,
+    partLabelEnglish = null,
+    partLabelUrdu = null,
     title,
     titleEnglish,
     titleUrdu,
@@ -43,6 +49,21 @@ export function QuestionTypeHeading({
         : '';
     const printedHeadingNumber =
         headingNumber === undefined ? index + 1 : headingNumber;
+    const numberPrefix = (urduMedium: boolean) =>
+        printedHeadingNumber === null ? null : (
+            <span
+                aria-hidden={showHeadingNumber ? undefined : true}
+                className={
+                    showHeadingNumber
+                        ? 'font-bold'
+                        : 'invisible font-bold whitespace-pre'
+                }
+            >
+                {urduMedium
+                    ? `سوال نمبر ${printedHeadingNumber}:-`
+                    : `Q.${printedHeadingNumber}:-`}
+            </span>
+        );
 
     if (!isBilingual) {
         const isUrdu = urdu !== '' && english === '';
@@ -66,15 +87,12 @@ export function QuestionTypeHeading({
                 >
                     {isUrdu ? (
                         <>
-                            {printedHeadingNumber !== null && (
-                                <>
-                                    <span className="font-bold">
-                                        &#1587;&#1608;&#1575;&#1604;
-                                        &#1606;&#1605;&#1576;&#1585;{' '}
-                                        {printedHeadingNumber}:-
-                                    </span>{' '}
-                                </>
-                            )}
+                            {numberPrefix(true)}{' '}
+                            {partLabelUrdu && (
+                                <span className="font-bold">
+                                    ({partLabelUrdu})
+                                </span>
+                            )}{' '}
                             <QuestionContent
                                 value={urdu}
                                 inline
@@ -88,13 +106,12 @@ export function QuestionTypeHeading({
                         </>
                     ) : (
                         <>
-                            {printedHeadingNumber !== null && (
-                                <>
-                                    <span className="font-bold">
-                                        Q.{printedHeadingNumber}:-
-                                    </span>{' '}
-                                </>
-                            )}
+                            {numberPrefix(false)}{' '}
+                            {partLabelEnglish && (
+                                <span className="font-bold">
+                                    ({partLabelEnglish})
+                                </span>
+                            )}{' '}
                             <QuestionContent
                                 value={english || visibleTitle}
                                 inline
@@ -127,13 +144,10 @@ export function QuestionTypeHeading({
             }
         >
             <div className="min-w-0 text-left" dir="ltr">
-                {printedHeadingNumber !== null && (
-                    <>
-                        <span className="font-bold">
-                            Q.{printedHeadingNumber}:-
-                        </span>{' '}
-                    </>
-                )}
+                {numberPrefix(false)}{' '}
+                {partLabelEnglish && (
+                    <span className="font-bold">({partLabelEnglish})</span>
+                )}{' '}
                 <QuestionContent
                     value={english}
                     inline
@@ -156,15 +170,10 @@ export function QuestionTypeHeading({
                 data-paper-urdu-content
                 style={{ fontFamily: 'var(--paper-urdu-font)' }}
             >
-                {printedHeadingNumber !== null && (
-                    <>
-                        <span className="font-bold">
-                            &#1587;&#1608;&#1575;&#1604;
-                            &#1606;&#1605;&#1576;&#1585; {printedHeadingNumber}
-                            :-
-                        </span>{' '}
-                    </>
-                )}
+                {numberPrefix(true)}{' '}
+                {partLabelUrdu && (
+                    <span className="font-bold">({partLabelUrdu})</span>
+                )}{' '}
                 <QuestionContent
                     value={urdu}
                     inline

@@ -15,6 +15,9 @@ interface BoxedObjectiveSectionProps {
     section: GeneratedPaperSection;
     index: number;
     headingNumber: number | null;
+    showHeadingNumber?: boolean;
+    partLabelEnglish?: string | null;
+    partLabelUrdu?: string | null;
     questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;
     hideHeadingMarks?: boolean;
@@ -56,6 +59,9 @@ export function BoxedObjectiveSection({
     section,
     index,
     headingNumber,
+    showHeadingNumber,
+    partLabelEnglish,
+    partLabelUrdu,
     questionNumberOffset,
     numberingFormat,
     hideHeadingMarks,
@@ -90,6 +96,9 @@ export function BoxedObjectiveSection({
             <QuestionTypeHeading
                 index={index}
                 headingNumber={headingNumber}
+                showHeadingNumber={showHeadingNumber}
+                partLabelEnglish={partLabelEnglish}
+                partLabelUrdu={partLabelUrdu}
                 title={section.title}
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}

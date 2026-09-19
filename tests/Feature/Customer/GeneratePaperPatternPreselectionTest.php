@@ -5,6 +5,7 @@ use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
+use App\Models\CustomPaperLayout;
 use App\Models\Medium;
 use App\Models\MultipartQuestionSetting;
 use App\Models\PaperQuestionSection;
@@ -375,6 +376,48 @@ test('paper generator returns question types in the saved pattern class subject 
             $first->id,
             $second->id,
         ]);
+
+    $customLayout = CustomPaperLayout::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'is_active' => true,
+    ]);
+    $customSection = $customLayout->sections()->create(['sort_order' => 2]);
+    $customSection->items()->createMany([
+        [
+            'question_type_id' => $second->id,
+            'sort_order' => 0,
+            'shared_number_group' => 1,
+            'or_group' => 1,
+        ],
+        [
+            'question_type_id' => $first->id,
+            'sort_order' => 1,
+            'shared_number_group' => 1,
+            'or_group' => 1,
+        ],
+    ]);
+    $customOrGroupId = -(($customLayout->id * 100000) + 1);
+
+    $this->actingAs($customer)
+        ->getJson(route('customer.papers.generate.question-types', [
+            'chapter_ids' => [$chapter->id],
+            'sources' => [Question::SOURCE_EXERCISE],
+        ]))
+        ->assertOk()
+        ->assertJsonPath('sections.0.questionTypeId', $second->id)
+        ->assertJsonPath('sections.0.layoutNumberGroup', "custom:{$customLayout->id}:number:1")
+        ->assertJsonPath('sections.0.layoutItemOrder', 0)
+        ->assertJsonPath('sections.0.layoutOrGroupId', $customOrGroupId)
+        ->assertJsonPath('sections.1.questionTypeId', $first->id)
+        ->assertJsonPath('sections.1.layoutItemOrder', 1)
+        ->assertJsonPath('groups.0.id', $customOrGroupId)
+        ->assertJsonPath('groups.0.questionTypeIds', [$second->id, $first->id])
+        ->assertJsonPath('paperSectioning.custom', true)
+        ->assertJsonPath('paperSectioning.groups.0.id', $customSection->id);
+
+    $customLayout->update(['is_active' => false]);
 
     $pairing->update(['is_active' => false]);
     PaperQuestionSectionScope::query()->update(['is_active' => false]);

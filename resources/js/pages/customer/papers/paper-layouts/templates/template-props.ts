@@ -15,6 +15,9 @@ export interface SectionTemplateProps {
     index: number;
     /** Number printed in the type heading; null hides it for later objective blocks. */
     headingNumber: number | null;
+    showHeadingNumber?: boolean;
+    partLabelEnglish?: string | null;
+    partLabelUrdu?: string | null;
     /** Number of questions in earlier objective types; subjective types receive zero. */
     questionNumberOffset: number;
     numberingFormat: PaperQuestionNumberingFormat;

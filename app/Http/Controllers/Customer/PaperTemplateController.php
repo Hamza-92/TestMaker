@@ -132,6 +132,8 @@ class PaperTemplateController extends Controller
             'structure.sections.*.orGroupTypeIds' => ['nullable', 'array', 'min:2'],
             'structure.sections.*.orGroupTypeIds.*' => ['integer', 'distinct'],
             'structure.sections.*.orRole' => ['nullable', Rule::in(['primary', 'alternative'])],
+            'structure.sections.*.layoutNumberGroup' => ['nullable', 'string', 'max:255'],
+            'structure.sections.*.layoutItemOrder' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $data['structure']['total_marks'] = round(collect($data['structure']['sections'])

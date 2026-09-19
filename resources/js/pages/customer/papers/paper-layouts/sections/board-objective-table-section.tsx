@@ -28,6 +28,9 @@ export function BoardObjectiveTableSection(props: SectionTemplateProps) {
             <QuestionTypeHeading
                 index={props.index}
                 headingNumber={props.headingNumber}
+                showHeadingNumber={props.showHeadingNumber}
+                partLabelEnglish={props.partLabelEnglish}
+                partLabelUrdu={props.partLabelUrdu}
                 title={section.title}
                 titleEnglish={section.titleEnglish}
                 titleUrdu={section.titleUrdu}
