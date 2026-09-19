@@ -49,8 +49,14 @@ export function QuestionTypeHeading({
         : '';
     const printedHeadingNumber =
         headingNumber === undefined ? index + 1 : headingNumber;
-    const numberPrefix = (urduMedium: boolean) =>
-        printedHeadingNumber === null ? null : (
+    const isSharedNumberContinuation =
+        !showHeadingNumber && Boolean(partLabelEnglish || partLabelUrdu);
+    const numberPrefix = (urduMedium: boolean) => {
+        if (printedHeadingNumber === null || isSharedNumberContinuation) {
+            return null;
+        }
+
+        return (
             <span
                 aria-hidden={showHeadingNumber ? undefined : true}
                 className={
@@ -64,6 +70,7 @@ export function QuestionTypeHeading({
                     : `Q.${printedHeadingNumber}:-`}
             </span>
         );
+    };
 
     if (!isBilingual) {
         const isUrdu = urdu !== '' && english === '';
