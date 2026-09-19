@@ -2869,6 +2869,40 @@ function storageAssetUrl(value: unknown): string {
     return `/storage/${path}`;
 }
 
+function SchoolIdentity({
+    schoolName,
+    address,
+    showAddress,
+}: {
+    schoolName: string;
+    address: string;
+    showAddress: boolean;
+}) {
+    const visibleSchoolName = schoolName.trim();
+    const visibleAddress = showAddress ? address.trim() : '';
+
+    if (visibleSchoolName === '') {
+        return null;
+    }
+
+    return (
+        <div
+            data-paper-school-identity
+            className="mb-1.5 text-center"
+            dir="auto"
+        >
+            <div className="text-[14px] leading-tight font-bold">
+                {visibleSchoolName}
+            </div>
+            {visibleAddress !== '' && (
+                <div className="mt-0.5 text-[11px] leading-tight font-normal">
+                    ({visibleAddress})
+                </div>
+            )}
+        </div>
+    );
+}
+
 function PaperHeader({
     template,
     header,
@@ -2964,6 +2998,14 @@ export default function GeneratePaper({
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
+    const configuredSchoolName = (
+        (auth.user.school_name as string) ||
+        auth.user.name ||
+        ''
+    ).trim();
+    const defaultSchoolName = configuredSchoolName || 'School Name';
+    const defaultPaperTopMargin =
+        configuredSchoolName === '' ? DEFAULT_PAPER_SETTINGS.marginTop : 3;
     const schoolAddress =
         typeof auth.user.address === 'string' ? auth.user.address : '';
     const showSchoolAddress = Boolean(auth.user.is_show_address);
@@ -5310,10 +5352,7 @@ export default function GeneratePaper({
             setGeneratedPaper({
                 id: `paper_${Date.now()}`,
                 header: {
-                    schoolName:
-                        (auth.user.school_name as string) ||
-                        auth.user.name ||
-                        'School Name',
+                    schoolName: defaultSchoolName,
                     exam: '',
                     className: klass?.label ?? '',
                     section: '',
@@ -5335,6 +5374,7 @@ export default function GeneratePaper({
                 },
                 settings: {
                     ...DEFAULT_PAPER_SETTINGS,
+                    marginTop: defaultPaperTopMargin,
                     paperLayout: effectivePaperLayout,
                     showSections:
                         usesCustomLayout ||
@@ -5378,10 +5418,7 @@ export default function GeneratePaper({
             id: `bubble_sheet_${Date.now()}`,
             documentKind: 'bubble-sheet',
             header: {
-                schoolName:
-                    (auth.user.school_name as string) ||
-                    auth.user.name ||
-                    'School Name',
+                schoolName: defaultSchoolName,
                 exam: '',
                 className: '',
                 section: '',
@@ -5401,6 +5438,7 @@ export default function GeneratePaper({
             },
             settings: {
                 ...DEFAULT_PAPER_SETTINGS,
+                marginTop: defaultPaperTopMargin,
                 bubbleSheetEnabled: true,
                 bubbleSheetMode: 'only',
             },
@@ -14303,6 +14341,11 @@ export function GeneratedPaperView({
                         </div>
                     )}
                     <div className="relative z-10">
+                        <SchoolIdentity
+                            schoolName={paper.header.schoolName}
+                            address={schoolAddress}
+                            showAddress={showSchoolAddress}
+                        />
                         <PaperHeader
                             template={settings.headerTemplate}
                             header={{
@@ -14392,6 +14435,13 @@ export function GeneratedPaperView({
                                     className="relative mx-auto overflow-hidden bg-white print:overflow-visible print:shadow-none"
                                 >
                                     <div className="relative z-10">
+                                        <SchoolIdentity
+                                            schoolName={
+                                                variantPaper.header.schoolName
+                                            }
+                                            address={schoolAddress}
+                                            showAddress={showSchoolAddress}
+                                        />
                                         <PaperHeader
                                             template={settings.headerTemplate}
                                             header={{
