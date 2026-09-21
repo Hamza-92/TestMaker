@@ -3638,6 +3638,7 @@ export default function GeneratePaper({
         chapters !== null &&
         chapters.length > 0 &&
         chapters.every((chapter) => chapter.topics.length === 0);
+    const isUrduChapterMedium = chapterMedium === 'Urdu';
 
     const renderChapterCard = (chapter: Chapter) => (
         <ChapterCard
@@ -8298,12 +8299,26 @@ export default function GeneratePaper({
                                                 <>
                                                     {isChapterWiseSubject ? (
                                                         <>
-                                                            <div className="space-y-4 lg:hidden">
+                                                            <div
+                                                                className="space-y-4 lg:hidden"
+                                                                dir={
+                                                                    isUrduChapterMedium
+                                                                        ? 'rtl'
+                                                                        : 'ltr'
+                                                                }
+                                                            >
                                                                 {chapterGroups.map(
                                                                     renderDirectChapterGroup,
                                                                 )}
                                                             </div>
-                                                            <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+                                                            <div
+                                                                className="hidden gap-4 lg:grid lg:grid-cols-2"
+                                                                dir={
+                                                                    isUrduChapterMedium
+                                                                        ? 'rtl'
+                                                                        : 'ltr'
+                                                                }
+                                                            >
                                                                 <div className="space-y-4">
                                                                     {directChapterColumns[0].map(
                                                                         renderDirectChapterGroup,
@@ -8318,7 +8333,14 @@ export default function GeneratePaper({
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <div className="space-y-4 lg:hidden">
+                                                            <div
+                                                                className="space-y-4 lg:hidden"
+                                                                dir={
+                                                                    isUrduChapterMedium
+                                                                        ? 'rtl'
+                                                                        : 'ltr'
+                                                                }
+                                                            >
                                                                 {chapterGroups
                                                                     .flatMap(
                                                                         (
@@ -8330,7 +8352,14 @@ export default function GeneratePaper({
                                                                         renderChapterCard,
                                                                     )}
                                                             </div>
-                                                            <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+                                                            <div
+                                                                className="hidden gap-4 lg:grid lg:grid-cols-2"
+                                                                dir={
+                                                                    isUrduChapterMedium
+                                                                        ? 'rtl'
+                                                                        : 'ltr'
+                                                                }
+                                                            >
                                                                 <div className="space-y-4">
                                                                     {topicWiseColumns[0].map(
                                                                         renderChapterCard,
@@ -14912,10 +14941,14 @@ function DirectChapterGroup({
 }) {
     const isActive = state !== 'unchecked';
     const heading = group.heading;
+    const isUrdu = medium === 'Urdu';
 
     if (heading === null) {
         return (
-            <ul className="grid gap-3 sm:grid-cols-2 lg:col-span-2">
+            <ul
+                className="grid gap-3 sm:grid-cols-2 lg:col-span-2"
+                dir={isUrdu ? 'rtl' : 'ltr'}
+            >
                 {group.items.map((chapter) => (
                     <DirectChapterRow
                         key={chapter.id}
@@ -14935,6 +14968,7 @@ function DirectChapterGroup({
 
     return (
         <div
+            dir={isUrdu ? 'rtl' : 'ltr'}
             className={cn(
                 'overflow-hidden rounded-xl border bg-white shadow-sm shadow-slate-900/[0.02] transition-all dark:bg-slate-900 dark:shadow-black/10',
                 isActive
@@ -14948,7 +14982,12 @@ function DirectChapterGroup({
                     onChange={onToggleGroup}
                     label={`Toggle all chapters in ${heading}`}
                 />
-                <h3 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400">
+                <h3
+                    className={cn(
+                        'min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-slate-500 uppercase dark:text-slate-400',
+                        isUrdu ? 'text-right' : 'text-left',
+                    )}
+                >
                     {heading}
                 </h3>
             </div>
@@ -14983,8 +15022,11 @@ function DirectChapterRow({
     onToggleChapter: (chapter: Chapter) => void;
     standalone?: boolean;
 }) {
+    const isUrdu = medium === 'Urdu';
+
     return (
         <li
+            dir={isUrdu ? 'rtl' : 'ltr'}
             className={cn(
                 'flex min-h-11 items-center gap-3 bg-white px-4 py-2.5 transition-colors dark:bg-slate-900',
                 standalone &&
@@ -15008,7 +15050,8 @@ function DirectChapterRow({
                 type="button"
                 onClick={() => onToggleChapter(chapter)}
                 className={cn(
-                    'flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-sm transition-colors',
+                    'flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm transition-colors',
+                    isUrdu ? 'text-right' : 'text-left',
                     checked
                         ? 'text-brand-700 dark:text-brand-300'
                         : 'text-slate-700 hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300',
@@ -15040,9 +15083,11 @@ function ChapterCard({
     onToggleTopic: (topicId: number) => void;
 }) {
     const isActive = state !== 'unchecked';
+    const isUrdu = medium === 'Urdu';
 
     return (
         <div
+            dir={isUrdu ? 'rtl' : 'ltr'}
             className={cn(
                 'overflow-hidden rounded-xl border bg-white shadow-sm shadow-slate-900/[0.02] transition-all dark:shadow-black/10',
                 isActive
@@ -15094,7 +15139,10 @@ function ChapterCard({
                                 <button
                                     type="button"
                                     onClick={() => onToggleTopic(topic.id)}
-                                    className="flex min-w-0 flex-1 cursor-pointer items-center text-left text-[13px]"
+                                    className={cn(
+                                        'flex min-w-0 flex-1 cursor-pointer items-center text-[13px]',
+                                        isUrdu ? 'text-right' : 'text-left',
+                                    )}
                                 >
                                     <BilingualPickerName
                                         english={topic.name_eng ?? topic.name}
