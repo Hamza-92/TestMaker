@@ -32,6 +32,7 @@ use App\Http\Controllers\Superadmin\SuperadminUserController;
 use App\Http\Controllers\Superadmin\TopicController;
 use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
+use App\Http\Controllers\Superadmin\UserTransferController;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -160,6 +161,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/data-transfer', [DataTransferController::class, 'index'])->name('superadmin.data-transfer')->middleware('permission:subjects.create');
         Route::get('superadmin/data-transfer/catalog', [DataTransferController::class, 'catalog'])->name('superadmin.data-transfer.catalog')->middleware('permission:subjects.create');
         Route::post('superadmin/data-transfer', [DataTransferController::class, 'store'])->name('superadmin.data-transfer.store')->middleware('permission:subjects.create');
+        Route::get('superadmin/user-transfer', [UserTransferController::class, 'index'])->name('superadmin.user-transfer')->middleware('permission:customers.view');
+        Route::get('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'show'])->name('superadmin.user-transfer.show')->middleware('permission:customers.view');
+        Route::post('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'store'])->name('superadmin.user-transfer.store')->middleware('permission:customers.create');
 
         // â”€â”€â”€ Subscriptions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/customers/{customer}/subscriptions/add', [CustomerSubscriptionController::class, 'create'])->name('superadmin.customers.subscriptions.add')->middleware('permission:subscriptions.create');

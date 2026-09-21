@@ -11,6 +11,7 @@ import {
     ShapesIcon,
     TagIcon,
     UserCogIcon,
+    UserRoundCogIcon,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
@@ -84,6 +85,15 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        ...(can('customers.view')
+            ? [
+                  {
+                      title: 'User Transfer',
+                      href: '/superadmin/user-transfer',
+                      icon: UserRoundCogIcon,
+                  },
+              ]
+            : []),
         ...(can('questions.view')
             ? [
                   {
@@ -112,6 +122,7 @@ export function AppSidebar() {
                               title: 'Type Settings',
                               href: '/superadmin/question-types/headings',
                           },
+
                           ...(can('questions.view')
                               ? [
                                     {

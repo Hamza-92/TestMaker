@@ -23,6 +23,7 @@ class Subscription extends Model
         'max_teachers',
         'is_question_based',
         'allowed_questions',
+        'remaining_questions',
         'amount',
         'started_at',
         'duration',
@@ -34,18 +35,18 @@ class Subscription extends Model
     protected function casts(): array
     {
         return [
-            'pattern_access'  => 'array',
-            'class_access'    => 'array',
-            'subject_access'  => 'array',
-            'access_scope'    => 'array',
-            'allow_teachers'  => 'boolean',
+            'pattern_access' => 'array',
+            'class_access' => 'array',
+            'subject_access' => 'array',
+            'access_scope' => 'array',
+            'allow_teachers' => 'boolean',
             'allow_online_mcq_tests' => 'boolean',
             'allow_subjective_answers' => 'boolean',
             'is_question_based' => 'boolean',
-            'amount'          => 'decimal:2',
-            'started_at'     => 'datetime',
-            'expired_at'     => 'datetime',
-            'status'         => SubscriptionStatus::class,
+            'amount' => 'decimal:2',
+            'started_at' => 'datetime',
+            'expired_at' => 'datetime',
+            'status' => SubscriptionStatus::class,
         ];
     }
 
