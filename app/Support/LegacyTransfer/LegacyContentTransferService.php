@@ -539,6 +539,7 @@ class LegacyContentTransferService
                     sourceTopicIds: $sourceTopicIds,
                     exerciseQuestion: $exerciseQuestion,
                     convertExercisesToTopics: $convertSubjectExercisesToTopics,
+                    subjectType: $subjectType,
                     statusColumn: $statusColumn,
                     targetClass: $class,
                     targetPattern: $pattern,
@@ -662,6 +663,7 @@ class LegacyContentTransferService
         array $sourceTopicIds,
         ?int $exerciseQuestion,
         bool $convertExercisesToTopics,
+        string $subjectType,
         string $statusColumn,
         SchoolClass $targetClass,
         Pattern $targetPattern,
@@ -677,6 +679,7 @@ class LegacyContentTransferService
             'question_types' => 0,
         ];
         $languagePresence = ['english' => false, 'urdu' => false];
+        $isTopicWiseSubject = $subjectType === 'topic-wise';
 
         $sourceChapters = $this->source()
             ->table('pk_chapter')
@@ -713,7 +716,9 @@ class LegacyContentTransferService
                 'name' => $this->limitedString($sourceChapter->name, 150) ?? "Chapter {$sourceChapter->chapter_number}",
                 'name_ur' => $this->limitedString($sourceChapter->u_name, 150),
                 'chapter_number' => $chapterNumber,
-                'group_name' => $this->nullableString($sourceChapter->chapter_type),
+                'group_name' => $isTopicWiseSubject
+                    ? null
+                    : $this->nullableString($sourceChapter->chapter_type),
                 'group_heading' => null,
                 'sort_id' => (int) ($sourceChapter->sort_int ?? 0),
                 'status' => (int) ($sourceChapter->status ?? 1),

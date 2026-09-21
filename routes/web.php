@@ -302,6 +302,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('superadmin/users/{user}', [SuperadminUserController::class, 'update'])->name('superadmin.users.update')->middleware('permission:users.edit');
         Route::delete('superadmin/users/{user}', [SuperadminUserController::class, 'destroy'])->name('superadmin.users.destroy')->middleware('permission:users.delete');
 
+        // Temporary maintenance page. Remove these two routes, the Blade view,
+        // and CleanupTopicWiseChapterGroups after all hosted databases are updated.
+        Route::get('superadmin/maintenance/topic-wise-chapter-groups', function () {
+            $exitCode = Artisan::call('cleanup:topic-wise-chapter-groups');
+
+            return view('superadmin.maintenance.topic-wise-chapter-groups', [
+                'applied' => false,
+                'exitCode' => $exitCode,
+                'output' => Artisan::output(),
+            ]);
+        })->name('superadmin.maintenance.topic-wise-chapter-groups')
+            ->middleware('permission:subjects.edit');
+
+        Route::post('superadmin/maintenance/topic-wise-chapter-groups', function () {
+            $exitCode = Artisan::call('cleanup:topic-wise-chapter-groups', [
+                '--apply' => true,
+            ]);
+
+            return view('superadmin.maintenance.topic-wise-chapter-groups', [
+                'applied' => true,
+                'exitCode' => $exitCode,
+                'output' => Artisan::output(),
+            ]);
+        })->name('superadmin.maintenance.topic-wise-chapter-groups.apply')
+            ->middleware('permission:subjects.edit');
+
     }); // end superadmin group
 });
 
