@@ -91,17 +91,19 @@ class LegacyUserTransferService
             $end = $start->copy()->addDay();
         }
 
-        $email = Str::lower(trim((string) $row->email));
-        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $warnings[] = 'Email must be corrected before transfer.';
-        } elseif (User::withTrashed()->whereRaw('LOWER(email) = ?', [$email])->exists()) {
+        $legacyEmail = Str::lower(trim((string) $row->email));
+        $email = $legacyEmail;
+        if (! filter_var($legacyEmail, FILTER_VALIDATE_EMAIL)) {
+            $email = $this->temporaryEmail($row);
+            $warnings[] = 'A temporary email was generated from the phone number and can be changed later.';
+        } elseif (User::withTrashed()->whereRaw('LOWER(email) = ?', [$legacyEmail])->exists()) {
             $warnings[] = 'Email already exists in Laravel and must be changed.';
         }
 
         return [
             'source_id' => (int) $row->id,
             'name' => trim((string) $row->name),
-            'email' => trim((string) $row->email),
+            'email' => $email,
             'phone' => trim((string) $row->phone),
             'school_name' => trim((string) $row->school_name),
             'address' => trim((string) $row->postal_address),
@@ -113,7 +115,7 @@ class LegacyUserTransferService
             'subscription_name' => trim((string) $row->package) ?: 'Legacy '.($row->account_type === 'Paid' ? 'Subscription' : 'Trial'),
             'started_at' => $start->toDateString(),
             'expired_at' => $end->toDateString(),
-            'subscription_status' => $row->status === 'Enabled' && $end->isFuture() ? 'active' : 'expired',
+            'subscription_status' => $row->status === 'Enabled' && $end->gte(now()->startOfDay()) ? 'active' : 'expired',
             'amount' => number_format((float) $row->price, 2, '.', ''),
             'is_question_based' => (int) $row->allowed_questions > 0,
             'allowed_questions' => max(0, (int) $row->allowed_questions),
@@ -256,6 +258,26 @@ class LegacyUserTransferService
         }
 
         return [SubscriptionAccess::normalizeScope($scope, $resources) ?? $scope, $warnings];
+    }
+
+    private function temporaryEmail(object $row): string
+    {
+        $phone = Str::lower((string) preg_replace('/[^a-z0-9]+/i', '', trim((string) $row->phone)));
+        $base = $phone !== '' ? Str::limit($phone, 180, '') : 'legacy'.$row->id;
+        $candidate = $base.'@mail.com';
+
+        if (! User::withTrashed()->whereRaw('LOWER(email) = ?', [$candidate])->exists()) {
+            return $candidate;
+        }
+
+        $candidate = $base.'-legacy'.$row->id.'@mail.com';
+        $suffix = 1;
+        while (User::withTrashed()->whereRaw('LOWER(email) = ?', [$candidate])->exists()) {
+            $candidate = $base.'-legacy'.$row->id.'-'.$suffix.'@mail.com';
+            $suffix++;
+        }
+
+        return $candidate;
     }
 
     private function sourceRow(int $sourceUserId): object
