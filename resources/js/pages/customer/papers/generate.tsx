@@ -120,7 +120,7 @@ import type {
 interface Pattern {
     id: number;
     name: string;
-    paper_layout: PaperLayout;
+    paper_layouts: Record<string, PaperLayout>;
 }
 
 interface PatternClass {
@@ -5317,8 +5317,9 @@ export default function GeneratePaper({
                 paperSectioning,
             );
             const assignedPaperLayout =
-                patterns.find((item) => item.id === pattern?.id)
-                    ?.paper_layout ?? 'standard';
+                patterns.find((item) => item.id === pattern?.id)?.paper_layouts[
+                    String(klass?.id)
+                ] ?? 'standard';
             const effectivePaperLayout = usesCustomLayout
                 ? 'standard'
                 : assignedPaperLayout;

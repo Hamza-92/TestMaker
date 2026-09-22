@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -51,6 +51,11 @@ class Pattern extends Model
         return $this->belongsToMany(SchoolClass::class, 'pattern_classes', 'pattern_id', 'class_id')
             ->orderBy('classes.sort_order')
             ->orderBy('classes.id');
+    }
+
+    public function paperLayoutAssignments(): HasMany
+    {
+        return $this->hasMany(PaperLayoutAssignment::class);
     }
 
     public function chapters(): HasMany

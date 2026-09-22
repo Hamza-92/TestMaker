@@ -7,6 +7,7 @@ use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\CustomPaperLayout;
 use App\Models\MultipartQuestionSetting;
+use App\Models\PaperLayoutAssignment;
 use App\Models\PaperQuestionSection;
 use App\Models\PaperQuestionSectionScope;
 use App\Models\PaperTemplate;
@@ -35,8 +36,18 @@ class GeneratePaperController extends Controller
 
         $patterns = Pattern::where('status', 1)
             ->when($patternIds !== null, fn ($q) => $q->whereIn('id', $patternIds))
+            ->with('paperLayoutAssignments:id,pattern_id,class_id,paper_layout')
             ->ordered()
-            ->get(['id', 'name', 'paper_layout']);
+            ->get(['id', 'name'])
+            ->map(fn (Pattern $pattern) => [
+                'id' => $pattern->id,
+                'name' => $pattern->name,
+                'paper_layouts' => $pattern->paperLayoutAssignments
+                    ->mapWithKeys(fn (PaperLayoutAssignment $assignment) => [
+                        (string) $assignment->class_id => $assignment->paper_layout,
+                    ])
+                    ->all(),
+            ]);
 
         $patternClasses = DB::table('pattern_classes')
             ->join('classes', 'classes.id', '=', 'pattern_classes.class_id')

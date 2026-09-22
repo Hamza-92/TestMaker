@@ -1,11 +1,17 @@
 import { Head, useForm } from '@inertiajs/react';
 import {
     CheckCircle2Icon,
+    ChevronDownIcon,
     LayoutPanelTopIcon,
     SaveIcon,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     Select,
     SelectContent,
@@ -23,16 +29,24 @@ interface PaperLayoutDefinition {
     patterns_count: number;
 }
 
+interface ClassItem {
+    id: number;
+    name: string;
+    status: number;
+    paper_layout: string;
+}
+
 interface PatternItem {
     id: number;
     name: string;
     short_name: string | null;
-    paper_layout: string;
     status: number;
+    classes: ClassItem[];
 }
 
 interface Assignment {
     pattern_id: number;
+    class_id: number;
     paper_layout: string;
 }
 
@@ -52,10 +66,13 @@ export default function PaperLayouts({
     const canEdit = can('patterns.edit');
     const initialAssignments = useMemo(
         () =>
-            patterns.map((pattern) => ({
-                pattern_id: pattern.id,
-                paper_layout: pattern.paper_layout,
-            })),
+            patterns.flatMap((pattern) =>
+                pattern.classes.map((schoolClass) => ({
+                    pattern_id: pattern.id,
+                    class_id: schoolClass.id,
+                    paper_layout: schoolClass.paper_layout,
+                })),
+            ),
         [patterns],
     );
     const { data, setData, put, processing, errors, recentlySuccessful } =
@@ -63,17 +80,24 @@ export default function PaperLayouts({
 
     const isDirty = data.assignments.some((assignment) => {
         const original = initialAssignments.find(
-            (item) => item.pattern_id === assignment.pattern_id,
+            (item) =>
+                item.pattern_id === assignment.pattern_id &&
+                item.class_id === assignment.class_id,
         );
 
         return original?.paper_layout !== assignment.paper_layout;
     });
 
-    const updateLayout = (patternId: number, paperLayout: string) => {
+    const updateLayout = (
+        patternId: number,
+        classId: number,
+        paperLayout: string,
+    ) => {
         setData(
             'assignments',
             data.assignments.map((assignment) =>
-                assignment.pattern_id === patternId
+                assignment.pattern_id === patternId &&
+                assignment.class_id === classId
                     ? { ...assignment, paper_layout: paperLayout }
                     : assignment,
             ),
@@ -127,12 +151,12 @@ export default function PaperLayouts({
                         </div>
                         <div>
                             <h2 className="text-sm font-semibold">
-                                Pattern assignments
+                                Pattern and class assignments
                             </h2>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                New papers use the layout assigned to their
-                                selected pattern. Saved papers keep their saved
-                                layout.
+                                New papers use the layout assigned to the
+                                selected pattern and class. Subject-specific
+                                custom layouts continue to take priority.
                             </p>
                         </div>
                     </div>
@@ -150,57 +174,162 @@ export default function PaperLayouts({
                     ) : (
                         <div className="divide-y">
                             {patterns.map((pattern) => {
-                                const assignment = data.assignments.find(
-                                    (item) => item.pattern_id === pattern.id,
-                                );
+                                const patternAssignments =
+                                    data.assignments.filter(
+                                        (assignment) =>
+                                            assignment.pattern_id ===
+                                            pattern.id,
+                                    );
+                                const layoutSummary = layouts
+                                    .filter(
+                                        (layout) => layout.key !== 'standard',
+                                    )
+                                    .map((layout) => {
+                                        const count = patternAssignments.filter(
+                                            (assignment) =>
+                                                assignment.paper_layout ===
+                                                layout.key,
+                                        ).length;
+
+                                        return count > 0
+                                            ? layout.name + ': ' + count
+                                            : null;
+                                    })
+                                    .filter(
+                                        (summary): summary is string =>
+                                            summary !== null,
+                                    )
+                                    .join(' · ');
 
                                 return (
-                                    <div
-                                        key={pattern.id}
-                                        className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                                    >
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="font-medium">
-                                                    {pattern.name}
-                                                </p>
-                                                {pattern.short_name && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        ({pattern.short_name})
-                                                    </span>
-                                                )}
-                                                {pattern.status !== 1 && (
-                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                                                        Inactive
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <Select
-                                            value={
-                                                assignment?.paper_layout ??
-                                                'standard'
-                                            }
-                                            onValueChange={(value) =>
-                                                updateLayout(pattern.id, value)
-                                            }
-                                            disabled={!canEdit || processing}
+                                    <Collapsible key={pattern.id}>
+                                        <CollapsibleTrigger
+                                            type="button"
+                                            className="group flex w-full items-center justify-between gap-4 bg-muted/10 px-5 py-3 text-left transition-colors hover:bg-muted/20"
                                         >
-                                            <SelectTrigger className="w-full sm:w-56">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {layouts.map((layout) => (
-                                                    <SelectItem
-                                                        key={layout.key}
-                                                        value={layout.key}
-                                                    >
-                                                        {layout.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="font-semibold">
+                                                        {pattern.name}
+                                                    </p>
+                                                    {pattern.short_name && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            (
+                                                            {pattern.short_name}
+                                                            )
+                                                        </span>
+                                                    )}
+                                                    {pattern.status !== 1 && (
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                            Inactive pattern
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                    {pattern.classes.length}{' '}
+                                                    {pattern.classes.length ===
+                                                    1
+                                                        ? 'class'
+                                                        : 'classes'}
+                                                    {' · '}
+                                                    {layoutSummary ||
+                                                        'All use Standard'}
+                                                </p>
+                                            </div>
+                                            <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                                        </CollapsibleTrigger>
+
+                                        <CollapsibleContent className="border-t">
+                                            {pattern.classes.length === 0 ? (
+                                                <p className="px-5 py-4 text-sm text-muted-foreground">
+                                                    No classes are linked to
+                                                    this pattern.
+                                                </p>
+                                            ) : (
+                                                <div className="divide-y">
+                                                    {pattern.classes.map(
+                                                        (schoolClass) => {
+                                                            const assignment =
+                                                                data.assignments.find(
+                                                                    (item) =>
+                                                                        item.pattern_id ===
+                                                                            pattern.id &&
+                                                                        item.class_id ===
+                                                                            schoolClass.id,
+                                                                );
+
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        schoolClass.id
+                                                                    }
+                                                                    className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:pl-10"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="text-sm font-medium">
+                                                                            {
+                                                                                schoolClass.name
+                                                                            }
+                                                                        </p>
+                                                                        {schoolClass.status !==
+                                                                            1 && (
+                                                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                                                Inactive
+                                                                                class
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <Select
+                                                                        value={
+                                                                            assignment?.paper_layout ??
+                                                                            'standard'
+                                                                        }
+                                                                        onValueChange={(
+                                                                            value,
+                                                                        ) =>
+                                                                            updateLayout(
+                                                                                pattern.id,
+                                                                                schoolClass.id,
+                                                                                value,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            !canEdit ||
+                                                                            processing
+                                                                        }
+                                                                    >
+                                                                        <SelectTrigger className="w-full sm:w-56">
+                                                                            <SelectValue />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {layouts.map(
+                                                                                (
+                                                                                    layout,
+                                                                                ) => (
+                                                                                    <SelectItem
+                                                                                        key={
+                                                                                            layout.key
+                                                                                        }
+                                                                                        value={
+                                                                                            layout.key
+                                                                                        }
+                                                                                    >
+                                                                                        {
+                                                                                            layout.name
+                                                                                        }
+                                                                                    </SelectItem>
+                                                                                ),
+                                                                            )}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )}
+                                                </div>
+                                            )}
+                                        </CollapsibleContent>
+                                    </Collapsible>
                                 );
                             })}
                         </div>

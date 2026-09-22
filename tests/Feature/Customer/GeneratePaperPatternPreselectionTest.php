@@ -8,6 +8,7 @@ use App\Models\ClassSubject;
 use App\Models\CustomPaperLayout;
 use App\Models\Medium;
 use App\Models\MultipartQuestionSetting;
+use App\Models\PaperLayoutAssignment;
 use App\Models\PaperQuestionSection;
 use App\Models\PaperQuestionSectionScope;
 use App\Models\PaperTemplate;
@@ -20,6 +21,7 @@ use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\TrialSetting;
 use App\Models\User;
+use App\Support\PaperLayouts\PaperLayoutRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -203,6 +205,20 @@ test('an available dashboard pattern can be preselected on the paper generator',
         'status' => 1,
         'created_by' => null,
     ]);
+    $class = SchoolClass::create([
+        'name' => '10th',
+        'status' => 1,
+        'created_by' => null,
+    ]);
+    DB::table('pattern_classes')->insert([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+    ]);
+    PaperLayoutAssignment::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'paper_layout' => PaperLayoutRegistry::FEDERAL_BOARD,
+    ]);
 
     TrialSetting::current()->update(['access_scope' => null]);
 
@@ -213,6 +229,7 @@ test('an available dashboard pattern can be preselected on the paper generator',
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/papers/generate')
             ->where('initialPatternId', $pattern->id)
+            ->where('patterns.0.paper_layouts.'.$class->id, PaperLayoutRegistry::FEDERAL_BOARD)
         );
 
     expect(substr_count($response->headers->get('Link', ''), '<'))
