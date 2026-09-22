@@ -11,8 +11,8 @@ use App\Models\PaymentLog;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Subscription;
-use App\Support\SubscriptionAccess;
 use App\Models\User;
+use App\Support\SubscriptionAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,82 +30,83 @@ class CustomerSubscriptionController extends Controller
         $subscription->load([
             'creator:id,name',
             'paymentLogs' => fn ($q) => $q->with('creator:id,name', 'reviewer:id,name')->latest(),
-            'auditLogs'   => fn ($q) => $q->with('changedBy:id,name')->latest('created_at'),
+            'auditLogs' => fn ($q) => $q->with('changedBy:id,name')->latest('created_at'),
         ]);
 
         $resources = $this->accessResources();
         $accessScope = SubscriptionAccess::resolveScope($subscription, $resources);
         $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
         $patternNames = $this->resolveNames(Pattern::class, $summaryIds['pattern_access'], 'name');
-        $classNames   = $this->resolveNames(SchoolClass::class, $summaryIds['class_access'], 'name');
+        $classNames = $this->resolveNames(SchoolClass::class, $summaryIds['class_access'], 'name');
         $subjectNames = $this->resolveNames(Subject::class, $summaryIds['subject_access'], 'name_eng');
 
         $paymentLogs = $subscription->paymentLogs->map(fn (PaymentLog $log) => [
-            'id'                   => $log->id,
-            'amount'               => (string) $log->amount,
-            'payment_method'       => $log->payment_method?->value,
-            'payment_method_label' => $log->payment_method?->label(),
-            'account_number'       => $log->account_number,
-            'status'               => $log->status?->value,
-            'status_label'         => $log->status?->label(),
-            'notes'                => $log->notes,
-            'rejection_reason'     => $log->rejection_reason,
-            'attachments'          => collect($log->attachments ?? [])->map(fn ($p) => Storage::url($p))->all(),
-            'created_at'           => $log->created_at?->toISOString(),
-            'reviewed_at'          => $log->reviewed_at?->toISOString(),
-            'creator_name'         => $log->creator?->name,
-            'reviewer_name'        => $log->reviewer?->name,
-            'is_editable'          => $log->isEditable(),
+            'id' => $log->id,
+            'amount' => (string) $log->amount,
+            'payment_method' => $log->payment_method?->value,
+            'payment_method_label' => $log->account_number === 'legacy-testmaker' ? 'Legacy TestMaker Record' : $log->payment_method?->label(),
+            'account_number' => $log->account_number === 'legacy-testmaker' ? null : $log->account_number,
+            'next_payment_date' => $log->next_payment_date?->toDateString(),
+            'status' => $log->status?->value,
+            'status_label' => $log->status?->label(),
+            'notes' => $log->notes,
+            'rejection_reason' => $log->rejection_reason,
+            'attachments' => collect($log->attachments ?? [])->map(fn ($p) => Storage::url($p))->all(),
+            'created_at' => $log->created_at?->toISOString(),
+            'reviewed_at' => $log->reviewed_at?->toISOString(),
+            'creator_name' => $log->creator?->name,
+            'reviewer_name' => $log->reviewer?->name,
+            'is_editable' => $log->isEditable(),
         ]);
 
         $paymentSummary = $this->buildPaymentSummary($subscription);
 
         $auditLogs = $subscription->auditLogs->map(fn (AuditLog $log) => [
-            'id'              => $log->id,
-            'event'           => $log->event?->value,
-            'old_values'      => $log->old_values ?? [],
-            'new_values'      => $log->new_values ?? [],
-            'notes'           => $log->notes,
+            'id' => $log->id,
+            'event' => $log->event?->value,
+            'old_values' => $log->old_values ?? [],
+            'new_values' => $log->new_values ?? [],
+            'notes' => $log->notes,
             'changed_by_name' => $log->changedBy?->name,
-            'created_at'      => $log->created_at?->toISOString(),
+            'created_at' => $log->created_at?->toISOString(),
         ]);
 
         return Inertia::render('superadmin/customers/subscriptions/show', [
             'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
             'subscription' => [
-                'id'                => $subscription->id,
-                'name'              => $subscription->name,
-                'amount'            => (string) $subscription->amount,
+                'id' => $subscription->id,
+                'name' => $subscription->name,
+                'amount' => (string) $subscription->amount,
                 'allowed_questions' => $subscription->allowed_questions,
-                'started_at'        => $subscription->started_at?->toISOString(),
-                'expired_at'        => $subscription->expired_at?->toISOString(),
-                'duration'          => $subscription->duration,
-                'status'            => $subscription->status?->value,
-                'allow_teachers'    => $subscription->allow_teachers,
+                'started_at' => $subscription->started_at?->toISOString(),
+                'expired_at' => $subscription->expired_at?->toISOString(),
+                'duration' => $subscription->duration,
+                'status' => $subscription->status?->value,
+                'allow_teachers' => $subscription->allow_teachers,
                 'allow_online_mcq_tests' => $subscription->allow_online_mcq_tests,
                 'allow_subjective_answers' => $subscription->allow_subjective_answers,
-                'max_teachers'      => $subscription->max_teachers,
+                'max_teachers' => $subscription->max_teachers,
                 'is_question_based' => $subscription->is_question_based,
-                'pattern_access'    => $summaryIds['pattern_access'],
-                'class_access'      => $summaryIds['class_access'],
-                'subject_access'    => $summaryIds['subject_access'],
-                'access_scope'      => $accessScope,
-                'access_overview'   => SubscriptionAccess::overview(
+                'pattern_access' => $summaryIds['pattern_access'],
+                'class_access' => $summaryIds['class_access'],
+                'subject_access' => $summaryIds['subject_access'],
+                'access_scope' => $accessScope,
+                'access_overview' => SubscriptionAccess::overview(
                     $accessScope,
                     $resources['patterns'],
                     $resources['classes'],
                     $resources['subjects'],
                     $resources,
                 ),
-                'pattern_names'     => $patternNames,
-                'class_names'       => $classNames,
-                'subject_names'     => $subjectNames,
-                'creator_name'      => $subscription->creator?->name,
-                'created_at'        => $subscription->created_at?->toISOString(),
+                'pattern_names' => $patternNames,
+                'class_names' => $classNames,
+                'subject_names' => $subjectNames,
+                'creator_name' => $subscription->creator?->name,
+                'created_at' => $subscription->created_at?->toISOString(),
             ],
-            'paymentLogs'    => $paymentLogs,
+            'paymentLogs' => $paymentLogs,
             'paymentSummary' => $paymentSummary,
-            'auditLogs'      => $auditLogs,
+            'auditLogs' => $auditLogs,
         ]);
     }
 
@@ -124,22 +125,22 @@ class CustomerSubscriptionController extends Controller
         DB::transaction(function () use ($validated, $attachments, $subscription) {
             $log = PaymentLog::create([
                 'subscription_id' => $subscription->id,
-                'amount'          => $validated['amount'],
-                'payment_method'  => $validated['payment_method'],
-                'account_number'  => $validated['account_number'] ?: null,
-                'status'          => PaymentStatus::PendingReview->value,
-                'attachments'     => $attachments ?: null,
-                'notes'           => $validated['notes'] ?: null,
-                'created_by'      => auth()->id(),
+                'amount' => $validated['amount'],
+                'payment_method' => $validated['payment_method'],
+                'account_number' => $validated['account_number'] ?: null,
+                'status' => PaymentStatus::PendingReview->value,
+                'attachments' => $attachments ?: null,
+                'notes' => $validated['notes'] ?: null,
+                'created_by' => auth()->id(),
             ]);
 
             AuditLog::record(
                 model: $log,
                 event: AuditEvent::Created,
                 newValues: [
-                    'amount'         => $log->amount,
+                    'amount' => $log->amount,
                     'payment_method' => $log->payment_method->value,
-                    'status'         => $log->status->value,
+                    'status' => $log->status->value,
                 ],
                 actor: auth()->user(),
                 notes: 'Payment added.',
@@ -169,18 +170,18 @@ class CustomerSubscriptionController extends Controller
         }
 
         $oldValues = [
-            'amount'         => (string) $paymentLog->amount,
+            'amount' => (string) $paymentLog->amount,
             'payment_method' => $paymentLog->payment_method?->value,
-            'status'         => $paymentLog->status?->value,
+            'status' => $paymentLog->status?->value,
         ];
 
         DB::transaction(function () use ($validated, $attachments, $paymentLog, $oldValues) {
             $paymentLog->update([
-                'amount'         => $validated['amount'],
+                'amount' => $validated['amount'],
                 'payment_method' => $validated['payment_method'],
                 'account_number' => $validated['account_number'] ?: null,
-                'attachments'    => $attachments ?: null,
-                'notes'          => $validated['notes'] ?: null,
+                'attachments' => $attachments ?: null,
+                'notes' => $validated['notes'] ?: null,
             ]);
 
             AuditLog::record(
@@ -188,9 +189,9 @@ class CustomerSubscriptionController extends Controller
                 event: AuditEvent::Updated,
                 oldValues: $oldValues,
                 newValues: [
-                    'amount'         => $validated['amount'],
+                    'amount' => $validated['amount'],
                     'payment_method' => $validated['payment_method'],
-                    'status'         => $paymentLog->status?->value,
+                    'status' => $paymentLog->status?->value,
                 ],
                 actor: auth()->user(),
                 notes: 'Payment updated.',
@@ -207,7 +208,7 @@ class CustomerSubscriptionController extends Controller
 
         $validated = $request->validate([
             'status' => ['required', 'in:reviewed,approved,rejected'],
-            'notes'  => ['nullable', 'string', 'max:1000'],
+            'notes' => ['nullable', 'string', 'max:1000'],
             'rejection_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -239,16 +240,21 @@ class CustomerSubscriptionController extends Controller
     {
         return [
             'patterns' => Pattern::where('status', 1)->ordered()->get(['id', 'name', 'short_name']),
-            'classes'  => SchoolClass::where('status', 1)->ordered()->get(['id', 'name']),
+            'classes' => SchoolClass::where('status', 1)->ordered()->get(['id', 'name']),
             'subjects' => Subject::where('status', 1)->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']),
             ...SubscriptionAccess::buildMaps(),
         ];
     }
 
-    private function resolveNames(string $model, ?array $ids, string $column): array|null
+    private function resolveNames(string $model, ?array $ids, string $column): ?array
     {
-        if ($ids === null) return null;
-        if (empty($ids)) return [];
+        if ($ids === null) {
+            return null;
+        }
+        if (empty($ids)) {
+            return [];
+        }
+
         return $model::whereIn('id', $ids)->pluck($column)->all();
     }
 
@@ -261,23 +267,23 @@ class CustomerSubscriptionController extends Controller
         return Inertia::render('superadmin/customers/subscriptions/edit', [
             'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
             'subscription' => [
-                'id'                => $subscription->id,
-                'name'              => $subscription->name,
-                'amount'            => (string) $subscription->amount,
+                'id' => $subscription->id,
+                'name' => $subscription->name,
+                'amount' => (string) $subscription->amount,
                 'allowed_questions' => $subscription->allowed_questions,
-                'started_at'        => $subscription->started_at?->toDateString(),
-                'expired_at'        => $subscription->expired_at?->toDateString(),
-                'status'            => $subscription->status?->value,
-                'allow_teachers'    => $subscription->allow_teachers,
+                'started_at' => $subscription->started_at?->toDateString(),
+                'expired_at' => $subscription->expired_at?->toDateString(),
+                'status' => $subscription->status?->value,
+                'allow_teachers' => $subscription->allow_teachers,
                 'allow_online_mcq_tests' => $subscription->allow_online_mcq_tests,
                 'allow_subjective_answers' => $subscription->allow_subjective_answers,
-                'max_teachers'      => $subscription->max_teachers,
+                'max_teachers' => $subscription->max_teachers,
                 'is_question_based' => $subscription->is_question_based,
-                'access_scope'      => SubscriptionAccess::resolveScope($subscription, $resources),
+                'access_scope' => SubscriptionAccess::resolveScope($subscription, $resources),
             ],
-            'patterns'        => $resources['patterns'],
-            'classes'         => $resources['classes'],
-            'subjects'        => $resources['subjects'],
+            'patterns' => $resources['patterns'],
+            'classes' => $resources['classes'],
+            'subjects' => $resources['subjects'],
             'patternClassMap' => $resources['patternClassMap'],
             'classSubjectMap' => $resources['classSubjectMap'],
         ]);
@@ -290,26 +296,26 @@ class CustomerSubscriptionController extends Controller
         $resources = $this->accessResources();
 
         $validated = $request->validate([
-            'name'               => ['required', 'string', 'max:255'],
-            'amount'             => ['required', 'numeric', 'min:0'],
-            'is_question_based'  => ['boolean'],
-            'allowed_questions'  => [
+            'name' => ['required', 'string', 'max:255'],
+            'amount' => ['required', 'numeric', 'min:0'],
+            'is_question_based' => ['boolean'],
+            'allowed_questions' => [
                 Rule::requiredIf(fn () => $request->boolean('is_question_based')),
                 'nullable', 'integer', 'min:0',
             ],
-            'started_at'         => ['required', 'date'],
-            'duration'           => ['nullable', 'integer', 'min:1'],
-            'expired_at'         => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
-            'status'             => ['required', 'in:active,expired,cancelled'],
-            'access_scope'       => ['nullable', 'array'],
-            'allow_teachers'     => ['boolean'],
+            'started_at' => ['required', 'date'],
+            'duration' => ['nullable', 'integer', 'min:1'],
+            'expired_at' => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
+            'status' => ['required', 'in:active,expired,cancelled'],
+            'access_scope' => ['nullable', 'array'],
+            'allow_teachers' => ['boolean'],
             'allow_online_mcq_tests' => ['boolean'],
             'allow_subjective_answers' => ['boolean'],
-            'max_teachers'       => ['nullable', 'integer', 'min:1'],
+            'max_teachers' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
-        $duration  = filled($validated['duration'] ?? null)
+        $duration = filled($validated['duration'] ?? null)
             ? max(1, (int) $validated['duration'])
             : max(1, $startedAt->diffInDays(Carbon::parse($validated['expired_at'])->startOfDay()));
         $expiredAt = filled($validated['expired_at'] ?? null)
@@ -321,35 +327,35 @@ class CustomerSubscriptionController extends Controller
         $oldSummaryIds = SubscriptionAccess::summaryIds($oldAccessScope, $resources);
 
         $oldValues = [
-            'name'           => $subscription->name,
-            'amount'         => (string) $subscription->amount,
-            'status'         => $subscription->status?->value,
+            'name' => $subscription->name,
+            'amount' => (string) $subscription->amount,
+            'status' => $subscription->status?->value,
             'pattern_access' => $oldSummaryIds['pattern_access'],
-            'class_access'   => $oldSummaryIds['class_access'],
+            'class_access' => $oldSummaryIds['class_access'],
             'subject_access' => $oldSummaryIds['subject_access'],
-            'access_scope'   => $oldAccessScope,
+            'access_scope' => $oldAccessScope,
             'allow_subjective_answers' => (bool) $subscription->allow_subjective_answers,
         ];
 
         DB::transaction(function () use ($validated, $startedAt, $expiredAt, $duration, $subscription, $oldValues, $accessScope, $summaryIds) {
             $isQuestionBased = $validated['is_question_based'] ?? false;
             $subscription->update([
-                'name'               => $validated['name'],
-                'pattern_access'     => $summaryIds['pattern_access'],
-                'class_access'       => $summaryIds['class_access'],
-                'subject_access'     => $summaryIds['subject_access'],
-                'access_scope'       => $accessScope,
-                'allow_teachers'     => $validated['allow_teachers'] ?? false,
+                'name' => $validated['name'],
+                'pattern_access' => $summaryIds['pattern_access'],
+                'class_access' => $summaryIds['class_access'],
+                'subject_access' => $summaryIds['subject_access'],
+                'access_scope' => $accessScope,
+                'allow_teachers' => $validated['allow_teachers'] ?? false,
                 'allow_online_mcq_tests' => $validated['allow_online_mcq_tests'] ?? false,
                 'allow_subjective_answers' => $validated['allow_subjective_answers'] ?? false,
-                'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
-                'is_question_based'  => $isQuestionBased,
-                'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
-                'amount'             => $validated['amount'],
-                'started_at'         => $startedAt,
-                'duration'           => $duration,
-                'expired_at'         => $expiredAt,
-                'status'             => $validated['status'],
+                'max_teachers' => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
+                'is_question_based' => $isQuestionBased,
+                'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
+                'amount' => $validated['amount'],
+                'started_at' => $startedAt,
+                'duration' => $duration,
+                'expired_at' => $expiredAt,
+                'status' => $validated['status'],
             ]);
 
             AuditLog::record(
@@ -357,13 +363,13 @@ class CustomerSubscriptionController extends Controller
                 event: AuditEvent::Updated,
                 oldValues: $oldValues,
                 newValues: [
-                    'name'           => $subscription->name,
-                    'amount'         => (string) $subscription->amount,
-                    'status'         => $subscription->status->value,
+                    'name' => $subscription->name,
+                    'amount' => (string) $subscription->amount,
+                    'status' => $subscription->status->value,
                     'pattern_access' => $subscription->pattern_access,
-                    'class_access'   => $subscription->class_access,
+                    'class_access' => $subscription->class_access,
                     'subject_access' => $subscription->subject_access,
-                    'access_scope'   => $subscription->access_scope,
+                    'access_scope' => $subscription->access_scope,
                     'allow_subjective_answers' => (bool) $subscription->allow_subjective_answers,
                 ],
                 actor: auth()->user(),
@@ -387,10 +393,10 @@ class CustomerSubscriptionController extends Controller
         $resources = $this->accessResources();
 
         return Inertia::render('superadmin/customers/subscriptions/add', [
-            'customer'        => $customer->only(['id', 'name', 'email', 'school_name']),
-            'patterns'        => $resources['patterns'],
-            'classes'         => $resources['classes'],
-            'subjects'        => $resources['subjects'],
+            'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
+            'patterns' => $resources['patterns'],
+            'classes' => $resources['classes'],
+            'subjects' => $resources['subjects'],
             'patternClassMap' => $resources['patternClassMap'],
             'classSubjectMap' => $resources['classSubjectMap'],
         ]);
@@ -407,49 +413,48 @@ class CustomerSubscriptionController extends Controller
         $resources = $this->accessResources();
 
         $validated = $request->validate([
-            'name'               => ['required', 'string', 'max:255'],
-            'amount'             => ['required', 'integer', 'min:0'],
-            'is_question_based'  => ['boolean'],
-            'allowed_questions'  => [
+            'name' => ['required', 'string', 'max:255'],
+            'amount' => ['required', 'integer', 'min:0'],
+            'is_question_based' => ['boolean'],
+            'allowed_questions' => [
                 Rule::requiredIf(fn () => $request->boolean('is_question_based')),
                 'nullable', 'integer', 'min:0',
             ],
-            'started_at'         => ['required', 'date'],
-            'duration'           => ['nullable', 'integer', 'min:1'],
-            'expired_at'         => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
-            'status'             => ['required', 'in:active,expired,cancelled'],
-            'access_scope'       => ['nullable', 'array'],
-            'allow_teachers'     => ['boolean'],
+            'started_at' => ['required', 'date'],
+            'duration' => ['nullable', 'integer', 'min:1'],
+            'expired_at' => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
+            'status' => ['required', 'in:active,expired,cancelled'],
+            'access_scope' => ['nullable', 'array'],
+            'allow_teachers' => ['boolean'],
             'allow_online_mcq_tests' => ['boolean'],
             'allow_subjective_answers' => ['boolean'],
-            'max_teachers'       => ['nullable', 'integer', 'min:1'],
+            'max_teachers' => ['nullable', 'integer', 'min:1'],
             // Payment (optional)
-            'has_payment'        => ['boolean'],
-            'payment_paid'       => [
+            'has_payment' => ['boolean'],
+            'payment_paid' => [
                 Rule::requiredIf(fn () => $request->boolean('has_payment')),
                 'nullable', 'integer', 'min:1',
             ],
-            'commission_amount'  => ['nullable', 'integer', 'min:0'],
-            'payment_method'     => [
+            'commission_amount' => ['nullable', 'integer', 'min:0'],
+            'payment_method' => [
                 Rule::requiredIf(fn () => $request->boolean('has_payment')),
                 'nullable', 'in:cash,bank_transfer,online,cheque',
             ],
-            'next_payment_date'  => [
-                Rule::requiredIf(fn () =>
-                    $request->boolean('has_payment') &&
+            'next_payment_date' => [
+                Rule::requiredIf(fn () => $request->boolean('has_payment') &&
                     (int) $request->input('payment_paid', 0) < (int) $request->input('amount', 0)
                 ),
                 'nullable', 'date',
             ],
-            'receipt'            => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
-            'payment_notes'      => ['nullable', 'string', 'max:1000'],
+            'receipt' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
+            'payment_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $startedAt  = Carbon::parse($validated['started_at'])->startOfDay();
-        $duration   = filled($validated['duration'] ?? null)
+        $startedAt = Carbon::parse($validated['started_at'])->startOfDay();
+        $duration = filled($validated['duration'] ?? null)
             ? max(1, (int) $validated['duration'])
             : max(1, $startedAt->diffInDays(Carbon::parse($validated['expired_at'])->startOfDay()));
-        $expiredAt  = filled($validated['expired_at'] ?? null)
+        $expiredAt = filled($validated['expired_at'] ?? null)
             ? Carbon::parse($validated['expired_at'])->startOfDay()
             : $startedAt->copy()->addDays($duration);
         $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
@@ -461,40 +466,40 @@ class CustomerSubscriptionController extends Controller
             $attachments[] = $request->file('receipt')->store('payment-receipts', 'public');
         }
 
-        DB::transaction(function () use ($validated, $startedAt, $expiredAt, $duration, $customer, $accessScope, $summaryIds, $attachments, $request, &$createdSubscription) {
+        DB::transaction(function () use ($validated, $startedAt, $expiredAt, $duration, $customer, $accessScope, $summaryIds, $attachments, &$createdSubscription) {
             $isQuestionBased = $validated['is_question_based'] ?? false;
             $createdSubscription = Subscription::create([
-                'user_id'            => $customer->id,
-                'name'               => $validated['name'],
-                'pattern_access'     => $summaryIds['pattern_access'],
-                'class_access'       => $summaryIds['class_access'],
-                'subject_access'     => $summaryIds['subject_access'],
-                'access_scope'       => $accessScope,
-                'allow_teachers'     => $validated['allow_teachers'] ?? false,
+                'user_id' => $customer->id,
+                'name' => $validated['name'],
+                'pattern_access' => $summaryIds['pattern_access'],
+                'class_access' => $summaryIds['class_access'],
+                'subject_access' => $summaryIds['subject_access'],
+                'access_scope' => $accessScope,
+                'allow_teachers' => $validated['allow_teachers'] ?? false,
                 'allow_online_mcq_tests' => $validated['allow_online_mcq_tests'] ?? false,
                 'allow_subjective_answers' => $validated['allow_subjective_answers'] ?? false,
-                'max_teachers'       => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
-                'is_question_based'  => $isQuestionBased,
-                'allowed_questions'  => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
-                'amount'             => $validated['amount'],
-                'started_at'         => $startedAt,
-                'duration'           => $duration,
-                'expired_at'         => $expiredAt,
-                'status'             => $validated['status'],
-                'created_by'         => auth()->id(),
+                'max_teachers' => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
+                'is_question_based' => $isQuestionBased,
+                'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
+                'amount' => $validated['amount'],
+                'started_at' => $startedAt,
+                'duration' => $duration,
+                'expired_at' => $expiredAt,
+                'status' => $validated['status'],
+                'created_by' => auth()->id(),
             ]);
 
             AuditLog::record(
                 model: $createdSubscription,
                 event: AuditEvent::Created,
                 newValues: [
-                    'name'           => $createdSubscription->name,
-                    'amount'         => $createdSubscription->amount,
-                    'status'         => $createdSubscription->status->value,
+                    'name' => $createdSubscription->name,
+                    'amount' => $createdSubscription->amount,
+                    'status' => $createdSubscription->status->value,
                     'pattern_access' => $createdSubscription->pattern_access,
-                    'class_access'   => $createdSubscription->class_access,
+                    'class_access' => $createdSubscription->class_access,
                     'subject_access' => $createdSubscription->subject_access,
-                    'access_scope'   => $createdSubscription->access_scope,
+                    'access_scope' => $createdSubscription->access_scope,
                     'allow_subjective_answers' => (bool) $createdSubscription->allow_subjective_answers,
                 ],
                 actor: auth()->user(),
@@ -505,8 +510,8 @@ class CustomerSubscriptionController extends Controller
                 model: $customer,
                 event: AuditEvent::Updated,
                 newValues: [
-                    'subscription_id'     => $createdSubscription->id,
-                    'subscription_name'   => $createdSubscription->name,
+                    'subscription_id' => $createdSubscription->id,
+                    'subscription_name' => $createdSubscription->name,
                     'subscription_amount' => (string) $createdSubscription->amount,
                     'subscription_status' => $createdSubscription->status->value,
                 ],
@@ -516,24 +521,24 @@ class CustomerSubscriptionController extends Controller
 
             if ($validated['has_payment'] ?? false) {
                 $paymentLog = PaymentLog::create([
-                    'subscription_id'   => $createdSubscription->id,
-                    'amount'            => $validated['payment_paid'],
+                    'subscription_id' => $createdSubscription->id,
+                    'amount' => $validated['payment_paid'],
                     'commission_amount' => $validated['commission_amount'] ?: null,
-                    'payment_method'    => $validated['payment_method'],
+                    'payment_method' => $validated['payment_method'],
                     'next_payment_date' => $validated['next_payment_date'] ?: null,
-                    'status'            => PaymentStatus::PendingReview->value,
-                    'attachments'       => $attachments ?: null,
-                    'notes'             => $validated['payment_notes'] ?: null,
-                    'created_by'        => auth()->id(),
+                    'status' => PaymentStatus::PendingReview->value,
+                    'attachments' => $attachments ?: null,
+                    'notes' => $validated['payment_notes'] ?: null,
+                    'created_by' => auth()->id(),
                 ]);
 
                 AuditLog::record(
                     model: $paymentLog,
                     event: AuditEvent::Created,
                     newValues: [
-                        'amount'         => $paymentLog->amount,
+                        'amount' => $paymentLog->amount,
                         'payment_method' => $paymentLog->payment_method->value,
-                        'status'         => $paymentLog->status->value,
+                        'status' => $paymentLog->status->value,
                     ],
                     actor: auth()->user(),
                     notes: 'Initial payment logged with subscription.',
@@ -549,11 +554,11 @@ class CustomerSubscriptionController extends Controller
     private function validatePaymentPayload(Request $request, bool $requireReceipt = true): array
     {
         return $request->validate([
-            'amount'         => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'integer', 'min:1'],
             'payment_method' => ['required', 'in:cash,bank_transfer,online,cheque'],
             'account_number' => ['nullable', 'string', 'max:100'],
-            'notes'          => ['nullable', 'string', 'max:1000'],
-            'receipt'        => [
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'receipt' => [
                 'nullable',
                 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120',
             ],
@@ -596,11 +601,11 @@ class CustomerSubscriptionController extends Controller
             ->sum('amount');
 
         return [
-            'subscription_amount'       => number_format($subscriptionAmount, 2, '.', ''),
-            'received_amount'           => number_format($receivedAmount, 2, '.', ''),
-            'under_review_amount'       => number_format($underReviewAmount, 2, '.', ''),
-            'pending_amount'            => number_format(max($subscriptionAmount - $receivedAmount, 0), 2, '.', ''),
-            'remaining_trackable_amount'=> number_format(max($subscriptionAmount - $trackedAmount, 0), 2, '.', ''),
+            'subscription_amount' => number_format($subscriptionAmount, 2, '.', ''),
+            'received_amount' => number_format($receivedAmount, 2, '.', ''),
+            'under_review_amount' => number_format($underReviewAmount, 2, '.', ''),
+            'pending_amount' => number_format(max($subscriptionAmount - $receivedAmount, 0), 2, '.', ''),
+            'remaining_trackable_amount' => number_format(max($subscriptionAmount - $trackedAmount, 0), 2, '.', ''),
         ];
     }
 }

@@ -4,6 +4,7 @@ namespace App\Support\LegacyTransfer;
 
 use App\Models\LegacyUserImport;
 use App\Models\Pattern;
+use App\Models\PaymentLog;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Subscription;
@@ -124,6 +125,8 @@ class LegacyUserTransferService
             'access_scope' => $scope,
             'legacy_patterns' => $this->jsonArray($row->pattern_type),
             'legacy_logo' => trim((string) $row->school_logo) !== '',
+            'payment_plan' => trim((string) $row->payment_plan),
+            'next_payment_date' => $this->date($row->due_payment_date)?->toDateString(),
             'attachment_count' => count($this->jsonArray($row->attachments)),
             'warnings' => array_values(array_unique($warnings)),
         ];
@@ -173,15 +176,45 @@ class LegacyUserTransferService
                 'expired_at' => $expiredAt, 'status' => $data['subscription_status'], 'created_by' => $actorId,
             ]);
 
+            $paymentLog = $this->createLegacyPaymentRecord($subscription, $data, $assets, $actorId);
+
             return LegacyUserImport::create([
                 'source_user_id' => $sourceUserId, 'target_user_id' => $user->id,
                 'subscription_id' => $subscription->id, 'source_account_type' => (string) $row->account_type,
                 'source_checksum' => hash('sha256', json_encode((array) $row, JSON_UNESCAPED_UNICODE)),
                 'warnings' => $data['warnings'] ?? null,
-                'source_snapshot' => ['id' => (int) $row->id, 'account_type' => (string) $row->account_type, 'package' => (string) $row->package, 'assets' => $assets],
+                'source_snapshot' => ['id' => (int) $row->id, 'account_type' => (string) $row->account_type, 'package' => (string) $row->package, 'assets' => $assets, 'payment_log_id' => $paymentLog?->id],
                 'transferred_by' => $actorId, 'transferred_at' => now(),
             ]);
         });
+    }
+
+    /** @param array<string, mixed> $data */
+    private function createLegacyPaymentRecord(Subscription $subscription, array $data, array $assets, int $actorId): ?PaymentLog
+    {
+        $paymentPlan = trim((string) ($data['payment_plan'] ?? ''));
+        $attachments = collect($assets['attachments'] ?? [])->pluck('path')->filter()->values()->all();
+        if ($paymentPlan === '' && $attachments === []) {
+            return null;
+        }
+
+        $notes = "Imported Legacy TestMaker Payment Record\n\n";
+        $notes .= $paymentPlan !== '' ? $paymentPlan : 'No payment-plan text was recorded.';
+        $notes .= "\n\nThe legacy system did not store a structured payment amount or method for this record.";
+
+        return PaymentLog::create([
+            'subscription_id' => $subscription->id,
+            'amount' => 0,
+            'payment_method' => 'cash',
+            'account_number' => 'legacy-testmaker',
+            'next_payment_date' => ($data['next_payment_date'] ?? null) ?: null,
+            'status' => 'approved',
+            'attachments' => $attachments ?: null,
+            'reviewed_by' => $actorId,
+            'reviewed_at' => now(),
+            'notes' => $notes,
+            'created_by' => $actorId,
+        ]);
     }
 
     /** @return array<string, mixed> */

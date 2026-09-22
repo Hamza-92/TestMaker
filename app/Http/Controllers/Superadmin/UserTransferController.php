@@ -46,6 +46,8 @@ class UserTransferController extends Controller
             'expired_at' => ['required', 'date', 'after:started_at'],
             'subscription_status' => ['required', 'in:active,expired,cancelled'],
             'amount' => ['required', 'numeric', 'min:0'],
+            'payment_plan' => ['nullable', 'string', 'max:20000'],
+            'next_payment_date' => ['nullable', 'date'],
             'is_question_based' => ['boolean'],
             'allowed_questions' => ['nullable', 'integer', 'min:0'],
             'remaining_questions' => ['nullable', 'integer', 'min:0', 'lte:allowed_questions'],

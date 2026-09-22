@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AuditEvent;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use Illuminate\Database\Eloquent\Model;
@@ -29,11 +30,12 @@ class PaymentLog extends Model
     protected function casts(): array
     {
         return [
-            'amount'         => 'decimal:2',
+            'amount' => 'decimal:2',
             'payment_method' => PaymentMethod::class,
-            'status'         => PaymentStatus::class,
-            'attachments'    => 'array',
-            'reviewed_at'    => 'datetime',
+            'status' => PaymentStatus::class,
+            'attachments' => 'array',
+            'reviewed_at' => 'datetime',
+            'next_payment_date' => 'date',
         ];
     }
 
@@ -78,8 +80,7 @@ class PaymentLog extends Model
         ?string $notes = null,
         ?User $actor = null,
         ?string $rejectionReason = null,
-    ): static
-    {
+    ): static {
         $oldStatus = $this->status;
         $oldRejectionReason = $this->rejection_reason;
 
@@ -98,8 +99,8 @@ class PaymentLog extends Model
         $this->save();
 
         AuditLog::record(
-            model:     $this,
-            event:     \App\Enums\AuditEvent::Updated,
+            model: $this,
+            event: AuditEvent::Updated,
             oldValues: [
                 'status' => $oldStatus?->value,
                 'rejection_reason' => $oldRejectionReason,
@@ -108,8 +109,8 @@ class PaymentLog extends Model
                 'status' => $newStatus->value,
                 'rejection_reason' => $this->rejection_reason,
             ],
-            actor:     $actor,
-            notes:     $notes,
+            actor: $actor,
+            notes: $notes,
         );
 
         return $this;

@@ -70,6 +70,9 @@ interface Detail {
     expired_at: string;
     subscription_status: 'active' | 'expired' | 'cancelled';
     amount: string;
+    payment_plan: string;
+    next_payment_date: string | null;
+    attachment_count: number;
     is_question_based: boolean;
     allowed_questions: number;
     remaining_questions: number;
@@ -757,6 +760,48 @@ export default function UserTransfer({
                                             <Label>Subjective answers</Label>
                                         </div>
                                     </div>
+                                </div>
+                            </section>
+                            <section className="space-y-3">
+                                <div>
+                                    <h3 className="font-medium">
+                                        Legacy payment record
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground">
+                                        This text and{' '}
+                                        {detail.attachment_count.toLocaleString()}{' '}
+                                        attachment(s) will be copied to the
+                                        subscription payment history.
+                                    </p>
+                                </div>
+                                <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+                                    <Field label="Payment plan / notes">
+                                        <textarea
+                                            className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                            value={detail.payment_plan}
+                                            onChange={(event) =>
+                                                update(
+                                                    'payment_plan',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="No legacy payment plan recorded"
+                                        />
+                                    </Field>
+                                    <Field label="Next payment date">
+                                        <Input
+                                            type="date"
+                                            value={
+                                                detail.next_payment_date ?? ''
+                                            }
+                                            onChange={(event) =>
+                                                update(
+                                                    'next_payment_date',
+                                                    event.target.value || null,
+                                                )
+                                            }
+                                        />
+                                    </Field>
                                 </div>
                             </section>
                             <section className="space-y-3">
