@@ -101,6 +101,8 @@ class LegacyUserTransferService
             $warnings[] = 'Email already exists in Laravel and must be changed.';
         }
 
+        $legacyAttachments = $this->legacyAttachments($row);
+
         return [
             'source_id' => (int) $row->id,
             'name' => trim((string) $row->name),
@@ -127,7 +129,8 @@ class LegacyUserTransferService
             'legacy_logo' => trim((string) $row->school_logo) !== '',
             'payment_plan' => trim((string) $row->payment_plan),
             'next_payment_date' => $this->date($row->due_payment_date)?->toDateString(),
-            'attachment_count' => count($this->jsonArray($row->attachments)),
+            'attachment_count' => count($legacyAttachments),
+            'legacy_attachments' => $legacyAttachments,
             'warnings' => array_values(array_unique($warnings)),
         ];
     }
@@ -348,6 +351,25 @@ class LegacyUserTransferService
         return is_array($decoded) ? array_values($decoded) : [];
     }
 
+    /** @return array<int, array{file_name: string, original_name: string, uploaded_at: string}> */
+    private function legacyAttachments(object $row): array
+    {
+        return collect($this->jsonArray($row->attachments))
+            ->filter(fn (mixed $attachment) => is_array($attachment))
+            ->map(function (array $attachment): array {
+                $fileName = basename((string) ($attachment['file_name'] ?? ''));
+
+                return [
+                    'file_name' => $fileName,
+                    'original_name' => trim((string) ($attachment['original_name'] ?? '')) ?: $fileName,
+                    'uploaded_at' => (string) ($attachment['uploaded_at'] ?? ''),
+                ];
+            })
+            ->filter(fn (array $attachment) => $attachment['file_name'] !== '')
+            ->values()
+            ->all();
+    }
+
     /** @return array{logo: ?string, attachments: array<int, array<string, string>>} */
     private function migrateAssets(object $row): array
     {
@@ -365,27 +387,35 @@ class LegacyUserTransferService
         }
 
         $attachments = [];
-        foreach ($this->jsonArray($row->attachments) as $attachment) {
-            if (! is_array($attachment)) {
-                continue;
-            }
-            $name = basename((string) ($attachment['file_name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
+        $missingAttachments = [];
+        foreach ($this->legacyAttachments($row) as $attachment) {
+            $name = $attachment['file_name'];
             $contents = $this->readLegacyAsset('uploads/admin_attachments/'.$name);
             if ($contents === null) {
+                $missingAttachments[] = $attachment['original_name'];
+
                 continue;
             }
+
             $target = 'legacy-user-attachments/'.$row->id.'/'.substr(hash('sha256', $contents), 0, 12).'-'.$name;
-            if (! Storage::disk('public')->exists($target)) {
-                Storage::disk('public')->put($target, $contents);
+            if (! Storage::disk('public')->exists($target) && ! Storage::disk('public')->put($target, $contents)) {
+                $missingAttachments[] = $attachment['original_name'];
+
+                continue;
             }
+
             $attachments[] = [
                 'path' => $target,
-                'original_name' => (string) ($attachment['original_name'] ?? $name),
-                'uploaded_at' => (string) ($attachment['uploaded_at'] ?? ''),
+                'original_name' => $attachment['original_name'],
+                'uploaded_at' => $attachment['uploaded_at'],
             ];
+        }
+
+        if ($missingAttachments !== []) {
+            throw new RuntimeException(
+                'The account was not transferred because these legacy attachments could not be copied: '
+                .implode(', ', $missingAttachments).'.'
+            );
         }
 
         return ['logo' => $logo, 'attachments' => $attachments];

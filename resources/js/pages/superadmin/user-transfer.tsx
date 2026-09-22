@@ -4,6 +4,7 @@ import {
     ArrowRightIcon,
     CheckCircle2Icon,
     LoaderCircleIcon,
+    PaperclipIcon,
     SearchIcon,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -73,6 +74,11 @@ interface Detail {
     payment_plan: string;
     next_payment_date: string | null;
     attachment_count: number;
+    legacy_attachments: Array<{
+        file_name: string;
+        original_name: string;
+        uploaded_at: string;
+    }>;
     is_question_based: boolean;
     allowed_questions: number;
     remaining_questions: number;
@@ -773,6 +779,34 @@ export default function UserTransfer({
                                         attachment(s) will be copied to the
                                         subscription payment history.
                                     </p>
+                                    {detail.legacy_attachments.length > 0 && (
+                                        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                                            {detail.legacy_attachments.map(
+                                                (attachment, index) => (
+                                                    <div
+                                                        key={
+                                                            attachment.file_name +
+                                                            '-' +
+                                                            index
+                                                        }
+                                                        className="flex min-w-0 items-center gap-2 rounded-md border bg-muted/20 px-2.5 py-2 text-xs"
+                                                    >
+                                                        <PaperclipIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                                                        <span
+                                                            className="truncate"
+                                                            title={
+                                                                attachment.original_name
+                                                            }
+                                                        >
+                                                            {
+                                                                attachment.original_name
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="grid gap-3 md:grid-cols-[1fr_220px]">
                                     <Field label="Payment plan / notes">
