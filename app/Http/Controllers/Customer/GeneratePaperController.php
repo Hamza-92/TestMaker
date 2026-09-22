@@ -98,6 +98,25 @@ class GeneratePaperController extends Controller
             ))
             ->values();
 
+        // A choice is useful only when its pattern, class, and subject scope
+        // contains at least one usable question. Keep all three selectors in sync.
+        $subjectScopes = $classSubjects
+            ->map(fn ($row) => $row->pattern_id.':'.$row->class_id)
+            ->flip();
+        $patternClasses = $patternClasses
+            ->filter(fn ($row) => $subjectScopes->has($row->pattern_id.':'.$row->id))
+            ->values();
+        $classScopes = $patternClasses
+            ->map(fn ($row) => $row->pattern_id.':'.$row->id)
+            ->flip();
+        $classSubjects = $classSubjects
+            ->filter(fn ($row) => $classScopes->has($row->pattern_id.':'.$row->class_id))
+            ->values();
+        $availablePatternIds = $patternClasses->pluck('pattern_id')->flip();
+        $patterns = $patterns
+            ->filter(fn (array $pattern) => $availablePatternIds->has($pattern['id']))
+            ->values();
+
         return [
             'patterns' => $patterns,
             'patternClasses' => $patternClasses,

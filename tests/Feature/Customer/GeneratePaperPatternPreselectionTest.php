@@ -219,6 +219,37 @@ test('an available dashboard pattern can be preselected on the paper generator',
         'class_id' => $class->id,
         'paper_layout' => PaperLayoutRegistry::FEDERAL_BOARD,
     ]);
+    $subject = Subject::create([
+        'name_eng' => 'English',
+        'subject_type' => 'chapter-wise',
+        'status' => 1,
+    ]);
+    ClassSubject::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+    ]);
+    $chapter = Chapter::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+        'name' => 'First chapter',
+        'chapter_number' => 1,
+        'status' => 1,
+    ]);
+    $type = QuestionType::create([
+        'name' => 'Short Questions',
+        'heading_en' => 'Short Questions',
+        'schema_key' => 'subjective_standard',
+        'status' => 1,
+    ]);
+    Question::create([
+        'question_type_id' => $type->id,
+        'chapter_id' => $chapter->id,
+        'statement_en' => 'A usable question',
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => 1,
+    ]);
 
     TrialSetting::current()->update(['access_scope' => null]);
 
@@ -234,6 +265,84 @@ test('an available dashboard pattern can be preselected on the paper generator',
 
     expect(substr_count($response->headers->get('Link', ''), '<'))
         ->toBeLessThanOrEqual(20);
+});
+
+test('paper generator lists only patterns, classes, and subjects with usable questions', function () {
+    $customer = User::factory()->create([
+        'user_type' => UserType::Customer->value,
+        'status' => UserStatus::Active->value,
+        'account_type' => AccountType::Trial->value,
+    ]);
+    TrialSetting::current()->update(['access_scope' => null]);
+
+    $populatedPattern = Pattern::create(['name' => 'Populated Pattern', 'status' => 1]);
+    $emptyPattern = Pattern::create(['name' => 'Empty Pattern', 'status' => 1]);
+    $populatedClass = SchoolClass::create(['name' => 'Populated Class', 'status' => 1]);
+    $emptyClass = SchoolClass::create(['name' => 'Empty Class', 'status' => 1]);
+    $populatedSubject = Subject::create([
+        'name_eng' => 'Populated Subject',
+        'subject_type' => 'chapter-wise',
+        'status' => 1,
+    ]);
+    $emptySubject = Subject::create([
+        'name_eng' => 'Empty Subject',
+        'subject_type' => 'chapter-wise',
+        'status' => 1,
+    ]);
+
+    DB::table('pattern_classes')->insert([
+        ['pattern_id' => $populatedPattern->id, 'class_id' => $populatedClass->id],
+        ['pattern_id' => $populatedPattern->id, 'class_id' => $emptyClass->id],
+        ['pattern_id' => $emptyPattern->id, 'class_id' => $emptyClass->id],
+    ]);
+    foreach ([
+        [$populatedPattern->id, $populatedClass->id, $populatedSubject->id],
+        [$populatedPattern->id, $populatedClass->id, $emptySubject->id],
+        [$populatedPattern->id, $emptyClass->id, $emptySubject->id],
+        [$emptyPattern->id, $emptyClass->id, $emptySubject->id],
+    ] as [$patternId, $classId, $subjectId]) {
+        ClassSubject::create([
+            'pattern_id' => $patternId,
+            'class_id' => $classId,
+            'subject_id' => $subjectId,
+        ]);
+    }
+
+    $chapter = Chapter::create([
+        'pattern_id' => $populatedPattern->id,
+        'class_id' => $populatedClass->id,
+        'subject_id' => $populatedSubject->id,
+        'name' => 'Usable chapter',
+        'chapter_number' => 1,
+        'status' => 1,
+    ]);
+    $type = QuestionType::create([
+        'name' => 'Usable question type',
+        'heading_en' => 'Usable question type',
+        'schema_key' => 'subjective_standard',
+        'status' => 1,
+    ]);
+    Question::create([
+        'question_type_id' => $type->id,
+        'chapter_id' => $chapter->id,
+        'statement_en' => 'Usable question',
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => 1,
+    ]);
+
+    $this->actingAs($customer)
+        ->get(route('customer.papers.generate', ['pattern' => $emptyPattern->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('customer/papers/generate')
+            ->where('initialPatternId', null)
+            ->has('patterns', 1)
+            ->where('patterns.0.id', $populatedPattern->id)
+            ->has('patternClasses', 1)
+            ->where('patternClasses.0.id', $populatedClass->id)
+            ->has('classSubjects', 1)
+            ->where('classSubjects.0.subject_id', $populatedSubject->id)
+        );
 });
 
 test('paper generator returns question types in the saved pattern class subject order', function () {
