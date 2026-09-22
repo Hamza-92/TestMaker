@@ -28,6 +28,7 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            'status' => \App\Enums\UserStatus::Active,
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'two_factor_secret' => null,

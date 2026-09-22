@@ -391,7 +391,7 @@ class CustomerController extends Controller
         Auth::login($admin);
         $request->session()->regenerate();
 
-        return redirect()->route('superadmin.customers');
+        return redirect()->route($admin->can('customers.view') ? 'superadmin.customers' : 'dashboard');
     }
 
     private function transformCustomerLog(User $customer, AuditLog $log): array

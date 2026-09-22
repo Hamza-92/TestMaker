@@ -33,10 +33,7 @@ use App\Http\Controllers\Superadmin\TopicController;
 use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
 use App\Http\Controllers\Superadmin\UserTransferController;
-use App\Models\Permission;
-use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -153,17 +150,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('superadmin.customers.edit')->middleware('permission:customers.edit');
         Route::put('superadmin/customers/{customer}', [CustomerController::class, 'update'])->name('superadmin.customers.update')->middleware('permission:customers.edit');
         Route::post('superadmin/customers/{customer}/reset-password', [CustomerController::class, 'resetPassword'])->name('superadmin.customers.reset-password')->middleware('permission:customers.edit');
-        Route::post('superadmin/customers/{customer}/login', [CustomerController::class, 'loginAsCustomer'])->name('superadmin.customers.login')->middleware('permission:customers.edit');
+        Route::post('superadmin/customers/{customer}/login', [CustomerController::class, 'loginAsCustomer'])->name('superadmin.customers.login')->middleware('permission:customers.impersonate');
         Route::get('superadmin/customers/{customer}/logs/{log}', [CustomerController::class, 'showLog'])->name('superadmin.customers.logs.show')->middleware('permission:customers.view');
         Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view');
 
         // Data Transfer
-        Route::get('superadmin/data-transfer', [DataTransferController::class, 'index'])->name('superadmin.data-transfer')->middleware('permission:subjects.create');
-        Route::get('superadmin/data-transfer/catalog', [DataTransferController::class, 'catalog'])->name('superadmin.data-transfer.catalog')->middleware('permission:subjects.create');
-        Route::post('superadmin/data-transfer', [DataTransferController::class, 'store'])->name('superadmin.data-transfer.store')->middleware('permission:subjects.create');
-        Route::get('superadmin/user-transfer', [UserTransferController::class, 'index'])->name('superadmin.user-transfer')->middleware('permission:customers.view');
-        Route::get('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'show'])->name('superadmin.user-transfer.show')->middleware('permission:customers.view');
-        Route::post('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'store'])->name('superadmin.user-transfer.store')->middleware('permission:customers.create');
+        Route::get('superadmin/data-transfer', [DataTransferController::class, 'index'])->name('superadmin.data-transfer')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/data-transfer/catalog', [DataTransferController::class, 'catalog'])->name('superadmin.data-transfer.catalog')->middleware('permission:data_transfer.manage');
+        Route::post('superadmin/data-transfer', [DataTransferController::class, 'store'])->name('superadmin.data-transfer.store')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/user-transfer', [UserTransferController::class, 'index'])->name('superadmin.user-transfer')->middleware('permission:user_transfer.manage');
+        Route::get('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'show'])->name('superadmin.user-transfer.show')->middleware('permission:user_transfer.manage');
+        Route::post('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'store'])->name('superadmin.user-transfer.store')->middleware('permission:user_transfer.manage');
 
         // â”€â”€â”€ Subscriptions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/customers/{customer}/subscriptions/add', [CustomerSubscriptionController::class, 'create'])->name('superadmin.customers.subscriptions.add')->middleware('permission:subscriptions.create');
@@ -335,99 +332,64 @@ Route::middleware(['auth', 'verified'])->group(function () {
     }); // end superadmin group
 });
 
-// this route will be just kept until the app is fully developed and live, after it, this route will be deleted
-Route::get('/run-migrate', function () {
-    Artisan::call('migrate');
+// Hosting maintenance helpers are restricted to the master account.
+Route::middleware(['auth', 'verified', 'master.superadmin'])->group(function () {
+    Route::get('/run-migrate', function () {
+        Artisan::call('migrate');
 
-    return Artisan::output();
-});
+        return Artisan::output();
+    });
 
-Route::get('/run-optimize-clear', function () {
-    Artisan::call('optimize:clear');
+    Route::get('/run-optimize-clear', function () {
+        Artisan::call('optimize:clear');
 
-    return Artisan::output();
-});
+        return Artisan::output();
+    });
 
-Route::get('/run-optimize', function () {
-    Artisan::call('optimize');
+    Route::get('/run-optimize', function () {
+        Artisan::call('optimize');
 
-    return Artisan::output();
-});
+        return Artisan::output();
+    });
 
-Route::get('/run-seed', function () {
-    // Only seeds safe, idempotent seeders â€” never recreates users
-    Artisan::call('db:seed', ['--class' => 'PermissionSeeder', '--force' => true]);
-    $out = trim(Artisan::output()) ?: '(no output)';
+    Route::get('/run-seed', function () {
+        // Only seeds safe, idempotent seeders â€” never recreates users
+        Artisan::call('db:seed', ['--class' => 'PermissionSeeder', '--force' => true]);
+        $out = trim(Artisan::output()) ?: '(no output)';
 
-    Artisan::call('db:seed', ['--class' => 'MediumSeeder', '--force' => true]);
-    $out .= "\n".(trim(Artisan::output()) ?: '(no output)');
+        Artisan::call('db:seed', ['--class' => 'MediumSeeder', '--force' => true]);
+        $out .= "\n".(trim(Artisan::output()) ?: '(no output)');
 
-    return response($out, 200)->header('Content-Type', 'text/plain');
-});
+        return response($out, 200)->header('Content-Type', 'text/plain');
+    });
 
-Route::get('/run-assign-permissions', function () {
-    $allIds = Permission::pluck('id');
+    Route::get('/run-wayfinder', function () {
+        Artisan::call('wayfinder:generate');
 
-    if ($allIds->isEmpty()) {
-        return response('No permissions found â€” run /run-seed first.', 200)
-            ->header('Content-Type', 'text/plain');
-    }
+        return Artisan::output();
+    });
 
-    $users = User::where('user_type', UserType::SuperAdmin)
-        ->whereNotNull('created_by')
-        ->get();
+    Route::get('/run-all', function () {
+        $output = '';
 
-    if ($users->isEmpty()) {
-        return response('No non-master superadmin users found.', 200)
-            ->header('Content-Type', 'text/plain');
-    }
+        // Step 1-5: artisan commands
+        $commands = [
+            ['optimize:clear', []],
+            ['migrate', ['--force' => true]],
+            ['db:seed', ['--class' => 'MediumSeeder', '--force' => true]],
+            ['db:seed', ['--class' => 'PermissionSeeder', '--force' => true]],
+            ['optimize', []],
+        ];
 
-    $output = '';
-    foreach ($users as $user) {
-        $user->permissions()->syncWithoutDetaching($allIds);
-        Cache::forget("user_permissions_{$user->id}");
-        $output .= "âœ“ Assigned all {$allIds->count()} permissions to: {$user->name} ({$user->email})\n";
-    }
+        foreach ($commands as [$command, $args]) {
+            Artisan::call($command, $args);
+            $result = trim(Artisan::output());
+            $label = $command.(isset($args['--class']) ? " ({$args['--class']})" : '');
+            $output .= "â–¶ {$label}\n".($result ?: '(no output)')."\n\n";
+        }
 
-    return response($output, 200)->header('Content-Type', 'text/plain');
-});
-
-Route::get('/run-wayfinder', function () {
-    Artisan::call('wayfinder:generate');
-
-    return Artisan::output();
-});
-
-Route::get('/run-all', function () {
-    $output = '';
-
-    // Step 1-5: artisan commands
-    $commands = [
-        ['optimize:clear', []],
-        ['migrate', ['--force' => true]],
-        ['db:seed', ['--class' => 'MediumSeeder', '--force' => true]],
-        ['db:seed', ['--class' => 'PermissionSeeder', '--force' => true]],
-        ['optimize', []],
-    ];
-
-    foreach ($commands as [$command, $args]) {
-        Artisan::call($command, $args);
-        $result = trim(Artisan::output());
-        $label = $command.(isset($args['--class']) ? " ({$args['--class']})" : '');
-        $output .= "â–¶ {$label}\n".($result ?: '(no output)')."\n\n";
-    }
-
-    // Step 6: assign all permissions to non-master superadmins
-    $allIds = Permission::pluck('id');
-    $users = User::where('user_type', UserType::SuperAdmin)->whereNotNull('created_by')->get();
-
-    foreach ($users as $user) {
-        $user->permissions()->syncWithoutDetaching($allIds);
-        Cache::forget("user_permissions_{$user->id}");
-        $output .= "âœ“ Permissions assigned to: {$user->name} ({$user->email})\n";
-    }
-
-    return response($output, 200)->header('Content-Type', 'text/plain');
+        return response($output, 200)->header('Content-Type', 'text/plain');
+    });
 });
 
 Route::get('take-test/{token}', [PublicOnlineTestController::class, 'show'])->name('online-tests.public.show');

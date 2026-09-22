@@ -27,6 +27,7 @@ class SuperadminUserController extends Controller
                 'status'       => $user->status?->value,
                 'created_at'   => $user->created_at?->toISOString(),
                 'created_by'   => $user->creator?->name,
+                'can_manage'   => auth()->user()->canManageSuperAdmin($user),
             ]);
 
         return Inertia::render('superadmin/users', ['users' => $users]);
@@ -61,8 +62,8 @@ class SuperadminUserController extends Controller
 
     public function edit(User $user)
     {
-        abort_if($user->isMasterSuperAdmin(), 403);
         abort_unless($user->isSuperAdmin(), 404);
+        abort_unless(auth()->user()->canManageSuperAdmin($user), 403);
 
         return Inertia::render('superadmin/users/edit', [
             'user' => $user->only(['id', 'name', 'email', 'status']),
@@ -71,8 +72,8 @@ class SuperadminUserController extends Controller
 
     public function update(Request $request, User $user)
     {
-        abort_if($user->isMasterSuperAdmin(), 403);
         abort_unless($user->isSuperAdmin(), 404);
+        abort_unless($request->user()->canManageSuperAdmin($user), 403);
 
         $validated = $request->validate([
             'name'     => ['required', 'string', 'max:255'],
@@ -97,8 +98,8 @@ class SuperadminUserController extends Controller
 
     public function destroy(User $user)
     {
-        abort_if($user->isMasterSuperAdmin(), 403);
         abort_unless($user->isSuperAdmin(), 404);
+        abort_unless(auth()->user()->canManageSuperAdmin($user), 403);
 
         $user->delete();
 

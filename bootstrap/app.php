@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureAppUser;
 use App\Http\Middleware\EnsureSchoolOwner;
 use App\Http\Middleware\EnsureSchoolSubscriptionFeature;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureMasterSuperAdmin;
 use App\Http\Middleware\EnsureTeacherFeature;
 use App\Http\Middleware\EnsureNonCustomer;
 use App\Http\Middleware\HandleAppearance;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'permission'      => CheckPermission::class,
             'superadmin'      => EnsureSuperAdmin::class,
+            'master.superadmin' => EnsureMasterSuperAdmin::class,
             'app.user'        => EnsureAppUser::class,
             'school.owner'    => EnsureSchoolOwner::class,
             'school.feature'  => EnsureSchoolSubscriptionFeature::class,

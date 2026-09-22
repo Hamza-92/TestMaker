@@ -484,7 +484,7 @@ export default function ShowCustomer({
                                 Reset Password
                             </Button>
                         )}
-                        {can('customers.edit') && (
+                        {can('customers.impersonate') && (
                             <Button type="button" variant="outline" size="sm" onClick={loginAsCustomer} disabled={loginForm.processing}>
                                 <LogInIcon className="size-4" />
                                 Login

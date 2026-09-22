@@ -3,6 +3,7 @@
 namespace App\Concerns;
 
 use App\Models\Permission;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Cache;
 
@@ -34,6 +35,17 @@ trait HasPermissions
         }
 
         return $this->cachedPermissions();
+    }
+
+    public function canManageSuperAdmin(User $target): bool
+    {
+        if (! $this->isSuperAdmin() || ! $target->isSuperAdmin()
+            || $target->isMasterSuperAdmin() || $this->is($target)) {
+            return false;
+        }
+
+        return $this->isMasterSuperAdmin()
+            || array_diff($target->getPermissionNames(), $this->getPermissionNames()) === [];
     }
 
     public function syncPermissions(array $permissionNames): void

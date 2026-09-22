@@ -1,6 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeftIcon, SaveIcon, ShieldCheckIcon } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
@@ -49,13 +49,20 @@ export default function UserPermissions({
     targetUser: TargetUser;
     permissionGroups: PermissionGroup[];
 }) {
-    const initialGranted = permissionGroups.flatMap((g) =>
-        g.permissions.filter((p) => p.granted).map((p) => p.name),
+    const initialGranted = useMemo(
+        () => permissionGroups.flatMap((g) =>
+            g.permissions.filter((p) => p.granted).map((p) => p.name),
+        ),
+        [permissionGroups],
     );
 
-    const { data, setData, put, processing } = useForm<FormData>({
+    const { data, setData, put, processing, errors, recentlySuccessful } = useForm<FormData>({
         permissions: initialGranted,
     });
+
+    useEffect(() => {
+        setData('permissions', initialGranted);
+    }, [targetUser.id, initialGranted, setData]);
 
     // Build ordered column list: standard actions first, then any extras
     const columns = useMemo(() => {
@@ -156,8 +163,7 @@ export default function UserPermissions({
                                                 <td className="px-4 py-4 text-center">
                                                     <div className="flex justify-center">
                                                         <Checkbox
-                                                            checked={state === 'all'}
-                                                            data-state={state === 'some' ? 'indeterminate' : undefined}
+                                                            checked={state === 'some' ? 'indeterminate' : state === 'all'}
                                                             className={cn(state === 'some' && 'opacity-60')}
                                                             onCheckedChange={(v) => toggleGroup(group, Boolean(v))}
                                                             aria-label={`Select all ${group.group} permissions`}
@@ -199,6 +205,17 @@ export default function UserPermissions({
                             </table>
                         </div>
                     </div>
+
+                    {Object.keys(errors).length > 0 && (
+                        <p role="alert" className="text-sm text-destructive">
+                            {Object.values(errors).join(' ')}
+                        </p>
+                    )}
+                    {recentlySuccessful && (
+                        <p role="status" className="text-sm text-emerald-700">
+                            Permissions saved.
+                        </p>
+                    )}
 
                     <div className="flex justify-end gap-3">
                         <Link

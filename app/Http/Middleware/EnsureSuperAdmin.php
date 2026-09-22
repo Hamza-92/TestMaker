@@ -17,6 +17,8 @@ class EnsureSuperAdmin
             return redirect('/dashboard');
         }
 
+        abort_unless($user->isActive(), 403);
+
         return $next($request);
     }
 }

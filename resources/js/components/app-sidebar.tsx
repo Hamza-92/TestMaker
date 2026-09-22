@@ -76,7 +76,7 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        ...(can('subjects.create')
+        ...(can('data_transfer.manage')
             ? [
                   {
                       title: 'Data Transfer',
@@ -85,7 +85,7 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        ...(can('customers.view')
+        ...(can('user_transfer.manage')
             ? [
                   {
                       title: 'User Transfer',

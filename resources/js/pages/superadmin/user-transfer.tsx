@@ -21,6 +21,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { usePermission } from '@/hooks/use-permission';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -144,6 +145,7 @@ export default function UserTransfer({
     patternClassMap,
     classSubjectMap,
 }: Props) {
+    const { can } = usePermission();
     const [accounts, setAccounts] = useState(initialAccounts);
     const [tab, setTab] = useState<Tab>('paid');
     const [filter, setFilter] = useState<Filter>('pending');
@@ -441,7 +443,7 @@ export default function UserTransfer({
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 {account.transferred ? (
-                                                    <Button
+                                                    can('customers.view') ? <Button
                                                         size="sm"
                                                         variant="outline"
                                                         asChild
@@ -451,7 +453,7 @@ export default function UserTransfer({
                                                         >
                                                             View user
                                                         </Link>
-                                                    </Button>
+                                                    </Button> : null
                                                 ) : (
                                                     <Button
                                                         size="sm"

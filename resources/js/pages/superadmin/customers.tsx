@@ -808,7 +808,7 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                                                                 <ActionIconLink href={`/superadmin/customers/${customer.id}/edit`}
                                                                     icon={<PencilIcon className="size-4" />} label="Edit customer" />
                                                             )}
-                                                            {can('customers.edit') && (
+                                                            {can('customers.impersonate') && (
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => loginAsCustomer(customer.id)}

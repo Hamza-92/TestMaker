@@ -15,6 +15,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'customers.create', 'display_name' => 'Create Customers', 'group' => 'Customers'],
             ['name' => 'customers.edit',   'display_name' => 'Edit Customers',   'group' => 'Customers'],
             ['name' => 'customers.delete', 'display_name' => 'Delete Customers', 'group' => 'Customers'],
+            ['name' => 'customers.impersonate', 'display_name' => 'Log In as Customer', 'group' => 'Customers'],
 
             // Subscriptions
             ['name' => 'subscriptions.view',            'display_name' => 'View Subscriptions',    'group' => 'Subscriptions'],
@@ -68,6 +69,9 @@ class PermissionSeeder extends Seeder
             ['name' => 'announcements.create', 'display_name' => 'Create Announcements', 'group' => 'Announcements'],
             ['name' => 'announcements.edit',   'display_name' => 'Edit Announcements',   'group' => 'Announcements'],
             ['name' => 'announcements.delete', 'display_name' => 'Delete Announcements', 'group' => 'Announcements'],
+
+            ['name' => 'data_transfer.manage', 'display_name' => 'Transfer Legacy Data', 'group' => 'Data Transfer'],
+            ['name' => 'user_transfer.manage', 'display_name' => 'Transfer Legacy Users and Subscriptions', 'group' => 'User Transfer'],
         ];
 
         foreach ($permissions as $data) {

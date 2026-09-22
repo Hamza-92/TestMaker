@@ -12,12 +12,14 @@ class UserPermissionController extends Controller
 {
     public function edit(User $user)
     {
-        abort_if($user->isMasterSuperAdmin(), 403);
         abort_unless($user->isSuperAdmin(), 404);
+        abort_unless(auth()->user()->canManageSuperAdmin($user), 403);
 
         $granted = $user->permissions()->pluck('name')->toArray();
 
-        $permissionGroups = Permission::orderBy('group')
+        $permissionGroups = Permission::when(! auth()->user()->isMasterSuperAdmin(),
+            fn ($query) => $query->whereIn('name', auth()->user()->getPermissionNames()))
+            ->orderBy('group')
             ->orderBy('display_name')
             ->get()
             ->groupBy('group')
@@ -40,16 +42,23 @@ class UserPermissionController extends Controller
 
     public function update(Request $request, User $user)
     {
-        abort_if($user->isMasterSuperAdmin(), 403);
         abort_unless($user->isSuperAdmin(), 404);
+        abort_unless($request->user()->canManageSuperAdmin($user), 403);
 
         $validated = $request->validate([
             'permissions'   => ['array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
-        $user->syncPermissions($validated['permissions'] ?? []);
+        $requested = $validated['permissions'] ?? [];
+        abort_unless($request->user()->isMasterSuperAdmin()
+            || array_diff($requested, $request->user()->getPermissionNames()) === [], 403);
 
-        return back()->with('success', 'Permissions updated successfully.');
+        $user->syncPermissions($requested);
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'message' => 'Permissions updated successfully.',
+        ]);
     }
 }

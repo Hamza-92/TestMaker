@@ -42,7 +42,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $permissions = [
-            'customers.view', 'customers.create', 'customers.edit', 'customers.delete',
+            'customers.view', 'customers.create', 'customers.edit', 'customers.delete', 'customers.impersonate',
             'subscriptions.view', 'subscriptions.create', 'subscriptions.edit', 'subscriptions.manage_payments',
             'patterns.view', 'patterns.create', 'patterns.edit', 'patterns.delete',
             'classes.view', 'classes.create', 'classes.edit', 'classes.delete',
@@ -51,6 +51,8 @@ class AppServiceProvider extends ServiceProvider
             'questions.view', 'questions.create', 'questions.edit', 'questions.delete', 'questions.import',
             'users.view', 'users.create', 'users.edit', 'users.delete', 'users.manage_permissions',
             'trial_settings.edit',
+            'announcements.view', 'announcements.create', 'announcements.edit', 'announcements.delete',
+            'data_transfer.manage', 'user_transfer.manage',
         ];
 
         foreach ($permissions as $permission) {

@@ -13,7 +13,7 @@ class CheckPermission
     {
         $user = $request->user();
 
-        if (!$user || !$user->isSuperAdmin()) {
+        if (! $user || ! $user->isSuperAdmin() || ! $user->isActive()) {
             abort(403);
         }
 

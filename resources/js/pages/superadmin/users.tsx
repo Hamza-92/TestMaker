@@ -24,6 +24,7 @@ interface SuperadminUser {
     status: AccountStatus;
     created_at: string;
     created_by: string | null;
+    can_manage: boolean;
 }
 
 const STATUS_CONFIG: Record<AccountStatus, { label: string; className: string }> = {
@@ -128,7 +129,7 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
                                                 <td className="text-muted-foreground px-4 py-3">{fmt(user.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1">
-                                                        {can('users.manage_permissions') && (
+                                                        {user.can_manage && can('users.manage_permissions') && (
                                                             <Link
                                                                 href={`/superadmin/users/${user.id}/permissions`}
                                                                 className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors"
@@ -137,7 +138,7 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
                                                                 <ShieldCheckIcon className="size-4" />
                                                             </Link>
                                                         )}
-                                                        {can('users.edit') && (
+                                                        {user.can_manage && can('users.edit') && (
                                                             <Link
                                                                 href={`/superadmin/users/${user.id}/edit`}
                                                                 className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors"
@@ -146,7 +147,7 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
                                                                 <PencilIcon className="size-4" />
                                                             </Link>
                                                         )}
-                                                        {can('users.delete') && (
+                                                        {user.can_manage && can('users.delete') && (
                                                             <button
                                                                 onClick={() => confirmDelete(user)}
                                                                 disabled={deleting === user.id}
