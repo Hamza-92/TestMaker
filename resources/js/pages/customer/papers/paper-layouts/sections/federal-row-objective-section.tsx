@@ -1,6 +1,9 @@
+import { Fragment } from 'react';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
 import type { SectionTemplateProps } from '../templates/template-props';
+import { objectiveQuestionCount } from '../types';
 import type {
+    GeneratedPaperPassageQuestion,
     GeneratedPaperQuestion,
     PaperQuestionOption,
 } from '../types';
@@ -13,7 +16,7 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
 export function FederalRowObjectiveSection(props: SectionTemplateProps) {
     const { section } = props;
     const supportsTable = section.questions.every(
-        (question) => !question.optionsOnly && !question.passageQuestions,
+        (question) => !question.optionsOnly,
     );
 
     if (!supportsTable) {
@@ -23,6 +26,7 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
     const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
     const optionIndexes = urduOnly ? [3, 2, 1, 0] : [0, 1, 2, 3];
     const showBubbles = props.showObjectiveBubbles === true;
+    const columnCount = showBubbles ? 10 : 6;
 
     return (
         <section className="paper-section">
@@ -80,19 +84,59 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
                     </tr>
                 </thead>
                 <tbody>
-                    {section.questions.map((question, questionIndex) => (
-                        <FederalRow
-                            key={question.id}
-                            question={question}
-                            number={
-                                questionIndex + props.questionNumberOffset + 1
-                            }
-                            urduOnly={urduOnly}
-                            optionIndexes={optionIndexes}
-                            showBubbles={showBubbles}
-                            props={props}
-                        />
-                    ))}
+                    {section.questions.map((question, questionIndex) => {
+                        const number =
+                            props.questionNumberOffset +
+                            section.questions
+                                .slice(0, questionIndex)
+                                .reduce(
+                                    (total, precedingQuestion) =>
+                                        total +
+                                        objectiveQuestionCount(
+                                            precedingQuestion,
+                                        ),
+                                    0,
+                                ) +
+                            1;
+
+                        if (question.passageQuestions?.length) {
+                            return (
+                                <Fragment key={question.id}>
+                                    <PassageRow
+                                        question={question}
+                                        columnCount={columnCount}
+                                        urduOnly={urduOnly}
+                                        props={props}
+                                    />
+                                    {question.passageQuestions.map(
+                                        (passageQuestion, passageIndex) => (
+                                            <FederalPassageQuestionRow
+                                                key={passageQuestion.id}
+                                                question={passageQuestion}
+                                                number={number + passageIndex}
+                                                urduOnly={urduOnly}
+                                                optionIndexes={optionIndexes}
+                                                showBubbles={showBubbles}
+                                                props={props}
+                                            />
+                                        ),
+                                    )}
+                                </Fragment>
+                            );
+                        }
+
+                        return (
+                            <FederalRow
+                                key={question.id}
+                                question={question}
+                                number={number}
+                                urduOnly={urduOnly}
+                                optionIndexes={optionIndexes}
+                                showBubbles={showBubbles}
+                                props={props}
+                            />
+                        );
+                    })}
                 </tbody>
             </table>
 
@@ -180,6 +224,70 @@ function BubbleHeaders({ optionIndexes }: { optionIndexes: number[] }) {
     );
 }
 
+function PassageRow({
+    question,
+    columnCount,
+    urduOnly,
+    props,
+}: {
+    question: GeneratedPaperQuestion;
+    columnCount: number;
+    urduOnly: boolean;
+    props: SectionTemplateProps;
+}) {
+    const { section } = props;
+
+    return (
+        <tr data-paper-question data-paper-passage-row>
+            <td
+                colSpan={columnCount}
+                className="group/question relative px-2 py-1.5 font-normal"
+            >
+                <BilingualTableContent
+                    value={question.text}
+                    urduOnly={urduOnly}
+                    forceRtl={section.questionTextRtl}
+                />
+                {question.sameStatement && (
+                    <div className="mt-0.5">
+                        <BilingualTableContent
+                            value={question.sameStatement}
+                            urduOnly={urduOnly}
+                            forceRtl={section.questionTextRtl}
+                        />
+                    </div>
+                )}
+                {question.imageUrl && (
+                    <img
+                        src={question.imageUrl}
+                        alt=""
+                        className="mx-auto mt-1 max-h-24 object-contain"
+                    />
+                )}
+                <QuestionHoverActions
+                    canSwap={section.questionTypeId !== null}
+                    answerLines={question.answerLines}
+                    onRandom={() =>
+                        props.onRandomQuestion(section.id, question.id)
+                    }
+                    onPick={() => props.onPickQuestion(section.id, question.id)}
+                    onEdit={() => props.onEditQuestion(section.id, question.id)}
+                    onDelete={() =>
+                        props.onRemoveQuestion(section.id, question.id)
+                    }
+                    onAnswerLinesChange={(value) =>
+                        props.onAnswerLinesChange(
+                            section.id,
+                            question.id,
+                            value,
+                        )
+                    }
+                />
+            </td>
+        </tr>
+    );
+}
+
 function FederalRow({
     question,
     number,
@@ -203,7 +311,7 @@ function FederalRow({
     return (
         <tr data-paper-question>
             {urduOnly && showBubbles && (
-                <BubbleCells
+                <BubbleCell
                     options={options}
                     showCorrectAnswers={props.showCorrectAnswers === true}
                 />
@@ -216,11 +324,7 @@ function FederalRow({
                     showCorrectAnswers={props.showCorrectAnswers === true}
                 />
             )}
-            {!urduOnly && (
-                <td className="px-0.5 py-1 text-center align-middle font-bold">
-                    {number}
-                </td>
-            )}
+            {!urduOnly && <SerialCell number={number} />}
             <td className="group/question relative px-1.5 py-1 align-middle font-normal">
                 <BilingualTableContent
                     value={question.text}
@@ -263,11 +367,7 @@ function FederalRow({
                     }
                 />
             </td>
-            {urduOnly && (
-                <td className="px-0.5 py-1 text-center align-middle font-bold">
-                    {number}
-                </td>
-            )}
+            {urduOnly && <SerialCell number={number} />}
             {!urduOnly && (
                 <OptionCells
                     options={options}
@@ -277,12 +377,82 @@ function FederalRow({
                 />
             )}
             {!urduOnly && showBubbles && (
-                <BubbleCells
+                <BubbleCell
                     options={options}
                     showCorrectAnswers={props.showCorrectAnswers === true}
                 />
             )}
         </tr>
+    );
+}
+
+function FederalPassageQuestionRow({
+    question,
+    number,
+    urduOnly,
+    optionIndexes,
+    showBubbles,
+    props,
+}: {
+    question: GeneratedPaperPassageQuestion;
+    number: number;
+    urduOnly: boolean;
+    optionIndexes: number[];
+    showBubbles: boolean;
+    props: SectionTemplateProps;
+}) {
+    const options = optionIndexes.map(
+        (optionIndex) => question.options[optionIndex],
+    );
+
+    return (
+        <tr data-paper-question>
+            {urduOnly && showBubbles && (
+                <BubbleCell
+                    options={options}
+                    showCorrectAnswers={props.showCorrectAnswers === true}
+                />
+            )}
+            {urduOnly && (
+                <OptionCells
+                    options={options}
+                    urduOnly
+                    forceRtl={props.section.questionTextRtl}
+                    showCorrectAnswers={props.showCorrectAnswers === true}
+                />
+            )}
+            {!urduOnly && <SerialCell number={number} />}
+            <td className="px-1.5 py-1 align-middle font-normal">
+                <BilingualTableContent
+                    value={question.text}
+                    urduOnly={urduOnly}
+                    forceRtl={props.section.questionTextRtl}
+                />
+            </td>
+            {urduOnly && <SerialCell number={number} />}
+            {!urduOnly && (
+                <OptionCells
+                    options={options}
+                    urduOnly={false}
+                    forceRtl={props.section.questionTextRtl}
+                    showCorrectAnswers={props.showCorrectAnswers === true}
+                />
+            )}
+            {!urduOnly && showBubbles && (
+                <BubbleCell
+                    options={options}
+                    showCorrectAnswers={props.showCorrectAnswers === true}
+                />
+            )}
+        </tr>
+    );
+}
+
+function SerialCell({ number }: { number: number }) {
+    return (
+        <td className="px-0.5 py-1 text-center align-middle font-bold">
+            {number}
+        </td>
     );
 }
 
@@ -327,7 +497,7 @@ function OptionCells({
     );
 }
 
-function BubbleCells({
+function BubbleCell({
     options,
     showCorrectAnswers,
 }: {
@@ -335,25 +505,30 @@ function BubbleCells({
     showCorrectAnswers: boolean;
 }) {
     return (
-        <>
-            {options.map((option, index) => {
-                const filled =
-                    showCorrectAnswers && option?.isCorrect === true;
+        <td
+            colSpan={OPTION_LABELS.length}
+            data-objective-bubble-group
+            className="px-0 py-1 align-middle"
+        >
+            <div className="grid grid-cols-4 items-center">
+                {options.map((option, index) => {
+                    const filled =
+                        showCorrectAnswers && option?.isCorrect === true;
 
-                return (
-                    <td
-                        key={option?.id ?? `empty-bubble-${index}`}
-                        data-objective-bubble-column
-                        className="px-0.5 py-1 text-center align-middle"
-                    >
+                    return (
                         <span
-                            data-objective-bubble
-                            data-filled={filled ? true : undefined}
-                            aria-label="Answer bubble"
-                        />
-                    </td>
-                );
-            })}
-        </>
+                            key={option?.id ?? `empty-bubble-${index}`}
+                            className="text-center"
+                        >
+                            <span
+                                data-objective-bubble
+                                data-filled={filled ? true : undefined}
+                                aria-label="Answer bubble"
+                            />
+                        </span>
+                    );
+                })}
+            </div>
+        </td>
     );
 }

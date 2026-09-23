@@ -101,6 +101,7 @@ import {
     getPageDimensions,
     PAPER_URDU_FONT_METRICS,
     normalizePaperSettings,
+    objectiveSectionQuestionCount,
     paperPartLabel,
     resolveOrGroupLabel,
 } from './paper-layouts/types';
@@ -13278,7 +13279,7 @@ export function GeneratedPaperView({
                       )
                       .reduce(
                           (total, candidate) =>
-                              total + candidate.questions.length,
+                              total + objectiveSectionQuestionCount(candidate),
                           0,
                       )
                 : 0;

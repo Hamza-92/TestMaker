@@ -1,8 +1,13 @@
 import { BilingualOptionContent } from '../questions/bilingual-option-content';
 import { BilingualQuestionRow } from '../questions/bilingual-question-row';
 import { PassageQuestionContent } from '../questions/passage-question-content';
+import { QuestionContent } from '../questions/question-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
-import { clampSectionColumns, formatQuestionLabel } from '../types';
+import {
+    clampSectionColumns,
+    formatQuestionLabel,
+    objectiveQuestionCount,
+} from '../types';
 import type {
     GeneratedPaperQuestion,
     GeneratedPaperSection,
@@ -127,7 +132,19 @@ export function BoxedObjectiveSection({
                     <ObjectiveQuestionRow
                         key={question.id}
                         question={question}
-                        index={questionIndex + questionNumberOffset}
+                        index={
+                            questionNumberOffset +
+                            section.questions
+                                .slice(0, questionIndex)
+                                .reduce(
+                                    (total, precedingQuestion) =>
+                                        total +
+                                        objectiveQuestionCount(
+                                            precedingQuestion,
+                                        ),
+                                    0,
+                                )
+                        }
                         numberingFormat={numberingFormat}
                         showCorrectAnswers={showCorrectAnswers}
                         section={section}
@@ -205,21 +222,38 @@ function ObjectiveQuestionRow({
         <div data-paper-question className="group/question relative">
             {!question.optionsOnly && (
                 <div className="px-2 py-1 text-sm">
-                    <BilingualQuestionRow
-                        value={question.text}
-                        indexLabel={formatQuestionLabel(
-                            index,
-                            numberingFormat,
-                            'numeric',
-                        )}
-                        marks={section.marksEach}
-                        urduOnly={Boolean(
-                            section.titleUrdu && !section.titleEnglish,
-                        )}
-                        forceRtl={section.questionTextRtl}
-                        hideMarks
-                        sameStatement={question.sameStatement}
-                    />
+                    {question.passageQuestions?.length ? (
+                        <div
+                            dir={section.questionTextRtl ? 'rtl' : undefined}
+                            data-paper-urdu-content={
+                                section.questionTextRtl ? true : undefined
+                            }
+                            className={
+                                section.questionTextRtl ? 'text-right' : undefined
+                            }
+                        >
+                            <QuestionContent value={question.text} />
+                            {question.sameStatement && (
+                                <QuestionContent value={question.sameStatement} />
+                            )}
+                        </div>
+                    ) : (
+                        <BilingualQuestionRow
+                            value={question.text}
+                            indexLabel={formatQuestionLabel(
+                                index,
+                                numberingFormat,
+                                'numeric',
+                            )}
+                            marks={section.marksEach}
+                            urduOnly={Boolean(
+                                section.titleUrdu && !section.titleEnglish,
+                            )}
+                            forceRtl={section.questionTextRtl}
+                            hideMarks
+                            sameStatement={question.sameStatement}
+                        />
+                    )}
                 </div>
             )}
             {question.imageUrl && (
@@ -262,6 +296,7 @@ function ObjectiveQuestionRow({
                         questions={question.passageQuestions}
                         rtl={section.questionTextRtl}
                         showCorrectAnswers={showCorrectAnswers}
+                        numberOffset={index}
                     />
                 </div>
             )}

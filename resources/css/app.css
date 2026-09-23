@@ -744,9 +744,9 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 [data-print-paper] [data-objective-bubble] {
     display: inline-block;
-    width: 0.78em;
-    height: 0.78em;
-    min-width: 0.78em;
+    width: 0.9em;
+    height: 0.9em;
+    min-width: 0.9em;
     border: 1px solid currentColor;
     border-radius: 9999px;
     vertical-align: middle;

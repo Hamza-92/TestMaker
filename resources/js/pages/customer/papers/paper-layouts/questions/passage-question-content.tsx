@@ -15,11 +15,13 @@ export function PassageQuestionContent({
     inline = false,
     rtl = false,
     showCorrectAnswers = false,
+    numberOffset = 0,
 }: {
     questions: GeneratedPaperPassageQuestion[];
     inline?: boolean;
     rtl?: boolean;
     showCorrectAnswers?: boolean;
+    numberOffset?: number;
 }) {
     if (inline) {
         return (
@@ -41,7 +43,7 @@ export function PassageQuestionContent({
                             className="inline-flex flex-wrap items-baseline gap-x-1"
                         >
                             <span className="font-semibold">
-                                {questionIndex + 1}.
+                                {numberOffset + questionIndex + 1}.
                             </span>
                             <QuestionContent
                                 value={question.text}
@@ -72,7 +74,7 @@ export function PassageQuestionContent({
                 <div key={question.id} className="py-1">
                     <div className="flex items-start gap-2">
                         <span className="shrink-0 font-semibold">
-                            {questionIndex + 1}.
+                            {numberOffset + questionIndex + 1}.
                         </span>
                         <QuestionContent
                             value={question.text}

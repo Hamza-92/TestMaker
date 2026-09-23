@@ -2,7 +2,7 @@ import { KeyRoundIcon } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { optionLetter, setLabelFor } from './paper-variant';
 import { QuestionContent } from './questions/question-content';
-import { resolveOrGroupLabel } from './types';
+import { objectiveSectionQuestionCount, resolveOrGroupLabel } from './types';
 import type {
     GeneratedPaper,
     GeneratedPaperQuestion,
@@ -207,7 +207,7 @@ function AnswersSheet({
                                   )
                                   .reduce(
                                       (total, candidate) =>
-                                          total + candidate.questions.length,
+                                          total + objectiveSectionQuestionCount(candidate),
                                       0,
                                   )
                             : 0;

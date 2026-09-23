@@ -35,6 +35,21 @@ export interface GeneratedPaperQuestion {
     answerText?: string | null;
 }
 
+export function objectiveQuestionCount(
+    question: GeneratedPaperQuestion,
+): number {
+    return question.passageQuestions?.length || 1;
+}
+
+export function objectiveSectionQuestionCount(
+    section: GeneratedPaperSection,
+): number {
+    return section.questions.reduce(
+        (total, question) => total + objectiveQuestionCount(question),
+        0,
+    );
+}
+
 export interface GeneratedMultipartPart {
     key: string;
     typeId: number | null;

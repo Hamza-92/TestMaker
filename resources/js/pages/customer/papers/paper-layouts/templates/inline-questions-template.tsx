@@ -3,7 +3,11 @@ import { PassageQuestionContent } from '../questions/passage-question-content';
 import { QuestionContent } from '../questions/question-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
 import { SectionControls } from '../sections/section-actions';
-import { clampSectionColumns, formatQuestionLabel } from '../types';
+import {
+    clampSectionColumns,
+    formatQuestionLabel,
+    objectiveQuestionCount,
+} from '../types';
 import type { SectionTemplate } from './template-props';
 
 const optionLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -75,8 +79,19 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                 }
             >
                 {section.questions.map((question, qIndex) => {
+                    const expandedIndex = isObjective
+                        ? questionNumberOffset +
+                          section.questions
+                              .slice(0, qIndex)
+                              .reduce(
+                                  (total, precedingQuestion) =>
+                                      total +
+                                      objectiveQuestionCount(precedingQuestion),
+                                  0,
+                              )
+                        : qIndex + questionNumberOffset;
                     const label = formatQuestionLabel(
-                        qIndex + questionNumberOffset,
+                        expandedIndex,
                         numberingFormat,
                         fallbackFormat,
                     );
@@ -164,6 +179,9 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                     rtl={section.questionTextRtl}
                                     showCorrectAnswers={
                                         isObjective && showCorrectAnswers
+                                    }
+                                    numberOffset={
+                                        isObjective ? expandedIndex : 0
                                     }
                                 />
                             )}
