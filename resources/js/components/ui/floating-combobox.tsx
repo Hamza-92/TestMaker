@@ -209,10 +209,15 @@ export function FloatingCombobox({
 
                 <ComboboxOptions
                     transition
+                    portal
+                    modal={false}
+                    anchor={{ to: 'bottom start', gap: 6, padding: 8 }}
                     className={cn(
-                        // Positioned inline (no portal) so the panel always matches
-                        // the input's exact width via the parent's relative box.
-                        'absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/[0.08] outline-none',
+                        // Render through Headless UI's anchored portal so dialogs,
+                        // drawers, and cards cannot clip the options panel or add
+                        // it to their scrollable height. --input-width keeps the
+                        // portal panel exactly aligned with its field.
+                        'pointer-events-auto z-[100] max-h-72 w-[var(--input-width)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/[0.08] outline-none',
                         'dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40',
                         'origin-top transition duration-100 ease-out',
                         'data-[closed]:scale-95 data-[closed]:opacity-0',
