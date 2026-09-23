@@ -25,6 +25,8 @@ export interface SectionTemplateProps {
     hideHeadingMarks?: boolean;
     /** Marks correct objective options without changing the normal paper view. */
     showCorrectAnswers?: boolean;
+    /** Adds four answer bubbles to each Federal objective row. */
+    showObjectiveBubbles?: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;

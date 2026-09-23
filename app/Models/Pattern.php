@@ -58,6 +58,11 @@ class Pattern extends Model
         return $this->hasMany(PaperLayoutAssignment::class);
     }
 
+    public function objectiveLayoutAssignments(): HasMany
+    {
+        return $this->hasMany(ObjectiveLayoutAssignment::class);
+    }
+
     public function chapters(): HasMany
     {
         return $this->hasMany(Chapter::class);

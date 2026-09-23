@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
     BookOpenIcon,
+    CircleDotIcon,
     MegaphoneIcon,
     DatabaseIcon,
     HelpCircleIcon,
@@ -55,6 +56,11 @@ export function AppSidebar() {
                       title: 'Paper Layouts',
                       href: '/superadmin/paper-layouts',
                       icon: LayoutPanelTopIcon,
+                  },
+                  {
+                      title: 'Objective Layouts',
+                      href: '/superadmin/objective-layouts',
+                      icon: CircleDotIcon,
                   },
               ]
             : []),

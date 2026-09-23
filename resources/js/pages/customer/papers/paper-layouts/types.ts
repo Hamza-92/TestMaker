@@ -237,7 +237,10 @@ export type PaperQuestionNumberingFormat =
     | 'roman'
     | 'alpha';
 export type PaperQuestionLayout = 'default' | 'stacked' | 'columns' | 'inline';
-export type PaperObjectiveLayout = 'standard' | 'board-table';
+export type PaperObjectiveLayout =
+    | 'standard'
+    | 'board-table'
+    | 'federal-row';
 export type PaperLayout = 'standard' | 'federal-board';
 export type PaperOrGroupLayout = 'stacked' | 'side-by-side';
 export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
@@ -335,6 +338,8 @@ export interface PaperSettings {
     questionLayout: PaperQuestionLayout;
     /** Layout used specifically for objective question sections. */
     objectiveLayout: PaperObjectiveLayout;
+    /** Show an A-D bubble column in the subject-assigned Federal objective row layout. */
+    objectiveBubblesEnabled: boolean;
     /** How paired subjective alternatives are arranged on the paper. */
     orGroupLayout: PaperOrGroupLayout;
     /** Visual treatment of the OR marker between paired alternatives. */
@@ -404,6 +409,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     questionNumberingFormat: 'roman',
     questionLayout: 'default',
     objectiveLayout: 'standard',
+    objectiveBubblesEnabled: false,
     orGroupLayout: 'stacked',
     orGroupDividerStyle: 'line',
     orGroupLabel: 'auto',
@@ -436,6 +442,7 @@ const QUESTION_LAYOUT_VALUES = new Set<PaperQuestionLayout>([
 const OBJECTIVE_LAYOUT_VALUES = new Set<PaperObjectiveLayout>([
     'standard',
     'board-table',
+    'federal-row',
 ]);
 const PAPER_LAYOUT_VALUES = new Set<PaperLayout>(['standard', 'federal-board']);
 const OR_GROUP_LAYOUT_VALUES = new Set<PaperOrGroupLayout>([
@@ -762,6 +769,10 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             OBJECTIVE_LAYOUT_VALUES,
             DEFAULT_PAPER_SETTINGS.objectiveLayout,
         ),
+        objectiveBubblesEnabled:
+            typeof source.objectiveBubblesEnabled === 'boolean'
+                ? source.objectiveBubblesEnabled
+                : DEFAULT_PAPER_SETTINGS.objectiveBubblesEnabled,
         orGroupLayout: pickEnum(
             source.orGroupLayout,
             OR_GROUP_LAYOUT_VALUES,

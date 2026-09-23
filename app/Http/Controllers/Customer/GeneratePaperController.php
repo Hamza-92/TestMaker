@@ -63,6 +63,11 @@ class GeneratePaperController extends Controller
 
         $classSubjects = ClassSubject::join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
             ->leftJoin('mediums', 'mediums.id', '=', 'class_subjects.medium_id')
+            ->leftJoin('objective_layout_assignments', function ($join): void {
+                $join->on('objective_layout_assignments.pattern_id', '=', 'class_subjects.pattern_id')
+                    ->on('objective_layout_assignments.class_id', '=', 'class_subjects.class_id')
+                    ->on('objective_layout_assignments.subject_id', '=', 'class_subjects.subject_id');
+            })
             ->where('subjects.status', 1)
             ->whereExists(function ($query): void {
                 $query->selectRaw('1')
@@ -88,6 +93,8 @@ class GeneratePaperController extends Controller
                 'subjects.name_eng as name',
                 'subjects.name_ur',
                 'mediums.name as medium',
+                'objective_layout_assignments.objective_layout',
+                'objective_layout_assignments.show_bubbles as objective_bubbles',
             )
             ->get()
             ->filter(fn ($row) => AppUserAccess::allowsSubject(

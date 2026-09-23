@@ -1,4 +1,5 @@
 import { BoardObjectiveTableSection } from '../sections/board-objective-table-section';
+import { FederalRowObjectiveSection } from '../sections/federal-row-objective-section';
 import type {
     PaperObjectiveLayout,
     PaperQuestionLayout,
@@ -29,11 +30,14 @@ export function pickSectionTemplate(
     category: PaperSectionCategory,
     objectiveLayout: PaperObjectiveLayout = 'standard',
 ): SectionTemplate {
-    if (
-        category === 'Objective Questions' &&
-        objectiveLayout === 'board-table'
-    ) {
-        return BoardObjectiveTableSection;
+    if (category === 'Objective Questions') {
+        if (objectiveLayout === 'federal-row') {
+            return FederalRowObjectiveSection;
+        }
+
+        if (objectiveLayout === 'board-table') {
+            return BoardObjectiveTableSection;
+        }
     }
 
     if (layout === 'stacked') {

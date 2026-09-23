@@ -136,6 +136,8 @@ interface ClassSubject {
     name: string;
     name_ur?: string | null;
     medium?: ContentMedium | null;
+    objective_layout?: 'standard' | 'federal-row' | null;
+    objective_bubbles?: boolean | number | null;
 }
 
 interface Topic {
@@ -5323,6 +5325,12 @@ export default function GeneratePaper({
             const effectivePaperLayout = usesCustomLayout
                 ? 'standard'
                 : assignedPaperLayout;
+            const objectiveAssignment = classSubjects.find(
+                (item) =>
+                    item.pattern_id === pattern?.id &&
+                    item.class_id === klass?.id &&
+                    item.subject_id === subject?.id,
+            );
 
             if (assignedPaperLayout === 'federal-board' && !usesCustomLayout) {
                 const federalized = federalizeGeneratedSections(
@@ -5378,6 +5386,13 @@ export default function GeneratePaper({
                     ...DEFAULT_PAPER_SETTINGS,
                     marginTop: defaultPaperTopMargin,
                     paperLayout: effectivePaperLayout,
+                    objectiveLayout:
+                        objectiveAssignment?.objective_layout === 'federal-row'
+                            ? 'federal-row'
+                            : DEFAULT_PAPER_SETTINGS.objectiveLayout,
+                    objectiveBubblesEnabled:
+                        objectiveAssignment?.objective_layout === 'federal-row' &&
+                        Boolean(objectiveAssignment.objective_bubbles),
                     showSections:
                         usesCustomLayout ||
                         paperSectioning.active ||
@@ -13244,7 +13259,9 @@ export function GeneratedPaperView({
         const Template = pickSectionTemplate(
             settings.questionLayout,
             section.category,
-            useFederalStructure ? 'board-table' : settings.objectiveLayout,
+            useFederalStructure && settings.objectiveLayout !== 'federal-row'
+                ? 'board-table'
+                : settings.objectiveLayout,
         );
         const sharedNumber = sharedNumberPresentation(
             targetPaper.sections,
@@ -13280,6 +13297,7 @@ export function GeneratedPaperView({
                 questionNumberOffset={questionNumberOffset}
                 numberingFormat={settings.questionNumberingFormat}
                 hideHeadingMarks={useFederalStructure}
+                showObjectiveBubbles={settings.objectiveBubblesEnabled}
                 showCorrectAnswers={
                     activeViewMode === 'answers_on_paper' &&
                     section.category === 'Objective Questions'

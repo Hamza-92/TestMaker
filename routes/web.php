@@ -21,6 +21,7 @@ use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
 use App\Http\Controllers\Superadmin\CustomPaperLayoutController;
 use App\Http\Controllers\Superadmin\DataTransferController;
 use App\Http\Controllers\Superadmin\MultipartQuestionSettingController;
+use App\Http\Controllers\Superadmin\ObjectiveLayoutController;
 use App\Http\Controllers\Superadmin\PaperLayoutController;
 use App\Http\Controllers\Superadmin\PaperQuestionSectionController;
 use App\Http\Controllers\Superadmin\PatternController;
@@ -186,6 +187,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Paper Layouts
         Route::get('superadmin/paper-layouts', [PaperLayoutController::class, 'index'])->name('superadmin.paper-layouts')->middleware('permission:patterns.view');
         Route::put('superadmin/paper-layouts/assignments', [PaperLayoutController::class, 'updateAssignments'])->name('superadmin.paper-layouts.assignments')->middleware('permission:patterns.edit');
+        Route::get('superadmin/objective-layouts', [ObjectiveLayoutController::class, 'index'])->name('superadmin.objective-layouts')->middleware('permission:patterns.view');
+        Route::put('superadmin/objective-layouts', [ObjectiveLayoutController::class, 'update'])->name('superadmin.objective-layouts.update')->middleware('permission:patterns.edit');
 
         // â”€â”€â”€ Classes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/classes', [ClassController::class, 'index'])->name('superadmin.classes')->middleware('permission:classes.view');
