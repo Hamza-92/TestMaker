@@ -711,7 +711,7 @@ input[type='date']::-webkit-calendar-picker-indicator {
     border-spacing: 0;
 }
 [data-print-paper] [data-paper-objective-table] thead {
-    display: table-header-group;
+    display: table-row-group;
 }
 [data-print-paper] [data-paper-objective-table] tr {
     break-inside: avoid;
@@ -730,11 +730,18 @@ input[type='date']::-webkit-calendar-picker-indicator {
     font-weight: 700;
 }
 
-
 /* Subject-assigned Federal objective row: Sr | Question | A-D | optional bubbles.
    Urdu-only papers render the same cells in reverse reading order. */
 [data-print-paper] [data-paper-federal-row-objectives] {
     font-variant-numeric: tabular-nums;
+}
+[data-print-paper][data-repeat-table-headers='true']
+    [data-paper-objective-table]
+    thead,
+[data-print-paper][data-repeat-table-headers='true']
+    [data-paper-federal-or-table]
+    thead {
+    display: table-header-group;
 }
 [data-print-paper]
     [data-paper-federal-row-objectives]
@@ -765,7 +772,7 @@ input[type='date']::-webkit-calendar-picker-indicator {
     border-spacing: 0;
 }
 [data-print-paper] [data-paper-federal-or-table] thead {
-    display: table-header-group;
+    display: table-row-group;
 }
 [data-print-paper] [data-paper-federal-or-table] tr {
     break-inside: avoid;

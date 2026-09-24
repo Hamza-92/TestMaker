@@ -3007,8 +3007,7 @@ export default function GeneratePaper({
         ''
     ).trim();
     const defaultSchoolName = configuredSchoolName || 'School Name';
-    const defaultPaperTopMargin =
-        configuredSchoolName === '' ? DEFAULT_PAPER_SETTINGS.marginTop : 3;
+    const defaultPaperTopMargin = DEFAULT_PAPER_SETTINGS.marginTop;
     const schoolAddress =
         typeof auth.user.address === 'string' ? auth.user.address : '';
     const showSchoolAddress = Boolean(auth.user.is_show_address);
@@ -5392,7 +5391,8 @@ export default function GeneratePaper({
                             ? 'federal-row'
                             : DEFAULT_PAPER_SETTINGS.objectiveLayout,
                     objectiveBubblesEnabled:
-                        objectiveAssignment?.objective_layout === 'federal-row' &&
+                        objectiveAssignment?.objective_layout ===
+                            'federal-row' &&
                         Boolean(objectiveAssignment.objective_bubbles),
                     showSections:
                         usesCustomLayout ||
@@ -14329,24 +14329,11 @@ export function GeneratedPaperView({
                 </div>
 
                 <style>{pageRule}</style>
-                {/* Print-only repeat-header rule. With `position: fixed`,
-                    Chromium-based browsers re-paint the element at the top of
-                    every printed page. The padding-top on main keeps the
-                    first-page content from sliding under the fixed header. */}
-                {settings.repeatHeaderOnEachPage && (
-                    <style>{`@media print {
-                        [data-paper-header-frame] {
-                            position: fixed;
-                            top: 0;
-                            left: ${settings.marginLeft}mm;
-                            right: ${settings.marginRight}mm;
-                            background: #fff;
-                            z-index: 10;
-                        }
-                    }`}</style>
-                )}
                 <main
                     data-print-paper
+                    data-repeat-table-headers={
+                        settings.repeatTableHeaders ? 'true' : undefined
+                    }
                     data-paper-set-index={activeSetIndex}
                     data-paper-forced-page-break={
                         bubbleSheetVisible &&
@@ -14471,6 +14458,11 @@ export function GeneratedPaperView({
                                 <main
                                     key={`variant-${index}`}
                                     data-print-paper
+                                    data-repeat-table-headers={
+                                        settings.repeatTableHeaders
+                                            ? 'true'
+                                            : undefined
+                                    }
                                     data-paper-set-index={index}
                                     data-paper-forced-page-break={
                                         bubbleSheetVisible &&

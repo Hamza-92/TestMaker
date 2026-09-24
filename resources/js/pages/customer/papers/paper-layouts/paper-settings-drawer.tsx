@@ -539,11 +539,11 @@ export function PaperSettingsDrawer({
 
                         <div className="mt-4 grid grid-cols-2 gap-2">
                             <CheckboxField
-                                label="Repeat Header"
-                                checked={settings.repeatHeaderOnEachPage}
+                                label="Repeat Table Headers"
+                                checked={settings.repeatTableHeaders}
                                 onChange={(checked) =>
                                     onChange({
-                                        repeatHeaderOnEachPage: checked,
+                                        repeatTableHeaders: checked,
                                     })
                                 }
                             />

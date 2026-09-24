@@ -277,50 +277,46 @@ export async function downloadPaperPdf({
                 clone.querySelector('[data-paper-watermark]') ?? sharedWatermark
             )?.cloneNode(true) as HTMLElement | undefined;
             clone.querySelector('[data-paper-watermark]')?.remove();
-            const header = clone.querySelector<HTMLElement>(
-                '[data-paper-header-frame]',
-            );
-            const headerHeight = header?.getBoundingClientRect().height ?? 0;
-            const repeatHeight =
-                settings.repeatHeaderOnEachPage && header
-                    ? headerHeight + 3 * PX_PER_MM
-                    : 0;
-
-            if (repeatHeight >= height - 32) {
-                throw new Error(
-                    'The repeated header is too tall for this paper size.',
-                );
-            }
-
-            // Capture this set's header once. Placing a cloned header inside a
-            // clipped page can shift it when html-to-image serializes the page.
-            // A separate image keeps the header aligned on every continuation.
-            const headerCanvas = repeatHeight && header
-                ? await timeout(
-                      toCanvas(header, {
-                          width,
-                          height: headerHeight,
-                          pixelRatio: PIXEL_RATIO,
-                          backgroundColor: '#ffffff',
-                          imagePlaceholder: TRANSPARENT_IMAGE,
-                          onImageErrorHandler: () => undefined,
-                          fontEmbedCSS,
-                          includeStyleProperties: captureStyleProperties,
-                          preferredFontFormat: 'woff2',
-                          style: {
-                              margin: '0',
-                              transform: 'none',
-                              position: 'relative',
-                              top: '0',
-                              left: '0',
-                          },
-                      }),
-                      'Could not render the repeated paper header.',
-                  )
-                : null;
 
             const geometry = measure(clone);
             const totalHeight = clone.getBoundingClientRect().height;
+            const cloneRect = clone.getBoundingClientRect();
+            const tableHeaders: Array<{
+                table: HTMLTableElement;
+                head: HTMLTableSectionElement;
+                top: number;
+                bottom: number;
+                left: number;
+                width: number;
+                height: number;
+            }> = [];
+
+            if (settings.repeatTableHeaders) {
+                clone
+                    .querySelectorAll<HTMLTableElement>(
+                        '[data-paper-objective-table], [data-paper-federal-or-table]',
+                    )
+                    .forEach((table) => {
+                        const head = table.querySelector('thead');
+
+                        if (!head) {
+                            return;
+                        }
+
+                        const tableRect = table.getBoundingClientRect();
+                        const headRect = head.getBoundingClientRect();
+
+                        tableHeaders.push({
+                            table,
+                            head,
+                            top: tableRect.top - cloneRect.top,
+                            bottom: tableRect.bottom - cloneRect.top,
+                            left: tableRect.left - cloneRect.left,
+                            width: tableRect.width,
+                            height: headRect.height,
+                        });
+                    });
+            }
             const questionBounds = Array.from(
                 clone.querySelectorAll('[data-paper-question]'),
             ).map((question) => {
@@ -330,15 +326,20 @@ export async function downloadPaperPdf({
                 return { top: rect.top - top, bottom: rect.bottom - top };
             });
             let start = 0;
-            let setPage = 0;
 
             while (start < totalHeight - 0.5) {
-                const repeated = setPage > 0 ? repeatHeight : 0;
+                const repeatedTableHeader = tableHeaders.find(
+                    (header) =>
+                        start > header.top + header.height + 0.5 &&
+                        start < header.bottom - 0.5,
+                );
+                const repeatedTableHeaderHeight =
+                    repeatedTableHeader?.height ?? 0;
                 // Nastaleeq ascenders can paint just above the CSS line box.
                 // Leave a small overlap in the capture, hiding questions from
                 // adjacent pages without collapsing their layout.
                 const bleed = start > 0 ? 4 : 0;
-                const capacity = height - repeated - bleed;
+                const capacity = height - repeatedTableHeaderHeight - bleed;
                 const end = nextPaperPageEnd(
                     start,
                     capacity,
@@ -366,7 +367,7 @@ export async function downloadPaperPdf({
                 const viewport = document.createElement('div');
                 Object.assign(viewport.style, {
                     position: 'absolute',
-                    top: `${repeated}px`,
+                    top: repeatedTableHeaderHeight + 'px',
                     left: '0',
                     width: `${width}px`,
                     height: `${end - start + bleed}px`,
@@ -380,18 +381,10 @@ export async function downloadPaperPdf({
                     background: 'transparent',
                 });
 
-                if (repeated) {
-                    content
-                        .querySelector<HTMLElement>('[data-paper-header-frame]')
-                        ?.style.setProperty('visibility', 'hidden');
-                }
-
                 // The overlap used to protect Urdu ascenders must not bring
                 // the previous bubble sheet's bottom border onto this page.
                 if (
-                    geometry.forcedBreaks.some(
-                        (point) => point <= start + 0.5,
-                    )
+                    geometry.forcedBreaks.some((point) => point <= start + 0.5)
                 ) {
                     content
                         .querySelectorAll<HTMLElement>(
@@ -417,6 +410,32 @@ export async function downloadPaperPdf({
                     });
                 viewport.append(content);
                 page.append(viewport);
+
+                if (repeatedTableHeader) {
+                    const repeatedTable = repeatedTableHeader.table.cloneNode(
+                        false,
+                    ) as HTMLTableElement;
+                    const colgroup =
+                        repeatedTableHeader.table.querySelector('colgroup');
+
+                    if (colgroup) {
+                        repeatedTable.append(colgroup.cloneNode(true));
+                    }
+
+                    repeatedTable.append(
+                        repeatedTableHeader.head.cloneNode(true),
+                    );
+                    Object.assign(repeatedTable.style, {
+                        position: 'absolute',
+                        top: '0',
+                        left: repeatedTableHeader.left + 'px',
+                        width: repeatedTableHeader.width + 'px',
+                        margin: '0',
+                        background: '#ffffff',
+                        zIndex: '2',
+                    });
+                    page.append(repeatedTable);
+                }
 
                 holder.append(page);
                 onProgress?.(`Creating PDF page ${pageCount + 1}…`);
@@ -457,19 +476,6 @@ export async function downloadPaperPdf({
                         'FAST',
                     );
 
-                    if (repeated && headerCanvas) {
-                        pdf.addImage(
-                            headerCanvas,
-                            'PNG',
-                            settings.marginLeft,
-                            settings.marginTop,
-                            width / PX_PER_MM,
-                            headerHeight / PX_PER_MM,
-                            undefined,
-                            'FAST',
-                        );
-                    }
-
                     canvas.width = 0;
                     canvas.height = 0;
                     pageCount++;
@@ -478,18 +484,12 @@ export async function downloadPaperPdf({
                 }
 
                 start = end;
-                setPage++;
                 await new Promise<void>((resolve) => setTimeout(resolve, 0));
             }
 
             // Keep the original first-set watermark available for later sets.
             if (watermark && setIndex === 0) {
                 clone.append(watermark);
-            }
-
-            if (headerCanvas) {
-                headerCanvas.width = 0;
-                headerCanvas.height = 0;
             }
         }
 

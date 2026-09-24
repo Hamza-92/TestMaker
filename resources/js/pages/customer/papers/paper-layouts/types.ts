@@ -252,10 +252,7 @@ export type PaperQuestionNumberingFormat =
     | 'roman'
     | 'alpha';
 export type PaperQuestionLayout = 'default' | 'stacked' | 'columns' | 'inline';
-export type PaperObjectiveLayout =
-    | 'standard'
-    | 'board-table'
-    | 'federal-row';
+export type PaperObjectiveLayout = 'standard' | 'board-table' | 'federal-row';
 export type PaperLayout = 'standard' | 'federal-board';
 export type PaperOrGroupLayout = 'stacked' | 'side-by-side';
 export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
@@ -338,8 +335,8 @@ export interface PaperSettings {
     pageNumbersEnabled: boolean;
     pageNumberPosition: PageNumberPosition;
     pageNumberFormat: PageNumberFormat;
-    /** Print-only: repeat the exam-info header at the top of every printed page. */
-    repeatHeaderOnEachPage: boolean;
+    /** Print-only: repeat table column headings when a table crosses a page. */
+    repeatTableHeaders: boolean;
     /**
      * Overrides the per-section convention (objective=numeric, subjective=roman).
      * 'default' = keep the per-section convention.
@@ -420,7 +417,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     pageNumbersEnabled: false,
     pageNumberPosition: 'footer-center',
     pageNumberFormat: 'page-n',
-    repeatHeaderOnEachPage: false,
+    repeatTableHeaders: false,
     questionNumberingFormat: 'roman',
     questionLayout: 'default',
     objectiveLayout: 'standard',
@@ -765,10 +762,10 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             PAGE_NUMBER_FORMAT_VALUES,
             DEFAULT_PAPER_SETTINGS.pageNumberFormat,
         ),
-        repeatHeaderOnEachPage:
-            typeof source.repeatHeaderOnEachPage === 'boolean'
-                ? source.repeatHeaderOnEachPage
-                : DEFAULT_PAPER_SETTINGS.repeatHeaderOnEachPage,
+        repeatTableHeaders:
+            typeof source.repeatTableHeaders === 'boolean'
+                ? source.repeatTableHeaders
+                : DEFAULT_PAPER_SETTINGS.repeatTableHeaders,
         questionNumberingFormat: pickEnum(
             source.questionNumberingFormat,
             QUESTION_NUMBERING_FORMAT_VALUES,

@@ -27,6 +27,7 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
     const optionIndexes = urduOnly ? [3, 2, 1, 0] : [0, 1, 2, 3];
     const showBubbles = props.showObjectiveBubbles === true;
     const columnCount = showBubbles ? 10 : 6;
+    const showColumnHeadings = props.questionNumberOffset === 0;
 
     return (
         <section className="paper-section">
@@ -54,35 +55,37 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
                     showBubbles={showBubbles}
                     urduOnly={urduOnly}
                 />
-                <thead>
-                    <tr>
-                        {urduOnly && showBubbles && (
-                            <BubbleHeaders optionIndexes={optionIndexes} />
-                        )}
-                        {urduOnly && (
-                            <OptionHeaders optionIndexes={optionIndexes} />
-                        )}
-                        {!urduOnly && (
+                {showColumnHeadings && (
+                    <thead>
+                        <tr>
+                            {urduOnly && showBubbles && (
+                                <BubbleHeaders optionIndexes={optionIndexes} />
+                            )}
+                            {urduOnly && (
+                                <OptionHeaders optionIndexes={optionIndexes} />
+                            )}
+                            {!urduOnly && (
+                                <th className="px-1 py-1 text-center font-bold">
+                                    Sr
+                                </th>
+                            )}
                             <th className="px-1 py-1 text-center font-bold">
-                                Sr
+                                {urduOnly ? 'سوالات' : 'Questions'}
                             </th>
-                        )}
-                        <th className="px-1 py-1 text-center font-bold">
-                            {urduOnly ? 'سوالات' : 'Questions'}
-                        </th>
-                        {urduOnly && (
-                            <th className="px-1 py-1 text-center font-bold">
-                                نمبر
-                            </th>
-                        )}
-                        {!urduOnly && (
-                            <OptionHeaders optionIndexes={optionIndexes} />
-                        )}
-                        {!urduOnly && showBubbles && (
-                            <BubbleHeaders optionIndexes={optionIndexes} />
-                        )}
-                    </tr>
-                </thead>
+                            {urduOnly && (
+                                <th className="px-1 py-1 text-center font-bold">
+                                    نمبر
+                                </th>
+                            )}
+                            {!urduOnly && (
+                                <OptionHeaders optionIndexes={optionIndexes} />
+                            )}
+                            {!urduOnly && showBubbles && (
+                                <BubbleHeaders optionIndexes={optionIndexes} />
+                            )}
+                        </tr>
+                    </thead>
+                )}
                 <tbody>
                     {section.questions.map((question, questionIndex) => {
                         const number =
@@ -147,9 +150,7 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
                 columns={1}
                 onMoveUp={() => props.onMoveUp(section.id)}
                 onMoveDown={() => props.onMoveDown(section.id)}
-                onShuffleQuestions={() =>
-                    props.onShuffleQuestions(section.id)
-                }
+                onShuffleQuestions={() => props.onShuffleQuestions(section.id)}
                 onAddRandom={() => props.onAddRandomQuestion(section.id)}
                 onAddCustom={() => props.onAddCustomQuestion(section.id)}
                 onEdit={() => props.onEditSection(section.id)}
