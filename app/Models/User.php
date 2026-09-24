@@ -34,15 +34,15 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at'        => 'datetime',
-            'password'                 => 'hashed',
-            'two_factor_confirmed_at'  => 'datetime',
-            'is_show_address'          => 'boolean',
-            'user_type'                => UserType::class,
-            'status'                   => UserStatus::class,
-            'account_type'             => AccountType::class,
-            'teacher_permissions'      => 'array',
-            'access_scope'             => 'array',
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'two_factor_confirmed_at' => 'datetime',
+            'is_show_address' => 'boolean',
+            'user_type' => UserType::class,
+            'status' => UserStatus::class,
+            'account_type' => AccountType::class,
+            'teacher_permissions' => 'array',
+            'access_scope' => 'array',
         ];
     }
 
@@ -103,10 +103,23 @@ class User extends Authenticatable
             return null;
         }
 
-        return $owner->subscriptions()
+        $request = app()->runningInConsole() || ! app()->bound('request')
+            ? null
+            : app('request');
+        $cacheKey = '_active_school_subscription_'.(string) $owner->getKey();
+
+        if ($request?->attributes->has($cacheKey)) {
+            return $request->attributes->get($cacheKey);
+        }
+
+        $subscription = $owner->subscriptions()
             ->where('status', 'active')
             ->latest('started_at')
             ->first();
+
+        $request?->attributes->set($cacheKey, $subscription);
+
+        return $subscription;
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────

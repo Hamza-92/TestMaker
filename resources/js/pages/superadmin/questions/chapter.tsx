@@ -35,6 +35,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { usePermission } from '@/hooks/use-permission';
+import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { BulkQuestionTypeChangeDialog } from './change-type-dialog';
 import type { QuestionTypeOption, SourceOption } from './form';
 
@@ -116,12 +117,6 @@ function statusBadge(status: number) {
             Inactive
         </Badge>
     );
-}
-
-function truncateText(value: string, maxLength = 96) {
-    return value.length > maxLength
-        ? `${value.slice(0, maxLength - 1)}...`
-        : value;
 }
 
 function sourceFilterValue(question: QuestionRow) {
@@ -818,11 +813,12 @@ export default function ChapterQuestions({
                                                     {sortingEnabled && (
                                                         <GripVerticalIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                                                     )}
-                                                    <p className="font-medium">
-                                                        {truncateText(
-                                                            question.summary_text,
-                                                        )}
-                                                    </p>
+                                                    <QuestionContent
+                                                        value={
+                                                            question.summary_text
+                                                        }
+                                                        className="line-clamp-2 font-medium [&_img]:inline-block [&_img]:max-h-7 [&_img]:max-w-full [&_img]:align-middle"
+                                                    />
                                                 </div>
                                             </td>
                                             <td className="px-3 py-2.5">

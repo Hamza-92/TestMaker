@@ -10,6 +10,15 @@ class AppUserAccess
 {
     public static function resolve(User $user): array
     {
+        $request = app()->runningInConsole() || ! app()->bound('request')
+            ? null
+            : app('request');
+        $cacheKey = '_app_user_access_'.(string) $user->getKey();
+
+        if ($request?->attributes->has($cacheKey)) {
+            return $request->attributes->get($cacheKey);
+        }
+
         $maps = SubscriptionAccess::buildMaps();
         $subscription = $user->activeSchoolSubscription();
         $schoolOwner = $user->schoolOwner();
@@ -26,11 +35,15 @@ class AppUserAccess
 
         $ids = SubscriptionAccess::summaryIds($scope, $maps);
 
-        return [
+        $access = [
             'scope' => $scope,
-            'ids'   => $ids,
-            'maps'  => $maps,
+            'ids' => $ids,
+            'maps' => $maps,
         ];
+
+        $request?->attributes->set($cacheKey, $access);
+
+        return $access;
     }
 
     public static function allowsPattern(array $access, int $patternId): bool

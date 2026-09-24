@@ -31,7 +31,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { usePermission } from '@/hooks/use-permission';
+import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { BulkQuestionTypeChangeDialog } from './questions/change-type-dialog';
 import type {
     ChapterOption,
@@ -181,6 +183,7 @@ export default function Questions({
     const [draggedId, setDraggedId] = useState<number | null>(null);
     const [sortDirty, setSortDirty] = useState(false);
     const [sortSaving, setSortSaving] = useState(false);
+    const [loadingQuestions, setLoadingQuestions] = useState(false);
 
     // ── Cascaded dropdown options ─────────────────────────────────────────────
     const patterns = useMemo(
@@ -258,7 +261,16 @@ export default function Questions({
             }
         }
 
-        router.get(url, {}, { preserveState: true, replace: true });
+        setLoadingQuestions(true);
+        router.get(
+            url,
+            {},
+            {
+                preserveState: true,
+                replace: true,
+                onFinish: () => setLoadingQuestions(false),
+            },
+        );
     };
 
     // ── Filter handlers ───────────────────────────────────────────────────────
@@ -670,7 +682,10 @@ export default function Questions({
                         <Select
                             value={chapterId || NONE}
                             onValueChange={handleChapterChange}
-                            disabled={availableChapters.length === 0}
+                            disabled={
+                                loadingQuestions ||
+                                availableChapters.length === 0
+                            }
                         >
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Chapter" />
@@ -692,7 +707,10 @@ export default function Questions({
                             <Select
                                 value={topicId || NONE}
                                 onValueChange={handleTopicChange}
-                                disabled={availableTopics.length === 0}
+                                disabled={
+                                    loadingQuestions ||
+                                    availableTopics.length === 0
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Topic" />
@@ -715,6 +733,16 @@ export default function Questions({
                             <div className="hidden lg:block" />
                         )}
                     </div>
+                    {loadingQuestions && (
+                        <div
+                            className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <Spinner />
+                            Loading questions…
+                        </div>
+                    )}
                 </div>
 
                 {/* Empty state */}
@@ -946,9 +974,12 @@ export default function Questions({
                                                         </span>
                                                     </td>
                                                     <td className="max-w-sm px-3 py-3">
-                                                        <p className="line-clamp-2 text-sm">
-                                                            {q.summary_text}
-                                                        </p>
+                                                        <QuestionContent
+                                                            value={
+                                                                q.summary_text
+                                                            }
+                                                            className="line-clamp-2 text-sm [&_img]:inline-block [&_img]:max-h-7 [&_img]:max-w-full [&_img]:align-middle"
+                                                        />
                                                     </td>
                                                     <td className="px-3 py-3">
                                                         <div className="flex items-center gap-1.5">

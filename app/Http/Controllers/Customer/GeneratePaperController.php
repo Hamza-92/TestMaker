@@ -517,29 +517,32 @@ class GeneratePaperController extends Controller
             ->orderBy('questions.topic_id')
             ->orderBy('questions.sort_order')
             ->orderBy('questions.id')
-            ->get()
-            ->map(function (Question $question) use ($displayMedium, $canViewSubjectiveAnswers, $scope) {
-                $effectiveType = QuestionTypeHeadingResolver::one(
-                    $question->questionType,
-                    (int) $scope->pattern_id,
-                    (int) $scope->class_id,
-                    (int) $scope->subject_id,
-                );
-                $effectiveType = QuestionTypeSchemaRegistry::typeForQuestion(
+            ->get();
+        $effectiveType = $questions->isEmpty()
+            ? null
+            : QuestionTypeHeadingResolver::one(
+                $questions->first()->questionType,
+                (int) $scope->pattern_id,
+                (int) $scope->class_id,
+                (int) $scope->subject_id,
+            );
+        $questions = $questions
+            ->map(function (Question $question) use ($displayMedium, $canViewSubjectiveAnswers, $effectiveType) {
+                $questionType = QuestionTypeSchemaRegistry::typeForQuestion(
                     $question,
-                    $effectiveType,
+                    $effectiveType ?? $question->questionType,
                 );
                 $content = QuestionTypeSchemaRegistry::contentFromQuestion(
                     $question,
-                    $effectiveType,
+                    $questionType,
                 );
                 $schema = QuestionTypeSchemaRegistry::resolve(
-                    $effectiveType->schema_key,
-                    $effectiveType->is_objective,
+                    $questionType->schema_key,
+                    $questionType->is_objective,
                     [
-                        'objective_type_id' => $effectiveType->objective_type_id,
-                        'have_description' => $effectiveType->have_description,
-                        'have_answer' => $effectiveType->have_answer,
+                        'objective_type_id' => $questionType->objective_type_id,
+                        'have_description' => $questionType->have_description,
+                        'have_answer' => $questionType->have_answer,
                     ],
                 );
                 $includeAnswers = (bool) $question->questionType->is_objective

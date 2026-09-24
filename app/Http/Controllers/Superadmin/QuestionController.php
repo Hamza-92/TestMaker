@@ -8,6 +8,7 @@ use App\Http\Requests\Superadmin\QuestionBulkImportRequest;
 use App\Http\Requests\Superadmin\QuestionUpsertRequest;
 use App\Models\AuditLog;
 use App\Models\Chapter;
+use App\Models\ClassSubject;
 use App\Models\Medium;
 use App\Models\Question;
 use App\Models\QuestionOption;
@@ -150,8 +151,13 @@ class QuestionController extends Controller
                 $query->where('topic_id', $topicId);
             }
 
-            $questions = $query->get()
-                ->map(fn (Question $question) => $this->transformQuestionListItem($question))
+            $questions = $query->get();
+            $subjectTypes = $this->subjectTypesForChapters($questions->pluck('chapter'));
+            $questions = $questions
+                ->map(fn (Question $question) => $this->transformQuestionListItem(
+                    $question,
+                    $subjectTypes->get((string) $question->chapter_id),
+                ))
                 ->values();
         }
 
@@ -183,11 +189,13 @@ class QuestionController extends Controller
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
+        $subjectType = $this->subjectTypesForChapters(collect([$chapter]))
+            ->get((string) $chapter->id);
 
         return Inertia::render('superadmin/questions/chapter', [
             'chapter' => $this->chapterContext($chapter),
             'questions' => $questions
-                ->map(fn (Question $question) => $this->transformQuestionListItem($question))
+                ->map(fn (Question $question) => $this->transformQuestionListItem($question, $subjectType))
                 ->values(),
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
@@ -289,6 +297,8 @@ class QuestionController extends Controller
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
+        $subjectType = $this->subjectTypesForChapters(collect([$chapter]))
+            ->get((string) $chapter->id);
 
         return Inertia::render('superadmin/questions/chapter', [
             'chapter' => $this->chapterContext($chapter),
@@ -298,7 +308,7 @@ class QuestionController extends Controller
                 'name_ur' => $topic->name_ur,
             ],
             'questions' => $questions
-                ->map(fn (Question $question) => $this->transformQuestionListItem($question))
+                ->map(fn (Question $question) => $this->transformQuestionListItem($question, $subjectType))
                 ->values(),
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
@@ -921,7 +931,7 @@ class QuestionController extends Controller
 
     private function chapterFormOptions(bool $includeInactive = false): Collection
     {
-        return Chapter::query()
+        $chapters = Chapter::query()
             ->with([
                 'subject:id,name_eng,name_ur,subject_type,status',
                 'schoolClass:id,name,status',
@@ -962,6 +972,11 @@ class QuestionController extends Controller
                     && (int) $chapter->schoolClass->status === 1
                     && (int) $chapter->pattern->status === 1;
             })
+            ->values();
+
+        $subjectTypes = $this->subjectTypesForChapters($chapters);
+
+        return $chapters
             ->map(fn (Chapter $chapter) => [
                 'id' => $chapter->id,
                 'name' => $chapter->name,
@@ -974,7 +989,7 @@ class QuestionController extends Controller
                     'id' => $chapter->subject->id,
                     'name_eng' => $chapter->subject->name_eng,
                     'name_ur' => $chapter->subject->name_ur,
-                    'subject_type' => $chapter->effectiveSubjectType(),
+                    'subject_type' => $subjectTypes->get((string) $chapter->id),
                     'status' => $chapter->subject->status,
                 ],
                 'class' => [
@@ -998,8 +1013,11 @@ class QuestionController extends Controller
             ->values();
     }
 
-    private function transformQuestionListItem(Question $question): array
-    {
+    private function transformQuestionListItem(
+        Question $question,
+        ?string $subjectType = null,
+        bool $includeContent = false,
+    ): array {
         $effectiveType = QuestionTypeSchemaRegistry::typeForQuestion(
             $question,
             $question->questionType,
@@ -1015,7 +1033,7 @@ class QuestionController extends Controller
             $question->options,
         );
 
-        return [
+        $item = [
             'id' => $question->id,
             'source' => $question->source,
             'source_label' => Question::sourceLabel($question->source),
@@ -1026,9 +1044,7 @@ class QuestionController extends Controller
                 $effectiveType,
                 $content,
             ),
-            'content' => $content,
             'question_type' => $this->serializeQuestionType($question->questionType),
-            'schema' => $schema,
             'chapter' => [
                 'id' => $question->chapter->id,
                 'name' => $question->chapter->name,
@@ -1040,7 +1056,7 @@ class QuestionController extends Controller
                     'id' => $question->chapter->subject->id,
                     'name_eng' => $question->chapter->subject->name_eng,
                     'name_ur' => $question->chapter->subject->name_ur,
-                    'subject_type' => $question->chapter->effectiveSubjectType(),
+                    'subject_type' => $subjectType ?? $question->chapter->effectiveSubjectType(),
                 ],
                 'class' => [
                     'id' => $question->chapter->schoolClass->id,
@@ -1063,11 +1079,79 @@ class QuestionController extends Controller
             'correct_options_count' => $metrics['correct_options_count'],
             'items_count' => $metrics['items_count'],
         ];
+
+        if ($includeContent) {
+            $item['content'] = $content;
+            $item['schema'] = $schema;
+        }
+
+        return $item;
+    }
+
+    /**
+     * Resolve scoped subject types for a chapter collection in one query.
+     *
+     * @param  Collection<int, Chapter>  $chapters
+     * @return Collection<string, string>
+     */
+    private function subjectTypesForChapters(Collection $chapters): Collection
+    {
+        $chapters = $chapters
+            ->filter(fn ($chapter) => $chapter instanceof Chapter)
+            ->unique('id')
+            ->values();
+
+        if ($chapters->isEmpty()) {
+            return collect();
+        }
+
+        $missingSubjectIds = $chapters
+            ->reject(fn (Chapter $chapter) => $chapter->relationLoaded('subject'))
+            ->pluck('subject_id')
+            ->unique()
+            ->values();
+        $missingSubjects = $missingSubjectIds->isEmpty()
+            ? collect()
+            : Subject::query()
+                ->whereIn('id', $missingSubjectIds)
+                ->get(['id', 'subject_type'])
+                ->keyBy('id');
+
+        $chapters->each(function (Chapter $chapter) use ($missingSubjects): void {
+            if (! $chapter->relationLoaded('subject')) {
+                $chapter->setRelation('subject', $missingSubjects->get($chapter->subject_id));
+            }
+        });
+
+        $scopedTypes = ClassSubject::query()
+            ->whereIn('pattern_id', $chapters->pluck('pattern_id')->unique()->values())
+            ->whereIn('class_id', $chapters->pluck('class_id')->unique()->values())
+            ->whereIn('subject_id', $chapters->pluck('subject_id')->unique()->values())
+            ->get(['pattern_id', 'class_id', 'subject_id', 'subject_type'])
+            ->keyBy(fn (ClassSubject $scope) => implode(':', [
+                (int) $scope->pattern_id,
+                (int) $scope->class_id,
+                (int) $scope->subject_id,
+            ]));
+
+        return $chapters->mapWithKeys(function (Chapter $chapter) use ($scopedTypes): array {
+            $scopeKey = implode(':', [
+                (int) $chapter->pattern_id,
+                (int) $chapter->class_id,
+                (int) $chapter->subject_id,
+            ]);
+            $subjectType = $scopedTypes->get($scopeKey)?->subject_type;
+            $fallback = $chapter->subject?->subject_type;
+
+            return [(string) $chapter->id => in_array($subjectType, ClassSubject::SUBJECT_TYPES, true)
+                ? $subjectType
+                : (in_array($fallback, ClassSubject::SUBJECT_TYPES, true) ? $fallback : 'chapter-wise')];
+        });
     }
 
     private function transformQuestionDetail(Question $question): array
     {
-        $listItem = $this->transformQuestionListItem($question);
+        $listItem = $this->transformQuestionListItem($question, includeContent: true);
         $listItem['options'] = $question->options
             ->map(fn (QuestionOption $option) => [
                 'id' => $option->id,
