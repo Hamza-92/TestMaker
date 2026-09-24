@@ -34,12 +34,18 @@ class CustomerDashboardData
     {
         $owner = $user->schoolOwner() ?? $user;
         $subscription = $user->activeSchoolSubscription();
-        $paperOwnerIds = self::paperOwnerIds($user);
+        $teachers = $owner->teachers()->get(['id', 'status']);
+        $teacherCount = $teachers->count();
+        $activeTeacherCount = $teachers->filter->isActive()->count();
+        $paperOwnerIds = self::paperOwnerIds(
+            $user,
+            $owner,
+            $teachers->pluck('id')->map(static fn ($id): int => (int) $id)->all(),
+        );
         $papers = Paper::query()->whereIn('user_id', $paperOwnerIds);
+        $paperStats = self::paperStats($papers);
         $access = AppUserAccess::resolve($user);
         $classIds = $access['ids']['class_access'];
-        $teacherCount = $owner->teachers()->count();
-        $activeTeacherCount = $owner->teachers()->where('status', 'active')->count();
         $isTrial = $owner->account_type === AccountType::Trial && $subscription === null;
         $planStart = $isTrial ? $owner->created_at : $subscription?->started_at;
         $planEnd = $isTrial
@@ -48,11 +54,6 @@ class CustomerDashboardData
         $planName = $isTrial ? 'Trial' : ($subscription?->name ?? 'No plan');
         $daysRemaining = self::daysRemaining($planEnd);
         $remainingPercent = self::remainingPercent($planStart, $planEnd);
-
-        $questionsUsed = (clone $papers)
-            ->select(['id', 'paper_data'])
-            ->cursor()
-            ->sum(fn (Paper $paper) => self::questionCount($paper->paper_data));
 
         return [
             'school' => [
@@ -69,26 +70,40 @@ class CustomerDashboardData
                     ->count(),
             ],
             'stats' => [
-                'papers_generated' => (clone $papers)->count(),
-                'saved_papers' => (clone $papers)->where('is_draft', false)->count(),
-                'questions_used' => $questionsUsed,
+                'papers_generated' => $paperStats['total'],
+                'saved_papers' => $paperStats['saved'],
+                'questions_used' => $paperStats['questions'],
                 'active_teachers' => $activeTeacherCount,
-                'drafts' => (clone $papers)->where('is_draft', true)->count(),
+                'drafts' => $paperStats['drafts'],
                 'total_teachers' => $teacherCount,
             ],
             'announcements' => self::announcements($user),
             'patterns' => self::patterns($access),
             'activities' => self::activities($user, $paperOwnerIds),
-            'subject_usage' => [
-                'weekly' => self::subjectUsage($papers, now()->startOfWeek()),
-                'monthly' => self::subjectUsage($papers, now()->startOfMonth()),
-                'yearly' => self::subjectUsage($papers, now()->startOfYear()),
-            ],
+            'subject_usage' => self::subjectUsage($papers),
+
             'permissions' => [
                 'can_generate_papers' => $user->isSchoolOwner()
                     || $user->hasTeacherPermission(TeacherPermission::GeneratePapers->value),
                 'can_add_teacher' => $user->isSchoolOwner(),
             ],
+        ];
+    }
+
+    private static function paperStats(Builder $papers): array
+    {
+        $stats = (clone $papers)
+            ->selectRaw('COUNT(*) as total_count')
+            ->selectRaw('SUM(CASE WHEN is_draft = 0 THEN 1 ELSE 0 END) as saved_count')
+            ->selectRaw('SUM(CASE WHEN is_draft = 1 THEN 1 ELSE 0 END) as draft_count')
+            ->selectRaw('COALESCE(SUM(questions_count), 0) as questions_count')
+            ->first();
+
+        return [
+            'total' => (int) ($stats?->total_count ?? 0),
+            'saved' => (int) ($stats?->saved_count ?? 0),
+            'drafts' => (int) ($stats?->draft_count ?? 0),
+            'questions' => (int) ($stats?->questions_count ?? 0),
         ];
     }
 
@@ -98,15 +113,28 @@ class CustomerDashboardData
             ->published()
             ->get();
 
+        $dismissedSurfaces = $visible->isEmpty()
+            ? collect()
+            : AnnouncementDismissal::query()
+                ->where('user_id', $user->id)
+                ->whereIn('announcement_id', $visible->pluck('id'))
+                ->get(['announcement_id', 'surface'])
+                ->mapWithKeys(fn (AnnouncementDismissal $dismissal): array => [
+                    $dismissal->announcement_id.':'.$dismissal->surface => true,
+                ]);
+
+        $isDismissed = fn (Announcement $announcement, string $surface): bool => $announcement->is_dismissible
+            && $dismissedSurfaces->has($announcement->id.':'.$surface);
+
         $banner = $visible->first(
             fn (Announcement $announcement) => in_array($announcement->placement, ['banner', 'both'], true)
-                && ! self::dismissedForSurface($announcement, $user, 'banner'),
+                && ! $isDismissed($announcement, 'banner'),
         );
 
         $updates = $visible
             ->filter(
                 fn (Announcement $announcement) => in_array($announcement->placement, ['card', 'both'], true)
-                    && ! self::dismissedForSurface($announcement, $user, 'card'),
+                    && ! $isDismissed($announcement, 'card'),
             )
             ->values();
 
@@ -132,16 +160,6 @@ class CustomerDashboardData
             'banner' => $banner ? $present($banner) : null,
             'updates' => $updates->map($present)->values()->all(),
         ];
-    }
-
-    private static function dismissedForSurface(Announcement $announcement, User $user, string $surface): bool
-    {
-        return $announcement->is_dismissible
-            && AnnouncementDismissal::query()
-                ->where('announcement_id', $announcement->id)
-                ->where('user_id', $user->id)
-                ->where('surface', $surface)
-                ->exists();
     }
 
     private static function patterns(array $access): Collection
@@ -183,25 +201,50 @@ class CustomerDashboardData
             });
     }
 
-    private static function subjectUsage(Builder $papers, $since): Collection
+    private static function subjectUsage(Builder $papers): array
     {
+        $weekStart = now()->startOfWeek();
+        $monthStart = now()->startOfMonth();
+        $yearStart = now()->startOfYear();
+
         $rows = (clone $papers)
             ->where('is_draft', false)
             ->whereNotNull('subject')
             ->where('subject', '!=', '')
-            ->where('created_at', '>=', $since)
-            ->selectRaw('subject, COUNT(*) as usage_count')
+            ->where('created_at', '>=', $yearStart)
+            ->select('subject')
+            ->selectRaw(
+                'SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as weekly_count',
+                [$weekStart],
+            )
+            ->selectRaw(
+                'SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as monthly_count',
+                [$monthStart],
+            )
+            ->selectRaw('COUNT(*) as yearly_count')
             ->groupBy('subject')
-            ->orderByDesc('usage_count')
-            ->limit(5)
             ->get();
 
-        $total = max(1, (int) $rows->sum('usage_count'));
+        return [
+            'weekly' => self::subjectUsageForPeriod($rows, 'weekly_count'),
+            'monthly' => self::subjectUsageForPeriod($rows, 'monthly_count'),
+            'yearly' => self::subjectUsageForPeriod($rows, 'yearly_count'),
+        ];
+    }
 
-        return $rows->map(fn ($row) => [
+    private static function subjectUsageForPeriod(Collection $rows, string $countColumn): Collection
+    {
+        $topRows = $rows
+            ->filter(fn ($row): bool => (int) $row->{$countColumn} > 0)
+            ->sortByDesc(fn ($row): int => (int) $row->{$countColumn})
+            ->take(5)
+            ->values();
+        $total = max(1, (int) $topRows->sum($countColumn));
+
+        return $topRows->map(fn ($row): array => [
             'name' => $row->subject,
-            'count' => (int) $row->usage_count,
-            'percentage' => round(((int) $row->usage_count / $total) * 100, 1),
+            'count' => (int) $row->{$countColumn},
+            'percentage' => round(((int) $row->{$countColumn} / $total) * 100, 1),
         ])->values();
     }
 
@@ -304,40 +347,14 @@ class CustomerDashboardData
         ])->values();
     }
 
-    private static function questionCount(?array $paperData): int
-    {
-        $sections = data_get($paperData, 'paper.sections', []);
-
-        if (! is_array($sections)) {
-            return 0;
-        }
-
-        return collect($sections)->sum(
-            fn ($section) => is_array($section['questions'] ?? null)
-                ? count($section['questions'])
-                : 0
-        );
-    }
-
-    private static function paperOwnerIds(User $user): array
+    private static function paperOwnerIds(User $user, User $owner, array $teacherIds): array
     {
         if ($user->isSchoolOwner()) {
-            return array_values(array_unique([
-                $user->id,
-                ...$user->teachers()->pluck('id')->all(),
-            ]));
+            return array_values(array_unique([$user->id, ...$teacherIds]));
         }
 
         if ($user->isTeacher() && $user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
-            $owner = $user->schoolOwner();
-
-            if ($owner !== null) {
-                return array_values(array_unique([
-                    $user->id,
-                    $owner->id,
-                    ...$owner->teachers()->pluck('id')->all(),
-                ]));
-            }
+            return array_values(array_unique([$user->id, $owner->id, ...$teacherIds]));
         }
 
         return [$user->id];

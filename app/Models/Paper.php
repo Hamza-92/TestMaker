@@ -22,6 +22,7 @@ class Paper extends Model
     protected $casts = [
         'total_marks' => 'float',
         'is_draft' => 'boolean',
+        'questions_count' => 'integer',
     ];
 
     protected function paperData(): Attribute
@@ -40,27 +41,44 @@ class Paper extends Model
 
                 return is_array($expanded) ? $expanded : [];
             },
-            set: function ($value): string {
+            set: function ($value): array {
                 $json = json_encode(
                     $value,
                     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
                 );
 
                 if ($json === false) {
-                    return json_encode(is_array($value) ? $value : []) ?: '{}';
+                    $json = json_encode(is_array($value) ? $value : []) ?: '{}';
                 }
 
                 $compressed = gzencode($json, 6);
 
-                if ($compressed === false) {
-                    return $json;
-                }
-
-                return json_encode([
-                    '__tm_compressed' => base64_encode($compressed),
-                ], JSON_UNESCAPED_SLASHES) ?: $json;
+                return [
+                    'paper_data' => $compressed === false
+                        ? $json
+                        : (json_encode([
+                            '__tm_compressed' => base64_encode($compressed),
+                        ], JSON_UNESCAPED_SLASHES) ?: $json),
+                    'questions_count' => self::countQuestions($value),
+                ];
             },
         );
+    }
+
+    public static function countQuestions(mixed $paperData): int
+    {
+        $sections = data_get($paperData, 'paper.sections', []);
+
+        if (! is_array($sections)) {
+            return 0;
+        }
+
+        return array_sum(array_map(
+            static fn ($section): int => is_array($section['questions'] ?? null)
+                ? count($section['questions'])
+                : 0,
+            $sections,
+        ));
     }
 
     public function user(): BelongsTo
