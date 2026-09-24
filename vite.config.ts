@@ -24,7 +24,9 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
             refresh: true,
         }),
-        inertia(),
+        // This application is deployed to PHP-only hosting, so there is no
+        // persistent Node process available to render Inertia responses.
+        inertia({ ssr: false }),
         react({
             babel: {
                 plugins: ['babel-plugin-react-compiler'],
