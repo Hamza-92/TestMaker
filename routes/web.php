@@ -34,13 +34,21 @@ use App\Http\Controllers\Superadmin\TopicController;
 use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
 use App\Http\Controllers\Superadmin\UserTransferController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
-Route::inertia('/', 'welcome', [
-    'canRegister' => Features::enabled(Features::registration()),
-])->name('home');
+Route::get('/', function (Request $request) {
+    if ($request->user()) {
+        return redirect()->route('dashboard');
+    }
+
+    return Inertia::render('welcome', [
+        'canRegister' => Features::enabled(Features::registration()),
+    ]);
+})->name('home');
 
 Route::inertia('/pricing', 'pricing')->name('pricing');
 

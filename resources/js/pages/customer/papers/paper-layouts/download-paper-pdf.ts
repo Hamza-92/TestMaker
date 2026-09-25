@@ -127,23 +127,29 @@ function preserveSingleLineHeadings(root: HTMLElement): void {
     );
 }
 
-interface ObjectiveTableBorder {
+interface PaperTableBorder {
     top: number;
     bottom: number;
     left: number;
     width: number;
     color: string;
+    rowStarts: number[];
     rowBoundaries: number[];
 }
 
-function objectiveTableBorders(root: HTMLElement): ObjectiveTableBorder[] {
+function paperTableBorders(root: HTMLElement): PaperTableBorder[] {
     const rootRect = root.getBoundingClientRect();
 
     return Array.from(
-        root.querySelectorAll<HTMLTableElement>('[data-paper-objective-table]'),
+        root.querySelectorAll<HTMLTableElement>(
+            '[data-paper-objective-table], [data-paper-federal-or-table]',
+        ),
     ).map((table) => {
         const rect = table.getBoundingClientRect();
         const firstCell = table.querySelector('th, td');
+        const rows = Array.from(table.querySelectorAll('tr'), (row) =>
+            row.getBoundingClientRect(),
+        );
 
         return {
             top: rect.top - rootRect.top,
@@ -153,25 +159,31 @@ function objectiveTableBorders(root: HTMLElement): ObjectiveTableBorder[] {
             color: firstCell
                 ? getComputedStyle(firstCell).borderTopColor
                 : '#000',
-            rowBoundaries: Array.from(table.querySelectorAll('tr')).map(
-                (row) => row.getBoundingClientRect().bottom - rootRect.top,
-            ),
+            rowStarts: rows.map((row) => row.top - rootRect.top),
+            rowBoundaries: rows.flatMap((row) => [
+                row.top - rootRect.top,
+                row.bottom - rootRect.top,
+            ]),
         };
     });
 }
 
 function tableBorderAt(
-    tables: ObjectiveTableBorder[],
+    tables: PaperTableBorder[],
     position: number,
-): ObjectiveTableBorder | undefined {
-    return tables.find(
-        (table) =>
+    edge: 'start' | 'end',
+): PaperTableBorder | undefined {
+    return tables.find((table) => {
+        const boundaries =
+            edge === 'start' ? table.rowStarts : table.rowBoundaries;
+
+        return (
             position > table.top + 1 &&
-            position <= table.bottom + 1 &&
-            table.rowBoundaries.some(
-                (boundary) => Math.abs(boundary - position) <= 1.5,
-            ),
-    );
+            position <=
+                (edge === 'start' ? table.bottom - 0.5 : table.bottom + 1) &&
+            boundaries.some((boundary) => Math.abs(boundary - position) <= 1.5)
+        );
+    });
 }
 
 function measure(root: HTMLElement) {
@@ -353,7 +365,7 @@ export async function downloadPaperPdf({
             clone.querySelector('[data-paper-watermark]')?.remove();
 
             const geometry = measure(clone);
-            const tableBorders = objectiveTableBorders(clone);
+            const tableBorders = paperTableBorders(clone);
             const totalHeight = clone.getBoundingClientRect().height;
             const cloneRect = clone.getBoundingClientRect();
             const tableHeaders: Array<{
@@ -411,10 +423,14 @@ export async function downloadPaperPdf({
                 );
                 const repeatedTableHeaderHeight =
                     repeatedTableHeader?.height ?? 0;
-                // Nastaleeq ascenders can paint just above the CSS line box.
-                // Leave a small overlap in the capture, hiding questions from
-                // adjacent pages without collapsing their layout.
-                const bleed = start > 0 ? 4 : 0;
+                // Preserve Nastaleeq ascenders at ordinary breaks. At a table
+                // row boundary, overlap would expose column borders from the
+                // previous row above the new page's horizontal border.
+                const tableAtStart =
+                    start > 0
+                        ? tableBorderAt(tableBorders, start, 'start')
+                        : undefined;
+                const bleed = start > 0 && !tableAtStart ? 4 : 0;
                 const capacity = height - repeatedTableHeaderHeight - bleed;
                 const end = nextPaperPageEnd(
                     start,
@@ -492,7 +508,7 @@ export async function downloadPaperPdf({
                 // rule, so draw the boundary inside both page captures.
                 if (settings.questionBorderWidth > 0) {
                     const appendBoundary = (
-                        table: ObjectiveTableBorder | undefined,
+                        table: PaperTableBorder | undefined,
                         top: number,
                     ) => {
                         if (!table) {
@@ -514,14 +530,14 @@ export async function downloadPaperPdf({
 
                     if (start > 0) {
                         appendBoundary(
-                            tableBorderAt(tableBorders, start),
+                            tableAtStart,
                             repeatedTableHeaderHeight + bleed,
                         );
                     }
 
                     if (end < totalHeight - 0.5) {
                         appendBoundary(
-                            tableBorderAt(tableBorders, end),
+                            tableBorderAt(tableBorders, end, 'end'),
                             Math.min(
                                 height - settings.questionBorderWidth,
                                 repeatedTableHeaderHeight +
