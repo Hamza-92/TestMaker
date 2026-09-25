@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -42,12 +43,12 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user'                => $user,
-                'permissions'         => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],
-                'is_master'           => $user?->isMasterSuperAdmin() ?? false,
+                'user' => $user,
+                'permissions' => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],
+                'is_master' => $user?->isMasterSuperAdmin() ?? false,
                 'teacher_permissions' => $user?->isTeacher() ? (array) ($user->teacher_permissions ?? []) : [],
-                'school_context'      => $this->schoolContext($user),
-                'is_impersonating'    => $request->session()->has('impersonator_id') && $user?->isCustomer(),
+                'school_context' => $this->schoolContext($user),
+                'is_impersonating' => $request->session()->has('impersonator_id') && $user?->isCustomer(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
 
@@ -73,16 +74,16 @@ class HandleInertiaRequests extends Middleware
         }
 
         $subscription = $user->activeSchoolSubscription();
-        $teacherCount = $owner->teachers()->count();
+        $teacherCount = SchoolTeacherSummary::for($user)['total'];
 
         return [
-            'school_name'         => $owner->school_name ?? $owner->name,
-            'is_owner'            => $user->isSchoolOwner(),
-            'allow_teachers'      => (bool) ($subscription?->allow_teachers ?? false),
+            'school_name' => $owner->school_name ?? $owner->name,
+            'is_owner' => $user->isSchoolOwner(),
+            'allow_teachers' => (bool) ($subscription?->allow_teachers ?? false),
             'allow_online_mcq_tests' => (bool) ($subscription?->allow_online_mcq_tests ?? false),
-            'max_teachers'        => $subscription?->max_teachers,
-            'teachers_used'       => $teacherCount,
-            'has_subscription'    => $subscription !== null,
+            'max_teachers' => $subscription?->max_teachers,
+            'teachers_used' => $teacherCount,
+            'has_subscription' => $subscription !== null,
         ];
     }
 }

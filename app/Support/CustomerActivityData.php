@@ -28,10 +28,17 @@ class CustomerActivityData
     {
         $query = self::query($user, null, '');
 
+        $counts = $query
+            ->reorder()
+            ->selectRaw('COUNT(*) as all_count')
+            ->selectRaw('SUM(CASE WHEN auditable_type = ? THEN 1 ELSE 0 END) as papers_count', [Paper::class])
+            ->selectRaw('SUM(CASE WHEN auditable_type = ? THEN 1 ELSE 0 END) as teachers_count', [User::class])
+            ->first();
+
         return [
-            'all' => (clone $query)->count(),
-            'papers' => (clone $query)->where('auditable_type', Paper::class)->count(),
-            'teachers' => (clone $query)->where('auditable_type', User::class)->count(),
+            'all' => (int) ($counts?->all_count ?? 0),
+            'papers' => (int) ($counts?->papers_count ?? 0),
+            'teachers' => (int) ($counts?->teachers_count ?? 0),
         ];
     }
 
@@ -115,7 +122,7 @@ class CustomerActivityData
         if ($user->isSchoolOwner()) {
             return array_values(array_unique([
                 $user->id,
-                ...$user->teachers()->pluck('id')->all(),
+                ...SchoolTeacherSummary::for($user)['ids'],
             ]));
         }
 
@@ -126,7 +133,7 @@ class CustomerActivityData
                 return array_values(array_unique([
                     $user->id,
                     $owner->id,
-                    ...$owner->teachers()->pluck('id')->all(),
+                    ...SchoolTeacherSummary::for($owner)['ids'],
                 ]));
             }
         }

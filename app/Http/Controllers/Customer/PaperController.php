@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\PaperFolder;
+use App\Support\SchoolTeacherSummary;
 use App\Support\SubjectiveAnswerAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -75,8 +76,13 @@ class PaperController extends Controller
         // the payload on each load and on each debounced search keystroke.
         $tab = $request->query('tab') === 'drafts' ? 'drafts' : 'papers';
 
-        $papersCount = (clone $base)->where('is_draft', false)->count();
-        $draftsCount = (clone $base)->where('is_draft', true)->count();
+        $tabCounts = (clone $base)
+            ->reorder()
+            ->selectRaw('SUM(CASE WHEN is_draft = 0 THEN 1 ELSE 0 END) as papers_count')
+            ->selectRaw('SUM(CASE WHEN is_draft = 1 THEN 1 ELSE 0 END) as drafts_count')
+            ->first();
+        $papersCount = (int) ($tabCounts?->papers_count ?? 0);
+        $draftsCount = (int) ($tabCounts?->drafts_count ?? 0);
 
         $items = (clone $base)
             ->where('is_draft', $tab === 'drafts')
@@ -87,10 +93,14 @@ class PaperController extends Controller
         // the per-folder counts above — they are navigation targets, so they
         // must not change as you filter. They used to be derived from the
         // full client-side list, which no longer exists.
-        $allScope = Paper::query()->whereIn('user_id', $userIds);
+        $sidebarCounts = Paper::query()
+            ->whereIn('user_id', $userIds)
+            ->selectRaw('COUNT(*) as all_count')
+            ->selectRaw('SUM(CASE WHEN folder_id IS NULL THEN 1 ELSE 0 END) as unfiled_count')
+            ->first();
         $sidebar = [
-            'all' => (clone $allScope)->count(),
-            'unfiled' => (clone $allScope)->whereNull('folder_id')->count(),
+            'all' => (int) ($sidebarCounts?->all_count ?? 0),
+            'unfiled' => (int) ($sidebarCounts?->unfiled_count ?? 0),
         ];
 
         return Inertia::render('customer/papers/index', [
@@ -396,7 +406,7 @@ class PaperController extends Controller
         if ($user->isSchoolOwner()) {
             $ids = array_values(array_unique([
                 ...$ids,
-                ...$user->teachers()->pluck('id')->all(),
+                ...SchoolTeacherSummary::for($user)['ids'],
             ]));
 
             return $ids;
@@ -409,7 +419,7 @@ class PaperController extends Controller
                 $ids = array_values(array_unique([
                     ...$ids,
                     $owner->id,
-                    ...$owner->teachers()->pluck('id')->all(),
+                    ...SchoolTeacherSummary::for($user)['ids'],
                 ]));
             }
         }

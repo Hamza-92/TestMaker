@@ -34,13 +34,13 @@ class CustomerDashboardData
     {
         $owner = $user->schoolOwner() ?? $user;
         $subscription = $user->activeSchoolSubscription();
-        $teachers = $owner->teachers()->get(['id', 'status']);
-        $teacherCount = $teachers->count();
-        $activeTeacherCount = $teachers->filter->isActive()->count();
+        $teacherSummary = SchoolTeacherSummary::for($user);
+        $teacherCount = $teacherSummary['total'];
+        $activeTeacherCount = $teacherSummary['active'];
         $paperOwnerIds = self::paperOwnerIds(
             $user,
             $owner,
-            $teachers->pluck('id')->map(static fn ($id): int => (int) $id)->all(),
+            $teacherSummary['ids'],
         );
         $papers = Paper::query()->whereIn('user_id', $paperOwnerIds);
         $paperStats = self::paperStats($papers);

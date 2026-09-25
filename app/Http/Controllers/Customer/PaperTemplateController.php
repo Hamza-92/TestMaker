@@ -58,7 +58,9 @@ class PaperTemplateController extends Controller
                 'to' => $items->lastItem(),
             ],
             // Unfiltered total, so the header count does not move as you search.
-            'totalCount' => PaperTemplate::where('user_id', $user->id)->count(),
+            'totalCount' => $search === ''
+                ? $items->total()
+                : PaperTemplate::where('user_id', $user->id)->count(),
             'filters' => ['q' => $search],
         ]);
     }
