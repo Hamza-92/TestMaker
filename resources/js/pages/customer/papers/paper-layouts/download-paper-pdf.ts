@@ -102,6 +102,78 @@ function cleanClone(source: HTMLElement): HTMLElement {
     return clone;
 }
 
+/** Keep headings that fit on one line in the measured DOM on one line in the SVG capture. */
+function preserveSingleLineHeadings(root: HTMLElement): void {
+    root.querySelectorAll<HTMLElement>('[data-paper-heading]').forEach(
+        (heading) => {
+            Array.from(heading.children).forEach((child) => {
+                if (!(child instanceof HTMLElement)) {
+                    return;
+                }
+
+                const lineHeight = Number.parseFloat(
+                    getComputedStyle(child).lineHeight,
+                );
+
+                if (
+                    Number.isFinite(lineHeight) &&
+                    child.getBoundingClientRect().height <= lineHeight + 2 &&
+                    child.scrollWidth <= child.clientWidth + 2
+                ) {
+                    child.style.whiteSpace = 'nowrap';
+                }
+            });
+        },
+    );
+}
+
+interface ObjectiveTableBorder {
+    top: number;
+    bottom: number;
+    left: number;
+    width: number;
+    color: string;
+    rowBoundaries: number[];
+}
+
+function objectiveTableBorders(root: HTMLElement): ObjectiveTableBorder[] {
+    const rootRect = root.getBoundingClientRect();
+
+    return Array.from(
+        root.querySelectorAll<HTMLTableElement>('[data-paper-objective-table]'),
+    ).map((table) => {
+        const rect = table.getBoundingClientRect();
+        const firstCell = table.querySelector('th, td');
+
+        return {
+            top: rect.top - rootRect.top,
+            bottom: rect.bottom - rootRect.top,
+            left: rect.left - rootRect.left,
+            width: rect.width,
+            color: firstCell
+                ? getComputedStyle(firstCell).borderTopColor
+                : '#000',
+            rowBoundaries: Array.from(table.querySelectorAll('tr')).map(
+                (row) => row.getBoundingClientRect().bottom - rootRect.top,
+            ),
+        };
+    });
+}
+
+function tableBorderAt(
+    tables: ObjectiveTableBorder[],
+    position: number,
+): ObjectiveTableBorder | undefined {
+    return tables.find(
+        (table) =>
+            position > table.top + 1 &&
+            position <= table.bottom + 1 &&
+            table.rowBoundaries.some(
+                (boundary) => Math.abs(boundary - position) <= 1.5,
+            ),
+    );
+}
+
 function measure(root: HTMLElement) {
     const offset = root.getBoundingClientRect().top;
     const interval = (element: Element): PaperInterval => {
@@ -254,6 +326,8 @@ export async function downloadPaperPdf({
         const captureStyleProperties = Array.from(
             getComputedStyle(document.documentElement),
         ).filter((property) => property !== 'font-size' && property !== 'font');
+        preserveSingleLineHeadings(holder);
+
         const fontEmbedCSS = await timeout(
             getFontEmbedCSS(holder),
             'Could not prepare the paper fonts. Please retry.',
@@ -279,6 +353,7 @@ export async function downloadPaperPdf({
             clone.querySelector('[data-paper-watermark]')?.remove();
 
             const geometry = measure(clone);
+            const tableBorders = objectiveTableBorders(clone);
             const totalHeight = clone.getBoundingClientRect().height;
             const cloneRect = clone.getBoundingClientRect();
             const tableHeaders: Array<{
@@ -317,6 +392,7 @@ export async function downloadPaperPdf({
                         });
                     });
             }
+
             const questionBounds = Array.from(
                 clone.querySelectorAll('[data-paper-question]'),
             ).map((question) => {
@@ -410,6 +486,53 @@ export async function downloadPaperPdf({
                     });
                 viewport.append(content);
                 page.append(viewport);
+
+                // A collapsed table border straddles its row boundary. When
+                // a PDF page ends exactly there, clipping removes half of the
+                // rule, so draw the boundary inside both page captures.
+                if (settings.questionBorderWidth > 0) {
+                    const appendBoundary = (
+                        table: ObjectiveTableBorder | undefined,
+                        top: number,
+                    ) => {
+                        if (!table) {
+                            return;
+                        }
+
+                        const rule = document.createElement('div');
+                        Object.assign(rule.style, {
+                            position: 'absolute',
+                            top: `${top}px`,
+                            left: `${table.left}px`,
+                            width: `${table.width}px`,
+                            borderTop: `${settings.questionBorderWidth}px ${settings.questionBorderStyle} ${table.color}`,
+                            zIndex: '3',
+                            pointerEvents: 'none',
+                        });
+                        page.append(rule);
+                    };
+
+                    if (start > 0) {
+                        appendBoundary(
+                            tableBorderAt(tableBorders, start),
+                            repeatedTableHeaderHeight + bleed,
+                        );
+                    }
+
+                    if (end < totalHeight - 0.5) {
+                        appendBoundary(
+                            tableBorderAt(tableBorders, end),
+                            Math.min(
+                                height - settings.questionBorderWidth,
+                                repeatedTableHeaderHeight +
+                                    end -
+                                    start +
+                                    bleed -
+                                    settings.questionBorderWidth,
+                            ),
+                        );
+                    }
+                }
 
                 if (repeatedTableHeader) {
                     const repeatedTable = repeatedTableHeader.table.cloneNode(
