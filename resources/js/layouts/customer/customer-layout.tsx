@@ -65,7 +65,7 @@ export default function CustomerLayout({
         >
             <div
                 data-customer-layout
-                className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950"
+                className="flex h-dvh overflow-hidden bg-slate-50 dark:bg-slate-950"
             >
                 <CustomerSidebar />
                 <div
@@ -75,7 +75,7 @@ export default function CustomerLayout({
                     <CustomerHeader />
                     <main
                         data-customer-content
-                        className="flex-1 overflow-y-auto p-4 md:p-6"
+                        className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6"
                     >
                         {children}
                     </main>

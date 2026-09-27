@@ -88,8 +88,8 @@ class TeacherController extends Controller
             'user_type' => UserType::Teacher->value,
             'school_id' => $owner->id,
             'created_by' => $owner->id,
-            'teacher_permissions' => TeacherPermission::defaults(),
-            'access_scope' => null,
+            'teacher_permissions' => [],
+            'access_scope' => [],
         ]);
 
         AuditLog::record(
@@ -105,8 +105,8 @@ class TeacherController extends Controller
             notes: 'Teacher added.',
         );
 
-        return redirect()->route('customer.teachers.index')
-            ->with('success', 'Teacher created successfully.');
+        return redirect()->route('customer.teachers.permissions', $teacher)
+            ->with('success', 'Teacher created. Choose the access they should have.');
     }
 
     public function edit(User $teacher)
@@ -203,27 +203,38 @@ class TeacherController extends Controller
 
         $teacherScope = TeacherAccess::boundedScope($teacher->access_scope, $ceiling, $resources);
 
-        $catalog = collect(TeacherPermission::cases())->map(fn (TeacherPermission $case) => [
-            'name' => $case->value,
-            'label' => $case->label(),
-            'description' => $case->description(),
-        ])->values();
+        $allowedPermissions = $this->assignablePermissions($subscription);
+        $catalog = collect(TeacherPermission::cases())
+            ->filter(fn (TeacherPermission $case) => in_array($case->value, $allowedPermissions, true))
+            ->map(fn (TeacherPermission $case) => [
+                'name' => $case->value,
+                'label' => $case->label(),
+                'description' => $case->description(),
+            ])->values();
+
+        $patternClassMap = $this->limitPatternClassMap($resources['patternClassMap'], $ceiling);
+        $classSubjectMap = $this->limitClassSubjectMap($resources['classSubjectMap'], $ceiling);
+        $allowedPatternIds = array_keys(array_filter($patternClassMap));
+        $allowedClassIds = array_values(array_unique(array_merge([], ...array_values($patternClassMap))));
+        $allowedSubjectIds = array_values(array_unique(array_merge([], ...array_values($classSubjectMap))));
 
         return Inertia::render('customer/teachers/permissions', [
             'teacher' => [
                 'id' => $teacher->id,
                 'name' => $teacher->name,
                 'email' => $teacher->email,
-                'teacher_permissions' => (array) ($teacher->teacher_permissions ?? []),
+                'teacher_permissions' => array_values(array_intersect(
+                    (array) ($teacher->teacher_permissions ?? []),
+                    $allowedPermissions,
+                )),
                 'access_scope' => $teacherScope,
             ],
             'permissionCatalog' => $catalog,
-            'ceilingScope' => $ceiling,
-            'patterns' => $resources['patterns'],
-            'classes' => $resources['classes'],
-            'subjects' => $resources['subjects'],
-            'patternClassMap' => $this->limitPatternClassMap($resources['patternClassMap'], $ceiling),
-            'classSubjectMap' => $this->limitClassSubjectMap($resources['classSubjectMap'], $ceiling),
+            'patterns' => $resources['patterns']->whereIn('id', $allowedPatternIds)->values(),
+            'classes' => $resources['classes']->whereIn('id', $allowedClassIds)->values(),
+            'subjects' => $resources['subjects']->whereIn('id', $allowedSubjectIds)->values(),
+            'patternClassMap' => $patternClassMap,
+            'classSubjectMap' => $classSubjectMap,
         ]);
     }
 
@@ -231,14 +242,17 @@ class TeacherController extends Controller
     {
         $this->authorizeTeacher($teacher);
 
-        $validated = $request->validate([
-            'permissions' => ['array'],
-            'permissions.*' => ['string', Rule::in(TeacherPermission::values())],
-            'access_scope' => ['nullable', 'array'],
-        ]);
-
         $owner = auth()->user();
         $subscription = $owner->activeSchoolSubscription();
+        abort_unless($subscription?->allow_teachers, 403);
+
+        $allowedPermissions = $this->assignablePermissions($subscription);
+
+        $validated = $request->validate([
+            'permissions' => ['array'],
+            'permissions.*' => ['string', Rule::in($allowedPermissions)],
+            'access_scope' => ['nullable', 'array'],
+        ]);
 
         $resources = $this->accessResources();
         $ceiling = $subscription
@@ -276,6 +290,21 @@ class TeacherController extends Controller
                 'quota' => "Teacher limit reached ({$limit}). Upgrade your plan to add more.",
             ]);
         }
+    }
+
+    private function assignablePermissions(Subscription $subscription): array
+    {
+        $permissions = [
+            TeacherPermission::GeneratePapers->value,
+            TeacherPermission::ManageOwnPapers->value,
+            TeacherPermission::ViewSchoolPapers->value,
+        ];
+
+        if ($subscription->allow_online_mcq_tests) {
+            $permissions[] = TeacherPermission::ManageOnlineTests->value;
+        }
+
+        return $permissions;
     }
 
     private function upgradeViewIfBlocked(User $owner, ?Subscription $subscription)

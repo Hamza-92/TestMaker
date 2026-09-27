@@ -892,77 +892,83 @@ export default function CustomerDashboard({
                             )}
                         </div>
 
-                        <Card padding="md" className="overflow-hidden">
-                            <div className="flex items-center justify-between gap-3">
-                                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                    Select Pattern / Syllabus
-                                </h2>
-                                <Button asChild variant="secondary" size="sm">
-                                    <Link href="/papers/generate">
-                                        View All Patterns
-                                    </Link>
-                                </Button>
-                            </div>
-                            {/* Pattern options remain in the same card body. */}
-
-                            {patterns.length === 0 ? (
-                                <div className="py-10 text-center">
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        No patterns available
-                                    </p>
-                                    <p className="mt-1 text-xs text-slate-400">
-                                        Your active plan does not include a
-                                        pattern yet.
-                                    </p>
+                        {permissions.can_generate_papers && (
+                            <Card padding="md" className="overflow-hidden">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                        Select Pattern / Syllabus
+                                    </h2>
+                                    <Button
+                                        asChild
+                                        variant="secondary"
+                                        size="sm"
+                                    >
+                                        <Link href="/papers/generate">
+                                            View All Patterns
+                                        </Link>
+                                    </Button>
                                 </div>
-                            ) : (
-                                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                                    {patterns.map((pattern, index) => {
-                                        const PatternIcon = patternIcon(
-                                            pattern.icon,
-                                        );
+                                {/* Pattern options remain in the same card body. */}
 
-                                        return (
-                                            <Link
-                                                key={pattern.id}
-                                                href={`/papers/generate?pattern=${pattern.id}`}
-                                                className="tm-lift tm-appear group flex min-h-32 flex-col rounded-xl p-4 text-white shadow-sm"
-                                                style={
-                                                    {
-                                                        backgroundColor:
-                                                            pattern.color,
-                                                        '--tm-accent':
-                                                            pattern.color,
-                                                        animationDelay: `${index * 35}ms`,
-                                                    } as CSSProperties
-                                                }
-                                            >
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="flex size-9 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
-                                                        <PatternIcon className="size-5" />
+                                {patterns.length === 0 ? (
+                                    <div className="py-10 text-center">
+                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                            No patterns available
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-400">
+                                            Your active plan does not include a
+                                            pattern yet.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                                        {patterns.map((pattern, index) => {
+                                            const PatternIcon = patternIcon(
+                                                pattern.icon,
+                                            );
+
+                                            return (
+                                                <Link
+                                                    key={pattern.id}
+                                                    href={`/papers/generate?pattern=${pattern.id}`}
+                                                    className="tm-lift tm-appear group flex min-h-32 flex-col rounded-xl p-4 text-white shadow-sm"
+                                                    style={
+                                                        {
+                                                            backgroundColor:
+                                                                pattern.color,
+                                                            '--tm-accent':
+                                                                pattern.color,
+                                                            animationDelay: `${index * 35}ms`,
+                                                        } as CSSProperties
+                                                    }
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex size-9 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
+                                                            <PatternIcon className="size-5" />
+                                                        </div>
+                                                        <span className="flex size-7 items-center justify-center rounded-full bg-white text-slate-900 transition-transform duration-200 group-hover:translate-x-0.5">
+                                                            <ArrowRightIcon className="size-3.5" />
+                                                        </span>
                                                     </div>
-                                                    <span className="flex size-7 items-center justify-center rounded-full bg-white text-slate-900 transition-transform duration-200 group-hover:translate-x-0.5">
-                                                        <ArrowRightIcon className="size-3.5" />
-                                                    </span>
-                                                </div>
-                                                <div className="mt-auto pt-4">
-                                                    <p className="truncate text-sm font-semibold">
-                                                        {pattern.name}
-                                                    </p>
-                                                    {pattern.description && (
-                                                        <p className="mt-0.5 truncate text-[10px] text-white/75">
-                                                            {
-                                                                pattern.description
-                                                            }
+                                                    <div className="mt-auto pt-4">
+                                                        <p className="truncate text-sm font-semibold">
+                                                            {pattern.name}
                                                         </p>
-                                                    )}
-                                                </div>
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </Card>
+                                                        {pattern.description && (
+                                                            <p className="mt-0.5 truncate text-[10px] text-white/75">
+                                                                {
+                                                                    pattern.description
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </Card>
+                        )}
                     </div>
 
                     <aside className="min-w-0 space-y-4">

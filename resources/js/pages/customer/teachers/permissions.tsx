@@ -1,7 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeftIcon, SaveIcon, ShieldCheckIcon, SlidersHorizontalIcon } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+import {
+    ArrowLeftIcon,
+    SaveIcon,
+    ShieldCheckIcon,
+    SlidersHorizontalIcon,
+} from 'lucide-react';
 import { HierarchicalAccessControl } from '@/components/subscription-access-control';
+import { Checkbox } from '@/components/ui/checkbox';
 import type {
     AccessClass,
     AccessPattern,
@@ -29,7 +34,6 @@ interface Teacher {
 interface Props {
     teacher: Teacher;
     permissionCatalog: PermissionCatalogItem[];
-    ceilingScope: SubscriptionAccessScope | null;
     patterns: AccessPattern[];
     classes: AccessClass[];
     subjects: AccessSubject[];
@@ -45,14 +49,13 @@ type FormValues = {
 export default function TeacherPermissions({
     teacher,
     permissionCatalog,
-    ceilingScope,
     patterns,
     classes,
     subjects,
     patternClassMap,
     classSubjectMap,
 }: Props) {
-    const { data, setData, put, processing } = useForm<FormValues>({
+    const { data, setData, put, processing, errors } = useForm<FormValues>({
         permissions: teacher.teacher_permissions ?? [],
         access_scope: teacher.access_scope ?? null,
     });
@@ -70,8 +73,6 @@ export default function TeacherPermissions({
         e.preventDefault();
         put(`/teachers/${teacher.id}/permissions`);
     }
-
-    const scopeInheritsFromSchool = ceilingScope === null;
 
     return (
         <>
@@ -107,18 +108,22 @@ export default function TeacherPermissions({
                                     Feature Permissions
                                 </p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Toggle which parts of the app this teacher can use.
+                                    Toggle which parts of the app this teacher
+                                    can use.
                                 </p>
                             </div>
                         </div>
 
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                             {permissionCatalog.map((permission) => {
-                                const checked = data.permissions.includes(permission.name);
+                                const checked = data.permissions.includes(
+                                    permission.name,
+                                );
 
                                 return (
                                     <label
                                         key={permission.name}
+                                        htmlFor={`teacher-permission-${permission.name}`}
                                         className={cn(
                                             'flex cursor-pointer items-start gap-3 px-5 py-4 transition-colors',
                                             checked
@@ -127,9 +132,13 @@ export default function TeacherPermissions({
                                         )}
                                     >
                                         <Checkbox
+                                            id={`teacher-permission-${permission.name}`}
                                             checked={checked}
                                             onCheckedChange={(v) =>
-                                                togglePermission(permission.name, v === true)
+                                                togglePermission(
+                                                    permission.name,
+                                                    v === true,
+                                                )
                                             }
                                             className="mt-0.5"
                                         />
@@ -145,6 +154,11 @@ export default function TeacherPermissions({
                                 );
                             })}
                         </div>
+                        {errors.permissions && (
+                            <p className="px-5 py-3 text-xs text-rose-600 dark:text-rose-400">
+                                {errors.permissions}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-3">
@@ -153,21 +167,34 @@ export default function TeacherPermissions({
                                 Content Access
                             </h2>
                             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                                {scopeInheritsFromSchool
-                                    ? 'No active subscription found — assign a subscription to unlock content access.'
-                                    : 'Pick which patterns, classes, and subjects this teacher can use. The list is limited to what your school subscription allows.'}
+                                Select the patterns, classes, and subjects this
+                                teacher can use. Nothing is assigned until you
+                                select it, and choices cannot exceed your school
+                                subscription.
                             </p>
                         </div>
 
-                        <HierarchicalAccessControl
-                            patterns={patterns}
-                            classes={classes}
-                            subjects={subjects}
-                            patternClassMap={patternClassMap}
-                            classSubjectMap={classSubjectMap}
-                            value={data.access_scope}
-                            onChange={(next) => setData('access_scope', next)}
-                        />
+                        {patterns.length === 0 ? (
+                            <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                                No patterns or classes are available in your
+                                school subscription.
+                            </p>
+                        ) : (
+                            <HierarchicalAccessControl
+                                patterns={patterns}
+                                classes={classes}
+                                subjects={subjects}
+                                patternClassMap={patternClassMap}
+                                classSubjectMap={classSubjectMap}
+                                value={data.access_scope}
+                                onChange={(next) =>
+                                    setData('access_scope', next)
+                                }
+                                selectAllLabel="Select all"
+                                selectDescendantsOnParentToggle={false}
+                                error={errors.access_scope}
+                            />
+                        )}
                     </div>
 
                     <div className="flex justify-end gap-3">

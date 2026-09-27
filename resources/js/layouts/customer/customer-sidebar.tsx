@@ -19,6 +19,7 @@ interface NavItem {
     href: string;
     icon: React.ElementType;
     requires?: string;
+    requiresAny?: string[];
 }
 
 interface NavGroup {
@@ -61,7 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
                 label: 'Saved Papers',
                 href: '/papers',
                 icon: BookmarkIcon,
-                requires: 'manage_own_papers',
+                requiresAny: ['manage_own_papers', 'view_school_papers'],
             },
             {
                 label: 'My Templates',
@@ -200,6 +201,12 @@ function SidebarContent({
                 return true;
             }
 
+            if (item.requiresAny) {
+                return item.requiresAny.some((permission) =>
+                    teacherPermissions.includes(permission),
+                );
+            }
+
             if (!item.requires) {
                 return false;
             }
@@ -215,6 +222,9 @@ function SidebarContent({
         ...visibleGroups.flatMap((g) => g.items.map((i) => i.href)),
     ];
     const activeHref = resolveActiveHref(url, allHrefs);
+    const isTeacherAccessPage = /^\/teachers\/\d+\/permissions\/?$/.test(
+        url.split('?')[0],
+    );
 
     return (
         <>
@@ -243,7 +253,8 @@ function SidebarContent({
             {/* ── Nav ────────────────────────────────────────────────────────── */}
             <nav
                 className={[
-                    'scrollbar-slim flex-1 space-y-4 overflow-x-hidden overflow-y-auto pt-3 pb-3',
+                    'flex-1 space-y-4 overflow-x-hidden overflow-y-auto pt-3 pb-3',
+                    isTeacherAccessPage ? 'scrollbar-hidden' : 'scrollbar-slim',
                     collapsed ? 'px-2' : 'px-3',
                 ].join(' ')}
             >

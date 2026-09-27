@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     BookmarkIcon,
     CalendarIcon,
@@ -68,6 +68,14 @@ interface Props {
     filters?: { q?: string; folder?: string | null; tab?: Tab };
 }
 
+interface AccessPageProps {
+    auth: {
+        school_context?: { is_owner: boolean } | null;
+        teacher_permissions?: string[];
+    };
+    [key: string]: unknown;
+}
+
 function csrf(): string {
     return (
         (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
@@ -117,6 +125,11 @@ export default function PapersIndex({
     folders = [],
     filters,
 }: Props) {
+    const { auth } = usePage<AccessPageProps>().props;
+    const isOwner = auth.school_context?.is_owner ?? false;
+    const teacherPermissions = auth.teacher_permissions ?? [];
+    const canManagePapers = isOwner || teacherPermissions.includes('manage_own_papers');
+    const canGeneratePapers = isOwner || teacherPermissions.includes('generate_papers');
     const activeTab: Tab = filters?.tab ?? 'papers';
     const activeFolder = filters?.folder ?? null;
 
@@ -484,11 +497,11 @@ export default function PapersIndex({
 
     return (
         <>
-            <Head title="My Papers" />
+            <Head title={canManagePapers ? 'My Papers' : 'School Papers'} />
 
             <div className="w-full space-y-5">
                 <PageHeader
-                    title="My Papers"
+                    title={canManagePapers ? 'My Papers' : 'School Papers'}
                     meta={
                         <>
                             {counts.papers} saved &middot; {counts.drafts} draft
@@ -497,18 +510,20 @@ export default function PapersIndex({
                     }
                     actions={
                         <>
-                            {!selectionMode && rows.length > 0 && (
+                            {canManagePapers && !selectionMode && selectableIds.length > 0 && (
                                 <Button onClick={() => setSelectionMode(true)}>
                                     <CheckSquareIcon />
                                     Select
                                 </Button>
                             )}
-                            <Button asChild variant="primary">
-                                <Link href="/papers/generate">
-                                    <PlusIcon />
-                                    New Paper
-                                </Link>
-                            </Button>
+                            {canGeneratePapers && (
+                                <Button asChild variant="primary">
+                                    <Link href="/papers/generate">
+                                        <PlusIcon />
+                                        New Paper
+                                    </Link>
+                                </Button>
+                            )}
                         </>
                     }
                 />
@@ -519,14 +534,16 @@ export default function PapersIndex({
                             <p className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
                                 Folders
                             </p>
-                            <button
-                                type="button"
-                                onClick={() => setIsFolderModalOpen(true)}
-                                title="New folder"
-                                className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-800"
-                            >
-                                <FolderPlusIcon className="size-4" />
-                            </button>
+                            {canManagePapers && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFolderModalOpen(true)}
+                                    title="New folder"
+                                    className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-800"
+                                >
+                                    <FolderPlusIcon className="size-4" />
+                                </button>
+                            )}
                         </div>
 
                         <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-slate-900">
@@ -569,8 +586,8 @@ export default function PapersIndex({
                                             page: 1,
                                         })
                                     }
-                                    onRename={() => setRenamingFolder(folder)}
-                                    onDelete={() => setDeletingFolder(folder)}
+                                    onRename={canManagePapers ? () => setRenamingFolder(folder) : undefined}
+                                    onDelete={canManagePapers ? () => setDeletingFolder(folder) : undefined}
                                 />
                             ))}
                         </div>
@@ -664,7 +681,7 @@ export default function PapersIndex({
                                         : undefined
                                 }
                                 action={
-                                    activeTab === 'papers' ? (
+                                    activeTab === 'papers' && canGeneratePapers ? (
                                         <Button asChild variant="primary">
                                             <Link href="/papers/generate">
                                                 <PlusIcon />
@@ -693,7 +710,7 @@ export default function PapersIndex({
                                     // actionable, so they stay inert in
                                     // selection mode.
                                     const selectable =
-                                        selectionMode &&
+                                        canManagePapers && selectionMode &&
                                         paper.is_mine !== false;
 
                                     return (
@@ -845,7 +862,7 @@ export default function PapersIndex({
                                                     selectionMode && 'hidden',
                                                 )}
                                             >
-                                                {activeTab === 'papers' && (
+                                                {activeTab === 'papers' && canManagePapers && paper.is_mine !== false && (
                                                     <Button
                                                         asChild
                                                         variant="ghost"
@@ -860,7 +877,7 @@ export default function PapersIndex({
                                                         </a>
                                                     </Button>
                                                 )}
-                                                {paper.is_mine !== false ? (
+                                                {canManagePapers && paper.is_mine !== false ? (
                                                     <>
                                                         <Button
                                                             asChild
@@ -922,11 +939,9 @@ export default function PapersIndex({
                                                     </>
                                                 ) : (
                                                     <Button asChild size="sm">
-                                                        <Link
-                                                            href={`/papers/${paper.id}/edit`}
-                                                        >
-                                                            View
-                                                        </Link>
+                                                        <a href={`/papers/${paper.id}/pdf`}>
+                                                            Download PDF
+                                                        </a>
                                                     </Button>
                                                 )}
                                             </div>

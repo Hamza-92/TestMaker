@@ -84,6 +84,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
             Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
             Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
+        });
+
+        Route::middleware('teacher.feature:generate_papers,manage_own_papers')->group(function () {
             Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
         });
 

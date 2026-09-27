@@ -412,6 +412,14 @@ input[type='date']::-webkit-calendar-picker-indicator {
     background: rgba(255 255 255 / 0.25);
 }
 
+.scrollbar-hidden {
+    scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+}
+
 .rich-question-editor :where(p, div) {
     margin: 0 0 0.5rem;
 }

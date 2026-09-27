@@ -59,3 +59,61 @@ test('a teacher who can generate papers can save and update their paper', functi
     expect($paper->fresh()->name)->toBe('Updated Physics Paper');
     expect($paper->fresh()->total_marks)->toBe(21.25);
 });
+
+test('a teacher who manages own papers can update an existing paper without generation access', function () {
+    $school = User::factory()->create([
+        'user_type' => UserType::Customer->value,
+        'status' => UserStatus::Active->value,
+    ]);
+    $teacher = User::factory()->create([
+        'user_type' => UserType::Teacher->value,
+        'status' => UserStatus::Active->value,
+        'school_id' => $school->id,
+        'teacher_permissions' => ['manage_own_papers'],
+    ]);
+    $paper = Paper::create([
+        'user_id' => $teacher->id,
+        'name' => 'My Paper',
+        'total_marks' => 10,
+        'paper_data' => ['paper' => ['sections' => []]],
+        'is_draft' => false,
+    ]);
+
+    $this->actingAs($teacher)->putJson(route('customer.papers.update', $paper), [
+        'name' => 'Edited Paper',
+        'total_marks' => 15,
+        'paper_data' => ['paper' => ['sections' => []]],
+        'is_draft' => false,
+    ])->assertOk();
+
+    expect($paper->fresh()->name)->toBe('Edited Paper');
+    $this->actingAs($teacher)->postJson(route('customer.papers.store'), [
+        'name' => 'New Paper',
+        'total_marks' => 10,
+        'paper_data' => ['paper' => ['sections' => []]],
+    ])->assertForbidden();
+});
+
+test('a teacher with view-only school paper access cannot edit a colleague paper', function () {
+    $school = User::factory()->create([
+        'user_type' => UserType::Customer->value,
+        'status' => UserStatus::Active->value,
+    ]);
+    $teacher = User::factory()->create([
+        'user_type' => UserType::Teacher->value,
+        'status' => UserStatus::Active->value,
+        'school_id' => $school->id,
+        'teacher_permissions' => ['view_school_papers'],
+    ]);
+    $paper = Paper::create([
+        'user_id' => $school->id,
+        'name' => 'School Paper',
+        'total_marks' => 10,
+        'paper_data' => ['paper' => ['sections' => []]],
+        'is_draft' => false,
+    ]);
+
+    $this->actingAs($teacher)->get(route('customer.papers.index'))->assertOk();
+    $this->actingAs($teacher)->get(route('customer.papers.pdf.saved', $paper))->assertOk();
+    $this->actingAs($teacher)->get(route('customer.papers.edit', $paper))->assertForbidden();
+});

@@ -1,5 +1,5 @@
 import { BookOpenIcon, ChevronDownIcon, GraduationCapIcon, LayoutGridIcon, LockIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -30,6 +30,8 @@ interface Props {
     value: SubscriptionAccessScope | null;
     onChange: (value: SubscriptionAccessScope | null) => void;
     error?: string;
+    selectAllLabel?: string;
+    selectDescendantsOnParentToggle?: boolean;
 }
 
 export function HierarchicalAccessControl({
@@ -41,9 +43,12 @@ export function HierarchicalAccessControl({
     value,
     onChange,
     error,
+    selectAllLabel = 'Full access',
+    selectDescendantsOnParentToggle = true,
 }: Props) {
     const [openPatterns, setOpenPatterns] = useState<Record<string, boolean>>({});
     const [activeClasses, setActiveClasses] = useState<Record<string, number | null>>({});
+    const controlId = useId();
 
     const classLookup = Object.fromEntries(classes.map((schoolClass) => [schoolClass.id, schoolClass]));
     const subjectLookup = Object.fromEntries(subjects.map((subject) => [subject.id, subject]));
@@ -68,25 +73,27 @@ export function HierarchicalAccessControl({
         );
     }
 
-    function buildClassRule(patternId: number, classId: number) {
+    function buildClassRule(patternId: number, classId: number, selectSubjects = selectDescendantsOnParentToggle) {
         const availableSubjectIds = getAvailableSubjectIds(patternId, classId, classSubjectMap);
-        return { subjects: availableSubjectIds.length === 0 ? [] : null };
+        return { subjects: selectSubjects && availableSubjectIds.length > 0 ? null : [] };
     }
 
-    function buildPatternRule(patternId: number) {
+    function buildPatternRule(patternId: number, selectClasses = selectDescendantsOnParentToggle) {
         return {
-            classes: Object.fromEntries(
-                getAvailableClassIds(patternId, patternClassMap).map((classId) => [
-                    String(classId),
-                    buildClassRule(patternId, classId),
-                ]),
-            ),
+            classes: selectClasses
+                ? Object.fromEntries(
+                    getAvailableClassIds(patternId, patternClassMap).map((classId) => [
+                        String(classId),
+                        buildClassRule(patternId, classId, true),
+                    ]),
+                )
+                : {},
         };
     }
 
     function buildFullScope(): SubscriptionAccessScope {
         return Object.fromEntries(
-            patterns.map((pattern) => [String(pattern.id), buildPatternRule(pattern.id)]),
+            patterns.map((pattern) => [String(pattern.id), buildPatternRule(pattern.id, true)]),
         );
     }
 
@@ -96,6 +103,7 @@ export function HierarchicalAccessControl({
     }
 
     function isFullScope(scope: SubscriptionAccessScope) {
+        if (patterns.length === 0) return false;
         if (Object.keys(scope).length !== patterns.length) return false;
         return patterns.every((pattern) => {
             const availableClassIds = getAvailableClassIds(pattern.id, patternClassMap);
@@ -142,7 +150,7 @@ export function HierarchicalAccessControl({
     }
 
     function handleFullAccessToggle(checked: boolean) {
-        onChange(checked ? null : buildFullScope());
+        onChange(checked ? null : {});
     }
 
     function handlePatternToggle(patternId: number, checked: boolean) {
@@ -158,9 +166,16 @@ export function HierarchicalAccessControl({
 
     function handlePatternSelectAllClasses(patternId: number, checked: boolean) {
         updateScope((scope) => {
-            const patternRule = scope[String(patternId)];
-            if (!patternRule) return;
-            patternRule.classes = checked ? buildPatternRule(patternId).classes : {};
+            const patternRule = scope[String(patternId)] ?? { classes: {} };
+            scope[String(patternId)] = patternRule;
+            patternRule.classes = checked
+                ? Object.fromEntries(
+                    getAvailableClassIds(patternId, patternClassMap).map((classId) => [
+                        String(classId),
+                        buildClassRule(patternId, classId),
+                    ]),
+                )
+                : {};
         });
         if (checked) setPatternOpen(patternId, true);
     }
@@ -242,12 +257,14 @@ export function HierarchicalAccessControl({
                             />
                         </div>
                     </div>
-                    <label className="bg-muted/40 flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3">
+                    <label htmlFor={`${controlId}-all`} className="bg-muted/40 flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3">
                         <Checkbox
-                            checked={value === null}
+                            id={`${controlId}-all`}
+                            checked={patterns.length > 0 && (value === null || isFullScope(value))}
+                            disabled={patterns.length === 0}
                             onCheckedChange={(checked) => handleFullAccessToggle(checked === true)}
                         />
-                        <span className="text-sm font-medium">Full access</span>
+                        <span className="text-sm font-medium">{selectAllLabel}</span>
                     </label>
                 </div>
 
@@ -282,6 +299,7 @@ export function HierarchicalAccessControl({
                                     <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
                                         <div className="flex min-w-0 flex-1 items-center gap-3">
                                             <Checkbox
+                                                id={`${controlId}-pattern-${pattern.id}`}
                                                 checked={patternSelected}
                                                 onCheckedChange={(checked) =>
                                                     handlePatternToggle(pattern.id, checked === true)
@@ -289,9 +307,9 @@ export function HierarchicalAccessControl({
                                             />
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <p className="truncate text-sm font-semibold">
+                                                    <label htmlFor={`${controlId}-pattern-${pattern.id}`} className="cursor-pointer truncate text-sm font-semibold">
                                                         {pattern.name}
-                                                    </p>
+                                                    </label>
                                                     {pattern.short_name && (
                                                         <Badge variant="outline" className="text-[11px]">
                                                             {pattern.short_name}
@@ -308,12 +326,11 @@ export function HierarchicalAccessControl({
                                         </div>
 
                                         <div className="flex items-center gap-2">
-                                            <label className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium">
+                                            <label htmlFor={`${controlId}-classes-${pattern.id}`} className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium">
                                                 <Checkbox
+                                                    id={`${controlId}-classes-${pattern.id}`}
                                                     checked={allClassesSelected}
-                                                    disabled={
-                                                        !patternSelected || availableClassIds.length === 0
-                                                    }
+                                                    disabled={availableClassIds.length === 0}
                                                     onCheckedChange={(checked) =>
                                                         handlePatternSelectAllClasses(
                                                             pattern.id,
@@ -402,12 +419,13 @@ export function HierarchicalAccessControl({
                                                                     <button
                                                                         type="button"
                                                                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left"
-                                                                        onClick={() =>
-                                                                            toggleActiveClass(
-                                                                                pattern.id,
-                                                                                classId,
-                                                                            )
-                                                                        }
+                                                                        onClick={() => {
+                                                                            if (classSelected) {
+                                                                                toggleActiveClass(pattern.id, classId);
+                                                                            } else {
+                                                                                handleClassToggle(pattern.id, classId, true);
+                                                                            }
+                                                                        }}
                                                                         disabled={!patternSelected}
                                                                     >
                                                                         <span
@@ -467,8 +485,9 @@ export function HierarchicalAccessControl({
                                                                         {classLookup[activeClassId]?.name ??
                                                                             `Class #${activeClassId}`}
                                                                     </p>
-                                                                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                                                                    <label htmlFor={`${controlId}-subjects-${pattern.id}-${activeClassId}`} className="flex cursor-pointer items-center gap-2 text-xs font-medium">
                                                                         <Checkbox
+                                                                            id={`${controlId}-subjects-${pattern.id}-${activeClassId}`}
                                                                             checked={allSubjectsSelected}
                                                                             disabled={
                                                                                 !classSelected ||
