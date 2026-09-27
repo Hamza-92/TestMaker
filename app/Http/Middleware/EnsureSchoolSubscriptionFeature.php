@@ -26,9 +26,10 @@ class EnsureSchoolSubscriptionFeature
         }
 
         return Inertia::render('customer/blocked', [
-            'title'   => 'Upgrade required',
+            'title'   => 'Feature unavailable',
             'heading' => 'This feature is not in your plan',
-            'message' => 'Your current school subscription does not include online MCQ tests. Contact support or upgrade the plan to unlock it.',
+            'message' => 'Your current school subscription does not include online MCQ tests. Contact TestMaker to ask about access.',
+            'contactSupport' => true,
             'primary' => [
                 'href'  => '/dashboard',
                 'label' => 'Back to Dashboard',

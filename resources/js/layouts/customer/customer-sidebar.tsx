@@ -3,6 +3,7 @@ import {
     ActivityIcon,
     BookmarkIcon,
     FilePlusIcon,
+    HeadsetIcon,
     LayoutDashboardIcon,
     LayoutTemplateIcon,
     SettingsIcon,
@@ -10,6 +11,7 @@ import {
     UsersIcon,
     XIcon,
 } from 'lucide-react';
+import { CONTACT_EMAIL, CONTACT_PHONES } from '@/lib/contact';
 import { useCustomerSidebar } from './customer-layout';
 
 interface NavItem {
@@ -81,17 +83,22 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
             { label: 'Teachers', href: '/teachers', icon: UsersIcon },
 
-
-            { label: 'Settings', href: '/customer/settings', icon: SettingsIcon },
+            {
+                label: 'Settings',
+                href: '/customer/settings',
+                icon: SettingsIcon,
+            },
         ],
     },
     {
         title: 'Analytics',
         ownerOnly: true,
         items: [
-
-            { label: 'Activity Log', href: '/customer/activity', icon: ActivityIcon },
-
+            {
+                label: 'Activity Log',
+                href: '/customer/activity',
+                icon: ActivityIcon,
+            },
         ],
     },
 ];
@@ -177,15 +184,29 @@ function SidebarContent({
         (user.name as string);
 
     const visibleGroups = NAV_GROUPS.map((group) => {
-        if (group.ownerOnly && !isOwner) return null;
+        if (group.ownerOnly && !isOwner) {
+            return null;
+        }
+
         const items = group.items.filter((item) => {
-            if (item.href === '/online-tests' && !schoolContext?.allow_online_mcq_tests) {
+            if (
+                item.href === '/online-tests' &&
+                !schoolContext?.allow_online_mcq_tests
+            ) {
                 return false;
             }
-            if (isOwner) return true;
-            if (!item.requires) return false;
+
+            if (isOwner) {
+                return true;
+            }
+
+            if (!item.requires) {
+                return false;
+            }
+
             return teacherPermissions.includes(item.requires);
         });
+
         return items.length > 0 ? { ...group, items } : null;
     }).filter((g): g is NavGroup => g !== null);
 
@@ -263,23 +284,47 @@ function SidebarContent({
                 ))}
             </nav>
 
-            {/* ── Upgrade card ───────────────────────────────────────────────── */}
+            {/* ── Contact card ───────────────────────────────────────────────── */}
             {!collapsed && (
-                <div className="mx-3 mb-3 rounded-lg border border-white/10 bg-white/[0.06] p-3">
-                    <div className="mb-1.5 flex items-center gap-2">
-                        <div className="flex size-5 items-center justify-center rounded-md bg-amber-400">
-                            <SparklesIcon className="size-3 text-amber-950" />
+                <div className="mx-3 mb-3 rounded-xl border border-white/15 bg-gradient-to-br from-white/10 to-brand-800/40 p-3 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2.5">
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-400/20 text-brand-100">
+                            <HeadsetIcon className="size-4" />
                         </div>
-                        <span className="text-xs font-semibold text-white">
-                            Upgrade Plan
-                        </span>
+                        <div>
+                            <p className="text-xs font-semibold text-white">
+                                Need help?
+                            </p>
+                            <p className="text-[11px] text-brand-100/70">
+                                Contact TestMaker
+                            </p>
+                        </div>
                     </div>
-                    <p className="mb-2.5 text-[11px] leading-relaxed text-brand-100/60">
-                        Unlock unlimited questions and advanced analytics.
-                    </p>
-                    <button className="w-full cursor-pointer rounded-md bg-brand-500 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-400 active:bg-brand-600">
-                        View Plans
-                    </button>
+                    <div className="border-t border-white/10 pt-3">
+                        <p className="mb-1 text-[10px] font-semibold tracking-wide text-brand-100/60 uppercase">
+                            Email
+                        </p>
+                        <a
+                            href={`mailto:${CONTACT_EMAIL}`}
+                            className="block text-[13px] font-medium tracking-tight whitespace-nowrap text-white hover:underline"
+                        >
+                            {CONTACT_EMAIL}
+                        </a>
+                        <p className="mt-3 mb-1 text-[10px] font-semibold tracking-wide text-brand-100/60 uppercase">
+                            Call / WhatsApp
+                        </p>
+                        <div className="space-y-1">
+                            {CONTACT_PHONES.map((phone) => (
+                                <a
+                                    key={phone.display}
+                                    href={`tel:${phone.tel}`}
+                                    className="block text-[13px] font-medium text-white hover:underline"
+                                >
+                                    {phone.display}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
         </>

@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { ArrowUp, ArrowUpRight, ChevronDown, Menu, SquareCheckBig, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import SiteContactBar from '@/components/site-contact-bar';
 import { dashboard, login, register } from '@/routes';
 import type { Auth } from '@/types/auth';
 
@@ -19,7 +20,9 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
 
     useEffect(() => {
         const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') setIsMenuOpen(false);
+            if (event.key === 'Escape') {
+                setIsMenuOpen(false);
+            }
         };
 
         document.body.style.overflow = isMenuOpen ? 'hidden' : '';
@@ -34,7 +37,9 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
     useEffect(() => {
         const updateBackToTop = () => setShowBackToTop(window.scrollY > window.innerHeight * 0.75);
         updateBackToTop();
+
         window.addEventListener('scroll', updateBackToTop, { passive: true });
+
         return () => window.removeEventListener('scroll', updateBackToTop);
     }, []);
 
@@ -44,6 +49,7 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
     return (
         <>
             <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
+                <SiteContactBar />
                 <div className="mx-auto flex h-[74px] w-full max-w-[1360px] items-center justify-between px-4 sm:px-6 lg:px-8">
                     <Link href="/" className="flex items-center gap-2.5 rounded-lg text-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/20" aria-label="TestMaker home">
                         <SquareCheckBig size={30} strokeWidth={2.4} className="text-brand-600" aria-hidden="true" />

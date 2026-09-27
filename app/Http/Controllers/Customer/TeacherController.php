@@ -297,10 +297,6 @@ class TeacherController extends Controller
                 'Control which features each teacher can access',
                 'Track paper activity per teacher',
             ],
-            'support' => [
-                'email' => config('mail.support_address') ?: 'support@testmaker.app',
-                'phone' => config('app.support_phone'),
-            ],
         ]);
     }
 
