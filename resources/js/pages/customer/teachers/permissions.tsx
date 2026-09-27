@@ -97,7 +97,8 @@ export default function TeacherPermissions({
                     </div>
                 </div>
 
-                <form onSubmit={submit} className="space-y-6">
+                {/* Contain Radix's absolute hidden inputs within the scrolling content. */}
+                <form onSubmit={submit} className="relative space-y-6">
                     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                         <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                             <div className="flex size-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
@@ -197,7 +198,7 @@ export default function TeacherPermissions({
                         )}
                     </div>
 
-                    <div className="flex justify-end gap-3">
+                    <div className="sticky bottom-0 z-20 -mx-4 -mb-4 flex justify-end gap-3 border-y border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur md:-mx-6 md:-mb-6 md:px-6 dark:border-slate-800 dark:bg-slate-900/95">
                         <Link
                             href="/teachers"
                             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -210,7 +211,7 @@ export default function TeacherPermissions({
                             className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-60"
                         >
                             <SaveIcon className="size-4" />
-                            Save Access
+                            {processing ? 'Saving…' : 'Save Access'}
                         </button>
                     </div>
                 </form>
