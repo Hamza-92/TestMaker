@@ -424,6 +424,10 @@ input[type='date']::-webkit-calendar-picker-indicator {
     margin: 0 0 0.5rem;
 }
 
+[data-paper-preview-only] [data-paper-edit-actions] {
+    display: none;
+}
+
 .rich-question-editor :where(h3, h4) {
     margin: 0.35rem 0 0.2rem;
     font-weight: 700;

@@ -16,6 +16,7 @@ use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\QuestionTypeOrGroup;
 use App\Support\AppUserAccess;
+use App\Support\CustomerPaperDefaults;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use App\Support\SubjectiveAnswerAccess;
@@ -125,6 +126,7 @@ class GeneratePaperController extends Controller
             ->values();
 
         return [
+            'paperDefaults' => CustomerPaperDefaults::forUser(auth()->user()),
             'patterns' => $patterns,
             'patternClasses' => $patternClasses,
             'classSubjects' => $classSubjects,

@@ -70,6 +70,8 @@ import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
 import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
+import { preferredPaperSettings } from './paper-layouts/paper-preferences';
+import type { PaperPreferences } from './paper-layouts/paper-preferences';
 import {
     SET_LABELS,
     setLabelFor,
@@ -116,6 +118,7 @@ import type {
     PaperImageSize,
     PaperQuestionOption,
     PaperSettings,
+    PaperViewMode,
 } from './paper-layouts/types';
 
 interface Pattern {
@@ -331,6 +334,7 @@ interface Props {
     appliedTemplate?: AppliedTemplate;
     initialPatternId?: number | null;
     canViewSubjectiveAnswers: boolean;
+    paperDefaults?: PaperPreferences | null;
 }
 
 interface SourceOption {
@@ -340,11 +344,6 @@ interface SourceOption {
 
 type StepState = 'active' | 'done' | 'upcoming';
 type FormStep = 'chapters' | 'questions';
-type PaperViewMode =
-    | 'paper'
-    | 'answer_key'
-    | 'answers_on_paper'
-    | 'subjective_answers';
 type SelectionMode = 'automatic' | 'manual';
 type SourceFilterKey = string;
 type SectionCategory = 'Objective Questions' | 'Subjective Questions';
@@ -2998,6 +2997,7 @@ export default function GeneratePaper({
     appliedTemplate,
     initialPatternId,
     canViewSubjectiveAnswers,
+    paperDefaults,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
@@ -3007,7 +3007,8 @@ export default function GeneratePaper({
         ''
     ).trim();
     const defaultSchoolName = configuredSchoolName || 'School Name';
-    const defaultPaperTopMargin = DEFAULT_PAPER_SETTINGS.marginTop;
+    const defaultSettings = preferredPaperSettings(paperDefaults);
+    const defaultPaperTopMargin = defaultSettings.marginTop;
     const schoolAddress =
         typeof auth.user.address === 'string' ? auth.user.address : '';
     const showSchoolAddress = Boolean(auth.user.is_show_address);
@@ -3133,8 +3134,10 @@ export default function GeneratePaper({
         null,
     );
     const [activeSetIndex, setActiveSetIndex] = useState(0);
-    const [numSets, setNumSets] = useState(1);
-    const [viewMode, setViewMode] = useState<PaperViewMode>('paper');
+    const [numSets, setNumSets] = useState(paperDefaults?.numSets ?? 1);
+    const [viewMode, setViewMode] = useState<PaperViewMode>(
+        paperDefaults?.viewMode ?? 'paper',
+    );
     const [printAllSets, setPrintAllSets] = useState(false);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const pdfDownloadStarted = useRef(false);
@@ -5374,6 +5377,7 @@ export default function GeneratePaper({
                     marks: questionSelection.totalMarks,
                     passingMarks: 0,
                     rollNo: '',
+                    ...paperDefaults?.header,
                 },
                 sections,
                 sectioning: {
@@ -5383,7 +5387,7 @@ export default function GeneratePaper({
                     medium: chapterMedium,
                 },
                 settings: {
-                    ...DEFAULT_PAPER_SETTINGS,
+                    ...defaultSettings,
                     marginTop: defaultPaperTopMargin,
                     paperLayout: effectivePaperLayout,
                     objectiveLayout:
@@ -5394,12 +5398,7 @@ export default function GeneratePaper({
                         objectiveAssignment?.objective_layout ===
                             'federal-row' &&
                         Boolean(objectiveAssignment.objective_bubbles),
-                    showSections:
-                        usesCustomLayout ||
-                        paperSectioning.active ||
-                        effectivePaperLayout === 'federal-board'
-                            ? true
-                            : DEFAULT_PAPER_SETTINGS.showSections,
+                    showSections: defaultSettings.showSections,
                 },
             });
             setPaperQuestionPickerTarget(null);
@@ -5455,7 +5454,7 @@ export default function GeneratePaper({
                 medium: 'English',
             },
             settings: {
-                ...DEFAULT_PAPER_SETTINGS,
+                ...defaultSettings,
                 marginTop: defaultPaperTopMargin,
                 bubbleSheetEnabled: true,
                 bubbleSheetMode: 'only',
@@ -12987,6 +12986,9 @@ export function GeneratedPaperView({
     onPickerSearchChange,
     onPickerSelect,
     onPickerClose,
+    previewOnly = false,
+    toolbarExtras,
+    footerActions,
 }: {
     paper: GeneratedPaper;
     rawPaper: GeneratedPaper;
@@ -13057,6 +13059,9 @@ export function GeneratedPaperView({
     onPickerSearchChange: (value: string) => void;
     onPickerSelect: (question: ManualQuestion) => void;
     onPickerClose: () => void;
+    previewOnly?: boolean;
+    toolbarExtras?: ReactNode;
+    footerActions?: ReactNode;
 }) {
     const [isConfirmingBack, setIsConfirmingBack] = useState(false);
     const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
@@ -13729,19 +13734,25 @@ export function GeneratedPaperView({
 
     return (
         <>
-            <div data-paper-shell className="w-full space-y-3">
+            <div
+                data-paper-shell
+                data-paper-preview-only={previewOnly ? '' : undefined}
+                className="w-full space-y-3"
+            >
                 <div className="mx-auto flex w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/70 print:hidden">
-                    <div className="contents">
+                    <div className={previewOnly ? 'hidden' : 'contents'}>
                         {!isStandaloneBubbleSheet && (
                             <>
-                                <button
-                                    type="button"
-                                    onClick={onAddSection}
-                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                                >
-                                    <PlusIcon className="size-3.5" />
-                                    Add Section
-                                </button>
+                                {!previewOnly && (
+                                    <button
+                                        type="button"
+                                        onClick={onAddSection}
+                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                                    >
+                                        <PlusIcon className="size-3.5" />
+                                        Add Section
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     role="switch"
@@ -14233,7 +14244,8 @@ export function GeneratedPaperView({
                             )}
                     </div>
                     <div className="contents">
-                        {!isStandaloneBubbleSheet && (
+                        {toolbarExtras}
+                        {!isStandaloneBubbleSheet && !previewOnly && (
                             <>
                                 <button
                                     type="button"
@@ -14565,19 +14577,21 @@ export function GeneratedPaperView({
 
                 <div className="sticky bottom-0 z-20 -mx-4 border-y border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur md:-mx-6 md:px-6 dark:border-slate-800 dark:bg-slate-900/95 print:hidden">
                     <div className="flex w-full justify-end">
-                        <button
-                            type="button"
-                            onClick={handleBackClick}
-                            disabled={isSavingDraft}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                        >
-                            {isSavingDraft ? (
-                                <Loader2Icon className="size-4 animate-spin" />
-                            ) : (
-                                <ArrowLeftIcon className="size-4" />
-                            )}
-                            {isSavingDraft ? 'Saving Draft…' : 'Back'}
-                        </button>
+                        {footerActions ?? (
+                            <button
+                                type="button"
+                                onClick={handleBackClick}
+                                disabled={isSavingDraft}
+                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                            >
+                                {isSavingDraft ? (
+                                    <Loader2Icon className="size-4 animate-spin" />
+                                ) : (
+                                    <ArrowLeftIcon className="size-4" />
+                                )}
+                                {isSavingDraft ? 'Saving Draft…' : 'Back'}
+                            </button>
+                        )}
                     </div>
                 </div>
 

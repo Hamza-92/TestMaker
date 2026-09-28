@@ -85,7 +85,7 @@ const NAV_GROUPS: NavGroup[] = [
             { label: 'Teachers', href: '/teachers', icon: UsersIcon },
 
             {
-                label: 'Settings',
+                label: 'Paper Defaults',
                 href: '/customer/settings',
                 icon: SettingsIcon,
             },

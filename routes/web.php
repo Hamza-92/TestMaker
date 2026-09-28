@@ -7,6 +7,7 @@ use App\Http\Controllers\Customer\GeneratePaperController;
 use App\Http\Controllers\Customer\OnlineTestAttemptController;
 use App\Http\Controllers\Customer\OnlineTestController;
 use App\Http\Controllers\Customer\PaperController;
+use App\Http\Controllers\Customer\PaperDefaultsController;
 use App\Http\Controllers\Customer\PaperFolderController;
 use App\Http\Controllers\Customer\PaperTemplateController;
 use App\Http\Controllers\Customer\ProfileController;
@@ -59,10 +60,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // â”€â”€â”€ Shared smart dashboard (renders based on user type) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::inertia('customer/settings', 'customer/coming-soon', [
-        'title' => 'Settings',
-        'description' => 'Customer settings are being prepared and will be available soon.',
-    ])->middleware('app.user')->name('customer.settings');
+    Route::middleware(['app.user', 'school.owner'])->group(function () {
+        Route::get('customer/settings', [PaperDefaultsController::class, 'edit'])->name('customer.settings');
+        Route::put('customer/settings', [PaperDefaultsController::class, 'update'])->name('customer.settings.update');
+        Route::delete('customer/settings', [PaperDefaultsController::class, 'destroy'])->name('customer.settings.reset');
+    });
 
     Route::get('customer/activity', [ActivityController::class, 'index'])
         ->middleware('app.user')

@@ -50,7 +50,7 @@ export function QuestionHoverActions({
 
     return (
         <>
-            <div className="pointer-events-none absolute top-1/2 right-2 z-10 flex -translate-y-1/2 items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 opacity-0 shadow-lg shadow-slate-900/10 backdrop-blur transition-opacity group-hover/question:pointer-events-auto group-hover/question:opacity-100 dark:border-slate-700 dark:bg-slate-900/95 print:hidden">
+            <div data-paper-edit-actions className="pointer-events-none absolute top-1/2 right-2 z-10 flex -translate-y-1/2 items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 opacity-0 shadow-lg shadow-slate-900/10 backdrop-blur transition-opacity group-hover/question:pointer-events-auto group-hover/question:opacity-100 dark:border-slate-700 dark:bg-slate-900/95 print:hidden">
                 {canSwap && (
                     <>
                         <ActionButton
@@ -218,7 +218,7 @@ export function SectionControls({
 
     return (
         <>
-            <div className="mt-3 flex justify-center print:hidden">
+            <div data-paper-edit-actions className="mt-3 flex justify-center print:hidden">
                 <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-sm ring-1 shadow-slate-900/4 ring-white/60 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:ring-slate-700/40">
                     <SectionButton
                         label="Move section up"

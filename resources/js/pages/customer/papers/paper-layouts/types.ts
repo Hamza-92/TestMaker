@@ -1,4 +1,5 @@
 export type PaperImageSize = 'sm' | 'md' | 'lg';
+export type PaperViewMode = 'paper' | 'answer_key' | 'answers_on_paper' | 'subjective_answers';
 export type PaperSectionCategory =
     | 'Objective Questions'
     | 'Subjective Questions';
