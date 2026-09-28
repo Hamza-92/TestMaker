@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Enums\AuditEvent;
-use App\Enums\TeacherPermission;
 use App\Models\AuditLog;
 use App\Models\Paper;
 use App\Models\User;
@@ -48,13 +47,13 @@ class CustomerActivityData
 
         return AuditLog::query()
             ->whereIn('changed_by', $ownerIds)
-            ->where(function (Builder $query): void {
+            ->where(function (Builder $query) use ($user): void {
                 $query->where('auditable_type', Paper::class)
-                    ->orWhere(function (Builder $userQuery): void {
+                    ->when($user->isSchoolOwner(), fn (Builder $query) => $query->orWhere(function (Builder $userQuery): void {
                         $userQuery
                             ->where('auditable_type', User::class)
                             ->where('notes', 'like', 'Teacher %');
-                    });
+                    }));
             })
             ->when($category === 'papers', fn (Builder $query) => $query->where('auditable_type', Paper::class))
             ->when($category === 'teachers', fn (Builder $query) => $query->where('auditable_type', User::class))
@@ -124,18 +123,6 @@ class CustomerActivityData
                 $user->id,
                 ...SchoolTeacherSummary::for($user)['ids'],
             ]));
-        }
-
-        if ($user->isTeacher() && $user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
-            $owner = $user->schoolOwner();
-
-            if ($owner !== null) {
-                return array_values(array_unique([
-                    $user->id,
-                    $owner->id,
-                    ...SchoolTeacherSummary::for($owner)['ids'],
-                ]));
-            }
         }
 
         return [$user->id];

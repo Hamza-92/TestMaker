@@ -89,7 +89,7 @@ export default function AnnouncementShow({ announcement }: Props) {
                             <MegaphoneIcon className="size-4" />
                             <Badge>{TYPE_LABELS[announcement.type]}</Badge>
                         </div>
-                        <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl dark:text-white">
+                        <h1 className="mt-4 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere] text-slate-950 sm:text-3xl dark:text-white">
                             {announcement.title}
                         </h1>
                         <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">

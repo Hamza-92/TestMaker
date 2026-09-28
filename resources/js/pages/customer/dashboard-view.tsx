@@ -76,6 +76,7 @@ interface Props {
     };
     announcements: {
         banner: Announcement | null;
+        banners: Announcement[];
         updates: Announcement[];
     };
 }
@@ -95,6 +96,10 @@ interface Announcement {
     banner_style: 'standard' | 'ticker';
     banner_direction: 'auto' | 'ltr' | 'rtl';
     banner_font: 'default' | 'urdu';
+    banner_font_size: number | null;
+    banner_summary_font_size: number | null;
+    banner_font_weight: number | null;
+    banner_scroll_duration: number | null;
     banner_background: string | null;
     banner_text_color: string | null;
     action_label: string | null;
@@ -162,6 +167,10 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
         ...(announcement.banner_text_color
             ? { color: announcement.banner_text_color }
             : {}),
+    };
+    const titleStyle: CSSProperties = {
+        fontSize: announcement.banner_font_size ?? undefined,
+        fontWeight: announcement.banner_font_weight ?? undefined,
     };
 
     if (!visible) {
@@ -234,8 +243,12 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
                                     'announcement-ticker-rtl',
                             )}
                             dir={direction}
+                            style={{
+                                animationDuration: `${announcement.banner_scroll_duration ?? 24}s`,
+                            }}
                         >
                             <span
+                                style={titleStyle}
                                 className={cn(
                                     'announcement-ticker-item text-sm font-semibold',
                                     isUrdu && 'leading-[1.8]',
@@ -248,7 +261,13 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
                 ) : (
                     <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <p className={cn("text-sm font-semibold", isUrdu && "leading-[1.8]")}>
+                            <p
+                                style={titleStyle}
+                                className={cn(
+                                    'min-w-0 text-sm font-semibold [overflow-wrap:anywhere]',
+                                    isUrdu && 'leading-[1.8]',
+                                )}
+                            >
                                 {announcement.title}
                             </p>
                             <span className="text-[10px] font-semibold tracking-wide uppercase opacity-60">
@@ -256,7 +275,17 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
                             </span>
                         </div>
                         {(announcement.summary || announcement.body) && (
-                            <p className={cn("mt-1 max-w-3xl text-xs leading-relaxed opacity-75", isUrdu && "leading-[1.8]")}>
+                            <p
+                                style={{
+                                    fontSize:
+                                        announcement.banner_summary_font_size ??
+                                        undefined,
+                                }}
+                                className={cn(
+                                    'mt-1 max-w-3xl text-xs leading-relaxed [overflow-wrap:anywhere] opacity-75',
+                                    isUrdu && 'leading-[1.8]',
+                                )}
+                            >
                                 {announcement.summary || announcement.body}
                             </p>
                         )}
@@ -837,11 +866,12 @@ export default function CustomerDashboard({
                             </div>
                         </Card>
 
-                        {announcements.banner && (
+                        {announcements.banners.map((announcement) => (
                             <AnnouncementBanner
-                                announcement={announcements.banner}
+                                key={announcement.id}
+                                announcement={announcement}
                             />
-                        )}
+                        ))}
 
                         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                             {statCards.map(

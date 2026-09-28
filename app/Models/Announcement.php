@@ -17,6 +17,10 @@ class Announcement extends Model
         'banner_style',
         'banner_direction',
         'banner_font',
+        'banner_font_size',
+        'banner_summary_font_size',
+        'banner_font_weight',
+        'banner_scroll_duration',
         'banner_background',
         'banner_text_color',
         'status',
@@ -30,6 +34,10 @@ class Announcement extends Model
     ];
 
     protected $casts = [
+        'banner_font_size' => 'integer',
+        'banner_summary_font_size' => 'integer',
+        'banner_font_weight' => 'integer',
+        'banner_scroll_duration' => 'integer',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
         'published_at' => 'datetime',

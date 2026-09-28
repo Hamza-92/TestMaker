@@ -355,6 +355,14 @@ input[type='date']::-webkit-calendar-picker-indicator {
     .announcement-ticker-rtl {
         animation: none;
         transform: none;
+        width: auto;
+        white-space: normal;
+    }
+
+    .announcement-ticker-item {
+        width: auto;
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 }
 .scrollbar-slim-muted {

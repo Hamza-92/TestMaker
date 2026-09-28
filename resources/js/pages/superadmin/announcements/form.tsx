@@ -37,6 +37,10 @@ interface Announcement {
     banner_style: 'standard' | 'ticker';
     banner_direction: 'auto' | 'ltr' | 'rtl';
     banner_font: 'default' | 'urdu';
+    banner_font_size: number | null;
+    banner_summary_font_size: number | null;
+    banner_font_weight: number | null;
+    banner_scroll_duration: number | null;
     banner_background: string | null;
     banner_text_color: string | null;
     status: AnnouncementStatus;
@@ -60,6 +64,10 @@ interface FormData {
     banner_style: 'standard' | 'ticker';
     banner_direction: 'auto' | 'ltr' | 'rtl';
     banner_font: 'default' | 'urdu';
+    banner_font_size: string;
+    banner_summary_font_size: string;
+    banner_font_weight: string;
+    banner_scroll_duration: string;
     banner_background: string;
     banner_text_color: string;
     status: AnnouncementStatus;
@@ -100,6 +108,12 @@ export default function AnnouncementForm({ announcement }: Props) {
         banner_style: announcement?.banner_style ?? 'standard',
         banner_direction: announcement?.banner_direction ?? 'auto',
         banner_font: announcement?.banner_font ?? 'default',
+        banner_font_size: announcement?.banner_font_size?.toString() ?? '',
+        banner_summary_font_size:
+            announcement?.banner_summary_font_size?.toString() ?? '',
+        banner_font_weight: announcement?.banner_font_weight?.toString() ?? '',
+        banner_scroll_duration:
+            announcement?.banner_scroll_duration?.toString() ?? '',
         banner_background: announcement?.banner_background ?? '#eff6ff',
         banner_text_color: announcement?.banner_text_color ?? '#0f172a',
         status: announcement?.status ?? 'draft',
@@ -123,7 +137,12 @@ export default function AnnouncementForm({ announcement }: Props) {
 
     const fieldError = (field: string) => errors[field as keyof typeof errors];
     const previewStyle: CSSProperties = {
-        direction: data.banner_direction === 'rtl' ? 'rtl' : 'ltr',
+        direction:
+            data.banner_direction === 'auto'
+                ? /[\u0590-\u08ff]/.test(data.title)
+                    ? 'rtl'
+                    : 'ltr'
+                : data.banner_direction,
         fontFamily:
             data.banner_font === 'urdu'
                 ? '"Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", serif'
@@ -132,6 +151,14 @@ export default function AnnouncementForm({ announcement }: Props) {
             ? { backgroundColor: data.banner_background }
             : {}),
         ...(data.banner_text_color ? { color: data.banner_text_color } : {}),
+    };
+    const titleStyle: CSSProperties = {
+        fontSize: data.banner_font_size
+            ? Number(data.banner_font_size)
+            : undefined,
+        fontWeight: data.banner_font_weight
+            ? Number(data.banner_font_weight)
+            : undefined,
     };
 
     return (
@@ -169,15 +196,20 @@ export default function AnnouncementForm({ announcement }: Props) {
                                 Title{' '}
                                 <span className="text-destructive">*</span>
                             </Label>
-                            <Input
+                            <textarea
                                 id="title"
+                                className="min-h-24 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 value={data.title}
-                                maxLength={150}
+                                maxLength={1000}
+                                rows={3}
                                 onChange={(e) =>
                                     setData('title', e.target.value)
                                 }
                                 placeholder="e.g. New paper templates are now available"
                             />
+                            <p className="text-right text-xs text-muted-foreground">
+                                {data.title.length} / 1,000 characters
+                            </p>
                             {fieldError('title') && (
                                 <p className="text-xs text-destructive">
                                     {fieldError('title')}
@@ -322,6 +354,10 @@ export default function AnnouncementForm({ announcement }: Props) {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    All published banner items appear in
+                                    priority order.
+                                </p>
                             </div>
                             <div className="space-y-1.5">
                                 <Label htmlFor="status">Status</Label>
@@ -575,6 +611,136 @@ export default function AnnouncementForm({ announcement }: Props) {
                                     />
                                 </div>
                             </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                {(
+                                    [
+                                        {
+                                            key: 'banner_font_size',
+                                            label: 'Title size (px)',
+                                            max: 48,
+                                            defaultSize: 14,
+                                        },
+                                        {
+                                            key: 'banner_summary_font_size',
+                                            label: 'Summary size (px)',
+                                            max: 32,
+                                            defaultSize: 12,
+                                        },
+                                    ] as const
+                                ).map(({ key, label, max, defaultSize }) => (
+                                    <div key={key} className="space-y-1.5">
+                                        <Label htmlFor={key}>{label}</Label>
+                                        <Input
+                                            id={key}
+                                            type="number"
+                                            min={10}
+                                            max={max}
+                                            step={1}
+                                            value={data[key]}
+                                            placeholder={`${defaultSize} (default)`}
+                                            onChange={(event) =>
+                                                setData(key, event.target.value)
+                                            }
+                                        />
+                                        {fieldError(key) && (
+                                            <p className="text-xs text-destructive">
+                                                {fieldError(key)}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                                <div className="space-y-1.5 sm:col-span-2">
+                                    <Label htmlFor="banner_font_weight">
+                                        Title weight
+                                    </Label>
+                                    <Select
+                                        value={
+                                            data.banner_font_weight || 'default'
+                                        }
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'banner_font_weight',
+                                                value === 'default'
+                                                    ? ''
+                                                    : value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger id="banner_font_weight">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="default">
+                                                Default (semibold)
+                                            </SelectItem>
+                                            <SelectItem value="400">
+                                                Normal
+                                            </SelectItem>
+                                            <SelectItem value="500">
+                                                Medium
+                                            </SelectItem>
+                                            <SelectItem value="600">
+                                                Semibold
+                                            </SelectItem>
+                                            <SelectItem value="700">
+                                                Bold
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {fieldError('banner_font_weight') && (
+                                        <p className="text-xs text-destructive">
+                                            {fieldError('banner_font_weight')}
+                                        </p>
+                                    )}
+                                </div>
+                                {data.banner_style === 'ticker' && (
+                                    <div className="space-y-1.5 sm:col-span-2">
+                                        <Label htmlFor="banner_scroll_duration">
+                                            Scroll duration (seconds)
+                                        </Label>
+                                        <Input
+                                            id="banner_scroll_duration"
+                                            type="number"
+                                            min={10}
+                                            max={180}
+                                            step={1}
+                                            value={data.banner_scroll_duration}
+                                            placeholder="24 (default)"
+                                            onChange={(event) =>
+                                                setData(
+                                                    'banner_scroll_duration',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Higher values scroll more slowly.
+                                            Use a longer duration for long news.
+                                        </p>
+                                        {fieldError(
+                                            'banner_scroll_duration',
+                                        ) && (
+                                            <p className="text-xs text-destructive">
+                                                {fieldError(
+                                                    'banner_scroll_duration',
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => {
+                                    setData('banner_font_size', '');
+                                    setData('banner_summary_font_size', '');
+                                    setData('banner_font_weight', '');
+                                    setData('banner_scroll_duration', '');
+                                }}
+                            >
+                                Reset text settings
+                            </Button>
                         </Card>
                         <Card
                             className="overflow-hidden bg-muted/20"
@@ -597,19 +763,60 @@ export default function AnnouncementForm({ announcement }: Props) {
                                     style={previewStyle}
                                     dir={previewStyle.direction}
                                 >
-                                    <p className="text-sm font-semibold">
-                                        {data.title ||
-                                            'Your announcement title'}
-                                    </p>
-                                    <p className="mt-1 text-xs leading-relaxed opacity-70">
-                                        {data.summary ||
-                                            'Your short summary will appear here.'}
-                                    </p>
-                                    {data.action_label && (
-                                        <span className="mt-3 inline-flex rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground">
-                                            {data.action_label}
-                                        </span>
+                                    {data.banner_style === 'ticker' ? (
+                                        <div className="min-w-0 overflow-hidden">
+                                            <div
+                                                className={cn(
+                                                    'announcement-ticker whitespace-nowrap',
+                                                    previewStyle.direction ===
+                                                        'rtl' &&
+                                                        'announcement-ticker-rtl',
+                                                )}
+                                                style={{
+                                                    animationDuration: `${data.banner_scroll_duration || 24}s`,
+                                                }}
+                                            >
+                                                <span
+                                                    className="announcement-ticker-item text-sm font-semibold"
+                                                    style={titleStyle}
+                                                >
+                                                    {data.title ||
+                                                        'Your announcement title'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <p
+                                                className="text-sm font-semibold [overflow-wrap:anywhere]"
+                                                style={titleStyle}
+                                            >
+                                                {data.title ||
+                                                    'Your announcement title'}
+                                            </p>
+                                            <p
+                                                className="mt-1 text-xs leading-relaxed [overflow-wrap:anywhere] opacity-70"
+                                                style={{
+                                                    fontSize:
+                                                        data.banner_summary_font_size
+                                                            ? Number(
+                                                                  data.banner_summary_font_size,
+                                                              )
+                                                            : undefined,
+                                                }}
+                                            >
+                                                {data.summary ||
+                                                    data.body ||
+                                                    'Your short summary will appear here.'}
+                                            </p>
+                                        </>
                                     )}
+                                    {data.action_label &&
+                                        data.banner_style !== 'ticker' && (
+                                            <span className="mt-3 inline-flex rounded-lg bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground">
+                                                {data.action_label}
+                                            </span>
+                                        )}
                                 </div>
                             </div>
                         </Card>

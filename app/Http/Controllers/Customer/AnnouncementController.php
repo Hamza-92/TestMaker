@@ -33,6 +33,7 @@ class AnnouncementController extends Controller
             'announcement' => $this->present($announcement),
         ]);
     }
+
     public function dismiss(Request $request, Announcement $announcement)
     {
         abort_unless($announcement->is_dismissible, 404);
@@ -61,6 +62,10 @@ class AnnouncementController extends Controller
             'banner_style' => $announcement->banner_style,
             'banner_direction' => $announcement->banner_direction,
             'banner_font' => $announcement->banner_font,
+            'banner_font_size' => $announcement->banner_font_size,
+            'banner_summary_font_size' => $announcement->banner_summary_font_size,
+            'banner_font_weight' => $announcement->banner_font_weight,
+            'banner_scroll_duration' => $announcement->banner_scroll_duration,
             'banner_background' => $announcement->banner_background,
             'banner_text_color' => $announcement->banner_text_color,
             'action_label' => $announcement->action_label,
@@ -69,5 +74,5 @@ class AnnouncementController extends Controller
             'published_at' => $announcement->published_at?->toISOString(),
             'is_dismissible' => $announcement->is_dismissible,
         ];
-    }}
-
+    }
+}

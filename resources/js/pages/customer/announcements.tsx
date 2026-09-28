@@ -127,7 +127,7 @@ export default function AnnouncementsPage({ announcements }: Props) {
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                    <h2 className="text-sm font-semibold [overflow-wrap:anywhere] text-slate-900 dark:text-slate-100">
                                                         {announcement.title}
                                                     </h2>
                                                     <Badge>{meta.label}</Badge>

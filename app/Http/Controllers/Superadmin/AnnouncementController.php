@@ -58,7 +58,7 @@ class AnnouncementController extends Controller
     private function validated(Request $request): array
     {
         return $request->validate([
-            'title' => ['required', 'string', 'max:150'],
+            'title' => ['required', 'string', 'max:1000'],
             'summary' => ['nullable', 'string', 'max:500'],
             'body' => ['nullable', 'string', 'max:5000'],
             'type' => ['required', Rule::in(['feature', 'update', 'maintenance', 'important', 'event'])],
@@ -66,6 +66,10 @@ class AnnouncementController extends Controller
             'banner_style' => ['required', Rule::in(['standard', 'ticker'])],
             'banner_direction' => ['required', Rule::in(['auto', 'ltr', 'rtl'])],
             'banner_font' => ['required', Rule::in(['default', 'urdu'])],
+            'banner_font_size' => ['sometimes', 'nullable', 'integer', 'between:10,48'],
+            'banner_summary_font_size' => ['sometimes', 'nullable', 'integer', 'between:10,32'],
+            'banner_font_weight' => ['sometimes', 'nullable', 'integer', Rule::in([400, 500, 600, 700])],
+            'banner_scroll_duration' => ['sometimes', 'nullable', 'integer', 'between:10,180'],
             'banner_background' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'banner_text_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'status' => ['required', Rule::in(['draft', 'published', 'archived'])],
@@ -103,6 +107,10 @@ class AnnouncementController extends Controller
             'banner_style' => $announcement->banner_style,
             'banner_direction' => $announcement->banner_direction,
             'banner_font' => $announcement->banner_font,
+            'banner_font_size' => $announcement->banner_font_size,
+            'banner_summary_font_size' => $announcement->banner_summary_font_size,
+            'banner_font_weight' => $announcement->banner_font_weight,
+            'banner_scroll_duration' => $announcement->banner_scroll_duration,
             'banner_background' => $announcement->banner_background,
             'banner_text_color' => $announcement->banner_text_color,
             'status' => $announcement->status,

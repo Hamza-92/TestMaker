@@ -44,7 +44,7 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'legacyWebsiteUrl' => config('app.legacy_website_url'),
             'auth' => [
-                'user' => $user,
+                'user' => $user?->isTeacher() ? $user->withoutRelations() : $user,
                 'permissions' => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],
                 'is_master' => $user?->isMasterSuperAdmin() ?? false,
                 'teacher_permissions' => $user?->isTeacher() ? (array) ($user->teacher_permissions ?? []) : [],
@@ -75,14 +75,14 @@ class HandleInertiaRequests extends Middleware
         }
 
         $subscription = $user->activeSchoolSubscription();
-        $teacherCount = SchoolTeacherSummary::for($user)['total'];
+        $teacherCount = $user->isTeacher() ? 1 : SchoolTeacherSummary::for($user)['total'];
 
         return [
             'school_name' => $owner->school_name ?? $owner->name,
             'is_owner' => $user->isSchoolOwner(),
             'allow_teachers' => (bool) ($subscription?->allow_teachers ?? false),
             'allow_online_mcq_tests' => (bool) ($subscription?->allow_online_mcq_tests ?? false),
-            'max_teachers' => $subscription?->max_teachers,
+            'max_teachers' => $user->isSchoolOwner() ? $subscription?->max_teachers : null,
             'teachers_used' => $teacherCount,
             'has_subscription' => $subscription !== null,
         ];

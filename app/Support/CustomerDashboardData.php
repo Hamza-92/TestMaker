@@ -34,12 +34,13 @@ class CustomerDashboardData
     {
         $owner = $user->schoolOwner() ?? $user;
         $subscription = $user->activeSchoolSubscription();
-        $teacherSummary = SchoolTeacherSummary::for($user);
+        $teacherSummary = $user->isTeacher()
+            ? ['ids' => [$user->id], 'total' => 1, 'active' => (int) $user->isActive()]
+            : SchoolTeacherSummary::for($user);
         $teacherCount = $teacherSummary['total'];
         $activeTeacherCount = $teacherSummary['active'];
         $paperOwnerIds = self::paperOwnerIds(
             $user,
-            $owner,
             $teacherSummary['ids'],
         );
         $papers = Paper::query()->whereIn('user_id', $paperOwnerIds);
@@ -126,10 +127,12 @@ class CustomerDashboardData
         $isDismissed = fn (Announcement $announcement, string $surface): bool => $announcement->is_dismissible
             && $dismissedSurfaces->has($announcement->id.':'.$surface);
 
-        $banner = $visible->first(
-            fn (Announcement $announcement) => in_array($announcement->placement, ['banner', 'both'], true)
-                && ! $isDismissed($announcement, 'banner'),
-        );
+        $banners = $visible
+            ->filter(
+                fn (Announcement $announcement) => in_array($announcement->placement, ['banner', 'both'], true)
+                    && ! $isDismissed($announcement, 'banner'),
+            )
+            ->values();
 
         $updates = $visible
             ->filter(
@@ -147,6 +150,10 @@ class CustomerDashboardData
             'banner_style' => $announcement->banner_style,
             'banner_direction' => $announcement->banner_direction,
             'banner_font' => $announcement->banner_font,
+            'banner_font_size' => $announcement->banner_font_size,
+            'banner_summary_font_size' => $announcement->banner_summary_font_size,
+            'banner_font_weight' => $announcement->banner_font_weight,
+            'banner_scroll_duration' => $announcement->banner_scroll_duration,
             'banner_background' => $announcement->banner_background,
             'banner_text_color' => $announcement->banner_text_color,
             'action_label' => $announcement->action_label,
@@ -157,7 +164,8 @@ class CustomerDashboardData
         ];
 
         return [
-            'banner' => $banner ? $present($banner) : null,
+            'banner' => $banners->isNotEmpty() ? $present($banners->first()) : null,
+            'banners' => $banners->map($present)->all(),
             'updates' => $updates->map($present)->values()->all(),
         ];
     }
@@ -253,13 +261,13 @@ class CustomerDashboardData
         $logs = AuditLog::query()
             ->with('changedBy:id,name')
             ->whereIn('changed_by', $paperOwnerIds)
-            ->where(function ($query): void {
+            ->where(function ($query) use ($user): void {
                 $query->where('auditable_type', Paper::class)
-                    ->orWhere(function ($userQuery): void {
+                    ->when($user->isSchoolOwner(), fn ($query) => $query->orWhere(function ($userQuery): void {
                         $userQuery
                             ->where('auditable_type', User::class)
                             ->where('notes', 'like', 'Teacher %');
-                    });
+                    }));
             })
             ->latest('created_at')
             ->limit(10)
@@ -347,14 +355,10 @@ class CustomerDashboardData
         ])->values();
     }
 
-    private static function paperOwnerIds(User $user, User $owner, array $teacherIds): array
+    private static function paperOwnerIds(User $user, array $teacherIds): array
     {
         if ($user->isSchoolOwner()) {
             return array_values(array_unique([$user->id, ...$teacherIds]));
-        }
-
-        if ($user->isTeacher() && $user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
-            return array_values(array_unique([$user->id, $owner->id, ...$teacherIds]));
         }
 
         return [$user->id];
