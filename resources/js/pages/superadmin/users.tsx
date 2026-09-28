@@ -1,6 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    KeyRoundIcon,
     PencilIcon,
     PlusIcon,
     SearchIcon,
@@ -11,6 +10,14 @@ import {
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { usePermission } from '@/hooks/use-permission';
 import { cn } from '@/lib/utils';
@@ -40,17 +47,24 @@ function fmt(date: string): string {
 export default function Users({ users }: { users: SuperadminUser[] }) {
     const { can } = usePermission();
     const [search, setSearch] = useState('');
+    const [deleteTarget, setDeleteTarget] = useState<SuperadminUser | null>(null);
     const [deleting, setDeleting] = useState<number | null>(null);
 
     const filtered = users.filter((u) => {
         const q = search.trim().toLowerCase();
+
         return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
     });
 
-    function confirmDelete(user: SuperadminUser) {
-        if (!confirm(`Delete "${user.name}"? This cannot be undone.`)) return;
-        setDeleting(user.id);
-        router.delete(`/superadmin/users/${user.id}`, {
+    function confirmDelete() {
+        if (!deleteTarget || deleting !== null) {
+            return;
+        }
+
+        setDeleting(deleteTarget.id);
+        router.delete(`/superadmin/users/${deleteTarget.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeleteTarget(null),
             onFinish: () => setDeleting(null),
         });
     }
@@ -114,6 +128,7 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
                                 ) : (
                                     filtered.map((user) => {
                                         const status = STATUS_CONFIG[user.status];
+
                                         return (
                                             <tr key={user.id} className="hover:bg-muted/20 transition-colors">
                                                 <td className="px-4 py-3 font-medium">{user.name}</td>
@@ -149,10 +164,12 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
                                                         )}
                                                         {user.can_manage && can('users.delete') && (
                                                             <button
-                                                                onClick={() => confirmDelete(user)}
-                                                                disabled={deleting === user.id}
+                                                                type="button"
+                                                                onClick={() => setDeleteTarget(user)}
+                                                                disabled={deleting !== null}
                                                                 className="text-muted-foreground hover:bg-red-50 hover:text-red-600 inline-flex size-8 items-center justify-center rounded-md transition-colors disabled:opacity-40"
                                                                 title="Delete user"
+                                                                aria-label={`Delete ${user.name}`}
                                                             >
                                                                 <Trash2Icon className="size-4" />
                                                             </button>
@@ -168,6 +185,46 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
                     </div>
                 </div>
             </div>
+            <Dialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open && deleting === null) {
+                        setDeleteTarget(null);
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete User</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete{' '}
+                            <span className="font-medium text-foreground">
+                                &quot;{deleteTarget?.name}&quot;
+                            </span>
+                            ? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setDeleteTarget(null)}
+                            disabled={deleting !== null}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={confirmDelete}
+                            disabled={deleting !== null}
+                        >
+                            <Trash2Icon className="size-4" />
+                            {deleting !== null ? 'Deleting…' : 'Delete'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
