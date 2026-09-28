@@ -2,9 +2,12 @@
 
 use App\Enums\UserStatus;
 use App\Enums\UserType;
+use App\Models\Permission;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 
 uses(RefreshDatabase::class);
 
@@ -28,6 +31,76 @@ function delegatedAdmin(User $master, array $permissions = []): User
 
     return $user;
 }
+
+it('shows manageable user controls to the master and opens their editors', function () {
+    $target = delegatedAdmin($this->master, ['questions.delete']);
+    $customer = User::factory()->create(['user_type' => UserType::Customer]);
+
+    $page = $this->actingAs($this->master)->get('/superadmin/users')->assertOk()->viewData('page');
+    $users = collect($page['props']['users'])->keyBy('id');
+
+    expect($users[$target->id]['can_manage'])->toBeTrue();
+    expect($users->has($this->master->id))->toBeFalse();
+    expect($users->has($customer->id))->toBeFalse();
+    expect($page['props']['auth']['is_master'])->toBeTrue();
+
+    $this->get("/superadmin/users/{$target->id}/edit")->assertOk();
+    $this->get("/superadmin/users/{$target->id}/permissions")->assertOk();
+});
+
+it('keeps the user list management flags consistent with delegated account boundaries', function () {
+    $manager = delegatedAdmin($this->master, [
+        'users.view', 'users.edit', 'users.manage_permissions', 'announcements.view',
+    ]);
+    $eligible = delegatedAdmin($this->master, ['announcements.view']);
+    $privileged = delegatedAdmin($this->master, ['questions.delete']);
+
+    $page = $this->actingAs($manager)->get('/superadmin/users')->assertOk()->viewData('page');
+    $users = collect($page['props']['users'])->keyBy('id');
+
+    expect($users[$eligible->id]['can_manage'])->toBeTrue();
+    expect($users[$privileged->id]['can_manage'])->toBeFalse();
+    expect($users[$manager->id]['can_manage'])->toBeFalse();
+
+    $this->get("/superadmin/users/{$eligible->id}/edit")->assertOk();
+    $this->get("/superadmin/users/{$eligible->id}/permissions")->assertOk();
+    $this->get("/superadmin/users/{$privileged->id}/edit")->assertForbidden();
+    $this->get("/superadmin/users/{$privileged->id}/permissions")->assertForbidden();
+});
+
+it('does not allow a user viewer to edit accounts or assign permissions', function () {
+    $viewer = delegatedAdmin($this->master, ['users.view']);
+    $target = delegatedAdmin($this->master);
+
+    $page = $this->actingAs($viewer)->get('/superadmin/users')->assertOk()->viewData('page');
+    expect($page['props']['auth']['permissions'])->toBe(['users.view']);
+
+    $this->get("/superadmin/users/{$target->id}/edit")->assertForbidden();
+    $this->get("/superadmin/users/{$target->id}/permissions")->assertForbidden();
+    $this->put("/superadmin/users/{$target->id}", [
+        'name' => 'Unauthorized edit', 'email' => $target->email, 'status' => 'inactive',
+    ])->assertForbidden();
+    $this->put("/superadmin/users/{$target->id}/permissions", ['permissions' => ['users.view']])
+        ->assertForbidden();
+
+    expect($target->fresh()->name)->toBe($target->name);
+    expect($target->fresh()->getPermissionNames())->toBe([]);
+});
+
+it('saves an authorized account edit without changing its password or permissions', function () {
+    $target = delegatedAdmin($this->master, ['announcements.view']);
+    $originalPassword = $target->password;
+
+    $this->actingAs($this->master)->put("/superadmin/users/{$target->id}", [
+        'name' => 'Updated Administrator', 'email' => $target->email, 'status' => 'active',
+        'password' => '', 'password_confirmation' => '',
+    ])->assertRedirect(route('superadmin.users'));
+
+    $updated = $target->fresh();
+    expect($updated->name)->toBe('Updated Administrator');
+    expect($updated->password)->toBe($originalPassword);
+    expect($updated->getPermissionNames())->toBe(['announcements.view']);
+});
 
 it('allows only the granted announcement action', function () {
     $admin = delegatedAdmin($this->master, ['announcements.view']);
@@ -94,10 +167,8 @@ it('keeps deployment helpers master only and blocks inactive admins', function (
     $this->actingAs($admin)->get('/superadmin/announcements')->assertForbidden();
 });
 
-
-
 it('keeps every Superadmin route tied to a seeded Gate', function () {
-    foreach (\Illuminate\Support\Facades\Route::getRoutes() as $route) {
+    foreach (Route::getRoutes() as $route) {
         if (! str_starts_with($route->uri(), 'superadmin/')) {
             continue;
         }
@@ -111,13 +182,12 @@ it('keeps every Superadmin route tied to a seeded Gate', function () {
 
         foreach ($permissions as $middleware) {
             foreach (explode(',', substr($middleware, strlen('permission:'))) as $ability) {
-                expect(\App\Models\Permission::where('name', $ability)->exists())->toBeTrue();
-                expect(\Illuminate\Support\Facades\Gate::has($ability))->toBeTrue();
+                expect(Permission::where('name', $ability)->exists())->toBeTrue();
+                expect(Gate::has($ability))->toBeTrue();
             }
         }
     }
 });
-
 
 it('allows explicitly granted impersonation and returns to the admin dashboard', function () {
     $admin = delegatedAdmin($this->master, ['customers.impersonate']);
@@ -133,7 +203,6 @@ it('allows explicitly granted impersonation and returns to the admin dashboard',
     $this->post(route('impersonation.stop'))->assertRedirect(route('dashboard'));
     expect(auth()->id())->toBe($admin->id);
 });
-
 
 it('saves and edits the same delegated permissions repeatedly', function () {
     $admin = delegatedAdmin($this->master);

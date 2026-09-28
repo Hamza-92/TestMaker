@@ -19,7 +19,7 @@ class SuperadminUserController extends Controller
             ->whereNotNull('created_by')
             ->with('creator:id,name')
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'status', 'created_at', 'created_by'])
+            ->get(['id', 'user_type', 'name', 'email', 'status', 'created_at', 'created_by'])
             ->map(fn (User $user) => [
                 'id'           => $user->id,
                 'name'         => $user->name,
