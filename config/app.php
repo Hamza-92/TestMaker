@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'legacy_website_url' => env('LEGACY_WEBSITE_URL', 'https://old.testmaker.pk'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

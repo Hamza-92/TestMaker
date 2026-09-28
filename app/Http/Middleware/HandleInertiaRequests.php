@@ -42,6 +42,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'legacyWebsiteUrl' => config('app.legacy_website_url'),
             'auth' => [
                 'user' => $user,
                 'permissions' => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],

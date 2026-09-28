@@ -2,6 +2,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     BellIcon,
     ChevronDownIcon,
+    ExternalLinkIcon,
     LogOutIcon,
     MenuIcon,
     MonitorIcon,
@@ -191,7 +192,13 @@ function UserMenu() {
 }
 
 export function CustomerHeader() {
-    const page = usePage<{ auth: { user: Record<string, unknown>; is_impersonating?: boolean } }>();
+    const page = usePage<{
+        auth: {
+            user: Record<string, unknown>;
+            is_impersonating?: boolean;
+        };
+        legacyWebsiteUrl: string;
+    }>();
     const user = page.props.auth.user;
     const isImpersonating = Boolean(page.props.auth.is_impersonating);
     const schoolName =
@@ -212,8 +219,25 @@ export function CustomerHeader() {
                 </span>
             </p>
 
+            {page.props.legacyWebsiteUrl && (
+                <a
+                    href={page.props.legacyWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Visit Old Website"
+                    aria-label="Visit Old Website (opens in a new tab)"
+                    className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-brand-700 bg-brand-600 px-2.5 text-xs font-semibold whitespace-nowrap text-white shadow-sm transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:border-brand-400 dark:bg-brand-500 dark:hover:bg-brand-600"
+                >
+                    <ExternalLinkIcon className="size-4 shrink-0" />
+                    <span className="hidden sm:inline">
+                        <span className="hidden lg:inline">Visit </span>
+                        Old Website
+                    </span>
+                </a>
+            )}
+
             {/* ── Search ─────────────────────────────────────────────────────── */}
-            <div className="relative flex-1 lg:max-w-xs">
+            <div className="relative min-w-0 flex-1 lg:max-w-xs">
                 <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400" />
                 <input
                     type="search"
