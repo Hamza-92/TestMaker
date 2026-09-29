@@ -32,19 +32,23 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Install and test
+      - name: Install dependencies
         run: |
           composer install --no-interaction --prefer-dist --no-progress
           npm ci
           cp .env.example .env
           php artisan key:generate --force
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Test application and deployment runner
+        run: |
           ./vendor/bin/pest
           python3 deploy/cpanel/smoke_test.py
 
-      - name: Build frontend and production dependencies
-        run: |
-          npm run build
-          composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
+      - name: Prepare production dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
 
       - name: Package immutable release
         run: |
