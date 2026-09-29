@@ -268,9 +268,10 @@ it('imports objective questions with options', function () {
 
     expect($question->statement_en)->toBe('Choose the correct answer')
         ->and($question->answer_en)->toBeNull()
-        ->and($question->options)->toHaveCount(3)
+        ->and($question->options)->toHaveCount(4)
         ->and($question->options->where('is_correct', true))->toHaveCount(1)
-        ->and($question->options->firstWhere('is_correct', true)?->text_en)->toBe('Option A');
+        ->and($question->options->firstWhere('is_correct', true)?->text_en)->toBe('Option A')
+        ->and($question->options->last()?->text_en)->toBeNull();
 });
 
 it('fails objective import when a single-answer row has multiple correct options', function () {

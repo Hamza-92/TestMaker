@@ -5,7 +5,7 @@ use App\Models\Chapter;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
-use App\Models\QuestionTypePairing;
+use App\Models\QuestionTypeOrGroup;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\User;
@@ -156,7 +156,7 @@ it('shows only subjective question types available in the exact selected scope',
             ->has('questionTypes', 2)
             ->where('questionTypes.0.id', $fixture['first']->id)
             ->where('questionTypes.1.id', $fixture['second']->id)
-            ->has('pairings', 0),
+            ->has('groups', 0),
         );
 
     $otherScope = [
@@ -186,57 +186,65 @@ it('normalizes bidirectional pairs and rejects duplicate or invalid pairings', f
     $this->actingAs($fixture['admin'])
         ->post(route('superadmin.question-type-pairings.store'), [
             ...$scope,
-            'question_type_a_id' => $fixture['second']->id,
-            'question_type_b_id' => $fixture['first']->id,
+            'question_type_ids' => [$fixture['second']->id, $fixture['first']->id],
         ])
         ->assertRedirect()
         ->assertSessionHas('success');
 
-    $pairing = QuestionTypePairing::query()->sole();
-    expect($pairing->question_type_a_id)->toBe(min($fixture['first']->id, $fixture['second']->id))
-        ->and($pairing->question_type_b_id)->toBe(max($fixture['first']->id, $fixture['second']->id))
-        ->and($pairing->is_active)->toBeTrue();
+    $group = QuestionTypeOrGroup::query()->with('members')->sole();
+    expect($group->type_signature)->toBe(implode(':', [
+        min($fixture['first']->id, $fixture['second']->id),
+        max($fixture['first']->id, $fixture['second']->id),
+    ]))
+        ->and($group->members->pluck('question_type_id')->all())->toBe([
+            $fixture['second']->id,
+            $fixture['first']->id,
+        ])
+        ->and($group->is_active)->toBeTrue();
 
     $this->actingAs($fixture['admin'])
         ->from(route('superadmin.question-type-pairings', $scope))
         ->post(route('superadmin.question-type-pairings.store'), [
             ...$scope,
-            'question_type_a_id' => $fixture['first']->id,
-            'question_type_b_id' => $fixture['second']->id,
+            'question_type_ids' => [$fixture['first']->id, $fixture['second']->id],
         ])
-        ->assertSessionHasErrors('question_type_b_id');
+        ->assertSessionHasErrors('question_type_ids');
 
     $this->actingAs($fixture['admin'])
         ->from(route('superadmin.question-type-pairings', $scope))
         ->post(route('superadmin.question-type-pairings.store'), [
             ...$scope,
-            'question_type_a_id' => $fixture['first']->id,
-            'question_type_b_id' => $fixture['objective']->id,
+            'question_type_ids' => [$fixture['first']->id, $fixture['objective']->id],
         ])
-        ->assertSessionHasErrors('question_type_b_id');
+        ->assertSessionHasErrors('question_type_ids');
 
     $this->actingAs($fixture['admin'])
         ->from(route('superadmin.question-type-pairings', $scope))
         ->post(route('superadmin.question-type-pairings.store'), [
             ...$scope,
-            'question_type_a_id' => $fixture['first']->id,
-            'question_type_b_id' => $fixture['outside']->id,
+            'question_type_ids' => [$fixture['first']->id, $fixture['outside']->id],
         ])
-        ->assertSessionHasErrors('question_type_b_id');
+        ->assertSessionHasErrors('question_type_ids');
 
-    expect(QuestionTypePairing::query()->count())->toBe(1);
+    expect(QuestionTypeOrGroup::query()->count())->toBe(1);
 });
 
 it('supports safe activation, deactivation, and removal', function () {
     $fixture = makePairingFixture();
-    $pairing = QuestionTypePairing::create([
+    $pairing = QuestionTypeOrGroup::create([
         'pattern_id' => $fixture['pattern']->id,
         'class_id' => $fixture['class']->id,
         'subject_id' => $fixture['subject']->id,
-        'question_type_a_id' => min($fixture['first']->id, $fixture['second']->id),
-        'question_type_b_id' => max($fixture['first']->id, $fixture['second']->id),
+        'type_signature' => implode(':', [
+            min($fixture['first']->id, $fixture['second']->id),
+            max($fixture['first']->id, $fixture['second']->id),
+        ]),
         'is_active' => true,
         'created_by' => $fixture['admin']->id,
+    ]);
+    $pairing->members()->createMany([
+        ['question_type_id' => $fixture['first']->id, 'sort_order' => 0],
+        ['question_type_id' => $fixture['second']->id, 'sort_order' => 1],
     ]);
 
     $this->actingAs($fixture['admin'])
@@ -262,5 +270,5 @@ it('supports safe activation, deactivation, and removal', function () {
         ->assertRedirect()
         ->assertSessionHas('success');
 
-    expect(QuestionTypePairing::query()->whereKey($pairing->id)->exists())->toBeFalse();
+    expect(QuestionTypeOrGroup::query()->whereKey($pairing->id)->exists())->toBeFalse();
 });

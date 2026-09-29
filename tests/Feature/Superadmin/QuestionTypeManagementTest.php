@@ -16,7 +16,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
-function makeSuperAdmin(): User
+function makeQuestionTypeSuperAdmin(): User
 {
     return User::factory()->create([
         'user_type' => UserType::SuperAdmin->value,
@@ -103,7 +103,7 @@ function makeQuestion(User $creator, QuestionType $questionType): Question
 }
 
 it('renders the question types index page', function () {
-    $admin = makeSuperAdmin();
+    $admin = makeQuestionTypeSuperAdmin();
     $questionType = makeQuestionType($admin, [
         'name' => 'MCQ',
         'heading_en' => 'Multiple Choice Questions',
@@ -121,7 +121,7 @@ it('renders the question types index page', function () {
 });
 
 it('creates a question type and normalizes dependent fields', function () {
-    $admin = makeSuperAdmin();
+    $admin = makeQuestionTypeSuperAdmin();
     $objectiveType = makeQuestionType($admin, [
         'name' => 'Objective Base',
         'heading_en' => 'Objective Base',
@@ -160,7 +160,7 @@ it('creates a question type and normalizes dependent fields', function () {
 });
 
 it('updates a question type', function () {
-    $admin = makeSuperAdmin();
+    $admin = makeQuestionTypeSuperAdmin();
     $objectiveType = makeQuestionType($admin, [
         'name' => 'Objective Parent',
         'heading_en' => 'Objective Parent',
@@ -207,7 +207,7 @@ it('updates a question type', function () {
 });
 
 it('does not delete a question type that is already linked to questions', function () {
-    $admin = makeSuperAdmin();
+    $admin = makeQuestionTypeSuperAdmin();
     $questionType = makeQuestionType($admin, [
         'name' => 'Protected Type',
         'heading_en' => 'Protected Type',
@@ -224,7 +224,7 @@ it('does not delete a question type that is already linked to questions', functi
 });
 
 it('sorts only question types available in the selected scope and keeps kinds independent', function () {
-    $admin = makeSuperAdmin();
+    $admin = makeQuestionTypeSuperAdmin();
     $first = makeQuestionType($admin, ['name' => 'First scoped subjective']);
     $second = makeQuestionType($admin, ['name' => 'Second scoped subjective']);
     $outside = makeQuestionType($admin, ['name' => 'Outside scoped subjective']);
