@@ -37,7 +37,9 @@ workflow publishes the complete built release after `git push origin master`.
    though the database is shared.
 5. The FTP account `testmaker_deploy@testmaker.pk` must have **Directory** set
    to `public_html`, not `public_html/testmaker_deploy`. The workflow connects
-   to `ftp.testmaker.pk` on port 21 and requires explicit TLS.
+   to `host.launchpad123.com` on port 21 and requires explicit TLS. This is the
+   same server as `ftp.testmaker.pk`, but its FTP certificate covers the server
+   hostname rather than the `ftp.testmaker.pk` alias.
 6. In GitHub, create the `production` environment. Add environment secrets
    `CPANEL_FTP_USERNAME` and `CPANEL_FTP_PASSWORD` for the scoped FTP account.
    In repository **Settings → Secrets and variables → Actions → Variables**,

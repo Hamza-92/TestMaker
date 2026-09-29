@@ -78,7 +78,7 @@ jobs:
         env:
           FTP_USER: ${{ secrets.CPANEL_FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.CPANEL_FTP_PASSWORD }}
-          FTP_HOST: ftp.testmaker.pk
+          FTP_HOST: host.launchpad123.com
         run: |
           if [ -z "$FTP_USER" ] || [ -z "$FTP_PASSWORD" ]; then
             echo 'The production FTPS credentials are not configured.' >&2
