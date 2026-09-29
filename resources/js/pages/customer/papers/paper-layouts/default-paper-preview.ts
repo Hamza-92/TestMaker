@@ -267,7 +267,7 @@ export function defaultPaperPreview(
                 shorts,
                 2,
                 'subjective-1',
-                2,
+                medium === 'Both' ? 1 : 2,
             ),
             section(
                 'longs',

@@ -431,7 +431,7 @@ export function PaperSettingsPanel({
         <div
             className={cn(
                 inline
-                    ? 'grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3 print:hidden'
+                    ? 'space-y-4 print:hidden'
                     : 'scrollbar-slim flex-1 space-y-2 overflow-y-auto bg-slate-50/60 p-3 dark:bg-slate-950/30',
             )}
         >
@@ -441,23 +441,29 @@ export function PaperSettingsPanel({
                 title={inline ? 'Page & Fonts' : 'General'}
                 icon={SlidersHorizontalIcon}
                 defaultOpen
-                className={inline ? 'md:col-span-2 xl:col-span-3' : undefined}
-                contentClassName={
-                    inline
-                        ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>div]:mt-0'
-                        : undefined
-                }
             >
                 {/* Paper-wide font family — applied across header,
                 headings and questions via a single CSS cascade. */}
-                <div>
-                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                        Font Family
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
+                <div className={inline ? 'contents' : undefined}>
+                    {!inline && (
+                        <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Font Family
+                        </p>
+                    )}
+                    <div
+                        className={
+                            inline ? 'contents' : 'grid grid-cols-2 gap-2'
+                        }
+                    >
                         <div>
-                            <p className="mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                                English
+                            <p
+                                className={
+                                    inline
+                                        ? 'mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400'
+                                        : 'mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500'
+                                }
+                            >
+                                {inline ? 'English Font' : 'English'}
                             </p>
                             <FontPicker
                                 value={settings.englishFont}
@@ -468,8 +474,14 @@ export function PaperSettingsPanel({
                             />
                         </div>
                         <div>
-                            <p className="mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                                Urdu
+                            <p
+                                className={
+                                    inline
+                                        ? 'mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400'
+                                        : 'mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500'
+                                }
+                            >
+                                {inline ? 'Urdu Font' : 'Urdu'}
                             </p>
                             <FontPicker
                                 value={settings.urduFont}
@@ -484,7 +496,11 @@ export function PaperSettingsPanel({
 
                 {/* Paper size + orientation — drives both the on-screen
                 shell dimensions and the printed @page rule. */}
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div
+                    className={
+                        inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'
+                    }
+                >
                     <div>
                         <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                             Paper Size
@@ -512,11 +528,23 @@ export function PaperSettingsPanel({
                 </div>
 
                 {/* Page margins — millimetres on all four sides. */}
-                <div className="mt-4">
+                <div
+                    className={
+                        inline
+                            ? 'col-span-full border-y border-slate-100 py-4 dark:border-slate-800'
+                            : 'mt-4'
+                    }
+                >
                     <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         Margins (mm)
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div
+                        className={
+                            inline
+                                ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4'
+                                : 'grid grid-cols-2 gap-2'
+                        }
+                    >
                         <LabeledStepper
                             label="Top"
                             value={settings.marginTop}
@@ -550,7 +578,7 @@ export function PaperSettingsPanel({
 
                 {/* Spacing between consecutive sections (and between
                 header and the first section). */}
-                <div className="mt-4">
+                <div className={inline ? 'min-w-0' : 'mt-4'}>
                     <LabeledStepper
                         label="Section Spacing (mm)"
                         value={settings.sectionSpacing}
@@ -561,8 +589,13 @@ export function PaperSettingsPanel({
                     />
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div
+                    className={
+                        inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'
+                    }
+                >
                     <CheckboxField
+                        className={inline ? 'self-end' : undefined}
                         label="Repeat Table Headers"
                         checked={settings.repeatTableHeaders}
                         onChange={(checked) =>
@@ -572,6 +605,7 @@ export function PaperSettingsPanel({
                         }
                     />
                     <CheckboxField
+                        className={inline ? 'self-end' : undefined}
                         label="Page Numbers"
                         checked={settings.pageNumbersEnabled}
                         onChange={(checked) =>
@@ -581,7 +615,13 @@ export function PaperSettingsPanel({
                 </div>
 
                 {settings.pageNumbersEnabled && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div
+                        className={
+                            inline
+                                ? 'col-span-full grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4'
+                                : 'mt-3 grid grid-cols-2 gap-2'
+                        }
+                    >
                         <div>
                             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                 Number Format
@@ -623,7 +663,7 @@ export function PaperSettingsPanel({
                     value={settings.watermarkType}
                     onChange={(value) => onChange({ watermarkType: value })}
                 />
-                <div className="mt-4">
+                <div className={inline ? 'xl:col-span-2' : 'mt-4'}>
                     {settings.watermarkType === 'text' ? (
                         <TextInput
                             label="Text"
@@ -645,7 +685,7 @@ export function PaperSettingsPanel({
                         />
                     )}
                 </div>
-                <div className="mt-4">
+                <div className={inline ? 'min-w-0' : 'mt-4'}>
                     <LabeledStepper
                         label="Opacity"
                         value={settings.watermarkOpacity}
@@ -661,7 +701,7 @@ export function PaperSettingsPanel({
                 title="Header"
                 icon={LayoutPanelTopIcon}
             >
-                <div className="mb-3">
+                <div className={inline ? 'sm:col-span-2' : 'mb-3'}>
                     <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         Template
                     </p>
@@ -672,6 +712,7 @@ export function PaperSettingsPanel({
                     />
                 </div>
                 <TypographyControls
+                    inline={inline}
                     size={settings.headerSize}
                     sizeMin={SIZE_BOUNDS.header.min}
                     sizeMax={SIZE_BOUNDS.header.max}
@@ -681,7 +722,11 @@ export function PaperSettingsPanel({
                         onChange({ headerLineHeight: v })
                     }
                 />
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div
+                    className={
+                        inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'
+                    }
+                >
                     <LabeledStepper
                         label="Padding X (px)"
                         value={settings.headerPaddingX}
@@ -698,6 +743,7 @@ export function PaperSettingsPanel({
                     />
                 </div>
                 <BorderControls
+                    inline={inline}
                     width={settings.headerBorderWidth}
                     style={settings.headerBorderStyle}
                     onWidthChange={(v) => onChange({ headerBorderWidth: v })}
@@ -711,6 +757,7 @@ export function PaperSettingsPanel({
                 icon={HeadingIcon}
             >
                 <TypographyControls
+                    inline={inline}
                     size={settings.headingSize}
                     sizeMin={SIZE_BOUNDS.heading.min}
                     sizeMax={SIZE_BOUNDS.heading.max}
@@ -721,6 +768,7 @@ export function PaperSettingsPanel({
                     }
                 />
                 <BorderControls
+                    inline={inline}
                     width={settings.headingBorderWidth}
                     style={settings.headingBorderStyle}
                     onWidthChange={(v) => onChange({ headingBorderWidth: v })}
@@ -733,7 +781,13 @@ export function PaperSettingsPanel({
                 title="Section Heading"
                 icon={Rows3Icon}
             >
-                <div className="grid grid-cols-2 gap-2">
+                <div
+                    className={
+                        inline
+                            ? 'col-span-full flex flex-wrap gap-3'
+                            : 'grid grid-cols-2 gap-2'
+                    }
+                >
                     <CheckboxField
                         label="Sections"
                         checked={
@@ -759,8 +813,9 @@ export function PaperSettingsPanel({
                         }
                     />
                 </div>
-                <div className="mt-3">
+                <div className={inline ? 'contents' : 'mt-3'}>
                     <TypographyControls
+                        inline={inline}
                         size={settings.sectionHeadingSize}
                         sizeMin={SIZE_BOUNDS.heading.min}
                         sizeMax={SIZE_BOUNDS.heading.max}
@@ -775,6 +830,7 @@ export function PaperSettingsPanel({
                         }
                     />
                     <BorderControls
+                        inline={inline}
                         width={settings.sectionHeadingBorderWidth}
                         style={settings.sectionHeadingBorderStyle}
                         onWidthChange={(value) =>
@@ -808,7 +864,11 @@ export function PaperSettingsPanel({
                         }
                     />
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div
+                    className={
+                        inline ? 'contents' : 'mt-3 grid grid-cols-2 gap-2'
+                    }
+                >
                     <div>
                         <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                             Divider
@@ -836,7 +896,7 @@ export function PaperSettingsPanel({
                         />
                     </div>
                 </div>
-                <div className="mt-3">
+                <div className={inline ? 'min-w-0' : 'mt-3'}>
                     <LabeledStepper
                         label="Spacing (mm)"
                         value={settings.orGroupGap}
@@ -853,7 +913,7 @@ export function PaperSettingsPanel({
                 title="Questions"
                 icon={ListOrderedIcon}
             >
-                <div className="mb-3">
+                <div className={inline ? 'sm:col-span-2' : 'mb-3'}>
                     <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         General Layout
                     </p>
@@ -865,7 +925,7 @@ export function PaperSettingsPanel({
                         }
                     />
                 </div>
-                <div className="mb-3">
+                <div className={inline ? 'sm:col-span-2' : 'mb-3'}>
                     <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         Numbering
                     </p>
@@ -880,6 +940,7 @@ export function PaperSettingsPanel({
                     />
                 </div>
                 <TypographyControls
+                    inline={inline}
                     size={settings.questionSize}
                     sizeMin={SIZE_BOUNDS.question.min}
                     sizeMax={SIZE_BOUNDS.question.max}
@@ -890,6 +951,7 @@ export function PaperSettingsPanel({
                     }
                 />
                 <BorderControls
+                    inline={inline}
                     width={settings.questionBorderWidth}
                     style={settings.questionBorderStyle}
                     onWidthChange={(v) => onChange({ questionBorderWidth: v })}
@@ -927,7 +989,8 @@ function CollapsibleSection({
     return (
         <section
             className={cn(
-                'overflow-hidden rounded-lg border bg-white transition-colors dark:bg-slate-900',
+                'overflow-hidden border bg-white transition-colors dark:bg-slate-900',
+                inline ? 'rounded-xl' : 'rounded-lg',
                 open
                     ? 'border-slate-200 shadow-sm shadow-slate-900/[0.03] dark:border-slate-700'
                     : 'border-slate-200 dark:border-slate-800',
@@ -938,19 +1001,28 @@ function CollapsibleSection({
                 type="button"
                 onClick={() => setOpen((value) => !value)}
                 aria-expanded={open}
-                className="group flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                className={cn(
+                    'group flex w-full cursor-pointer items-center gap-2.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50',
+                    inline ? 'px-5 py-3.5' : 'px-3 py-2.5',
+                )}
             >
                 <span
                     className={cn(
-                        'flex size-6 shrink-0 items-center justify-center rounded-md transition-colors',
+                        'flex shrink-0 items-center justify-center rounded-md transition-colors',
+                        inline ? 'size-7' : 'size-6',
                         open
                             ? 'bg-brand-600 text-white'
                             : 'bg-slate-100 text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-600 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-brand-500/10 dark:group-hover:text-brand-400',
                     )}
                 >
-                    <Icon className="size-3.5" />
+                    <Icon className={inline ? 'size-4' : 'size-3.5'} />
                 </span>
-                <span className="flex-1 text-[13px] font-semibold text-slate-800 group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white">
+                <span
+                    className={cn(
+                        'flex-1 font-semibold text-slate-800 group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white',
+                        inline ? 'text-sm' : 'text-[13px]',
+                    )}
+                >
                     {title}
                 </span>
                 <ChevronDownIcon
@@ -963,7 +1035,10 @@ function CollapsibleSection({
             {open && (
                 <div
                     className={cn(
-                        'border-t border-slate-100 px-3 pt-3 pb-3 dark:border-slate-800',
+                        'border-t border-slate-100 dark:border-slate-800',
+                        inline
+                            ? 'grid grid-cols-1 items-start gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4'
+                            : 'px-3 pt-3 pb-3',
                         contentClassName,
                     )}
                 >
@@ -976,6 +1051,7 @@ function CollapsibleSection({
 
 /** Default per-element typography controls: font size + line height. */
 function TypographyControls({
+    inline = false,
     size,
     sizeMin,
     sizeMax,
@@ -983,6 +1059,7 @@ function TypographyControls({
     onSizeChange,
     onLineHeightChange,
 }: {
+    inline?: boolean;
     size: number;
     sizeMin: number;
     sizeMax: number;
@@ -991,7 +1068,7 @@ function TypographyControls({
     onLineHeightChange: (next: number) => void;
 }) {
     return (
-        <div className="grid grid-cols-2 gap-2">
+        <div className={inline ? 'contents' : 'grid grid-cols-2 gap-2'}>
             <LabeledStepper
                 label="Font Size"
                 value={size}
@@ -1013,18 +1090,20 @@ function TypographyControls({
 
 /** Per-element border controls: width + style (width=0 = no border). */
 function BorderControls({
+    inline = false,
     width,
     style,
     onWidthChange,
     onStyleChange,
 }: {
+    inline?: boolean;
     width: number;
     style: PaperBorderStyle;
     onWidthChange: (next: number) => void;
     onStyleChange: (next: PaperBorderStyle) => void;
 }) {
     return (
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className={inline ? 'contents' : 'mt-3 grid grid-cols-2 gap-2'}>
             <LabeledStepper
                 label="Border Width"
                 value={width}
@@ -1312,11 +1391,13 @@ function TextInput({
 }
 
 function CheckboxField({
+    className,
     label,
     checked,
     disabled = false,
     onChange,
 }: {
+    className?: string;
     label: string;
     checked: boolean;
     disabled?: boolean;
@@ -1335,6 +1416,7 @@ function CheckboxField({
                 checked
                     ? 'border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70',
+                className,
             )}
         >
             <span
