@@ -314,60 +314,85 @@ input[type='date']::-webkit-calendar-picker-indicator {
 
 .announcement-ticker {
     position: relative;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 1.6em;
+}
+
+.announcement-ticker-urdu {
+    min-height: 1.8em;
+}
+
+.announcement-ticker-track {
+    position: absolute;
+    inset-block-start: 0;
+    left: 0;
+    display: flex;
+    direction: ltr;
     width: max-content;
+    max-width: none;
+    white-space: nowrap;
     animation: tm-announcement-marquee 24s linear infinite;
-    will-change: left, transform;
+    will-change: transform;
 }
 
-.announcement-ticker-item {
-    display: block;
-    width: max-content;
-}
-
-.announcement-ticker-rtl {
+.announcement-ticker-track-rtl {
+    right: 0;
+    left: auto;
+    flex-direction: row-reverse;
     animation-name: tm-announcement-marquee-rtl;
 }
 
-.announcement-ticker:hover,
-.announcement-ticker:focus-within {
+.announcement-ticker-copy {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 1.5rem;
+    padding-inline-end: 1.5rem;
+}
+
+.announcement-ticker:hover .announcement-ticker-track,
+.announcement-ticker:focus-within .announcement-ticker-track {
     animation-play-state: paused;
 }
 
 @keyframes tm-announcement-marquee {
-    from {
-        left: 100%;
-        transform: translateX(0);
-    }
     to {
-        left: 0;
-        transform: translateX(-100%);
+        transform: translateX(calc(-1 * var(--announcement-ticker-distance)));
     }
 }
 
 @keyframes tm-announcement-marquee-rtl {
-    from {
-        left: 0;
-        transform: translateX(-100%);
-    }
     to {
-        left: 100%;
-        transform: translateX(0);
+        transform: translateX(var(--announcement-ticker-distance));
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .announcement-ticker,
-    .announcement-ticker-rtl {
+    .announcement-ticker {
+        min-height: 0;
+    }
+
+    .announcement-ticker-track {
+        position: relative;
+        right: auto;
+        left: auto;
         animation: none;
         transform: none;
         width: auto;
         white-space: normal;
+        will-change: auto;
     }
 
-    .announcement-ticker-item {
-        width: auto;
+    .announcement-ticker-copy {
+        display: block;
         white-space: normal;
         overflow-wrap: anywhere;
+    }
+
+    .announcement-ticker-copy:not(:first-child),
+    .announcement-ticker-separator {
+        display: none;
     }
 }
 .scrollbar-slim-muted {

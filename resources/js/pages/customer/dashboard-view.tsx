@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ElementType } from 'react';
 import { useState } from 'react';
+import { AnnouncementTicker } from '@/components/announcement-ticker';
 import { Badge, Button, Card, PageHeader } from '@/components/tm';
 import { iconCardStyle, iconContainerStyle } from '@/lib/icon-appearance';
 import { patternIcon } from '@/lib/pattern-appearance';
@@ -233,31 +234,14 @@ function AnnouncementBanner({ announcement }: { announcement: Announcement }) {
                     <AnnouncementIcon type={announcement.type} />
                 </div>
                 {isTicker ? (
-                    <div
-                        className="min-w-0 flex-1 overflow-hidden"
-                        aria-live="polite"
-                    >
-                        <div
-                            className={cn(
-                                'announcement-ticker whitespace-nowrap',
-                                direction === 'rtl' &&
-                                    'announcement-ticker-rtl',
-                            )}
-                            dir={direction}
-                            style={{
-                                animationDuration: `${announcement.banner_scroll_duration ?? 24}s`,
-                            }}
-                        >
-                            <span
-                                style={titleStyle}
-                                className={cn(
-                                    'announcement-ticker-item text-sm font-semibold',
-                                    isUrdu && 'leading-[1.8]',
-                                )}
-                            >
-                                {announcement.title}
-                            </span>
-                        </div>
+                    <div className="min-w-0 flex-1">
+                        <AnnouncementTicker
+                            text={announcement.title}
+                            direction={direction}
+                            duration={announcement.banner_scroll_duration ?? 24}
+                            textStyle={titleStyle}
+                            isUrdu={isUrdu}
+                        />
                     </div>
                 ) : (
                     <div className="min-w-0 flex-1">
@@ -977,7 +961,9 @@ export default function CustomerDashboard({
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div
                                                             className="flex size-9 items-center justify-center rounded-lg"
-                                                            style={iconContainerStyle(pattern.color)}
+                                                            style={iconContainerStyle(
+                                                                pattern.color,
+                                                            )}
                                                         >
                                                             <PatternIcon className="size-5" />
                                                         </div>

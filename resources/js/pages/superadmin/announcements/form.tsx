@@ -7,6 +7,7 @@ import {
     SaveIcon,
 } from 'lucide-react';
 import type { CSSProperties } from 'react';
+import { AnnouncementTicker } from '@/components/announcement-ticker';
 import { Button, Card, PageHeader } from '@/components/tm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -764,27 +765,24 @@ export default function AnnouncementForm({ announcement }: Props) {
                                     dir={previewStyle.direction}
                                 >
                                     {data.banner_style === 'ticker' ? (
-                                        <div className="min-w-0 overflow-hidden">
-                                            <div
-                                                className={cn(
-                                                    'announcement-ticker whitespace-nowrap',
-                                                    previewStyle.direction ===
-                                                        'rtl' &&
-                                                        'announcement-ticker-rtl',
-                                                )}
-                                                style={{
-                                                    animationDuration: `${data.banner_scroll_duration || 24}s`,
-                                                }}
-                                            >
-                                                <span
-                                                    className="announcement-ticker-item text-sm font-semibold"
-                                                    style={titleStyle}
-                                                >
-                                                    {data.title ||
-                                                        'Your announcement title'}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        <AnnouncementTicker
+                                            text={
+                                                data.title ||
+                                                'Your announcement title'
+                                            }
+                                            direction={
+                                                previewStyle.direction as
+                                                    | 'ltr'
+                                                    | 'rtl'
+                                            }
+                                            duration={
+                                                Number(
+                                                    data.banner_scroll_duration,
+                                                ) || 24
+                                            }
+                                            textStyle={titleStyle}
+                                            isUrdu={data.banner_font === 'urdu'}
+                                        />
                                     ) : (
                                         <>
                                             <p
