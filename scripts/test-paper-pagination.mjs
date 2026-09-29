@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const source = readFileSync(new URL('../resources/js/pages/customer/papers/paper-layouts/pdf-pagination.ts', import.meta.url), 'utf8');

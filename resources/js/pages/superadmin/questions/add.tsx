@@ -81,7 +81,9 @@ function loadSticky(
 function saveSticky(data: StickyDefaults) {
     try {
         localStorage.setItem(STICKY_KEY, JSON.stringify(data));
-    } catch {}
+    } catch {
+        return;
+    }
 }
 
 export default function AddQuestion({

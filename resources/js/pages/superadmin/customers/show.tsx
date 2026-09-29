@@ -385,7 +385,6 @@ export default function ShowCustomer({
     const location = [customer.city, customer.province].filter(Boolean).join(', ');
     const address = customer.is_show_address ? customer.address : null;
     const activeSubscriptions = customer.subscriptions.filter((subscription) => subscription.status === 'active');
-    const activeSub = activeSubscriptions[0] ?? null;
 
     const totalPaid = paymentLogs
         .filter((log) => log.status === 'approved')

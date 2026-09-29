@@ -1,5 +1,5 @@
 ﻿import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,6 @@ export default function Register() {
 }
 
 Register.layout = null;
-
 
 
 
