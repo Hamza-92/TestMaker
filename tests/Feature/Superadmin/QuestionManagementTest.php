@@ -108,24 +108,30 @@ it('creates an objective question with options', function () {
                     ['text_en' => 'Option A', 'text_ur' => null, 'is_correct' => true],
                     ['text_en' => 'Option B', 'text_ur' => null, 'is_correct' => false],
                     ['text_en' => 'Option C', 'text_ur' => null, 'is_correct' => false],
+                    ['text_en' => 'Option D', 'text_ur' => null, 'is_correct' => false],
                 ],
             ],
         ]);
 
     $question = Question::query()->with('options')->sole();
 
-    $response->assertRedirect(route('superadmin.questions.show', $question));
+    $response->assertRedirect(route('superadmin.questions.chapter', $context['chapter']));
 
     expect($question->question_type_id)->toBe($questionType->id)
         ->and($question->statement_en)->toBe('Choose the correct option')
         ->and($question->answer_en)->toBeNull()
-        ->and($question->options)->toHaveCount(3)
+        ->and($question->options)->toHaveCount(4)
         ->and($question->options->where('is_correct', true))->toHaveCount(1)
         ->and($question->options->pluck('text_en')->all())->toBe([
             'Option A',
             'Option B',
             'Option C',
+            'Option D',
         ]);
+
+    $this->getJson(route('superadmin.questions.list-data', ['chapter_id' => $context['chapter']->id]))
+        ->assertOk()->assertJsonPath('questions.0.id', $question->id)
+        ->assertJsonPath('questions.0.options_count', 4);
 });
 
 it('sorts questions within one chapter topic and question type scope', function () {
@@ -229,7 +235,7 @@ it('updates an objective question and replaces its options', function () {
             ],
         ]);
 
-    $response->assertRedirect(route('superadmin.questions.show', $question));
+    $response->assertRedirect(route('superadmin.questions.chapter', $context['chapter']));
 
     $question->refresh()->load('options');
 

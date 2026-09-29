@@ -10,15 +10,18 @@ use App\Models\AuditLog;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Medium;
+use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\QuestionType;
+use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Support\Questions\QuestionBulkImporter;
 use App\Support\Questions\QuestionTypeChanger;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -130,44 +133,159 @@ class QuestionController extends Controller
 
     private function renderQuestionsIndex(?int $chapterId, ?int $topicId)
     {
-        $questions = null;
-        if ($chapterId) {
-            $query = Question::query()
-                ->where('chapter_id', $chapterId)
-                ->with([
-                    'questionType.objectiveType:id,name',
-                    'chapter.subject:id,name_eng,name_ur,subject_type',
-                    'chapter.schoolClass:id,name',
-                    'chapter.pattern:id,name,short_name',
-                    'topic:id,name,name_ur,chapter_id',
-                    'options',
-                ])
-                ->orderBy('question_type_id')
-                ->orderBy('topic_id')
-                ->orderBy('sort_order')
-                ->orderBy('id');
+        return Inertia::render('superadmin/questions', [
+            'patterns' => fn () => Pattern::query()->ordered()->get(['id', 'name', 'short_name']),
+            'initialChapter' => fn () => $chapterId
+                ? $this->questionFilterChapter(Chapter::query()->findOrFail($chapterId))
+                : null,
+            'filters' => ['chapter_id' => $chapterId, 'topic_id' => $topicId],
+        ]);
+    }
 
-            if ($topicId) {
-                $query->where('topic_id', $topicId);
-            }
+    public function filterOptions(Request $request): JsonResponse
+    {
+        $scope = $request->validate([
+            'level' => ['required', 'in:classes,subjects,chapters,topics'],
+            'pattern_id' => ['required_if:level,classes,subjects,chapters', 'integer', 'min:1'],
+            'class_id' => ['required_if:level,subjects,chapters', 'integer', 'min:1'],
+            'subject_id' => ['required_if:level,chapters', 'integer', 'min:1'],
+            'chapter_id' => ['required_if:level,topics', 'integer', 'min:1'],
+        ]);
 
-            $questions = $query->get();
-            $subjectTypes = $this->subjectTypesForChapters($questions->pluck('chapter'));
-            $questions = $questions
-                ->map(fn (Question $question) => $this->transformQuestionListItem(
-                    $question,
-                    $subjectTypes->get((string) $question->chapter_id),
-                ))
-                ->values();
+        $options = match ($scope['level']) {
+            'classes' => SchoolClass::query()
+                ->where(function ($query) use ($scope) {
+                    $query->whereIn('id', DB::table('pattern_classes')->select('class_id')->where('pattern_id', $scope['pattern_id']))
+                        // Keep older chapters reachable even if their assignment is missing.
+                        ->orWhereIn('id', Chapter::query()->select('class_id')->where('pattern_id', $scope['pattern_id']));
+                })
+                ->ordered()->get(['id', 'name']),
+            'subjects' => Subject::query()
+                ->where(function ($query) use ($scope) {
+                    $query->whereIn('id', ClassSubject::query()->select('subject_id')->where('pattern_id', $scope['pattern_id'])->where('class_id', $scope['class_id']))
+                        ->orWhereIn('id', Chapter::query()->select('subject_id')->where('pattern_id', $scope['pattern_id'])->where('class_id', $scope['class_id']));
+                })
+                ->orderBy('name_eng')->orderBy('id')->get(['id', 'name_eng', 'name_ur']),
+            'chapters' => $this->questionFilterChapters($scope),
+            'topics' => Topic::query()->where('chapter_id', $scope['chapter_id'])
+                ->orderBy('sort_id')->orderBy('name')->orderBy('id')
+                ->get(['id', 'name', 'name_ur', 'status']),
+        };
+
+        return response()->json(['options' => $options]);
+    }
+
+    public function listTypes(): JsonResponse
+    {
+        return response()->json(['options' => $this->questionTypeFormOptions(includeInactive: true)]);
+    }
+
+    public function listData(Request $request): JsonResponse
+    {
+        $scope = $request->validate([
+            'chapter_id' => ['required', 'integer', 'min:1'],
+            'topic_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $chapter = Chapter::query()->findOrFail($scope['chapter_id']);
+        $topicId = $scope['topic_id'] ?? null;
+        if ($topicId !== null) {
+            abort_unless(Topic::query()->whereKey($topicId)->where('chapter_id', $chapter->id)->exists(), 404);
         }
 
-        return Inertia::render('superadmin/questions', [
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
-            'questions' => $questions,
-            'filters' => ['chapter_id' => $chapterId, 'topic_id' => $topicId],
-            'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
-            'sourceOptions' => $this->sourceOptions(),
+        $questions = Question::query()->where('chapter_id', $chapter->id)
+            ->when($topicId, fn ($query) => $query->where('topic_id', $topicId))
+            ->with(['questionType', 'topic:id,name,name_ur,chapter_id'])
+            ->withCount(['options', 'options as correct_options_count' => fn ($query) => $query->where('is_correct', true)])
+            ->orderBy('question_type_id')->orderBy('topic_id')->orderBy('sort_order')->orderBy('id')
+            ->get();
+        $types = $questions->pluck('questionType')->unique('id')->values();
+        $optionsOnlyIds = $questions->filter(fn (Question $question) => $question->questionType->options_only && empty($question->content))->pluck('id');
+        $firstOptions = $optionsOnlyIds->isEmpty() ? collect() : QuestionOption::query()
+            ->whereIn('question_id', $optionsOnlyIds)->orderBy('sort_order')->orderBy('id')
+            ->get(['id', 'question_id', 'text_en', 'text_ur', 'is_correct'])->groupBy('question_id')->map->first();
+
+        return response()->json([
+            'chapter' => $this->questionFilterChapter($chapter),
+            'questionTypes' => $types->sortBy('name')->values()->map(fn (QuestionType $type) => $this->serializeQuestionType($type)),
+            'topics' => $questions->pluck('topic')->filter()->unique('id')->values(),
+            'questions' => $questions->map(function (Question $question) use ($firstOptions): array {
+                $type = QuestionTypeSchemaRegistry::typeForQuestion($question, $question->questionType);
+                $legacy = empty($question->content);
+                $question->setRelation('options', collect());
+                $content = QuestionTypeSchemaRegistry::contentFromQuestion($question, $type);
+                if ($legacy && $type->options_only && $firstOptions->has($question->id)) {
+                    $option = $firstOptions->get($question->id);
+                    $content['options'] = [['text_en' => $option->text_en, 'text_ur' => $option->text_ur]];
+                }
+                $metrics = QuestionTypeSchemaRegistry::metrics($type, $content);
+                $schemaKey = $this->resolvedQuestionSchema($type)['key'];
+                if (! in_array($schemaKey, [
+                    QuestionTypeSchemaRegistry::OBJECTIVE_MCQ, QuestionTypeSchemaRegistry::OBJECTIVE_BLANK_CHOICE,
+                    QuestionTypeSchemaRegistry::OBJECTIVE_TRUE_FALSE, QuestionTypeSchemaRegistry::OBJECTIVE_PASSAGE_MCQ,
+                    QuestionTypeSchemaRegistry::SUBJECTIVE_GROUPED, QuestionTypeSchemaRegistry::SUBJECTIVE_PAIRS,
+                    QuestionTypeSchemaRegistry::SUBJECTIVE_SAME_STATEMENT,
+                ], true)) {
+                    $metrics['options_count'] = $question->options_count;
+                }
+                if ($legacy) {
+                    if (in_array($schemaKey, [QuestionTypeSchemaRegistry::OBJECTIVE_MCQ, QuestionTypeSchemaRegistry::OBJECTIVE_BLANK_CHOICE], true)) {
+                        $metrics['options_count'] = $question->options_count;
+                        $metrics['correct_options_count'] = $question->correct_options_count;
+                    } elseif ($schemaKey === QuestionTypeSchemaRegistry::OBJECTIVE_TRUE_FALSE) {
+                        $metrics['correct_options_count'] = $question->correct_options_count > 0 ? 1 : 0;
+                    }
+                }
+
+                return [
+                    'id' => $question->id,
+                    'question_type_id' => $question->question_type_id,
+                    'topic_id' => $question->topic_id,
+                    'summary_text' => QuestionTypeSchemaRegistry::summarize($type, $content),
+                    'source' => $question->source,
+                    'source_label' => Question::sourceLabel($question->source),
+                    'status' => $question->status,
+                    'sort_order' => $question->sort_order,
+                    'created_at' => $question->created_at?->toISOString(),
+                    ...$metrics,
+                ];
+            }),
         ]);
+    }
+
+    private function questionFilterChapters(array $scope): Collection
+    {
+        $chapters = Chapter::query()->where('pattern_id', $scope['pattern_id'])
+            ->where('class_id', $scope['class_id'])->where('subject_id', $scope['subject_id'])
+            ->with(['subject', 'schoolClass:id,name', 'pattern:id,name,short_name'])
+            ->orderBy('group_name')->orderBy('group_heading')->orderBy('sort_id')->orderBy('chapter_number')->orderBy('name')->orderBy('id')->get();
+        $subjectTypes = $this->subjectTypesForChapters($chapters);
+
+        return $chapters->map(fn (Chapter $chapter) => $this->questionFilterChapter($chapter, $subjectTypes->get((string) $chapter->id)));
+    }
+
+    private function questionFilterChapter(Chapter $chapter, ?string $subjectType = null): array
+    {
+        $chapter->loadMissing(['subject', 'schoolClass:id,name', 'pattern:id,name,short_name']);
+
+        return [
+            'id' => $chapter->id,
+            'name' => $chapter->name,
+            'name_ur' => $chapter->name_ur,
+            'chapter_number' => $chapter->chapter_number,
+            'group_name' => $chapter->group_name,
+            'group_heading' => $chapter->group_heading,
+            'status' => $chapter->status,
+            'subject' => [
+                'id' => $chapter->subject->id,
+                'name_eng' => $chapter->subject->name_eng,
+                'name_ur' => $chapter->subject->name_ur,
+                'subject_type' => $subjectType ?? $chapter->effectiveSubjectType(),
+                'status' => $chapter->subject->status,
+            ],
+            'class' => $chapter->schoolClass->only(['id', 'name']),
+            'pattern' => $chapter->pattern->only(['id', 'name', 'short_name']),
+            'topics' => [],
+        ];
     }
 
     public function chapterIndex(Subject $subject, Chapter $chapter)

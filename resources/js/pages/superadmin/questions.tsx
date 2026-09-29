@@ -24,6 +24,8 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
+import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
+import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import {
     Select,
     SelectContent,
@@ -35,11 +37,13 @@ import { Spinner } from '@/components/ui/spinner';
 import { usePermission } from '@/hooks/use-permission';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { BulkQuestionTypeChangeDialog } from './questions/change-type-dialog';
-import type {
-    ChapterOption,
-    QuestionTypeOption,
-    SourceOption,
-} from './questions/form';
+import type { ChapterOption, QuestionTypeOption } from './questions/form';
+import type { TopicOption } from './questions/form';
+import {
+    fetchQuestionJson,
+    useQuestionJson,
+    useQuestionOptions,
+} from './questions/use-question-options';
 
 interface QuestionRow {
     id: number;
@@ -75,18 +79,59 @@ interface Filters {
     topic_id: number | null;
 }
 
-function uniqueById<T extends { id: number }>(arr: T[]): T[] {
-    const seen = new Set<number>();
+interface PatternOption {
+    id: number;
+    name: string;
+    short_name: string | null;
+}
+interface ClassOption {
+    id: number;
+    name: string;
+}
+interface SubjectOption {
+    id: number;
+    name_eng: string;
+    name_ur: string | null;
+}
+interface QuestionListData {
+    chapter: ChapterOption;
+    questionTypes: QuestionTypeOption[];
+    topics: TopicOption[];
+    questions: (Omit<QuestionRow, 'chapter' | 'topic' | 'question_type'> & {
+        question_type_id: number;
+        topic_id: number | null;
+    })[];
+}
 
-    return arr.filter((item) => {
-        if (seen.has(item.id)) {
-            return false;
-        }
-
-        seen.add(item.id);
-
-        return true;
-    });
+function ScopeSelect({
+    label,
+    options,
+    value,
+    onChange,
+    disabled,
+    placeholder,
+}: {
+    label: string;
+    options: ComboboxOptionItem[];
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+    placeholder?: string;
+}) {
+    return (
+        <FloatingCombobox
+            label={label}
+            hideLabel
+            compact
+            placeholder={placeholder ?? label}
+            options={options}
+            value={
+                options.find((option) => String(option.id) === value) ?? null
+            }
+            onChange={(option) => onChange(option ? String(option.id) : '')}
+            disabled={disabled}
+        />
+    );
 }
 
 function StatusBadge({ status }: { status: number }) {
@@ -128,28 +173,19 @@ function KindBadge({ isObjective }: { isObjective: boolean }) {
 }
 
 const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
-const NONE = '__none__';
 
 export default function Questions({
-    chapters,
-    questions,
+    patterns,
+    initialChapter,
     filters,
-    questionTypes,
 }: {
-    chapters: ChapterOption[];
-    questions: QuestionRow[] | null;
+    patterns: PatternOption[];
+    initialChapter: ChapterOption | null;
     filters: Filters;
-    questionTypes: QuestionTypeOption[];
-    sourceOptions: SourceOption[];
 }) {
     const { can } = usePermission();
     const canEditQuestions = can('questions.edit');
-
-    // ── Derive the initial chapter from filters ──────────────────────────────
-    const activeChapter = useMemo(
-        () => chapters.find((c) => c.id === filters.chapter_id) ?? null,
-        [chapters, filters.chapter_id],
-    );
+    const activeChapter = initialChapter;
 
     // ── Local cascading-filter state ─────────────────────────────────────────
     const [patternId, setPatternId] = useState(() =>
@@ -183,156 +219,210 @@ export default function Questions({
     const [draggedId, setDraggedId] = useState<number | null>(null);
     const [sortDirty, setSortDirty] = useState(false);
     const [sortSaving, setSortSaving] = useState(false);
-    const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [loadedScope, setLoadedScope] = useState<Filters>(filters);
+    const [loadingTypes, setLoadingTypes] = useState(false);
+    const [typeError, setTypeError] = useState('');
+    const [questionTypes, setQuestionTypes] = useState<
+        QuestionTypeOption[] | null
+    >(null);
 
-    // ── Cascaded dropdown options ─────────────────────────────────────────────
-    const patterns = useMemo(
-        () => uniqueById(chapters.map((c) => c.pattern)),
-        [chapters],
+    const classesResource = useQuestionOptions<ClassOption>(
+        patternId
+            ? '/superadmin/questions/filter-options?' +
+                  new URLSearchParams({
+                      level: 'classes',
+                      pattern_id: patternId,
+                  })
+            : null,
+        activeChapter && String(activeChapter.pattern.id) === patternId
+            ? [activeChapter.class]
+            : [],
     );
-
-    const availableClasses = useMemo(
-        () =>
-            !patternId
-                ? []
-                : uniqueById(
-                      chapters
-                          .filter((c) => String(c.pattern.id) === patternId)
-                          .map((c) => c.class),
-                  ),
-        [chapters, patternId],
+    const subjectsResource = useQuestionOptions<SubjectOption>(
+        patternId && classId
+            ? '/superadmin/questions/filter-options?' +
+                  new URLSearchParams({
+                      level: 'subjects',
+                      pattern_id: patternId,
+                      class_id: classId,
+                  })
+            : null,
+        activeChapter &&
+            String(activeChapter.pattern.id) === patternId &&
+            String(activeChapter.class.id) === classId
+            ? [activeChapter.subject]
+            : [],
     );
-
-    const availableSubjects = useMemo(
-        () =>
-            !classId
-                ? []
-                : uniqueById(
-                      chapters
-                          .filter(
-                              (c) =>
-                                  String(c.pattern.id) === patternId &&
-                                  String(c.class.id) === classId,
-                          )
-                          .map((c) => c.subject),
-                  ),
-        [chapters, patternId, classId],
+    const chaptersResource = useQuestionOptions<ChapterOption>(
+        patternId && classId && subjectId
+            ? '/superadmin/questions/filter-options?' +
+                  new URLSearchParams({
+                      level: 'chapters',
+                      pattern_id: patternId,
+                      class_id: classId,
+                      subject_id: subjectId,
+                  })
+            : null,
+        activeChapter &&
+            String(activeChapter.pattern.id) === patternId &&
+            String(activeChapter.class.id) === classId &&
+            String(activeChapter.subject.id) === subjectId
+            ? [activeChapter]
+            : [],
     );
-
-    const availableChapters = useMemo(
-        () =>
-            !subjectId
-                ? []
-                : chapters.filter(
-                      (c) =>
-                          String(c.pattern.id) === patternId &&
-                          String(c.class.id) === classId &&
-                          String(c.subject.id) === subjectId,
-                  ),
-        [chapters, patternId, classId, subjectId],
-    );
-
-    const selectedChapter = useMemo(
-        () => availableChapters.find((c) => String(c.id) === chapterId) ?? null,
-        [availableChapters, chapterId],
-    );
-
+    const availableClasses = classesResource.options;
+    const availableSubjects = subjectsResource.options;
+    const availableChapters = chaptersResource.options;
+    const selectedChapter =
+        availableChapters.find((chapter) => String(chapter.id) === chapterId) ??
+        null;
     const isTopicWise = selectedChapter?.subject.subject_type === 'topic-wise';
-    const availableTopics = selectedChapter?.topics ?? [];
-    const availableQuestionTypes = useMemo(() => {
-        const typeIds = new Set(
-            (questions ?? []).map((question) => question.question_type.id),
+    const topicsResource = useQuestionOptions<TopicOption>(
+        isTopicWise && chapterId
+            ? '/superadmin/questions/filter-options?' +
+                  new URLSearchParams({
+                      level: 'topics',
+                      chapter_id: chapterId,
+                  })
+            : null,
+    );
+    const availableTopics = topicsResource.options;
+    const questionResource = useQuestionJson<QuestionListData>(
+        loadedScope.chapter_id
+            ? '/superadmin/questions/list-data?' +
+                  new URLSearchParams({
+                      chapter_id: String(loadedScope.chapter_id),
+                      ...(loadedScope.topic_id
+                          ? { topic_id: String(loadedScope.topic_id) }
+                          : {}),
+                  })
+            : null,
+    );
+    const loadingQuestions = questionResource.loading;
+    const questions = useMemo(() => {
+        const data = questionResource.data;
+
+        if (!data) {
+            return null;
+        }
+
+        const types = new Map(
+            data.questionTypes.map((type) => [type.id, type]),
         );
+        const topics = new Map(data.topics.map((topic) => [topic.id, topic]));
 
-        return questionTypes.filter((type) => typeIds.has(type.id));
-    }, [questionTypes, questions]);
+        return data.questions.map(
+            (question): QuestionRow => ({
+                ...question,
+                chapter: data.chapter,
+                question_type: types.get(question.question_type_id)!,
+                topic: question.topic_id
+                    ? (topics.get(question.topic_id) ?? null)
+                    : null,
+            }),
+        );
+    }, [questionResource.data]);
+    const availableQuestionTypes = questionResource.data?.questionTypes ?? [];
+    const filterResources = [
+        classesResource,
+        subjectsResource,
+        chaptersResource,
+        topicsResource,
+    ];
 
-    // ── Navigate to load questions from server ────────────────────────────────
     const navigate = (newChapterId: string, newTopicId = '') => {
         setSelectedIds(new Set());
         setChangeTypeOpen(false);
+        setSortingEnabled(false);
+        setSortingItems([]);
+        setTypeFilter('all');
+        setPage(1);
+        const scope = {
+            chapter_id: newChapterId ? Number(newChapterId) : null,
+            topic_id: newTopicId ? Number(newTopicId) : null,
+        };
+        setLoadedScope(scope);
         let url = '/superadmin/questions';
 
         if (newChapterId) {
-            url += `/chapters/${newChapterId}`;
+            url += '/chapters/' + newChapterId;
 
             if (newTopicId) {
-                url += `/topics/${newTopicId}`;
+                url += '/topics/' + newTopicId;
             }
         }
 
-        setLoadingQuestions(true);
-        router.get(
+        router.replace({
             url,
-            {},
-            {
-                preserveState: true,
-                replace: true,
-                onFinish: () => setLoadingQuestions(false),
-            },
-        );
+            preserveState: true,
+            preserveScroll: true,
+            props: (props) => ({
+                ...props,
+                filters: scope,
+                initialChapter:
+                    availableChapters.find(
+                        (chapter) => String(chapter.id) === newChapterId,
+                    ) ?? null,
+            }),
+        });
     };
 
-    // ── Filter handlers ───────────────────────────────────────────────────────
-    const handlePatternChange = (val: string) => {
-        const v = val === NONE ? '' : val;
-        setPatternId(v);
+    const handlePatternChange = (value: string) => {
+        setPatternId(value);
         setClassId('');
         setSubjectId('');
         setChapterId('');
         setTopicId('');
-
-        if (filters.chapter_id) {
-            navigate('');
-        }
+        navigate('');
     };
-
-    const handleClassChange = (val: string) => {
-        const v = val === NONE ? '' : val;
-        setClassId(v);
+    const handleClassChange = (value: string) => {
+        setClassId(value);
         setSubjectId('');
         setChapterId('');
         setTopicId('');
-
-        if (filters.chapter_id) {
-            navigate('');
-        }
+        navigate('');
     };
-
-    const handleSubjectChange = (val: string) => {
-        const v = val === NONE ? '' : val;
-        setSubjectId(v);
+    const handleSubjectChange = (value: string) => {
+        setSubjectId(value);
         setChapterId('');
         setTopicId('');
-
-        if (filters.chapter_id) {
-            navigate('');
-        }
+        navigate('');
+    };
+    const handleChapterChange = (value: string) => {
+        setChapterId(value);
+        setTopicId('');
+        const chapter = availableChapters.find(
+            (item) => String(item.id) === value,
+        );
+        navigate(chapter?.subject.subject_type === 'topic-wise' ? '' : value);
+    };
+    const handleTopicChange = (value: string) => {
+        setTopicId(value);
+        navigate(chapterId, value);
     };
 
-    const handleChapterChange = (val: string) => {
-        const v = val === NONE ? '' : val;
-        setChapterId(v);
-        setTopicId('');
+    const openChangeType = async () => {
+        setTypeError('');
 
-        if (!v) {
-            navigate('');
+        if (questionTypes) {
+            setChangeTypeOpen(true);
 
             return;
         }
 
-        const ch = availableChapters.find((c) => String(c.id) === v);
+        setLoadingTypes(true);
 
-        if (ch?.subject.subject_type !== 'topic-wise') {
-            navigate(v);
+        try {
+            const data = await fetchQuestionJson<{
+                options: QuestionTypeOption[];
+            }>('/superadmin/questions/list-types');
+            setQuestionTypes(data.options);
+            setChangeTypeOpen(true);
+        } catch {
+            setTypeError('Could not load question types. Please try again.');
+        } finally {
+            setLoadingTypes(false);
         }
-        // topic-wise: wait for topic selection
-    };
-
-    const handleTopicChange = (val: string) => {
-        const v = val === NONE ? '' : val;
-        setTopicId(v);
-        navigate(chapterId, v);
     };
 
     // ── Client-side search within loaded questions ────────────────────────────
@@ -420,6 +510,7 @@ export default function Questions({
 
         setDeleting(true);
         router.delete(`/superadmin/questions/${deleteTarget.id}`, {
+            onSuccess: () => questionResource.retry(),
             onFinish: () => {
                 setDeleting(false);
                 setDeleteTarget(null);
@@ -524,7 +615,10 @@ export default function Questions({
             },
             {
                 preserveScroll: true,
-                onSuccess: cancelSorting,
+                onSuccess: () => {
+                    cancelSorting();
+                    questionResource.retry();
+                },
                 onFinish: () => setSortSaving(false),
             },
         );
@@ -570,8 +664,11 @@ export default function Questions({
                             <Button
                                 type="button"
                                 variant="outline"
-                                disabled={selectedQuestions.length === 0}
-                                onClick={() => setChangeTypeOpen(true)}
+                                disabled={
+                                    selectedQuestions.length === 0 ||
+                                    loadingTypes
+                                }
+                                onClick={openChangeType}
                             >
                                 <ArrowRightLeftIcon className="size-4" />
                                 Change type
@@ -616,123 +713,150 @@ export default function Questions({
                 {/* Cascading Filters */}
                 <div className="rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        {/* Pattern */}
-                        <Select
-                            value={patternId || NONE}
-                            onValueChange={handlePatternChange}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Pattern" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NONE}>
-                                    All patterns
-                                </SelectItem>
-                                {patterns.map((p) => (
-                                    <SelectItem key={p.id} value={String(p.id)}>
-                                        {p.short_name ?? p.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Class */}
-                        <Select
-                            value={classId || NONE}
-                            onValueChange={handleClassChange}
-                            disabled={availableClasses.length === 0}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Class" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NONE}>
-                                    All classes
-                                </SelectItem>
-                                {availableClasses.map((c) => (
-                                    <SelectItem key={c.id} value={String(c.id)}>
-                                        {c.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Subject */}
-                        <Select
-                            value={subjectId || NONE}
-                            onValueChange={handleSubjectChange}
-                            disabled={availableSubjects.length === 0}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Subject" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NONE}>
-                                    All subjects
-                                </SelectItem>
-                                {availableSubjects.map((s) => (
-                                    <SelectItem key={s.id} value={String(s.id)}>
-                                        {s.name_eng}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Chapter */}
-                        <Select
-                            value={chapterId || NONE}
-                            onValueChange={handleChapterChange}
+                        <ScopeSelect
+                            label="Pattern"
+                            options={patterns.map((pattern) => ({
+                                id: pattern.id,
+                                label: pattern.short_name ?? pattern.name,
+                                searchLabel:
+                                    pattern.name +
+                                    ' ' +
+                                    (pattern.short_name ?? ''),
+                            }))}
+                            value={patternId}
+                            onChange={handlePatternChange}
+                            disabled={sortingEnabled || loadingTypes}
+                        />
+                        <ScopeSelect
+                            label="Class"
+                            options={availableClasses.map((item) => ({
+                                id: item.id,
+                                label: item.name,
+                            }))}
+                            value={classId}
+                            onChange={handleClassChange}
                             disabled={
-                                loadingQuestions ||
-                                availableChapters.length === 0
+                                !patternId ||
+                                classesResource.loading ||
+                                sortingEnabled ||
+                                loadingTypes
                             }
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Chapter" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-80">
-                                <SelectItem value={NONE}>
-                                    Select chapter
-                                </SelectItem>
-                                {availableChapters.map((c) => (
-                                    <SelectItem key={c.id} value={String(c.id)}>
-                                        {chapterLabel(c)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Topic (topic-wise only) */}
+                        />
+                        <ScopeSelect
+                            label="Subject"
+                            options={availableSubjects.map((item) => ({
+                                id: item.id,
+                                label: item.name_eng,
+                                searchLabel:
+                                    item.name_eng + ' ' + (item.name_ur ?? ''),
+                            }))}
+                            value={subjectId}
+                            onChange={handleSubjectChange}
+                            disabled={
+                                !classId ||
+                                subjectsResource.loading ||
+                                sortingEnabled
+                            }
+                        />
+                        <ScopeSelect
+                            label="Chapter"
+                            options={availableChapters.map((item) => ({
+                                id: item.id,
+                                label: chapterLabel(item),
+                                searchLabel:
+                                    chapterLabel(item) +
+                                    ' ' +
+                                    item.name +
+                                    ' ' +
+                                    (item.name_ur ?? ''),
+                            }))}
+                            value={chapterId}
+                            onChange={handleChapterChange}
+                            disabled={
+                                !subjectId ||
+                                chaptersResource.loading ||
+                                sortingEnabled
+                            }
+                        />
                         {isTopicWise ? (
-                            <Select
-                                value={topicId || NONE}
-                                onValueChange={handleTopicChange}
-                                disabled={
-                                    loadingQuestions ||
-                                    availableTopics.length === 0
+                            <ScopeSelect
+                                label="Topic"
+                                placeholder="All topics"
+                                options={[
+                                    { id: '__all__', label: 'All topics' },
+                                    ...availableTopics.map((item) => ({
+                                        id: item.id,
+                                        label: item.name,
+                                        searchLabel:
+                                            item.name +
+                                            ' ' +
+                                            (item.name_ur ?? ''),
+                                    })),
+                                ]}
+                                value={topicId}
+                                onChange={(value) =>
+                                    handleTopicChange(
+                                        value === '__all__' ? '' : value,
+                                    )
                                 }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Topic" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-80">
-                                    <SelectItem value={NONE}>
-                                        All topics
-                                    </SelectItem>
-                                    {availableTopics.map((t) => (
-                                        <SelectItem
-                                            key={t.id}
-                                            value={String(t.id)}
-                                        >
-                                            {t.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                disabled={
+                                    topicsResource.loading || sortingEnabled
+                                }
+                            />
                         ) : (
                             <div className="hidden lg:block" />
                         )}
                     </div>
+                    {filterResources.some((resource) => resource.loading) && (
+                        <div
+                            className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"
+                            role="status"
+                        >
+                            <Spinner />
+                            Loading filter options…
+                        </div>
+                    )}
+                    {filterResources.map((resource, index) =>
+                        resource.error ? (
+                            <div
+                                key={index}
+                                className="mt-3 flex items-center gap-2 text-sm text-destructive"
+                                role="alert"
+                            >
+                                {resource.error}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={resource.retry}
+                                >
+                                    Retry
+                                </Button>
+                            </div>
+                        ) : null,
+                    )}
+                    {questionResource.error && (
+                        <div
+                            className="mt-3 flex items-center gap-2 text-sm text-destructive"
+                            role="alert"
+                        >
+                            Could not load questions.
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={questionResource.retry}
+                            >
+                                Retry
+                            </Button>
+                        </div>
+                    )}
+                    {typeError && (
+                        <p
+                            className="mt-3 text-sm text-destructive"
+                            role="alert"
+                        >
+                            {typeError}
+                        </p>
+                    )}
                     {loadingQuestions && (
                         <div
                             className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"
@@ -746,7 +870,7 @@ export default function Questions({
                 </div>
 
                 {/* Empty state */}
-                {!showTable && (
+                {!showTable && !loadingQuestions && !questionResource.error && (
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center text-muted-foreground">
                         <SearchIcon className="mb-3 size-8 opacity-30" />
                         <p className="text-sm font-medium">
@@ -1155,8 +1279,11 @@ export default function Questions({
                 open={changeTypeOpen}
                 onOpenChange={setChangeTypeOpen}
                 questions={selectedQuestions}
-                questionTypes={questionTypes}
-                onChanged={() => setSelectedIds(new Set())}
+                questionTypes={questionTypes ?? []}
+                onChanged={() => {
+                    setSelectedIds(new Set());
+                    questionResource.retry();
+                }}
             />
         </>
     );

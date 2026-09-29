@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\UserType;
 use App\Http\Controllers\Customer\ActivityController;
 use App\Http\Controllers\Customer\AnnouncementController as CustomerAnnouncementController;
 use App\Http\Controllers\Customer\GeneratePaperController;
@@ -280,6 +279,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // â”€â”€â”€ Questions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/questions', [QuestionController::class, 'index'])->name('superadmin.questions')->middleware('permission:questions.view');
+        Route::get('superadmin/questions/filter-options', [QuestionController::class, 'filterOptions'])->name('superadmin.questions.filter-options')->middleware('permission:questions.view');
+        Route::get('superadmin/questions/list-data', [QuestionController::class, 'listData'])->name('superadmin.questions.list-data')->middleware('permission:questions.view');
+        Route::get('superadmin/questions/list-types', [QuestionController::class, 'listTypes'])->name('superadmin.questions.list-types')->middleware('permission:questions.edit');
         Route::get('superadmin/questions/add', [QuestionController::class, 'create'])->name('superadmin.questions.add')->middleware('permission:questions.create');
         Route::get('superadmin/questions/import', [QuestionController::class, 'import'])->name('superadmin.questions.import')->middleware('permission:questions.import');
         Route::post('superadmin/questions/import/preview', [QuestionController::class, 'previewImport'])->name('superadmin.questions.import.preview')->middleware('permission:questions.import');
