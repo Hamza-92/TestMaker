@@ -15,6 +15,7 @@ class SchoolClass extends Model
 
     protected $fillable = [
         'name',
+        'color',
         'sort_order',
         'status',
         'created_by',

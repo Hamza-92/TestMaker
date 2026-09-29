@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeftIcon, BookOpenIcon, LinkIcon, SaveIcon } from 'lucide-react';
+import { IconColorField } from '@/components/icon-color-field';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +39,7 @@ interface LinkItem {
 }
 
 interface SubjectData {
+    color: string | null;
     id: number;
     name_eng: string;
     name_ur: string | null;
@@ -46,6 +48,7 @@ interface SubjectData {
 }
 
 interface FormData {
+    color: string;
     _method: string;
     name_eng: string;
     name_ur: string;
@@ -94,6 +97,7 @@ export default function EditSubject({
     existingLinks: LinkItem[];
 }) {
     const { data, setData, post, processing, errors } = useForm<FormData>({
+        color: subject.color ?? '',
         _method: 'put',
         name_eng: subject.name_eng,
         name_ur: subject.name_ur ?? '',
@@ -323,6 +327,15 @@ export default function EditSubject({
                                 </Select>
                             </Field>
                         </div>
+                    </div>
+
+                    <div className="w-full min-w-0 rounded-xl border p-5 shadow-sm">
+                        <IconColorField
+                            color={data.color}
+                            onChange={(color) => setData('color', color)}
+                            icon={BookOpenIcon}
+                            error={errors.color}
+                        />
                     </div>
 
                     {/* ── Section 2: Class–Pattern Links ───────────────────── */}

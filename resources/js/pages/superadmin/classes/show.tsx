@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { iconContainerStyle } from '@/lib/icon-appearance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PatternItem {
@@ -44,6 +45,7 @@ interface AuditLogEntry {
 }
 
 interface ClassData {
+    color: string | null;
     id: number;
     name: string;
     status: number;
@@ -143,7 +145,10 @@ export default function ShowClass({
                 {/* ── Overview card ────────────────────────────────────────── */}
                 <div className="overflow-hidden rounded-xl border shadow-sm">
                     <div className="bg-muted/20 flex flex-wrap items-center gap-6 border-b p-5 md:p-6">
-                        <div className="bg-primary/10 text-primary flex size-14 shrink-0 items-center justify-center rounded-xl">
+                        <div
+                            className="flex size-14 shrink-0 items-center justify-center rounded-xl"
+                            style={iconContainerStyle(schoolClass.color)}
+                        >
                             <SchoolIcon className="size-7" />
                         </div>
                         <div className="space-y-1">

@@ -47,6 +47,8 @@ import { toast } from 'sonner';
 import { Button, Card } from '@/components/tm';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
+import { iconCardStyle, iconContainerStyle } from '@/lib/icon-appearance';
+import { patternIcon } from '@/lib/pattern-appearance';
 import { cn } from '@/lib/utils';
 import type { Auth } from '@/types/auth';
 import {
@@ -69,9 +71,9 @@ import { CenteredExamHeader } from './paper-layouts/headers/centered-exam-header
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
 import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
-import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
 import { preferredPaperSettings } from './paper-layouts/paper-preferences';
 import type { PaperPreferences } from './paper-layouts/paper-preferences';
+import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
 import {
     SET_LABELS,
     setLabelFor,
@@ -124,6 +126,8 @@ import type {
 interface Pattern {
     id: number;
     name: string;
+    icon?: string | null;
+    color?: string | null;
     paper_layouts: Record<string, PaperLayout>;
 }
 
@@ -131,6 +135,7 @@ interface PatternClass {
     pattern_id: number;
     id: number;
     name: string;
+    color?: string | null;
 }
 
 interface ClassSubject {
@@ -138,6 +143,7 @@ interface ClassSubject {
     class_id: number;
     subject_id: number;
     name: string;
+    color?: string | null;
     name_ur?: string | null;
     medium?: ContentMedium | null;
     objective_layout?: 'standard' | 'federal-row' | null;
@@ -2425,15 +2431,21 @@ function ScopeOptionCard({
         <Card
             padding="none"
             interactive
-            className="group tm-appear overflow-hidden"
-            style={{ animationDelay: String(Math.min(index, 9) * 28) + 'ms' }}
+            className="group tm-appear tm-icon-card overflow-hidden"
+            style={{
+                ...iconCardStyle(option.color),
+                animationDelay: String(Math.min(index, 9) * 28) + 'ms',
+            }}
         >
             <button
                 type="button"
                 onClick={onSelect}
                 className="flex min-h-[62px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none focus-visible:ring-inset"
             >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                <span
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                    style={iconContainerStyle(option.color)}
+                >
                     <Icon className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -2634,7 +2646,11 @@ function ScopePicker({
                             <ScopeOptionCard
                                 key={option.id}
                                 option={option}
-                                icon={icon}
+                                icon={
+                                    option.icon
+                                        ? patternIcon(option.icon)
+                                        : icon
+                                }
                                 index={index}
                                 onSelect={() => select(option)}
                             />
@@ -3163,6 +3179,8 @@ export default function GeneratePaper({
         () =>
             patterns.map((item) => ({
                 id: item.id,
+                color: item.color,
+                icon: item.icon,
                 label: item.name,
                 searchLabel: plainQuestionText(item.name),
                 displayLabel: (
@@ -3181,6 +3199,7 @@ export default function GeneratePaper({
             .filter((item) => item.pattern_id === pattern.id)
             .map((item) => ({
                 id: item.id,
+                color: item.color,
                 label: item.name,
                 searchLabel: plainQuestionText(item.name),
                 displayLabel: (
@@ -3202,6 +3221,7 @@ export default function GeneratePaper({
             )
             .map((item) => ({
                 id: item.subject_id,
+                color: item.color,
                 label: item.name,
                 searchLabel: plainQuestionText(item.name),
                 displayLabel: (
@@ -12987,6 +13007,7 @@ export function GeneratedPaperView({
     onPickerSelect,
     onPickerClose,
     previewOnly = false,
+    showSettingsDrawer = true,
     toolbarExtras,
     footerActions,
 }: {
@@ -13060,6 +13081,7 @@ export function GeneratedPaperView({
     onPickerSelect: (question: ManualQuestion) => void;
     onPickerClose: () => void;
     previewOnly?: boolean;
+    showSettingsDrawer?: boolean;
     toolbarExtras?: ReactNode;
     footerActions?: ReactNode;
 }) {
@@ -14645,7 +14667,7 @@ export function GeneratedPaperView({
             )}
 
             {/* Floating right-edge gear → opens the live paper settings drawer. */}
-            {!isStandaloneBubbleSheet && (
+            {showSettingsDrawer && !isStandaloneBubbleSheet && (
                 <>
                     <button
                         type="button"

@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
+export { ICON_COLOR_OPTIONS as PATTERN_COLOR_OPTIONS } from './icon-appearance';
+
 export interface PatternIconOption {
     value: string;
     label: string;
@@ -33,21 +35,6 @@ export const PATTERN_ICON_OPTIONS: PatternIconOption[] = [
     { value: 'library', label: 'Library', icon: LibraryBigIcon },
     { value: 'atom', label: 'Science', icon: AtomIcon },
     { value: 'shapes', label: 'Shapes', icon: ShapesIcon },
-];
-
-export const PATTERN_COLOR_OPTIONS = [
-    '#4f46e5',
-    '#059669',
-    '#0284c7',
-    '#ea580c',
-    '#0f9fa8',
-    '#db2777',
-    '#4338ca',
-    '#7c3aed',
-    '#0891b2',
-    '#16a34a',
-    '#d97706',
-    '#dc2626',
 ];
 
 export function patternIcon(value: string | null | undefined): LucideIcon {

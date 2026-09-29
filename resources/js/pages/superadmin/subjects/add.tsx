@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeftIcon, BookOpenIcon, LinkIcon, SaveIcon } from 'lucide-react';
+import { IconColorField } from '@/components/icon-color-field';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +39,7 @@ interface Link_ {
 }
 
 interface FormData {
+    color: string;
     name_eng: string;
     name_ur: string;
     subject_type: string;
@@ -81,6 +83,7 @@ export default function AddSubject({
     mediums: MediumOption[];
 }) {
     const { data, setData, post, processing, errors } = useForm<FormData>({
+        color: '',
         name_eng: '',
         name_ur: '',
         subject_type: 'chapter-wise',
@@ -312,6 +315,15 @@ export default function AddSubject({
                                 </Select>
                             </Field>
                         </div>
+                    </div>
+
+                    <div className="w-full min-w-0 rounded-xl border p-5 shadow-sm">
+                        <IconColorField
+                            color={data.color}
+                            onChange={(color) => setData('color', color)}
+                            icon={BookOpenIcon}
+                            error={errors.color}
+                        />
                     </div>
 
                     {/* ── Section 2: Class–Pattern Links ───────────────────── */}

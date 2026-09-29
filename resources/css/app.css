@@ -231,6 +231,11 @@
 
 /* Hover lift. Deliberately moves the card rather than tinting it: a
    background change fights with the selected-row tint, a shadow does not. */
+.tm-icon-card {
+    box-shadow: 0 2px 8px -2px
+        color-mix(in srgb, var(--tm-accent) 18%, transparent);
+}
+
 .tm-lift {
     transition:
         transform 180ms cubic-bezier(0.22, 1, 0.36, 1),

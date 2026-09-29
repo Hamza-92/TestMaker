@@ -16,6 +16,9 @@ export interface ComboboxOptionItem {
     searchLabel?: string;
     displayLabel?: ReactNode;
     hint?: string;
+    /** Optional saved appearance for catalog selection cards. */
+    color?: string | null;
+    icon?: string | null;
 }
 
 interface FloatingComboboxProps {

@@ -18,7 +18,7 @@ class ClassController extends Controller
     {
         $classes = SchoolClass::with('patterns:id,name,sort_order,short_name')
             ->ordered()
-            ->get(['id', 'name', 'sort_order', 'status', 'created_at']);
+            ->get(['id', 'name', 'color', 'sort_order', 'status', 'created_at']);
 
         return Inertia::render('superadmin/classes', [
             'classes' => $classes,
@@ -50,6 +50,7 @@ class ClassController extends Controller
             'schoolClass' => [
                 'id' => $class->id,
                 'name' => $class->name,
+                'color' => $class->color,
                 'status' => $class->status,
                 'created_at' => $class->created_at?->toISOString(),
                 'patterns' => $class->patterns,
@@ -109,6 +110,7 @@ class ClassController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:50', 'unique:classes,name'],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'status' => ['required', 'boolean'],
             'pattern_ids' => ['array'],
             'pattern_ids.*' => ['integer', 'exists:patterns,id'],
@@ -116,6 +118,7 @@ class ClassController extends Controller
 
         $class = SchoolClass::create([
             'name' => $validated['name'],
+            'color' => $validated['color'] ?? null,
             'status' => $validated['status'],
             'created_by' => auth()->id(),
         ]);
@@ -127,6 +130,7 @@ class ClassController extends Controller
             event: AuditEvent::Created,
             newValues: [
                 'name' => $class->name,
+                'color' => $class->color,
                 'status' => $class->status,
                 'pattern_ids' => $validated['pattern_ids'] ?? [],
             ],
@@ -149,6 +153,7 @@ class ClassController extends Controller
             'schoolClass' => [
                 'id' => $class->id,
                 'name' => $class->name,
+                'color' => $class->color,
                 'status' => $class->status,
                 'pattern_ids' => $class->patterns->pluck('id'),
             ],
@@ -160,17 +165,20 @@ class ClassController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:50', Rule::unique('classes', 'name')->ignore($class->id)],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'status' => ['required', 'boolean'],
             'pattern_ids' => ['array'],
             'pattern_ids.*' => ['integer', 'exists:patterns,id'],
         ]);
 
         $oldName = $class->name;
+        $oldColor = $class->color;
         $oldStatus = $class->status;
         $oldPatternIds = $class->patterns()->pluck('patterns.id')->toArray();
 
         $class->update([
             'name' => $validated['name'],
+            'color' => array_key_exists('color', $validated) ? $validated['color'] : $class->color,
             'status' => $validated['status'],
         ]);
 
@@ -183,6 +191,9 @@ class ClassController extends Controller
         }
         if ($oldStatus !== $class->status) {
             $changes['status'] = ['old' => $oldStatus, 'new' => $class->status];
+        }
+        if ($oldColor !== $class->color) {
+            $changes['color'] = ['old' => $oldColor, 'new' => $class->color];
         }
         if (sort($oldPatternIds) !== sort($newPatternIds)) {
             $changes['pattern_ids'] = ['old' => $oldPatternIds, 'new' => $newPatternIds];

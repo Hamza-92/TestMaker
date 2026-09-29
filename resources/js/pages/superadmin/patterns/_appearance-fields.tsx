@@ -1,8 +1,6 @@
+import { IconColorField } from '@/components/icon-color-field';
 import { Label } from '@/components/ui/label';
-import {
-    PATTERN_COLOR_OPTIONS,
-    PATTERN_ICON_OPTIONS,
-} from '@/lib/pattern-appearance';
+import { PATTERN_ICON_OPTIONS, patternIcon } from '@/lib/pattern-appearance';
 import { cn } from '@/lib/utils';
 
 export function PatternAppearanceFields({
@@ -39,18 +37,18 @@ export function PatternAppearanceFields({
                     maxLength={180}
                     rows={3}
                     placeholder="A short line shown on the customer dashboard"
-                    className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:ring-[3px]"
+                    className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 />
                 <div className="flex justify-between gap-3">
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-xs text-muted-foreground">
                         Keep it useful and concise.
                     </p>
-                    <span className="text-muted-foreground text-xs tabular-nums">
+                    <span className="text-xs text-muted-foreground tabular-nums">
                         {description.length}/180
                     </span>
                 </div>
                 {errors?.description && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                         {errors.description}
                     </p>
                 )}
@@ -75,7 +73,7 @@ export function PatternAppearanceFields({
                                     'flex aspect-square cursor-pointer items-center justify-center rounded-lg border transition-colors',
                                     selected
                                         ? 'border-primary bg-primary text-primary-foreground'
-                                        : 'border-input hover:bg-accent text-muted-foreground hover:text-foreground',
+                                        : 'border-input text-muted-foreground hover:bg-accent hover:text-foreground',
                                 )}
                             >
                                 <Icon className="size-4" />
@@ -84,37 +82,16 @@ export function PatternAppearanceFields({
                     })}
                 </div>
                 {errors?.icon && (
-                    <p className="text-destructive text-xs">{errors.icon}</p>
+                    <p className="text-xs text-destructive">{errors.icon}</p>
                 )}
             </div>
 
-            <div className="space-y-2">
-                <Label>Dashboard color</Label>
-                <div className="flex flex-wrap gap-2">
-                    {PATTERN_COLOR_OPTIONS.map((option) => (
-                        <button
-                            key={option}
-                            type="button"
-                            aria-label={`Use ${option}`}
-                            aria-pressed={color === option}
-                            onClick={() => onColorChange(option)}
-                            className={cn(
-                                'flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105',
-                                color === option &&
-                                    'ring-primary ring-2 ring-offset-2',
-                            )}
-                            style={{ backgroundColor: option }}
-                        >
-                            {color === option && (
-                                <span className="size-2 rounded-full bg-white" />
-                            )}
-                        </button>
-                    ))}
-                </div>
-                {errors?.color && (
-                    <p className="text-destructive text-xs">{errors.color}</p>
-                )}
-            </div>
+            <IconColorField
+                color={color}
+                onChange={onColorChange}
+                icon={patternIcon(icon)}
+                error={errors?.color}
+            />
         </div>
     );
 }

@@ -12,6 +12,7 @@ class Subject extends Model
     protected $fillable = [
         'name_eng',
         'name_ur',
+        'color',
         'subject_type',
         'status',
         'created_by',

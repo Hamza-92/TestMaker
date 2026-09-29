@@ -409,486 +409,494 @@ export function PaperSettingsDrawer({
                     </div>
                 </header>
 
-                <div className="scrollbar-slim flex-1 space-y-2 overflow-y-auto bg-slate-50/60 p-3 dark:bg-slate-950/30">
-                    {/* ── Collapsible per-section cards ──────────────── */}
-                    <CollapsibleSection
-                        title="General"
-                        icon={SlidersHorizontalIcon}
-                        defaultOpen
-                    >
-                        {/* Paper-wide font family — applied across header,
-                            headings and questions via a single CSS cascade. */}
-                        <div>
-                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                Font Family
-                            </p>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <p className="mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                                        English
-                                    </p>
-                                    <FontPicker
-                                        value={settings.englishFont}
-                                        options={ENGLISH_FONT_OPTIONS}
-                                        onChange={(value) =>
-                                            onChange({ englishFont: value })
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <p className="mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                                        Urdu
-                                    </p>
-                                    <FontPicker
-                                        value={settings.urduFont}
-                                        options={URDU_FONT_OPTIONS}
-                                        onChange={(value) =>
-                                            onChange({ urduFont: value })
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Paper size + orientation — drives both the on-screen
-                            shell dimensions and the printed @page rule. */}
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            <div>
-                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                    Paper Size
-                                </p>
-                                <FontPicker
-                                    value={settings.paperSize}
-                                    options={PAPER_SIZE_OPTIONS}
-                                    onChange={(value: PaperSize) =>
-                                        onChange({ paperSize: value })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                    Orientation
-                                </p>
-                                <FontPicker
-                                    value={settings.orientation}
-                                    options={ORIENTATION_OPTIONS}
-                                    onChange={(value: PaperOrientation) =>
-                                        onChange({ orientation: value })
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        {/* Page margins — millimetres on all four sides. */}
-                        <div className="mt-4">
-                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                Margins (mm)
-                            </p>
-                            <div className="grid grid-cols-2 gap-2">
-                                <LabeledStepper
-                                    label="Top"
-                                    value={settings.marginTop}
-                                    min={MARGIN_BOUNDS.min}
-                                    max={MARGIN_BOUNDS.max}
-                                    onChange={(v) => onChange({ marginTop: v })}
-                                />
-                                <LabeledStepper
-                                    label="Right"
-                                    value={settings.marginRight}
-                                    min={MARGIN_BOUNDS.min}
-                                    max={MARGIN_BOUNDS.max}
-                                    onChange={(v) =>
-                                        onChange({ marginRight: v })
-                                    }
-                                />
-                                <LabeledStepper
-                                    label="Bottom"
-                                    value={settings.marginBottom}
-                                    min={MARGIN_BOUNDS.min}
-                                    max={MARGIN_BOUNDS.max}
-                                    onChange={(v) =>
-                                        onChange({ marginBottom: v })
-                                    }
-                                />
-                                <LabeledStepper
-                                    label="Left"
-                                    value={settings.marginLeft}
-                                    min={MARGIN_BOUNDS.min}
-                                    max={MARGIN_BOUNDS.max}
-                                    onChange={(v) =>
-                                        onChange({ marginLeft: v })
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        {/* Spacing between consecutive sections (and between
-                            header and the first section). */}
-                        <div className="mt-4">
-                            <LabeledStepper
-                                label="Section Spacing (mm)"
-                                value={settings.sectionSpacing}
-                                min={SECTION_SPACING_BOUNDS.min}
-                                max={SECTION_SPACING_BOUNDS.max}
-                                step={0.5}
-                                onChange={(v) =>
-                                    onChange({ sectionSpacing: v })
-                                }
-                            />
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            <CheckboxField
-                                label="Repeat Table Headers"
-                                checked={settings.repeatTableHeaders}
-                                onChange={(checked) =>
-                                    onChange({
-                                        repeatTableHeaders: checked,
-                                    })
-                                }
-                            />
-                            <CheckboxField
-                                label="Page Numbers"
-                                checked={settings.pageNumbersEnabled}
-                                onChange={(checked) =>
-                                    onChange({ pageNumbersEnabled: checked })
-                                }
-                            />
-                        </div>
-
-                        {settings.pageNumbersEnabled && (
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                <div>
-                                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                        Number Format
-                                    </p>
-                                    <FontPicker
-                                        value={settings.pageNumberFormat}
-                                        options={PAGE_NUMBER_FORMAT_OPTIONS}
-                                        onChange={(value: PageNumberFormat) =>
-                                            onChange({
-                                                pageNumberFormat: value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                        Number Position
-                                    </p>
-                                    <FontPicker
-                                        value={settings.pageNumberPosition}
-                                        options={PAGE_NUMBER_POSITION_OPTIONS}
-                                        onChange={(value: PageNumberPosition) =>
-                                            onChange({
-                                                pageNumberPosition: value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </CollapsibleSection>
-
-                    <CollapsibleSection title="Watermark" icon={DropletsIcon}>
-                        <WatermarkTypeSelector
-                            value={settings.watermarkType}
-                            onChange={(value) =>
-                                onChange({ watermarkType: value })
-                            }
-                        />
-                        <div className="mt-4">
-                            {settings.watermarkType === 'text' ? (
-                                <TextInput
-                                    label="Text"
-                                    value={settings.watermarkText}
-                                    placeholder="Optional"
-                                    onChange={(value) =>
-                                        onChange({ watermarkText: value })
-                                    }
-                                />
-                            ) : (
-                                <LogoInput
-                                    value={settings.watermarkLogoUrl}
-                                    defaultValue={defaultWatermarkLogoUrl}
-                                    onChange={(value) =>
-                                        onChange({
-                                            watermarkLogoUrl: value,
-                                        })
-                                    }
-                                />
-                            )}
-                        </div>
-                        <div className="mt-4">
-                            <LabeledStepper
-                                label="Opacity"
-                                value={settings.watermarkOpacity}
-                                min={WATERMARK_OPACITY_BOUNDS.min}
-                                max={WATERMARK_OPACITY_BOUNDS.max}
-                                onChange={(v) =>
-                                    onChange({ watermarkOpacity: v })
-                                }
-                            />
-                        </div>
-                    </CollapsibleSection>
-
-                    <CollapsibleSection
-                        title="Header"
-                        icon={LayoutPanelTopIcon}
-                    >
-                        <div className="mb-3">
-                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                Template
-                            </p>
-                            <FontPicker
-                                value={settings.headerTemplate}
-                                options={HEADER_TEMPLATE_OPTIONS}
-                                onChange={(v) =>
-                                    onChange({ headerTemplate: v })
-                                }
-                            />
-                        </div>
-                        <TypographyControls
-                            size={settings.headerSize}
-                            sizeMin={SIZE_BOUNDS.header.min}
-                            sizeMax={SIZE_BOUNDS.header.max}
-                            lineHeight={settings.headerLineHeight}
-                            onSizeChange={(v) => onChange({ headerSize: v })}
-                            onLineHeightChange={(v) =>
-                                onChange({ headerLineHeight: v })
-                            }
-                        />
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                            <LabeledStepper
-                                label="Padding X (px)"
-                                value={settings.headerPaddingX}
-                                min={HEADER_PADDING_BOUNDS.min}
-                                max={HEADER_PADDING_BOUNDS.max}
-                                onChange={(v) =>
-                                    onChange({ headerPaddingX: v })
-                                }
-                            />
-                            <LabeledStepper
-                                label="Padding Y (px)"
-                                value={settings.headerPaddingY}
-                                min={HEADER_PADDING_BOUNDS.min}
-                                max={HEADER_PADDING_BOUNDS.max}
-                                onChange={(v) =>
-                                    onChange({ headerPaddingY: v })
-                                }
-                            />
-                        </div>
-                        <BorderControls
-                            width={settings.headerBorderWidth}
-                            style={settings.headerBorderStyle}
-                            onWidthChange={(v) =>
-                                onChange({ headerBorderWidth: v })
-                            }
-                            onStyleChange={(v) =>
-                                onChange({ headerBorderStyle: v })
-                            }
-                        />
-                    </CollapsibleSection>
-
-                    <CollapsibleSection title="Type Heading" icon={HeadingIcon}>
-                        <TypographyControls
-                            size={settings.headingSize}
-                            sizeMin={SIZE_BOUNDS.heading.min}
-                            sizeMax={SIZE_BOUNDS.heading.max}
-                            lineHeight={settings.headingLineHeight}
-                            onSizeChange={(v) => onChange({ headingSize: v })}
-                            onLineHeightChange={(v) =>
-                                onChange({ headingLineHeight: v })
-                            }
-                        />
-                        <BorderControls
-                            width={settings.headingBorderWidth}
-                            style={settings.headingBorderStyle}
-                            onWidthChange={(v) =>
-                                onChange({ headingBorderWidth: v })
-                            }
-                            onStyleChange={(v) =>
-                                onChange({ headingBorderStyle: v })
-                            }
-                        />
-                    </CollapsibleSection>
-
-                    <CollapsibleSection
-                        title="Section Heading"
-                        icon={Rows3Icon}
-                    >
-                        <div className="grid grid-cols-2 gap-2">
-                            <CheckboxField
-                                label="Sections"
-                                checked={
-                                    settings.paperLayout === 'federal-board' ||
-                                    (sectioningAvailable &&
-                                        settings.showSections)
-                                }
-                                disabled={
-                                    settings.paperLayout === 'federal-board' ||
-                                    !sectioningAvailable
-                                }
-                                onChange={(checked) =>
-                                    onChange({ showSections: checked })
-                                }
-                            />
-                            <CheckboxField
-                                label="Brackets"
-                                checked={settings.sectionHeadingBrackets}
-                                disabled={!sectioningAvailable}
-                                onChange={(checked) =>
-                                    onChange({
-                                        sectionHeadingBrackets: checked,
-                                    })
-                                }
-                            />
-                        </div>
-                        <div className="mt-3">
-                            <TypographyControls
-                                size={settings.sectionHeadingSize}
-                                sizeMin={SIZE_BOUNDS.heading.min}
-                                sizeMax={SIZE_BOUNDS.heading.max}
-                                lineHeight={settings.sectionHeadingLineHeight}
-                                onSizeChange={(value) =>
-                                    onChange({ sectionHeadingSize: value })
-                                }
-                                onLineHeightChange={(value) =>
-                                    onChange({
-                                        sectionHeadingLineHeight: value,
-                                    })
-                                }
-                            />
-                            <BorderControls
-                                width={settings.sectionHeadingBorderWidth}
-                                style={settings.sectionHeadingBorderStyle}
-                                onWidthChange={(value) =>
-                                    onChange({
-                                        sectionHeadingBorderWidth: value,
-                                    })
-                                }
-                                onStyleChange={(value) =>
-                                    onChange({
-                                        sectionHeadingBorderStyle: value,
-                                    })
-                                }
-                            />
-                        </div>
-                    </CollapsibleSection>
-
-                    <CollapsibleSection title="OR Group" icon={Link2Icon}>
-                        <div>
-                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                Print Layout
-                            </p>
-                            <FontPicker
-                                value={settings.orGroupLayout}
-                                options={OR_GROUP_LAYOUT_OPTIONS}
-                                onChange={(value: PaperOrGroupLayout) =>
-                                    onChange({ orGroupLayout: value })
-                                }
-                            />
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                            <div>
-                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                    Divider
-                                </p>
-                                <FontPicker
-                                    value={settings.orGroupDividerStyle}
-                                    options={OR_GROUP_DIVIDER_OPTIONS}
-                                    onChange={(
-                                        value: PaperOrGroupDividerStyle,
-                                    ) =>
-                                        onChange({
-                                            orGroupDividerStyle: value,
-                                        })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                    Label
-                                </p>
-                                <FontPicker
-                                    value={settings.orGroupLabel}
-                                    options={OR_GROUP_LABEL_OPTIONS}
-                                    onChange={(value: PaperOrGroupLabel) =>
-                                        onChange({ orGroupLabel: value })
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div className="mt-3">
-                            <LabeledStepper
-                                label="Spacing (mm)"
-                                value={settings.orGroupGap}
-                                min={OR_GROUP_GAP_BOUNDS.min}
-                                max={OR_GROUP_GAP_BOUNDS.max}
-                                step={0.5}
-                                onChange={(value) =>
-                                    onChange({ orGroupGap: value })
-                                }
-                            />
-                        </div>
-                    </CollapsibleSection>
-
-                    <CollapsibleSection
-                        title="Questions"
-                        icon={ListOrderedIcon}
-                    >
-                        <div className="mb-3">
-                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                General Layout
-                            </p>
-                            <FontPicker
-                                value={settings.questionLayout}
-                                options={QUESTION_LAYOUT_OPTIONS}
-                                onChange={(value: PaperQuestionLayout) =>
-                                    onChange({ questionLayout: value })
-                                }
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                Numbering
-                            </p>
-                            <FontPicker
-                                value={settings.questionNumberingFormat}
-                                options={QUESTION_NUMBERING_FORMAT_OPTIONS}
-                                onChange={(
-                                    value: PaperQuestionNumberingFormat,
-                                ) =>
-                                    onChange({
-                                        questionNumberingFormat: value,
-                                    })
-                                }
-                            />
-                        </div>
-                        <TypographyControls
-                            size={settings.questionSize}
-                            sizeMin={SIZE_BOUNDS.question.min}
-                            sizeMax={SIZE_BOUNDS.question.max}
-                            lineHeight={settings.questionLineHeight}
-                            onSizeChange={(v) => onChange({ questionSize: v })}
-                            onLineHeightChange={(v) =>
-                                onChange({ questionLineHeight: v })
-                            }
-                        />
-                        <BorderControls
-                            width={settings.questionBorderWidth}
-                            style={settings.questionBorderStyle}
-                            onWidthChange={(v) =>
-                                onChange({ questionBorderWidth: v })
-                            }
-                            onStyleChange={(v) =>
-                                onChange({ questionBorderStyle: v })
-                            }
-                        />
-                    </CollapsibleSection>
-                </div>
+                <PaperSettingsPanel
+                    settings={settings}
+                    sectioningAvailable={sectioningAvailable}
+                    defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
+                    onChange={onChange}
+                />
             </aside>
         </>
+    );
+}
+
+export function PaperSettingsPanel({
+    settings,
+    sectioningAvailable = false,
+    defaultWatermarkLogoUrl = '',
+    onChange,
+    inline = false,
+}: Omit<PaperSettingsDrawerProps, 'open' | 'onClose'> & { inline?: boolean }) {
+    return (
+        <div
+            className={cn(
+                inline
+                    ? 'grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3 print:hidden'
+                    : 'scrollbar-slim flex-1 space-y-2 overflow-y-auto bg-slate-50/60 p-3 dark:bg-slate-950/30',
+            )}
+        >
+            {/* ── Collapsible per-section cards ──────────────── */}
+            <CollapsibleSection
+                inline={inline}
+                title={inline ? 'Page & Fonts' : 'General'}
+                icon={SlidersHorizontalIcon}
+                defaultOpen
+                className={inline ? 'md:col-span-2 xl:col-span-3' : undefined}
+                contentClassName={
+                    inline
+                        ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>div]:mt-0'
+                        : undefined
+                }
+            >
+                {/* Paper-wide font family — applied across header,
+                headings and questions via a single CSS cascade. */}
+                <div>
+                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Font Family
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <p className="mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                English
+                            </p>
+                            <FontPicker
+                                value={settings.englishFont}
+                                options={ENGLISH_FONT_OPTIONS}
+                                onChange={(value) =>
+                                    onChange({ englishFont: value })
+                                }
+                            />
+                        </div>
+                        <div>
+                            <p className="mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                Urdu
+                            </p>
+                            <FontPicker
+                                value={settings.urduFont}
+                                options={URDU_FONT_OPTIONS}
+                                onChange={(value) =>
+                                    onChange({ urduFont: value })
+                                }
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Paper size + orientation — drives both the on-screen
+                shell dimensions and the printed @page rule. */}
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div>
+                        <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Paper Size
+                        </p>
+                        <FontPicker
+                            value={settings.paperSize}
+                            options={PAPER_SIZE_OPTIONS}
+                            onChange={(value: PaperSize) =>
+                                onChange({ paperSize: value })
+                            }
+                        />
+                    </div>
+                    <div>
+                        <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Orientation
+                        </p>
+                        <FontPicker
+                            value={settings.orientation}
+                            options={ORIENTATION_OPTIONS}
+                            onChange={(value: PaperOrientation) =>
+                                onChange({ orientation: value })
+                            }
+                        />
+                    </div>
+                </div>
+
+                {/* Page margins — millimetres on all four sides. */}
+                <div className="mt-4">
+                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Margins (mm)
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                        <LabeledStepper
+                            label="Top"
+                            value={settings.marginTop}
+                            min={MARGIN_BOUNDS.min}
+                            max={MARGIN_BOUNDS.max}
+                            onChange={(v) => onChange({ marginTop: v })}
+                        />
+                        <LabeledStepper
+                            label="Right"
+                            value={settings.marginRight}
+                            min={MARGIN_BOUNDS.min}
+                            max={MARGIN_BOUNDS.max}
+                            onChange={(v) => onChange({ marginRight: v })}
+                        />
+                        <LabeledStepper
+                            label="Bottom"
+                            value={settings.marginBottom}
+                            min={MARGIN_BOUNDS.min}
+                            max={MARGIN_BOUNDS.max}
+                            onChange={(v) => onChange({ marginBottom: v })}
+                        />
+                        <LabeledStepper
+                            label="Left"
+                            value={settings.marginLeft}
+                            min={MARGIN_BOUNDS.min}
+                            max={MARGIN_BOUNDS.max}
+                            onChange={(v) => onChange({ marginLeft: v })}
+                        />
+                    </div>
+                </div>
+
+                {/* Spacing between consecutive sections (and between
+                header and the first section). */}
+                <div className="mt-4">
+                    <LabeledStepper
+                        label="Section Spacing (mm)"
+                        value={settings.sectionSpacing}
+                        min={SECTION_SPACING_BOUNDS.min}
+                        max={SECTION_SPACING_BOUNDS.max}
+                        step={0.5}
+                        onChange={(v) => onChange({ sectionSpacing: v })}
+                    />
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                    <CheckboxField
+                        label="Repeat Table Headers"
+                        checked={settings.repeatTableHeaders}
+                        onChange={(checked) =>
+                            onChange({
+                                repeatTableHeaders: checked,
+                            })
+                        }
+                    />
+                    <CheckboxField
+                        label="Page Numbers"
+                        checked={settings.pageNumbersEnabled}
+                        onChange={(checked) =>
+                            onChange({ pageNumbersEnabled: checked })
+                        }
+                    />
+                </div>
+
+                {settings.pageNumbersEnabled && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div>
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Number Format
+                            </p>
+                            <FontPicker
+                                value={settings.pageNumberFormat}
+                                options={PAGE_NUMBER_FORMAT_OPTIONS}
+                                onChange={(value: PageNumberFormat) =>
+                                    onChange({
+                                        pageNumberFormat: value,
+                                    })
+                                }
+                            />
+                        </div>
+                        <div>
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Number Position
+                            </p>
+                            <FontPicker
+                                value={settings.pageNumberPosition}
+                                options={PAGE_NUMBER_POSITION_OPTIONS}
+                                onChange={(value: PageNumberPosition) =>
+                                    onChange({
+                                        pageNumberPosition: value,
+                                    })
+                                }
+                            />
+                        </div>
+                    </div>
+                )}
+            </CollapsibleSection>
+
+            <CollapsibleSection
+                inline={inline}
+                title="Watermark"
+                icon={DropletsIcon}
+            >
+                <WatermarkTypeSelector
+                    value={settings.watermarkType}
+                    onChange={(value) => onChange({ watermarkType: value })}
+                />
+                <div className="mt-4">
+                    {settings.watermarkType === 'text' ? (
+                        <TextInput
+                            label="Text"
+                            value={settings.watermarkText}
+                            placeholder="Optional"
+                            onChange={(value) =>
+                                onChange({ watermarkText: value })
+                            }
+                        />
+                    ) : (
+                        <LogoInput
+                            value={settings.watermarkLogoUrl}
+                            defaultValue={defaultWatermarkLogoUrl}
+                            onChange={(value) =>
+                                onChange({
+                                    watermarkLogoUrl: value,
+                                })
+                            }
+                        />
+                    )}
+                </div>
+                <div className="mt-4">
+                    <LabeledStepper
+                        label="Opacity"
+                        value={settings.watermarkOpacity}
+                        min={WATERMARK_OPACITY_BOUNDS.min}
+                        max={WATERMARK_OPACITY_BOUNDS.max}
+                        onChange={(v) => onChange({ watermarkOpacity: v })}
+                    />
+                </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection
+                inline={inline}
+                title="Header"
+                icon={LayoutPanelTopIcon}
+            >
+                <div className="mb-3">
+                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Template
+                    </p>
+                    <FontPicker
+                        value={settings.headerTemplate}
+                        options={HEADER_TEMPLATE_OPTIONS}
+                        onChange={(v) => onChange({ headerTemplate: v })}
+                    />
+                </div>
+                <TypographyControls
+                    size={settings.headerSize}
+                    sizeMin={SIZE_BOUNDS.header.min}
+                    sizeMax={SIZE_BOUNDS.header.max}
+                    lineHeight={settings.headerLineHeight}
+                    onSizeChange={(v) => onChange({ headerSize: v })}
+                    onLineHeightChange={(v) =>
+                        onChange({ headerLineHeight: v })
+                    }
+                />
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                    <LabeledStepper
+                        label="Padding X (px)"
+                        value={settings.headerPaddingX}
+                        min={HEADER_PADDING_BOUNDS.min}
+                        max={HEADER_PADDING_BOUNDS.max}
+                        onChange={(v) => onChange({ headerPaddingX: v })}
+                    />
+                    <LabeledStepper
+                        label="Padding Y (px)"
+                        value={settings.headerPaddingY}
+                        min={HEADER_PADDING_BOUNDS.min}
+                        max={HEADER_PADDING_BOUNDS.max}
+                        onChange={(v) => onChange({ headerPaddingY: v })}
+                    />
+                </div>
+                <BorderControls
+                    width={settings.headerBorderWidth}
+                    style={settings.headerBorderStyle}
+                    onWidthChange={(v) => onChange({ headerBorderWidth: v })}
+                    onStyleChange={(v) => onChange({ headerBorderStyle: v })}
+                />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+                inline={inline}
+                title="Type Heading"
+                icon={HeadingIcon}
+            >
+                <TypographyControls
+                    size={settings.headingSize}
+                    sizeMin={SIZE_BOUNDS.heading.min}
+                    sizeMax={SIZE_BOUNDS.heading.max}
+                    lineHeight={settings.headingLineHeight}
+                    onSizeChange={(v) => onChange({ headingSize: v })}
+                    onLineHeightChange={(v) =>
+                        onChange({ headingLineHeight: v })
+                    }
+                />
+                <BorderControls
+                    width={settings.headingBorderWidth}
+                    style={settings.headingBorderStyle}
+                    onWidthChange={(v) => onChange({ headingBorderWidth: v })}
+                    onStyleChange={(v) => onChange({ headingBorderStyle: v })}
+                />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+                inline={inline}
+                title="Section Heading"
+                icon={Rows3Icon}
+            >
+                <div className="grid grid-cols-2 gap-2">
+                    <CheckboxField
+                        label="Sections"
+                        checked={
+                            settings.paperLayout === 'federal-board' ||
+                            (sectioningAvailable && settings.showSections)
+                        }
+                        disabled={
+                            settings.paperLayout === 'federal-board' ||
+                            !sectioningAvailable
+                        }
+                        onChange={(checked) =>
+                            onChange({ showSections: checked })
+                        }
+                    />
+                    <CheckboxField
+                        label="Brackets"
+                        checked={settings.sectionHeadingBrackets}
+                        disabled={!sectioningAvailable}
+                        onChange={(checked) =>
+                            onChange({
+                                sectionHeadingBrackets: checked,
+                            })
+                        }
+                    />
+                </div>
+                <div className="mt-3">
+                    <TypographyControls
+                        size={settings.sectionHeadingSize}
+                        sizeMin={SIZE_BOUNDS.heading.min}
+                        sizeMax={SIZE_BOUNDS.heading.max}
+                        lineHeight={settings.sectionHeadingLineHeight}
+                        onSizeChange={(value) =>
+                            onChange({ sectionHeadingSize: value })
+                        }
+                        onLineHeightChange={(value) =>
+                            onChange({
+                                sectionHeadingLineHeight: value,
+                            })
+                        }
+                    />
+                    <BorderControls
+                        width={settings.sectionHeadingBorderWidth}
+                        style={settings.sectionHeadingBorderStyle}
+                        onWidthChange={(value) =>
+                            onChange({
+                                sectionHeadingBorderWidth: value,
+                            })
+                        }
+                        onStyleChange={(value) =>
+                            onChange({
+                                sectionHeadingBorderStyle: value,
+                            })
+                        }
+                    />
+                </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection
+                inline={inline}
+                title="OR Group"
+                icon={Link2Icon}
+            >
+                <div>
+                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Print Layout
+                    </p>
+                    <FontPicker
+                        value={settings.orGroupLayout}
+                        options={OR_GROUP_LAYOUT_OPTIONS}
+                        onChange={(value: PaperOrGroupLayout) =>
+                            onChange({ orGroupLayout: value })
+                        }
+                    />
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div>
+                        <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Divider
+                        </p>
+                        <FontPicker
+                            value={settings.orGroupDividerStyle}
+                            options={OR_GROUP_DIVIDER_OPTIONS}
+                            onChange={(value: PaperOrGroupDividerStyle) =>
+                                onChange({
+                                    orGroupDividerStyle: value,
+                                })
+                            }
+                        />
+                    </div>
+                    <div>
+                        <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Label
+                        </p>
+                        <FontPicker
+                            value={settings.orGroupLabel}
+                            options={OR_GROUP_LABEL_OPTIONS}
+                            onChange={(value: PaperOrGroupLabel) =>
+                                onChange({ orGroupLabel: value })
+                            }
+                        />
+                    </div>
+                </div>
+                <div className="mt-3">
+                    <LabeledStepper
+                        label="Spacing (mm)"
+                        value={settings.orGroupGap}
+                        min={OR_GROUP_GAP_BOUNDS.min}
+                        max={OR_GROUP_GAP_BOUNDS.max}
+                        step={0.5}
+                        onChange={(value) => onChange({ orGroupGap: value })}
+                    />
+                </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection
+                inline={inline}
+                title="Questions"
+                icon={ListOrderedIcon}
+            >
+                <div className="mb-3">
+                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        General Layout
+                    </p>
+                    <FontPicker
+                        value={settings.questionLayout}
+                        options={QUESTION_LAYOUT_OPTIONS}
+                        onChange={(value: PaperQuestionLayout) =>
+                            onChange({ questionLayout: value })
+                        }
+                    />
+                </div>
+                <div className="mb-3">
+                    <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        Numbering
+                    </p>
+                    <FontPicker
+                        value={settings.questionNumberingFormat}
+                        options={QUESTION_NUMBERING_FORMAT_OPTIONS}
+                        onChange={(value: PaperQuestionNumberingFormat) =>
+                            onChange({
+                                questionNumberingFormat: value,
+                            })
+                        }
+                    />
+                </div>
+                <TypographyControls
+                    size={settings.questionSize}
+                    sizeMin={SIZE_BOUNDS.question.min}
+                    sizeMax={SIZE_BOUNDS.question.max}
+                    lineHeight={settings.questionLineHeight}
+                    onSizeChange={(v) => onChange({ questionSize: v })}
+                    onLineHeightChange={(v) =>
+                        onChange({ questionLineHeight: v })
+                    }
+                />
+                <BorderControls
+                    width={settings.questionBorderWidth}
+                    style={settings.questionBorderStyle}
+                    onWidthChange={(v) => onChange({ questionBorderWidth: v })}
+                    onStyleChange={(v) => onChange({ questionBorderStyle: v })}
+                />
+            </CollapsibleSection>
+        </div>
     );
 }
 
@@ -901,14 +909,20 @@ function CollapsibleSection({
     title,
     icon: Icon,
     defaultOpen = false,
+    inline = false,
+    className,
+    contentClassName,
     children,
 }: {
     title: string;
     icon: React.ElementType;
     defaultOpen?: boolean;
+    inline?: boolean;
+    className?: string;
+    contentClassName?: string;
     children: React.ReactNode;
 }) {
-    const [open, setOpen] = useState(defaultOpen);
+    const [open, setOpen] = useState(inline || defaultOpen);
 
     return (
         <section
@@ -917,6 +931,7 @@ function CollapsibleSection({
                 open
                     ? 'border-slate-200 shadow-sm shadow-slate-900/[0.03] dark:border-slate-700'
                     : 'border-slate-200 dark:border-slate-800',
+                className,
             )}
         >
             <button
@@ -946,7 +961,12 @@ function CollapsibleSection({
                 />
             </button>
             {open && (
-                <div className="border-t border-slate-100 px-3 pt-3 pb-3 dark:border-slate-800">
+                <div
+                    className={cn(
+                        'border-t border-slate-100 px-3 pt-3 pb-3 dark:border-slate-800',
+                        contentClassName,
+                    )}
+                >
                     {children}
                 </div>
             )}

@@ -26,6 +26,7 @@ import {
 import type { CSSProperties, ElementType } from 'react';
 import { useState } from 'react';
 import { Badge, Button, Card, PageHeader } from '@/components/tm';
+import { iconCardStyle, iconContainerStyle } from '@/lib/icon-appearance';
 import { patternIcon } from '@/lib/pattern-appearance';
 import { cn } from '@/lib/utils';
 
@@ -961,19 +962,23 @@ export default function CustomerDashboard({
                                                 <Link
                                                     key={pattern.id}
                                                     href={`/papers/generate?pattern=${pattern.id}`}
-                                                    className="tm-lift tm-appear group flex min-h-32 flex-col rounded-xl p-4 text-white shadow-sm"
+                                                    className="tm-lift tm-appear tm-icon-card group flex min-h-32 flex-col rounded-xl p-4 text-white"
                                                     style={
                                                         {
-                                                            backgroundColor:
+                                                            ...iconCardStyle(
                                                                 pattern.color,
-                                                            '--tm-accent':
+                                                            ),
+                                                            backgroundColor:
                                                                 pattern.color,
                                                             animationDelay: `${index * 35}ms`,
                                                         } as CSSProperties
                                                     }
                                                 >
                                                     <div className="flex items-start justify-between gap-3">
-                                                        <div className="flex size-9 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
+                                                        <div
+                                                            className="flex size-9 items-center justify-center rounded-lg"
+                                                            style={iconContainerStyle(pattern.color)}
+                                                        >
                                                             <PatternIcon className="size-5" />
                                                         </div>
                                                         <span className="flex size-7 items-center justify-center rounded-full bg-white text-slate-900 transition-transform duration-200 group-hover:translate-x-0.5">

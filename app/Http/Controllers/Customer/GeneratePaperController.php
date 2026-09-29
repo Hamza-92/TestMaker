@@ -39,10 +39,12 @@ class GeneratePaperController extends Controller
             ->when($patternIds !== null, fn ($q) => $q->whereIn('id', $patternIds))
             ->with('paperLayoutAssignments:id,pattern_id,class_id,paper_layout')
             ->ordered()
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'icon', 'color'])
             ->map(fn (Pattern $pattern) => [
                 'id' => $pattern->id,
                 'name' => $pattern->name,
+                'icon' => $pattern->icon,
+                'color' => $pattern->color,
                 'paper_layouts' => $pattern->paperLayoutAssignments
                     ->mapWithKeys(fn (PaperLayoutAssignment $assignment) => [
                         (string) $assignment->class_id => $assignment->paper_layout,
@@ -57,7 +59,7 @@ class GeneratePaperController extends Controller
             ->when($classIds !== null, fn ($q) => $q->whereIn('pattern_classes.class_id', $classIds))
             ->orderBy('classes.sort_order')
             ->orderBy('classes.id')
-            ->select('pattern_classes.pattern_id', 'classes.id', 'classes.name')
+            ->select('pattern_classes.pattern_id', 'classes.id', 'classes.name', 'classes.color')
             ->get()
             ->filter(fn ($row) => AppUserAccess::allowsClass($access, (int) $row->pattern_id, (int) $row->id))
             ->values();
@@ -93,6 +95,7 @@ class GeneratePaperController extends Controller
                 'class_subjects.subject_id',
                 'subjects.name_eng as name',
                 'subjects.name_ur',
+                'subjects.color',
                 'mediums.name as medium',
                 'objective_layout_assignments.objective_layout',
                 'objective_layout_assignments.show_bubbles as objective_bubbles',

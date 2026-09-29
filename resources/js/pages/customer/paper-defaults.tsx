@@ -20,6 +20,7 @@ import {
     preferredPaperSettings,
 } from './papers/paper-layouts/paper-preferences';
 import type { PaperPreferences } from './papers/paper-layouts/paper-preferences';
+import { PaperSettingsPanel } from './papers/paper-layouts/paper-settings-drawer';
 import {
     DEFAULT_PAPER_SETTINGS,
     normalizePaperSettings,
@@ -112,6 +113,16 @@ export default function PaperDefaults({
             preserveScroll: true,
             onSuccess: () => form.setDefaults(),
         });
+    }
+
+    function updateSettings(patch: Partial<PaperSettings>) {
+        form.setData(
+            'settings',
+            normalizePaperSettings({
+                ...form.data.settings,
+                ...patch,
+            }),
+        );
     }
 
     function resetDefaults() {
@@ -210,7 +221,23 @@ export default function PaperDefaults({
             <Head title="Paper Defaults" />
             <div className="space-y-4" ref={previewRef}>
                 <div className="print:hidden">
-                    <PageHeader title="Paper Defaults" />
+                    <PageHeader
+                        title="Paper Defaults"
+                        actions={
+                            <Button
+                                type="button"
+                                disabled={form.processing || resetting}
+                                onClick={() =>
+                                    updateSettings({
+                                        ...DEFAULT_PAPER_SETTINGS,
+                                    })
+                                }
+                            >
+                                <RotateCcwIcon />
+                                Reset Paper Settings
+                            </Button>
+                        }
+                    />
                     {Object.values(form.errors).length > 0 && (
                         <div
                             role="alert"
@@ -222,6 +249,12 @@ export default function PaperDefaults({
                         </div>
                     )}
                 </div>
+                <PaperSettingsPanel
+                    inline
+                    settings={settings}
+                    defaultWatermarkLogoUrl={logoUrl}
+                    onChange={updateSettings}
+                />
                 <GeneratedPaperView
                     paper={paper}
                     rawPaper={paper}
@@ -278,15 +311,7 @@ export default function PaperDefaults({
                         }
                     }}
                     settings={settings}
-                    onSettingsChange={(patch) =>
-                        form.setData(
-                            'settings',
-                            normalizePaperSettings({
-                                ...form.data.settings,
-                                ...patch,
-                            }),
-                        )
-                    }
+                    onSettingsChange={updateSettings}
                     onBubbleSheetMediumChange={setMedium}
                     onAddSection={noop}
                     onEditSection={noop}
@@ -307,6 +332,7 @@ export default function PaperDefaults({
                     onPickerSelect={noop}
                     onPickerClose={noop}
                     previewOnly
+                    showSettingsDrawer={false}
                     footerActions={
                         <div className="flex flex-wrap justify-end gap-2">
                             {form.isDirty && (

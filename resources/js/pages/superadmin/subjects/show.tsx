@@ -35,6 +35,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { iconContainerStyle } from '@/lib/icon-appearance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ClassItem {
@@ -91,6 +92,7 @@ interface AuditLogEntry {
 }
 
 interface SubjectData {
+    color: string | null;
     id: number;
     name_eng: string;
     name_ur: string | null;
@@ -1352,7 +1354,10 @@ export default function ShowSubject({ subject }: { subject: SubjectData }) {
                 {/* ── Overview card ────────────────────────────────────────── */}
                 <div className="overflow-hidden rounded-xl border shadow-sm">
                     <div className="flex flex-wrap items-center gap-6 border-b bg-muted/20 p-5 md:p-6">
-                        <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <div
+                            className="flex size-14 shrink-0 items-center justify-center rounded-xl"
+                            style={iconContainerStyle(subject.color)}
+                        >
                             <BookOpenIcon className="size-7" />
                         </div>
                         <div className="space-y-2">

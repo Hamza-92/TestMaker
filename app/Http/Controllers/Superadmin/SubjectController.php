@@ -23,7 +23,7 @@ class SubjectController extends Controller
             'classSubjects.medium:id,name',
         ])
             ->orderByDesc('created_at')
-            ->get(['id', 'name_eng', 'name_ur', 'subject_type', 'status', 'created_at']);
+            ->get(['id', 'name_eng', 'name_ur', 'color', 'subject_type', 'status', 'created_at']);
 
         return Inertia::render('superadmin/subjects', [
             'subjects' => $subjects,
@@ -97,6 +97,7 @@ class SubjectController extends Controller
             'subject' => [
                 'id' => $subject->id,
                 'name_eng' => $subject->name_eng,
+                'color' => $subject->color,
                 'name_ur' => $subject->name_ur,
                 'subject_type' => $subject->subject_type,
                 'status' => $subject->status,
@@ -134,6 +135,7 @@ class SubjectController extends Controller
     {
         $validated = $request->validate([
             'name_eng' => ['required', 'string', 'max:100', 'unique:subjects,name_eng'],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'name_ur' => ['nullable', 'string', 'max:100'],
             'subject_type' => ['required', 'in:chapter-wise,topic-wise'],
             'status' => ['required', 'boolean'],
@@ -146,6 +148,7 @@ class SubjectController extends Controller
 
         $subject = Subject::create([
             'name_eng' => $validated['name_eng'],
+            'color' => $validated['color'] ?? null,
             'name_ur' => $validated['name_ur'] ?? null,
             'subject_type' => $validated['subject_type'],
             'status' => $validated['status'],
@@ -159,6 +162,7 @@ class SubjectController extends Controller
             event: AuditEvent::Created,
             newValues: [
                 'name_eng' => $subject->name_eng,
+                'color' => $subject->color,
                 'name_ur' => $subject->name_ur,
                 'subject_type' => $subject->subject_type,
                 'status' => $subject->status,
@@ -192,7 +196,7 @@ class SubjectController extends Controller
             ]);
 
         return Inertia::render('superadmin/subjects/edit', [
-            'subject' => $subject->only(['id', 'name_eng', 'name_ur', 'subject_type', 'status']),
+            'subject' => $subject->only(['id', 'name_eng', 'name_ur', 'color', 'subject_type', 'status']),
             'patterns' => $patterns,
             'mediums' => $this->mediums(),
             'existingLinks' => $existingLinks,
@@ -203,6 +207,7 @@ class SubjectController extends Controller
     {
         $validated = $request->validate([
             'name_eng' => ['required', 'string', 'max:100', Rule::unique('subjects', 'name_eng')->ignore($subject->id)],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'name_ur' => ['nullable', 'string', 'max:100'],
             'subject_type' => ['required', 'in:chapter-wise,topic-wise'],
             'status' => ['required', 'boolean'],
@@ -213,9 +218,10 @@ class SubjectController extends Controller
             'links.*.medium_id' => ['nullable', 'integer', 'exists:mediums,id'],
         ]);
 
-        $oldValues = $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']);
+        $oldValues = $subject->only(['name_eng', 'name_ur', 'color', 'subject_type', 'status']);
         $subject->update([
             'name_eng' => $validated['name_eng'],
+            'color' => array_key_exists('color', $validated) ? $validated['color'] : $subject->color,
             'name_ur' => $validated['name_ur'] ?? null,
             'subject_type' => $validated['subject_type'],
             'status' => $validated['status'],
@@ -227,7 +233,7 @@ class SubjectController extends Controller
             model: $subject,
             event: AuditEvent::Updated,
             oldValues: $oldValues,
-            newValues: $subject->only(['name_eng', 'name_ur', 'subject_type', 'status']),
+            newValues: $subject->only(['name_eng', 'name_ur', 'color', 'subject_type', 'status']),
             notes: 'Subject updated.',
         );
 

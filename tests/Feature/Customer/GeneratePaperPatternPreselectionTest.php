@@ -36,10 +36,11 @@ test('a subject assignment medium becomes the generator default without restrict
     ]);
     TrialSetting::current()->update(['access_scope' => null]);
 
-    $pattern = Pattern::create(['name' => 'Medium Pattern', 'status' => 1]);
-    $class = SchoolClass::create(['name' => 'Medium Class', 'status' => 1]);
+    $pattern = Pattern::create(['name' => 'Medium Pattern', 'status' => 1, 'icon' => 'atom', 'color' => '#4f46e5']);
+    $class = SchoolClass::create(['name' => 'Medium Class', 'status' => 1, 'color' => '#059669']);
     $subject = Subject::create([
         'name_eng' => 'Computer Science',
+        'color' => '#0284c7',
         'name_ur' => 'کمپیوٹر سائنس',
         'subject_type' => 'chapter-wise',
         'status' => 1,
@@ -88,6 +89,14 @@ test('a subject assignment medium becomes the generator default without restrict
         'source' => Question::SOURCE_EXERCISE,
         'status' => 1,
     ]);
+
+    $this->actingAs($customer)->get(route('customer.papers.generate'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('customer/papers/generate')
+            ->where('patterns.0.icon', 'atom')
+            ->where('patterns.0.color', '#4f46e5')
+            ->where('patternClasses.0.color', '#059669')
+            ->where('classSubjects.0.color', '#0284c7'));
 
     $this->actingAs($customer)
         ->getJson(route('customer.papers.generate.chapters', [
