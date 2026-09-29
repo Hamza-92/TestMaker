@@ -32,6 +32,17 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Check cPanel HTTPS reachability
+        if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+        env:
+          CPANEL_API_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+        run: |
+          if [ -z "$CPANEL_API_TOKEN" ]; then
+            echo 'Add CPANEL_API_TOKEN to the production environment before deploying.' >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 --output /dev/null https://testmaker.pk:2083/
+
       - name: Install dependencies
         run: |
           composer install --no-interaction --prefer-dist --no-progress
@@ -67,38 +78,72 @@ jobs:
           archive = Path('dist') / f'release-{commit}.zip'
           with archive.open('rb') as handle:
               checksum = hashlib.file_digest(handle, 'sha256').hexdigest()
+          parts_dir = Path('dist/parts')
+          parts_dir.mkdir()
+          parts = []
+          with archive.open('rb') as handle:
+              for index, chunk in enumerate(iter(lambda: handle.read(8 * 1024 * 1024), b''), start=1):
+                  name = f'release-{commit}.part{index:03d}'
+                  (parts_dir / name).write_bytes(chunk)
+                  parts.append({'name': name, 'size': len(chunk), 'sha256': hashlib.sha256(chunk).hexdigest()})
+          if not parts or len(parts) > 256:
+              raise SystemExit('Release must contain between 1 and 256 upload parts')
           Path('dist/release.json').write_text(json.dumps({
               'commit': commit,
               'sha256': checksum,
+              'parts': parts,
           }) + '\n')
           PY
 
-      - name: Upload deployment files by explicit FTPS
+      - name: Upload deployment files through cPanel HTTPS API
         if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
         env:
-          FTP_USER: ${{ secrets.CPANEL_FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.CPANEL_FTP_PASSWORD }}
-          FTP_HOST: host.launchpad123.com
+          CPANEL_API_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+          CPANEL_USER: tmpk
         run: |
-          if [ -z "$FTP_USER" ] || [ -z "$FTP_PASSWORD" ]; then
-            echo 'The production FTPS credentials are not configured.' >&2
+          if [ -z "$CPANEL_API_TOKEN" ]; then
+            echo 'The production cPanel API token is not configured.' >&2
             exit 1
           fi
 
           upload() {
-            curl --fail --silent --show-error --retry 3 \
-              --ssl-reqd --ftp-create-dirs \
-              --user "$FTP_USER:$FTP_PASSWORD" \
-              --upload-file "$1" "ftp://$FTP_HOST/$2"
+            local source="$1" directory="$2" name="$3"
+            echo "Uploading $name..."
+            curl --fail --silent --show-error --retry 2 --retry-delay 3 \
+              --connect-timeout 10 --max-time 120 \
+              --header "Authorization: cpanel $CPANEL_USER:$CPANEL_API_TOKEN" \
+              --form "dir=$directory" --form 'overwrite=1' \
+              --form "file-1=@$source;filename=$name" \
+              --output dist/upload-response.json \
+              https://testmaker.pk:2083/execute/Fileman/upload_files
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          try:
+              response = json.loads(Path('dist/upload-response.json').read_text())
+          except (ValueError, OSError) as error:
+              raise SystemExit(f'cPanel upload did not return valid JSON: {error}') from error
+          result = response.get('result') if isinstance(response, dict) else None
+          payload = result if isinstance(result, dict) and 'status' in result else response
+          if not isinstance(payload, dict) or str(payload.get('status')) != '1':
+              raise SystemExit(f"cPanel upload failed: {payload.get('errors') if isinstance(payload, dict) else 'unknown response'}")
+          data = payload.get('data')
+          if isinstance(data, dict) and int(data.get('failed') or 0) != 0:
+              raise SystemExit(f"cPanel reported failed uploads: {data.get('failed')}")
+          PY
+            echo "Uploaded $name"
           }
 
-          upload deploy/cpanel/deny.htaccess _deploy/.htaccess
-          upload deploy/cpanel/deny.htaccess _app/.htaccess
-          upload deploy/cpanel/runner.php _deploy/runner.php
-          upload deploy/cpanel/front-controller.php _deploy/front-controller.php
-          upload deploy/cpanel/public.htaccess _deploy/public.htaccess
-          upload "dist/release-$GITHUB_SHA.zip" "_deploy/incoming/release-$GITHUB_SHA.zip"
-          upload dist/release.json _deploy/incoming/release.json
+          upload deploy/cpanel/deny.htaccess public_html/_deploy .htaccess
+          upload deploy/cpanel/deny.htaccess public_html/_app .htaccess
+          upload deploy/cpanel/runner.php public_html/_deploy runner.php
+          upload deploy/cpanel/front-controller.php public_html/_deploy front-controller.php
+          upload deploy/cpanel/public.htaccess public_html/_deploy public.htaccess
+          for part in dist/parts/*; do
+            upload "$part" public_html/_deploy/incoming "$(basename "$part")"
+          done
+          upload dist/release.json public_html/_deploy/incoming release.json
 
       - name: Wait for activation and check protected files
         if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'

@@ -40,6 +40,7 @@ try {
     $request = json_decode((string) file_get_contents($marker), true, 512, JSON_THROW_ON_ERROR);
     $commit = $request['commit'] ?? null;
     $checksum = $request['sha256'] ?? null;
+    $parts = $request['parts'] ?? null;
 
     if (! is_string($commit) || ! preg_match('/\A[0-9a-f]{40}\z/D', $commit)
         || ! is_string($checksum) || ! preg_match('/\A[0-9a-f]{64}\z/D', $checksum)) {
@@ -52,11 +53,7 @@ try {
         exit(0);
     }
 
-    $archive = $incoming.'/release-'.$commit.'.zip';
-
-    if (! is_file($archive) || ! hash_equals($checksum, (string) hash_file('sha256', $archive))) {
-        throw new RuntimeException('Release archive is missing or failed its checksum.');
-    }
+    $archive = prepareArchive($incoming, $commit, $checksum, $parts);
 
     $publicUploads = $root.'/storage';
     $storage = $appRoot.'/shared/storage';
@@ -127,6 +124,77 @@ function ensureDirectory(string $path): void
     if (! is_dir($path) && ! mkdir($path, 0775, true) && ! is_dir($path)) {
         throw new RuntimeException('Could not create directory: '.$path);
     }
+}
+
+function prepareArchive(string $incoming, string $commit, string $checksum, mixed $parts): string
+{
+    $archive = $incoming.'/release-'.$commit.'.zip';
+
+    if (is_file($archive) && hash_equals($checksum, (string) hash_file('sha256', $archive))) {
+        return $archive;
+    }
+
+    if (! is_array($parts) || ! array_is_list($parts) || count($parts) < 1 || count($parts) > 256) {
+        throw new RuntimeException('Release archive is missing and its upload parts are invalid.');
+    }
+
+    $temporary = $archive.'.tmp.'.bin2hex(random_bytes(4));
+    $output = fopen($temporary, 'wb');
+
+    if ($output === false) {
+        throw new RuntimeException('Could not create the release archive.');
+    }
+
+    try {
+        foreach ($parts as $index => $part) {
+            $expectedName = sprintf('release-%s.part%03d', $commit, $index + 1);
+            $size = is_array($part) ? ($part['size'] ?? null) : null;
+            $partHash = is_array($part) ? ($part['sha256'] ?? null) : null;
+            $path = $incoming.'/'.$expectedName;
+
+            if (! is_array($part) || ($part['name'] ?? null) !== $expectedName
+                || ! is_int($size) || $size < 1 || $size > 8 * 1024 * 1024
+                || ! is_string($partHash) || ! preg_match('/\A[0-9a-f]{64}\z/D', $partHash)
+                || ! is_file($path) || filesize($path) !== $size
+                || ! hash_equals($partHash, (string) hash_file('sha256', $path))) {
+                throw new RuntimeException('A release upload part is missing or failed verification: '.$expectedName);
+            }
+
+            $input = fopen($path, 'rb');
+
+            if ($input === false) {
+                throw new RuntimeException('Could not read release upload part: '.$expectedName);
+            }
+
+            try {
+                if (stream_copy_to_stream($input, $output) !== $size) {
+                    throw new RuntimeException('Could not assemble release upload part: '.$expectedName);
+                }
+            } finally {
+                fclose($input);
+            }
+        }
+
+        fclose($output);
+
+        if (! hash_equals($checksum, (string) hash_file('sha256', $temporary))) {
+            throw new RuntimeException('Assembled release archive failed its checksum.');
+        }
+
+        if (! rename($temporary, $archive)) {
+            throw new RuntimeException('Could not publish the assembled release archive.');
+        }
+    } catch (Throwable $error) {
+        if (is_resource($output)) {
+            fclose($output);
+        }
+
+        @unlink($temporary);
+
+        throw $error;
+    }
+
+    return $archive;
 }
 
 function createLink(string $target, string $link): void

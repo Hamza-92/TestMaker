@@ -16,10 +16,6 @@ TEMPLATES = Path(__file__).resolve().parent
 
 
 def main() -> None:
-    if os.name == "nt":
-        print("Activation smoke test runs on Linux CI (Windows symlink privileges differ).")
-        return
-
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         deploy = root / "_deploy"
@@ -60,23 +56,48 @@ return new class {
             release_zip.writestr("public/build/manifest.json", "{}\n")
             release_zip.writestr("public/asset.txt", "new release\n")
 
-        checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+        release_bytes = archive.read_bytes()
+        checksum = hashlib.sha256(release_bytes).hexdigest()
+        archive.unlink()
+        parts = []
+
+        for index, offset in enumerate(range(0, len(release_bytes), 97), start=1):
+            content = release_bytes[offset : offset + 97]
+            name = f"release-{commit}.part{index:03d}"
+            (incoming / name).write_bytes(content)
+            parts.append({
+                "name": name,
+                "size": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            })
+
         (incoming / "release.json").write_text(
-            json.dumps({"commit": commit, "sha256": checksum})
+            json.dumps({"commit": commit, "sha256": checksum, "parts": parts})
         )
 
         result = subprocess.run(
             ["php", str(deploy / "runner.php")], capture_output=True, text=True
         )
+        assert hashlib.sha256(archive.read_bytes()).hexdigest() == checksum
+
+        if os.name == "nt" and result.returncode != 0:
+            print("Archive assembly passed; full activation requires Linux symlink privileges.")
+            return
+
         assert result.returncode == 0, result.stderr
         assert (app / "current").read_text().strip() == commit
         assert (root / "asset.txt").read_text() == "new release\n"
         assert (app / "shared" / "storage" / "app" / "public").is_symlink()
         assert (root / "index.php").is_file()
 
-        (incoming / "release.json").write_text(
-            json.dumps({"commit": "b" * 40, "sha256": "0" * 64})
-        )
+        bad_commit = "b" * 40
+        bad_part = f"release-{bad_commit}.part001"
+        (incoming / bad_part).write_bytes(b"bad")
+        (incoming / "release.json").write_text(json.dumps({
+            "commit": bad_commit,
+            "sha256": "0" * 64,
+            "parts": [{"name": bad_part, "size": 3, "sha256": "0" * 64}],
+        }))
         result = subprocess.run(
             ["php", str(deploy / "runner.php")], capture_output=True, text=True
         )

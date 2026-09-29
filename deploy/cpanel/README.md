@@ -2,9 +2,10 @@
 
 `testmaker.pk` serves `/home/tmpk/public_html` and PHP 8.4. The production
 workflow builds Composer dependencies and Vite assets on GitHub Actions,
-uploads one release ZIP over explicit FTPS, and lets a cPanel cron job verify,
-migrate, and activate it. Node and an interactive shell are not needed on the
-server. The cPanel Git clone for `dev.testmaker.pk` is not changed by this
+uploads the release in 8 MiB parts through cPanel's HTTPS API, and lets a cPanel
+cron job verify, assemble, migrate, and activate it. Node and an interactive
+shell are not needed on the server. The cPanel Git clone for `dev.testmaker.pk`
+is not changed by this
 process. Its disabled **Deploy HEAD Commit** button is not used; the GitHub
 workflow publishes the complete built release after `git push origin master`.
 
@@ -16,12 +17,13 @@ workflow publishes the complete built release after `git push origin master`.
    File Manager. Keep cPanel-managed files such as `.well-known` and do not
    remove the `_app` or `_deploy` directories below.
 2. In File Manager, enable **Show Hidden Files**. Create
-   `/home/tmpk/public_html/_app/.htaccess` with the contents of
-   [`deny.htaccess`](deny.htaccess). Before adding credentials, place a temporary
-   `_app/probe.txt` and confirm that
-   `https://testmaker.pk/_app/probe.txt` returns HTTP 403. Delete the probe.
-   If it is publicly readable, stop and ask the host to enable `.htaccess`
-   overrides for this domain.
+   `/home/tmpk/public_html/_app/shared` and
+   `/home/tmpk/public_html/_deploy/incoming`. Put the contents of
+   [`deny.htaccess`](deny.htaccess) in both `_app/.htaccess` and
+   `_deploy/.htaccess`. Before adding credentials, place temporary probe files
+   in both directories and confirm their URLs return HTTP 403. Delete the
+   probes. If either is publicly readable, stop and ask the host to enable
+   `.htaccess` overrides for this domain.
 3. Create `/home/tmpk/public_html/_app/shared/.env`. Copy the dev site's `.env`
    through File Manager, then set `APP_ENV=production`, `APP_DEBUG=false`, and
    `APP_URL=https://testmaker.pk`. Keep the existing `APP_KEY` and database
@@ -35,14 +37,12 @@ workflow publishes the complete built release after `git push origin master`.
    Production then keeps its own uploads, logs, cache, and sessions. New
    uploads on one site will not automatically appear on the other site even
    though the database is shared.
-5. The FTP account `testmaker_deploy@testmaker.pk` must have **Directory** set
-   to `public_html`, not `public_html/testmaker_deploy`. The workflow connects
-   to `host.launchpad123.com` on port 21 and requires explicit TLS. This is the
-   same server as `ftp.testmaker.pk`, but its FTP certificate covers the server
-   hostname rather than the `ftp.testmaker.pk` alias.
-6. In GitHub, create the `production` environment. Add environment secrets
-   `CPANEL_FTP_USERNAME` and `CPANEL_FTP_PASSWORD` for the scoped FTP account.
-   In repository **Settings → Secrets and variables → Actions → Variables**,
+5. In cPanel **Manage API Tokens**, create a token for deployment. In GitHub,
+   create the `production` environment and add the token as its secret
+   `CPANEL_API_TOKEN`. Never commit or send the token in chat. The workflow
+   authenticates as cPanel user `tmpk` at `https://testmaker.pk:2083`; the old
+   `CPANEL_FTP_USERNAME` and `CPANEL_FTP_PASSWORD` secrets are no longer used.
+6. In repository **Settings → Secrets and variables → Actions → Variables**,
    create `PRODUCTION_DEPLOY_ENABLED` with value `true` only when the first
    deployment is ready. While it is unset, a manual workflow run builds and
    tests but does not upload.
@@ -60,8 +60,9 @@ workflow publishes the complete built release after `git push origin master`.
 Push to `master` after enabling the repository variable, or run the
 **production deployment** workflow manually. It runs the PHP tests, builds the
 frontend with Node on GitHub Actions, makes a production Composer install,
-packages only runtime files, and uploads the ZIP and checksum marker. Cron
-verifies the checksum, prepares a new release under `_app/releases`, runs
+packages only runtime files, and uploads verified 8 MiB parts followed by the
+checksum marker. Cron assembles and verifies the ZIP, prepares a new release
+under `_app/releases`, runs
 `migrate --force` against the shared database, and switches `_app/current` only
 after the release and public assets are ready. Existing releases remain for a
 code rollback; migrations are not automatically reversed.
