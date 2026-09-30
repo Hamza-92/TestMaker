@@ -56,18 +56,46 @@ it('copies every attachment listed on a legacy account', function () {
     }
 });
 
-it('stops the transfer instead of silently omitting an unavailable attachment', function () {
+it('copies available attachments and records unavailable ones without blocking transfer', function () {
     Http::fake([
         'https://legacy.example/uploads/admin_attachments/available.jpg' => Http::response('available-file', 200),
         'https://legacy.example/uploads/admin_attachments/missing.jpg' => Http::response('', 404),
+        'https://legacy.example/uploads/admin_attachments/missing-page.jpg' => Http::response('<html>Not found</html>', 200, ['Content-Type' => 'text/html']),
     ]);
 
-    expect(fn () => invokeLegacyAssetMigration((object) [
+    $assets = invokeLegacyAssetMigration((object) [
         'id' => 43,
         'school_logo' => '',
         'attachments' => json_encode([
             ['file_name' => 'available.jpg', 'original_name' => 'Available.jpg'],
             ['file_name' => 'missing.jpg', 'original_name' => 'Missing.jpg'],
+            ['file_name' => 'missing-page.jpg', 'original_name' => 'Missing page.jpg'],
         ]),
-    ]))->toThrow(RuntimeException::class, 'Missing.jpg');
+    ]);
+
+    expect($assets['attachments'])->toHaveCount(1)
+        ->and($assets['attachments'][0]['original_name'])->toBe('Available.jpg')
+        ->and($assets['missing_attachments'])->toBe(['Missing.jpg', 'Missing page.jpg']);
+
+    Storage::disk('public')->assertExists($assets['attachments'][0]['path']);
+});
+
+it('fetches legacy account attachments from the old domain even with a stale asset URL', function () {
+    config(['legacy-transfer.asset_url' => 'https://testmaker.pk']);
+    Http::fake([
+        'https://old.testmaker.pk/uploads/admin_attachments/receipt.jpg' => Http::response('receipt-file', 200),
+    ]);
+
+    $assets = invokeLegacyAssetMigration((object) [
+        'id' => 44,
+        'school_logo' => '',
+        'attachments' => json_encode([
+            ['file_name' => 'receipt.jpg', 'original_name' => 'Receipt.jpg'],
+        ]),
+    ]);
+
+    expect($assets['attachments'])->toHaveCount(1)
+        ->and($assets['missing_attachments'])->toBe([]);
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://old.testmaker.pk/uploads/admin_attachments/receipt.jpg');
 });

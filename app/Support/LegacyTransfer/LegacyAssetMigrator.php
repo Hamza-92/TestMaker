@@ -409,6 +409,14 @@ class LegacyAssetMigrator
                 return [];
             }
 
+            if (in_array($host, ['testmaker.pk', 'www.testmaker.pk'], true)) {
+                $path = (string) parse_url($source, PHP_URL_PATH);
+                $query = parse_url($source, PHP_URL_QUERY);
+                $source = 'https://old.testmaker.pk'.($path === '' ? '/' : $path)
+                    .(is_string($query) ? '?'.$query : '');
+                $host = 'old.testmaker.pk';
+            }
+
             $candidates[] = $source;
             $scheme = (string) parse_url($source, PHP_URL_SCHEME);
             $origin = $scheme.'://'.$host;
@@ -419,7 +427,10 @@ class LegacyAssetMigrator
             $candidates[] = rtrim($origin, '/').'/'.ltrim($relativePath, '/');
         }
 
-        $baseUrl = rtrim((string) config('legacy-transfer.asset_url', 'https://testmaker.pk'), '/');
+        $baseUrl = rtrim((string) config('legacy-transfer.asset_url', 'https://old.testmaker.pk'), '/');
+        if (in_array(strtolower((string) parse_url($baseUrl, PHP_URL_HOST)), ['testmaker.pk', 'www.testmaker.pk'], true)) {
+            $baseUrl = 'https://old.testmaker.pk';
+        }
         if ($baseUrl !== '') {
             $candidates[] = $baseUrl.'/'.ltrim($relativePath, '/');
 
@@ -527,6 +538,8 @@ class LegacyAssetMigrator
             '127.0.0.1',
             'testmaker.pk',
             'www.testmaker.pk',
+            'old.testmaker.pk',
+            'www.old.testmaker.pk',
         ], true);
     }
 }

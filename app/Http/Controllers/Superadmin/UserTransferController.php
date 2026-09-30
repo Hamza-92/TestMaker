@@ -69,6 +69,7 @@ class UserTransferController extends Controller
             'target_user_id' => $import->target_user_id,
             'subscription_id' => $import->subscription_id,
             'transferred_at' => $import->transferred_at?->toIso8601String(),
+            'missing_attachment_count' => count($import->source_snapshot['assets']['missing_attachments'] ?? []),
         ]);
     }
 }

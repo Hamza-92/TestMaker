@@ -272,6 +272,12 @@ export default function UserTransfer({
             setOpen(false);
             setDetail(null);
             toast.success(payload.message);
+
+            if (payload.missing_attachment_count > 0) {
+                toast.warning(
+                    `${payload.missing_attachment_count} legacy payment attachment(s) could not be copied. The account was transferred.`,
+                );
+            }
         } catch (reason) {
             setError(
                 reason instanceof Error ? reason.message : 'Transfer failed.',
@@ -776,10 +782,11 @@ export default function UserTransfer({
                                         Legacy payment record
                                     </h3>
                                     <p className="text-xs text-muted-foreground">
-                                        This text and{' '}
+                                        The payment text will be imported. We
+                                        will try to copy{' '}
                                         {detail.attachment_count.toLocaleString()}{' '}
-                                        attachment(s) will be copied to the
-                                        subscription payment history.
+                                        attachment(s); unavailable files will
+                                        not block the account transfer.
                                     </p>
                                     {detail.legacy_attachments.length > 0 && (
                                         <div className="mt-2 grid gap-1.5 sm:grid-cols-2">

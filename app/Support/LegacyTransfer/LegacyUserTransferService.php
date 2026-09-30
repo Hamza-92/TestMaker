@@ -155,6 +155,13 @@ class LegacyUserTransferService
             }
 
             $assets = $this->migrateAssets($row);
+            $warnings = array_values(array_unique(array_merge(
+                (array) ($data['warnings'] ?? []),
+                array_map(
+                    fn (string $name): string => 'Legacy attachment could not be copied: '.$name,
+                    $assets['missing_attachments'],
+                ),
+            )));
 
             $user = User::create([
                 'name' => $data['name'], 'email' => Str::lower(trim($data['email'])), 'phone' => $data['phone'] ?: null,
@@ -185,7 +192,7 @@ class LegacyUserTransferService
                 'source_user_id' => $sourceUserId, 'target_user_id' => $user->id,
                 'subscription_id' => $subscription->id, 'source_account_type' => (string) $row->account_type,
                 'source_checksum' => hash('sha256', json_encode((array) $row, JSON_UNESCAPED_UNICODE)),
-                'warnings' => $data['warnings'] ?? null,
+                'warnings' => $warnings ?: null,
                 'source_snapshot' => ['id' => (int) $row->id, 'account_type' => (string) $row->account_type, 'package' => (string) $row->package, 'assets' => $assets, 'payment_log_id' => $paymentLog?->id],
                 'transferred_by' => $actorId, 'transferred_at' => now(),
             ]);
@@ -197,13 +204,17 @@ class LegacyUserTransferService
     {
         $paymentPlan = trim((string) ($data['payment_plan'] ?? ''));
         $attachments = collect($assets['attachments'] ?? [])->pluck('path')->filter()->values()->all();
-        if ($paymentPlan === '' && $attachments === []) {
+        $missingAttachments = $assets['missing_attachments'] ?? [];
+        if ($paymentPlan === '' && $attachments === [] && $missingAttachments === []) {
             return null;
         }
 
         $notes = "Imported Legacy TestMaker Payment Record\n\n";
         $notes .= $paymentPlan !== '' ? $paymentPlan : 'No payment-plan text was recorded.';
         $notes .= "\n\nThe legacy system did not store a structured payment amount or method for this record.";
+        if ($missingAttachments !== []) {
+            $notes .= "\n\nLegacy attachments unavailable during transfer: ".implode(', ', $missingAttachments).'.';
+        }
 
         return PaymentLog::create([
             'subscription_id' => $subscription->id,
@@ -370,7 +381,7 @@ class LegacyUserTransferService
             ->all();
     }
 
-    /** @return array{logo: ?string, attachments: array<int, array<string, string>>} */
+    /** @return array{logo: ?string, attachments: array<int, array<string, string>>, missing_attachments: array<int, string>} */
     private function migrateAssets(object $row): array
     {
         $logo = null;
@@ -411,14 +422,11 @@ class LegacyUserTransferService
             ];
         }
 
-        if ($missingAttachments !== []) {
-            throw new RuntimeException(
-                'The account was not transferred because these legacy attachments could not be copied: '
-                .implode(', ', $missingAttachments).'.'
-            );
-        }
-
-        return ['logo' => $logo, 'attachments' => $attachments];
+        return [
+            'logo' => $logo,
+            'attachments' => $attachments,
+            'missing_attachments' => array_values(array_unique($missingAttachments)),
+        ];
     }
 
     private function readLegacyAsset(string $relativePath): ?string
@@ -432,11 +440,18 @@ class LegacyUserTransferService
         }
 
         $baseUrl = rtrim((string) config('legacy-transfer.asset_url'), '/');
+        if (in_array(strtolower((string) parse_url($baseUrl, PHP_URL_HOST)), ['testmaker.pk', 'www.testmaker.pk'], true)) {
+            $baseUrl = 'https://old.testmaker.pk';
+        }
         $urlPath = implode('/', array_map('rawurlencode', explode(DIRECTORY_SEPARATOR, $relativePath)));
         try {
             $response = Http::withoutVerifying()->connectTimeout(3)->timeout(15)->get($baseUrl.'/'.$urlPath);
 
-            return $response->successful() ? $response->body() : null;
+            if (! $response->successful() || str_contains(strtolower((string) $response->header('Content-Type')), 'text/html')) {
+                return null;
+            }
+
+            return trim($response->body()) === '' ? null : $response->body();
         } catch (\Throwable) {
             return null;
         }

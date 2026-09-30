@@ -8,17 +8,17 @@ test('legacy images are prefetched and rewritten from the remote fallback', func
     Storage::fake('public');
     config([
         'legacy-transfer.asset_root' => 'Z:\missing-legacy-root',
-        'legacy-transfer.asset_url' => 'https://testmaker.pk',
+        'legacy-transfer.asset_url' => 'https://old.testmaker.pk',
     ]);
 
     Http::fake([
-        'https://testmaker.pk/ckfinder/userfiles/images/first.png' => Http::response(
+        'https://old.testmaker.pk/ckfinder/userfiles/images/first.png' => Http::response(
             'first-image',
             200,
             ['Content-Type' => 'image/png'],
         ),
-        'https://testmaker.pk/ckfinder/userfiles/images/second.jpg' => Http::response('', 404),
-        'https://testmaker.pk/ULC/ckfinder/userfiles/images/second.jpg' => Http::response(
+        'https://old.testmaker.pk/ckfinder/userfiles/images/second.jpg' => Http::response('', 404),
+        'https://old.testmaker.pk/ULC/ckfinder/userfiles/images/second.jpg' => Http::response(
             'second-image',
             200,
             ['Content-Type' => 'image/jpeg'],
@@ -50,4 +50,24 @@ test('legacy images are prefetched and rewritten from the remote fallback', func
 
     Storage::disk('public')->assertExists(ltrim($firstPath, '/storage/'));
     Storage::disk('public')->assertExists(ltrim($secondPath, '/storage/'));
+});
+
+test('old absolute TestMaker image URLs are fetched from the legacy domain', function () {
+    Storage::fake('public');
+    config([
+        'legacy-transfer.asset_root' => 'Z:\\missing-legacy-root',
+        'legacy-transfer.asset_url' => 'https://testmaker.pk',
+    ]);
+    Http::fake([
+        'https://old.testmaker.pk/uploads/example.png' => Http::response('legacy-image', 200, ['Content-Type' => 'image/png']),
+    ]);
+
+    $migrator = app(LegacyAssetMigrator::class);
+    $source = 'https://testmaker.pk/uploads/example.png';
+    $migrated = $migrator->migrateHtml('<img src="'.$source.'">');
+
+    expect($migrated)->toContain('/storage/legacy-content/')
+        ->not->toContain($source);
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://old.testmaker.pk/uploads/example.png');
 });
