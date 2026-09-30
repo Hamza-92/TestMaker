@@ -90,9 +90,9 @@ export default function Pricing() {
     return (
         <>
             <Head title="Pricing" />
-            <div id="top" className="min-h-screen overflow-x-hidden bg-white text-slate-900">
+            <div id="top" className="min-h-screen overflow-x-clip bg-white text-slate-900">
                 <SiteHeader auth={auth} />
-                <main className="pt-[162px] sm:pt-[138px] lg:pt-[114px]">
+                <main>
                     <section className="relative overflow-hidden border-b border-slate-200 bg-[linear-gradient(180deg,#EFF6FF_0%,#FFFFFF_84%)] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
                         <div className="pointer-events-none absolute -right-28 top-8 h-80 w-80 rounded-full bg-brand-100/80 blur-3xl" />
                         <div className="pointer-events-none absolute left-1/2 top-0 h-28 w-28 -translate-x-1/2 opacity-50 [background-image:radial-gradient(#93c5fd_1.5px,transparent_1.5px)] [background-size:13px_13px]" />
