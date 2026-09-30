@@ -56,7 +56,6 @@ class CustomerSubscriptionController extends Controller
             'reviewed_at' => $log->reviewed_at?->toISOString(),
             'creator_name' => $log->creator?->name,
             'reviewer_name' => $log->reviewer?->name,
-            'is_editable' => $log->isEditable(),
         ]);
 
         $paymentSummary = $this->buildPaymentSummary($subscription);
@@ -150,55 +149,12 @@ class CustomerSubscriptionController extends Controller
         return back()->with('success', 'Payment recorded.');
     }
 
-    public function updatePaymentLog(Request $request, User $customer, Subscription $subscription, PaymentLog $paymentLog)
+    public function updatePaymentLog(User $customer, Subscription $subscription, PaymentLog $paymentLog)
     {
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
         abort_unless((int) $paymentLog->subscription_id === (int) $subscription->id, 404);
 
-        if (! $paymentLog->isEditable()) {
-            throw ValidationException::withMessages([
-                'payment' => 'Only pending payments can be edited.',
-            ]);
-        }
-
-        $validated = $this->validatePaymentPayload($request, requireReceipt: false);
-        $this->ensurePaymentFitsSubscription($subscription, (float) $validated['amount'], $paymentLog);
-
-        $attachments = $paymentLog->attachments ?? [];
-        if ($request->hasFile('receipt') && $request->file('receipt')->isValid()) {
-            $attachments[] = $request->file('receipt')->store('payment-receipts', 'public');
-        }
-
-        $oldValues = [
-            'amount' => (string) $paymentLog->amount,
-            'payment_method' => $paymentLog->payment_method?->value,
-            'status' => $paymentLog->status?->value,
-        ];
-
-        DB::transaction(function () use ($validated, $attachments, $paymentLog, $oldValues) {
-            $paymentLog->update([
-                'amount' => $validated['amount'],
-                'payment_method' => $validated['payment_method'],
-                'account_number' => $validated['account_number'] ?: null,
-                'attachments' => $attachments ?: null,
-                'notes' => $validated['notes'] ?: null,
-            ]);
-
-            AuditLog::record(
-                model: $paymentLog,
-                event: AuditEvent::Updated,
-                oldValues: $oldValues,
-                newValues: [
-                    'amount' => $validated['amount'],
-                    'payment_method' => $validated['payment_method'],
-                    'status' => $paymentLog->status?->value,
-                ],
-                actor: auth()->user(),
-                notes: 'Payment updated.',
-            );
-        });
-
-        return back()->with('success', 'Payment updated.');
+        abort(403, 'Payment logs cannot be edited after they are added.');
     }
 
     public function reviewPaymentLog(Request $request, User $customer, Subscription $subscription, PaymentLog $paymentLog)
@@ -551,7 +507,7 @@ class CustomerSubscriptionController extends Controller
             ->with('success', 'Subscription added successfully.');
     }
 
-    private function validatePaymentPayload(Request $request, bool $requireReceipt = true): array
+    private function validatePaymentPayload(Request $request): array
     {
         return $request->validate([
             'amount' => ['required', 'integer', 'min:1'],

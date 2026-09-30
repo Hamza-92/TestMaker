@@ -51,11 +51,6 @@ class PaymentLog extends Model
         return $this->status === PaymentStatus::Approved;
     }
 
-    public function isEditable(): bool
-    {
-        return $this->status === PaymentStatus::PendingReview;
-    }
-
     /** @return array<int, string> */
     public function allowedTransitionValues(): array
     {

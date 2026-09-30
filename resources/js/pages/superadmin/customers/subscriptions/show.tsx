@@ -21,7 +21,6 @@ import {
     XIcon,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { usePermission } from '@/hooks/use-permission';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +39,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { usePermission } from '@/hooks/use-permission';
 import type { SubscriptionAccessScope } from '@/lib/subscription-access';
 
 type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
@@ -124,7 +124,6 @@ interface PaymentLog {
     reviewed_at: string | null;
     creator_name: string | null;
     reviewer_name: string | null;
-    is_editable: boolean;
 }
 
 interface AuditLog {
@@ -244,9 +243,13 @@ function money(amount: string) {
 }
 
 function truncateFilename(name: string, max = 36): string {
-    if (name.length <= max) return name;
+    if (name.length <= max) {
+        return name;
+    }
+
     const dot = name.lastIndexOf('.');
     const ext = dot > 0 ? name.slice(dot) : '';
+
     return name.slice(0, max - ext.length - 1) + '…' + ext;
 }
 
@@ -517,7 +520,6 @@ export default function ShowSubscription({
     const statusCfg = SUB_STATUS[subscription.status];
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [paymentDetail, setPaymentDetail] = useState<PaymentLog | null>(null);
-    const [editingLog, setEditingLog] = useState<PaymentLog | null>(null);
     const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>(
         {},
     );
@@ -537,22 +539,8 @@ export default function ShowSubscription({
         Number(paymentSummary.remaining_trackable_amount) > 0;
 
     function openAdd() {
-        setEditingLog(null);
         setPaymentErrors({});
         setPaymentForm(buildPaymentForm(''));
-        setPaymentOpen(true);
-    }
-
-    function openEdit(log: PaymentLog) {
-        setEditingLog(log);
-        setPaymentErrors({});
-        setPaymentForm({
-            amount: log.amount,
-            payment_method: log.payment_method ?? 'online',
-            account_number: log.account_number ?? '',
-            notes: log.notes ?? '',
-            receipt: null,
-        });
         setPaymentOpen(true);
     }
 
@@ -566,7 +554,6 @@ export default function ShowSubscription({
         setPaymentOpen(nextOpen);
 
         if (!nextOpen) {
-            setEditingLog(null);
             setPaymentErrors({});
             setPaymentForm(buildPaymentForm(''));
         }
@@ -583,11 +570,12 @@ export default function ShowSubscription({
     function submitPayment(e: React.FormEvent) {
         e.preventDefault();
 
-        if (!editingLog && !paymentForm.receipt) {
+        if (!paymentForm.receipt) {
             setPaymentErrors((prev) => ({
                 ...prev,
                 receipt: 'A receipt is required.',
             }));
+
             return;
         }
 
@@ -601,21 +589,18 @@ export default function ShowSubscription({
             fd.append('receipt', paymentForm.receipt);
         }
 
-        if (editingLog) {
-            fd.append('_method', 'PUT');
-        }
-
-        const base = `/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/payment-logs`;
-        const url = editingLog ? `${base}/${editingLog.id}` : base;
-
         setPaymentProcessing(true);
-        router.post(url, fd, {
-            preserveScroll: true,
-            onFinish: () => setPaymentProcessing(false),
-            onSuccess: () => closePaymentModal(false),
-            onError: (errors) =>
-                setPaymentErrors(errors as Record<string, string>),
-        });
+        router.post(
+            `/superadmin/customers/${customer.id}/subscriptions/${subscription.id}/payment-logs`,
+            fd,
+            {
+                preserveScroll: true,
+                onFinish: () => setPaymentProcessing(false),
+                onSuccess: () => closePaymentModal(false),
+                onError: (errors) =>
+                    setPaymentErrors(errors as Record<string, string>),
+            },
+        );
     }
 
     function movePaymentStatus(
@@ -934,24 +919,6 @@ export default function ShowSubscription({
                                                         <EyeIcon className="size-3" />
                                                         Details
                                                     </Button>
-                                                    {log.is_editable &&
-                                                        can(
-                                                            'subscriptions.manage_payments',
-                                                        ) && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="h-7 px-2.5 text-xs"
-                                                                onClick={() =>
-                                                                    openEdit(
-                                                                        log,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PencilIcon className="size-3" />
-                                                                Edit
-                                                            </Button>
-                                                        )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -1017,9 +984,7 @@ export default function ShowSubscription({
             <Dialog open={paymentOpen} onOpenChange={closePaymentModal}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>
-                            {editingLog ? 'Edit Payment' : 'Add Payment'}
-                        </DialogTitle>
+                        <DialogTitle>Add Payment</DialogTitle>
                     </DialogHeader>
 
                     <form onSubmit={submitPayment} className="space-y-4">
@@ -1131,11 +1096,9 @@ export default function ShowSubscription({
                         <div className="space-y-1.5">
                             <Label className="flex items-center gap-1">
                                 Receipt
-                                {!editingLog && (
-                                    <span className="text-xs text-destructive">
-                                        *
-                                    </span>
-                                )}
+                                <span className="text-xs text-destructive">
+                                    *
+                                </span>
                             </Label>
                             <div
                                 className="flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-input px-4 py-3 transition-colors hover:border-ring/50"
@@ -1167,8 +1130,10 @@ export default function ShowSubscription({
                                                 ...current,
                                                 receipt: null,
                                             }));
-                                            if (fileRef.current)
+
+                                            if (fileRef.current) {
                                                 fileRef.current.value = '';
+                                            }
                                         }}
                                     >
                                         <XIcon className="size-4" />
@@ -1204,11 +1169,7 @@ export default function ShowSubscription({
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={paymentProcessing}>
-                                {paymentProcessing
-                                    ? 'Saving…'
-                                    : editingLog
-                                      ? 'Save'
-                                      : 'Add Payment'}
+                                {paymentProcessing ? 'Saving…' : 'Add Payment'}
                             </Button>
                         </DialogFooter>
                     </form>

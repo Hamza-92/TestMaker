@@ -111,6 +111,31 @@ it('stores subscription payments in pending review status', function () {
         ->and((string) $payment->amount)->toBe('400.00');
 });
 
+it('does not allow a saved payment log to be edited before review', function () {
+    $admin = makeSuperAdmin();
+    $customer = makeCustomer();
+    $subscription = makeSubscription($customer, $admin);
+    $payment = makePaymentLog($subscription, $admin);
+
+    $this
+        ->actingAs($admin)
+        ->put(route('superadmin.customers.subscriptions.payment-logs.update', [$customer, $subscription, $payment]), [
+            'amount' => '500',
+            'payment_method' => PaymentMethod::Cash->value,
+            'account_number' => 'CHANGED',
+            'notes' => 'Changed after creation',
+        ])
+        ->assertForbidden();
+
+    $payment->refresh();
+
+    expect((string) $payment->amount)->toBe('300.00')
+        ->and($payment->payment_method)->toBe(PaymentMethod::Online)
+        ->and($payment->account_number)->toBe('TXN-1001')
+        ->and($payment->notes)->toBe('Initial receipt')
+        ->and($payment->status)->toBe(PaymentStatus::PendingReview);
+});
+
 it('enforces stepwise payment status transitions', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
