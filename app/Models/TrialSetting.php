@@ -10,10 +10,14 @@ class TrialSetting extends Model
         'trial_duration_days',
         'allow_subjective_answers',
         'access_scope',
+        'chapter_access',
+        'topic_access',
     ];
 
     protected $casts = [
         'access_scope' => 'array',
+        'chapter_access' => 'array',
+        'topic_access' => 'array',
         'allow_subjective_answers' => 'boolean',
     ];
 
@@ -22,7 +26,9 @@ class TrialSetting extends Model
         $instance = static::firstOrCreate([], [
             'trial_duration_days' => 30,
             'allow_subjective_answers' => false,
-            'access_scope'        => null,
+            'access_scope' => null,
+            'chapter_access' => null,
+            'topic_access' => null,
         ]);
 
         // Fix records that were accidentally created with an indexed array default

@@ -32,6 +32,7 @@ interface Props {
     error?: string;
     selectAllLabel?: string;
     selectDescendantsOnParentToggle?: boolean;
+    subjectAction?: (patternId: number, classId: number, subjectId: number) => React.ReactNode;
 }
 
 export function HierarchicalAccessControl({
@@ -45,6 +46,7 @@ export function HierarchicalAccessControl({
     error,
     selectAllLabel = 'Full access',
     selectDescendantsOnParentToggle = true,
+    subjectAction,
 }: Props) {
     const [openPatterns, setOpenPatterns] = useState<Record<string, boolean>>({});
     const [activeClasses, setActiveClasses] = useState<Record<string, number | null>>({});
@@ -512,7 +514,9 @@ export function HierarchicalAccessControl({
                                                                 ) : (
                                                                     <div
                                                                         className={cn(
-                                                                            'grid grid-cols-2 gap-2 sm:grid-cols-4',
+                                                                            subjectAction
+                                                                                ? 'grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3'
+                                                                                : 'grid grid-cols-2 gap-2 sm:grid-cols-4',
                                                                             !classSelected && 'opacity-60',
                                                                         )}
                                                                     >
@@ -525,36 +529,39 @@ export function HierarchicalAccessControl({
                                                                                 );
 
                                                                             return (
-                                                                                <label
+                                                                                <div
                                                                                     key={subjectId}
                                                                                     className="hover:bg-accent flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors"
                                                                                 >
-                                                                                    <Checkbox
-                                                                                        checked={checked}
-                                                                                        disabled={!classSelected}
-                                                                                        onCheckedChange={(
-                                                                                            nextChecked,
-                                                                                        ) =>
-                                                                                            handleSubjectToggle(
-                                                                                                pattern.id,
-                                                                                                activeClassId,
-                                                                                                subjectId,
-                                                                                                nextChecked === true,
-                                                                                            )
-                                                                                        }
-                                                                                    />
-                                                                                    <div className="min-w-0">
-                                                                                        <p className="truncate text-xs font-medium">
-                                                                                            {subject?.name_eng ??
-                                                                                                `Subject #${subjectId}`}
-                                                                                        </p>
-                                                                                        {subject?.name_ur && (
-                                                                                            <p className="text-muted-foreground truncate text-[10px]">
-                                                                                                {subject.name_ur}
-                                                                                            </p>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </label>
+                                                                                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                                                                                        <Checkbox
+                                                                                            checked={checked}
+                                                                                            disabled={!classSelected}
+                                                                                            onCheckedChange={(
+                                                                                                nextChecked,
+                                                                                            ) =>
+                                                                                                handleSubjectToggle(
+                                                                                                    pattern.id,
+                                                                                                    activeClassId,
+                                                                                                    subjectId,
+                                                                                                    nextChecked === true,
+                                                                                                )
+                                                                                            }
+                                                                                        />
+                                                                                        <span className="min-w-0">
+                                                                                            <span className="block truncate text-xs font-medium">
+                                                                                                {subject?.name_eng ??
+                                                                                                    `Subject #${subjectId}`}
+                                                                                            </span>
+                                                                                            {subject?.name_ur && (
+                                                                                                <span className="text-muted-foreground block truncate text-[10px]">
+                                                                                                    {subject.name_ur}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </span>
+                                                                                    </label>
+                                                                                    {checked && subjectAction?.(pattern.id, activeClassId, subjectId)}
+                                                                                </div>
                                                                             );
                                                                         })}
                                                                     </div>

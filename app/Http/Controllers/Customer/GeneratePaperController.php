@@ -203,14 +203,25 @@ class GeneratePaperController extends Controller
             (int) $data['subject_id'],
         );
 
+        $patternId = (int) $data['pattern_id'];
+        $classId = (int) $data['class_id'];
+        $subjectId = (int) $data['subject_id'];
+        $chapterAccess = AppUserAccess::chapterIds($access, $patternId, $classId, $subjectId);
+        $topicAccess = AppUserAccess::topicIds($access, $patternId, $classId, $subjectId);
+
         $chapters = Chapter::query()
             ->where('pattern_id', $data['pattern_id'])
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
             ->where('status', 1)
-            ->withCount(['questions as question_count' => fn ($q) => $q->where('status', 1)])
-            ->with(['topics' => function ($q) {
+            ->when($chapterAccess !== null, fn ($query) => $query->whereIn('id', $chapterAccess))
+            ->withCount(['questions as question_count' => function ($query) use ($access, $patternId, $classId, $subjectId) {
+                $query->where('status', 1);
+                AppUserAccess::restrictQuestions($query, $access, $patternId, $classId, $subjectId);
+            }])
+            ->with(['topics' => function ($q) use ($topicAccess) {
                 $q->where('status', 1)
+                    ->when($topicAccess !== null, fn ($query) => $query->whereIn('id', $topicAccess))
                     ->orderBy('sort_id')
                     ->orderBy('id')
                     ->select('id', 'chapter_id', 'name', 'name_ur')
@@ -267,7 +278,7 @@ class GeneratePaperController extends Controller
             ]);
         }
 
-        $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
+        $rows = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $scope, $difficulties)
             ->join('question_types', 'question_types.id', '=', 'questions.question_type_id')
             ->leftJoin('question_type_orders as question_type_orders', function ($join) use ($scope): void {
                 $join->on('question_type_orders.question_type_id', '=', 'question_types.id')
@@ -510,7 +521,7 @@ class GeneratePaperController extends Controller
 
         $displayMedium = $requestedMedium ?? $this->subjectMediumForChapters($chapterIds);
         $canViewSubjectiveAnswers = SubjectiveAnswerAccess::allows(auth()->user());
-        $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties)
+        $questions = $this->scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $scope, $difficulties)
             ->where('questions.question_type_id', $data['question_type_id'])
             ->with([
                 'questionType',
@@ -630,13 +641,14 @@ class GeneratePaperController extends Controller
         $access = AppUserAccess::resolve(auth()->user());
         $allowedChapters = DB::table('chapters')
             ->whereIn('id', $chapterIds)
+            ->where('status', 1)
             ->get(['id', 'pattern_id', 'class_id', 'subject_id'])
             ->filter(fn ($row) => AppUserAccess::allowsSubject(
                 $access,
                 (int) $row->pattern_id,
                 (int) $row->class_id,
                 (int) $row->subject_id,
-            ))
+            ) && AppUserAccess::allowsChapter($access, (int) $row->pattern_id, (int) $row->class_id, (int) $row->subject_id, (int) $row->id))
             ->values();
         $allowedChapterIds = $allowedChapters->pluck('id')->map(fn ($id) => (int) $id);
 
@@ -666,6 +678,10 @@ class GeneratePaperController extends Controller
                 ->whereIn('id', $topicIds)
                 ->whereIn('chapter_id', $chapterIds)
                 ->pluck('id');
+
+        abort_if($validTopicIds->contains(fn ($id) => ! AppUserAccess::allowsTopic(
+            $access, (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id, (int) $id,
+        )), 403);
 
         return [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium, $scope];
     }
@@ -829,8 +845,9 @@ class GeneratePaperController extends Controller
         return $english !== '' ? $english : ($urdu !== '' ? $urdu : $fallback);
     }
 
-    private function scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $difficulties = null)
+    private function scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $scope, $difficulties = null)
     {
+        $access = AppUserAccess::resolve(auth()->user());
         $query = Question::query()
             ->whereIn('questions.chapter_id', $chapterIds)
             ->where('questions.status', 1)
@@ -841,6 +858,8 @@ class GeneratePaperController extends Controller
                         ->orWhereNull('questions.topic_id');
                 });
             });
+
+        AppUserAccess::restrictQuestions($query, $access, (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id);
 
         if ($difficulties !== null && $difficulties->isNotEmpty()) {
             $query->whereIn('questions.difficulty', $difficulties);

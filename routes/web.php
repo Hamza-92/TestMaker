@@ -301,6 +301,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // â”€â”€â”€ Trial Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/trial-settings', [TrialSettingController::class, 'index'])->name('superadmin.trial-settings')->middleware('permission:trial_settings.edit');
+        Route::get('superadmin/trial-settings/chapters', [TrialSettingController::class, 'chapters'])->name('superadmin.trial-settings.chapters')->middleware('permission:trial_settings.edit');
         Route::put('superadmin/trial-settings', [TrialSettingController::class, 'update'])->name('superadmin.trial-settings.update')->middleware('permission:trial_settings.edit');
 
         // Announcements

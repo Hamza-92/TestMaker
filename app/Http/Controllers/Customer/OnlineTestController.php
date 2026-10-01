@@ -248,8 +248,11 @@ class OnlineTestController extends Controller
             ->map(fn ($id) => (int) $id)
             ->values();
 
-        $questions = Question::query()
-            ->whereIn('id', $questionIds)
+        $query = Question::query()
+            ->whereIn('id', $questionIds);
+        AppUserAccess::restrictQuestions($query, AppUserAccess::resolve(auth()->user()), (int) $onlineTest->pattern_id, (int) $onlineTest->class_id, (int) $onlineTest->subject_id);
+
+        $questions = $query
             ->with(['questionType:id,name,schema_key,is_objective', 'options', 'chapter:id,name', 'topic:id,name'])
             ->get()
             ->sortBy(fn (Question $question) => $questionIds->search($question->id))
@@ -334,17 +337,27 @@ class OnlineTestController extends Controller
         ]);
 
         $this->ensureSubjectAccess($data);
+        $access = AppUserAccess::resolve(auth()->user());
+        $patternId = (int) $data['pattern_id'];
+        $classId = (int) $data['class_id'];
+        $subjectId = (int) $data['subject_id'];
+        $chapterAccess = AppUserAccess::chapterIds($access, $patternId, $classId, $subjectId);
+        $topicAccess = AppUserAccess::topicIds($access, $patternId, $classId, $subjectId);
 
         $chapters = Chapter::query()
             ->where('pattern_id', $data['pattern_id'])
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
             ->where('status', 1)
-            ->withCount(['questions as question_count' => fn ($query) => $query
-                ->where('status', 1)
-                ->whereHas('questionType', fn ($typeQuery) => $typeQuery->where('is_objective', true))])
+            ->when($chapterAccess !== null, fn ($query) => $query->whereIn('id', $chapterAccess))
+            ->withCount(['questions as question_count' => function ($query) use ($access, $patternId, $classId, $subjectId) {
+                $query->where('status', 1)
+                    ->whereHas('questionType', fn ($typeQuery) => $typeQuery->where('is_objective', true));
+                AppUserAccess::restrictQuestions($query, $access, $patternId, $classId, $subjectId);
+            }])
             ->with(['topics' => fn ($query) => $query
                 ->where('status', 1)
+                ->when($topicAccess !== null, fn ($query) => $query->whereIn('id', $topicAccess))
                 ->orderBy('sort_id')
                 ->orderBy('id')
                 ->select('id', 'chapter_id', 'name')
@@ -392,6 +405,7 @@ class OnlineTestController extends Controller
         ]);
 
         $this->ensureSubjectAccess($data);
+        $access = AppUserAccess::resolve(auth()->user());
 
         $chapterIds = collect($data['chapter_ids'])->map(fn ($id) => (int) $id)->unique()->values();
         $this->ensureChapterScope($chapterIds, $data);
@@ -404,10 +418,11 @@ class OnlineTestController extends Controller
                 ->whereIn('chapter_id', $chapterIds)
                 ->get(['id', 'chapter_id']);
             abort_unless($selectedTopics->count() === $topicIds->count(), 422);
+            abort_if($selectedTopics->contains(fn ($topic) => ! AppUserAccess::allowsTopic($access, (int) $data['pattern_id'], (int) $data['class_id'], (int) $data['subject_id'], (int) $topic->id)), 403);
             $topicsByChapter = $selectedTopics->groupBy('chapter_id');
         }
 
-        $questions = Question::query()
+        $query = Question::query()
             ->where('status', 1)
             ->where(function ($query) use ($chapterIds, $topicsByChapter) {
                 foreach ($chapterIds as $chapterId) {
@@ -429,7 +444,11 @@ class OnlineTestController extends Controller
             })
             ->when(! empty($data['sources']), fn ($query) => $query->whereIn('source', $data['sources']))
             ->when(! empty($data['difficulties']), fn ($query) => $query->whereIn('difficulty', $data['difficulties']))
-            ->whereHas('questionType', fn ($query) => $query->where('is_objective', true))
+            ->whereHas('questionType', fn ($query) => $query->where('is_objective', true));
+
+        AppUserAccess::restrictQuestions($query, $access, (int) $data['pattern_id'], (int) $data['class_id'], (int) $data['subject_id']);
+
+        $questions = $query
             ->with(['questionType:id,name,schema_key,is_objective', 'options', 'chapter:id,name', 'topic:id,name'])
             ->orderBy('chapter_id')
             ->orderBy('topic_id')
@@ -585,9 +604,12 @@ class OnlineTestController extends Controller
     {
         $questionIds = collect($validated['question_ids'])->map(fn ($id) => (int) $id)->unique()->values();
 
-        $questions = Question::query()
+        $query = Question::query()
             ->whereIn('id', $questionIds)
-            ->whereIn('chapter_id', $validated['chapter_ids'])
+            ->whereIn('chapter_id', $validated['chapter_ids']);
+        AppUserAccess::restrictQuestions($query, AppUserAccess::resolve(auth()->user()), (int) $validated['pattern_id'], (int) $validated['class_id'], (int) $validated['subject_id']);
+
+        $questions = $query
             ->with(['questionType:id,name,schema_key,is_objective', 'options', 'chapter:id,name', 'topic:id,name'])
             ->get()
             ->sortBy(fn (Question $question) => $questionIds->search($question->id))
@@ -645,12 +667,15 @@ class OnlineTestController extends Controller
 
     private function ensureChapterScope($chapterIds, array $scope): void
     {
+        $access = AppUserAccess::resolve(auth()->user());
+        $chapterAccess = AppUserAccess::chapterIds($access, (int) $scope['pattern_id'], (int) $scope['class_id'], (int) $scope['subject_id']);
         $validCount = Chapter::query()
             ->whereIn('id', $chapterIds)
             ->where('pattern_id', $scope['pattern_id'])
             ->where('class_id', $scope['class_id'])
             ->where('subject_id', $scope['subject_id'])
             ->where('status', 1)
+            ->when($chapterAccess !== null, fn ($query) => $query->whereIn('id', $chapterAccess))
             ->count();
 
         abort_unless($validCount === $chapterIds->count(), 422);

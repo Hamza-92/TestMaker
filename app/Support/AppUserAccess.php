@@ -22,13 +22,18 @@ class AppUserAccess
         $maps = SubscriptionAccess::buildMaps();
         $subscription = $user->activeSchoolSubscription();
         $schoolOwner = $user->schoolOwner();
+        $chapterAccess = [];
+        $topicAccess = [];
 
         if ($subscription !== null) {
             $scope = $user->isTeacher()
                 ? TeacherAccess::effectiveScope($user, $subscription, $maps)
                 : SubscriptionAccess::resolveScope($subscription, $maps);
         } elseif ($schoolOwner?->account_type === AccountType::Trial) {
-            $scope = SubscriptionAccess::normalizeScope(TrialSetting::current()->access_scope, $maps);
+            $trialSettings = TrialSetting::current();
+            $scope = SubscriptionAccess::normalizeScope($trialSettings->access_scope, $maps);
+            $chapterAccess = self::contentRules($trialSettings->chapter_access);
+            $topicAccess = self::contentRules($trialSettings->topic_access);
         } else {
             $scope = [];
         }
@@ -39,6 +44,8 @@ class AppUserAccess
             'scope' => $scope,
             'ids' => $ids,
             'maps' => $maps,
+            'chapter_access' => $chapterAccess,
+            'topic_access' => $topicAccess,
         ];
 
         $request?->attributes->set($cacheKey, $access);
@@ -93,5 +100,60 @@ class AppUserAccess
         }
 
         return in_array($subjectId, $classRule['subjects'], true);
+    }
+
+    public static function chapterIds(array $access, int $patternId, int $classId, int $subjectId): ?array
+    {
+        return $access['chapter_access'][self::contentKey($patternId, $classId, $subjectId)] ?? null;
+    }
+
+    public static function topicIds(array $access, int $patternId, int $classId, int $subjectId): ?array
+    {
+        return $access['topic_access'][self::contentKey($patternId, $classId, $subjectId)] ?? null;
+    }
+
+    public static function allowsChapter(array $access, int $patternId, int $classId, int $subjectId, int $chapterId): bool
+    {
+        $ids = self::chapterIds($access, $patternId, $classId, $subjectId);
+
+        return $ids === null || in_array($chapterId, $ids, true);
+    }
+
+    public static function allowsTopic(array $access, int $patternId, int $classId, int $subjectId, int $topicId): bool
+    {
+        $ids = self::topicIds($access, $patternId, $classId, $subjectId);
+
+        return $ids === null || in_array($topicId, $ids, true);
+    }
+
+    public static function restrictQuestions($query, array $access, int $patternId, int $classId, int $subjectId): void
+    {
+        $chapterIds = self::chapterIds($access, $patternId, $classId, $subjectId);
+        $topicIds = self::topicIds($access, $patternId, $classId, $subjectId);
+
+        if ($chapterIds !== null) {
+            $query->whereIn('questions.chapter_id', $chapterIds);
+        }
+
+        if ($topicIds !== null) {
+            $query->whereIn('questions.topic_id', $topicIds);
+        }
+    }
+
+    private static function contentKey(int $patternId, int $classId, int $subjectId): string
+    {
+        return "{$patternId}:{$classId}:{$subjectId}";
+    }
+
+    private static function contentRules(?array $rules): array
+    {
+        if ($rules === null) {
+            return [];
+        }
+
+        return collect($rules)
+            ->filter(fn ($ids, $key) => is_string($key) && preg_match('/^\d+:\d+:\d+$/', $key) && is_array($ids))
+            ->map(fn (array $ids) => collect($ids)->map(fn ($id) => (int) $id)->unique()->sort()->values()->all())
+            ->all();
     }
 }
