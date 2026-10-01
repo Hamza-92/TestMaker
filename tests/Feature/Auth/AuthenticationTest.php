@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Fortify\Features;
 
@@ -35,6 +36,36 @@ test('users can authenticate with their phone number in different common formats
 
     $this->assertAuthenticatedAs($user);
     $response->assertRedirect(route('dashboard', absolute: false));
+});
+
+test('phone login selects the account whose password matches when a number is shared', function () {
+    User::factory()->create([
+        'phone' => '03006752750',
+        'password' => Hash::make('another-password'),
+    ]);
+    $user = User::factory()->create([
+        'phone' => '+92 300 6752750',
+        'password' => Hash::make('correct-password'),
+    ]);
+
+    $this->post(route('login.store'), [
+        'email' => '03006752750',
+        'password' => 'correct-password',
+    ])->assertRedirect(route('dashboard', absolute: false));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+test('phone login rejects a shared password across matching accounts', function () {
+    User::factory()->create(['phone' => '03006752750']);
+    User::factory()->create(['phone' => '+92 300 6752750']);
+
+    $this->post(route('login.store'), [
+        'email' => '03006752750',
+        'password' => 'password',
+    ]);
+
+    $this->assertGuest();
 });
 
 test('phone login rejects an incorrect password or an ambiguous phone number', function () {

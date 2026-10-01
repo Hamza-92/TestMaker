@@ -28,11 +28,14 @@ class AuthenticateUser
 
         if (str_contains($identifier, '@')) {
             $user = User::query()->where('email', Str::lower($identifier))->first();
+            if (! $user || ! Hash::check($password, $user->password)) {
+                return null;
+            }
         } else {
-            $user = $this->byPhone($identifier);
+            $user = $this->byPhone($identifier, $password);
         }
 
-        if (! $user || ! Hash::check($password, $user->password)) {
+        if (! $user) {
             return null;
         }
 
@@ -43,7 +46,7 @@ class AuthenticateUser
         return $user;
     }
 
-    private function byPhone(string $identifier): ?User
+    private function byPhone(string $identifier, string $password): ?User
     {
         $digits = preg_replace('/\D+/', '', $identifier);
         if ($digits === null || strlen($digits) < 7 || strlen($digits) > 15) {
@@ -59,13 +62,23 @@ class AuthenticateUser
         }
 
         $normalizedPhone = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', '')";
-        $matches = User::query()
+        $matchedUser = null;
+        foreach (User::query()
             ->whereRaw($normalizedPhone.' in ('.implode(',', array_fill(0, count(array_unique($numbers)), '?')).')', array_values(array_unique($numbers)))
-            ->limit(2)
-            ->get();
+            ->cursor() as $candidate) {
+            if (! Hash::check($password, $candidate->password)) {
+                continue;
+            }
 
-        // A phone shared by multiple accounts cannot identify one account safely.
-        return $matches->count() === 1 ? $matches->first() : null;
+            // Never choose an arbitrary account when the same password works for both.
+            if ($matchedUser !== null) {
+                return null;
+            }
+
+            $matchedUser = $candidate;
+        }
+
+        return $matchedUser;
     }
 
     private static function localPhoneDigits(string $digits): string
