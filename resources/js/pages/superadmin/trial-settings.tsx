@@ -7,6 +7,7 @@ import type { TrialContentRules } from '@/components/trial-subject-content-dialo
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useSidebar } from '@/components/ui/sidebar';
 import { Switch } from '@/components/ui/switch';
 import type {
     AccessClass,
@@ -16,6 +17,7 @@ import type {
     PatternClassMap,
     SubscriptionAccessScope,
 } from '@/lib/subscription-access';
+import { cn } from '@/lib/utils';
 
 interface TrialSettings {
     id: number;
@@ -76,6 +78,7 @@ export default function TrialSettingsPage({
     patternClassMap,
     classSubjectMap,
 }: Props) {
+    const { state: sidebarState } = useSidebar();
     const { data, setData, put, processing, errors, isDirty } =
         useForm<FormData>({
             trial_duration_days: settings.trial_duration_days,
@@ -134,7 +137,7 @@ export default function TrialSettingsPage({
         <>
             <Head title="Trial Settings" />
 
-            <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
+            <div className="w-full min-w-0 space-y-6 p-4 pb-24 md:p-6 md:pb-24">
                 <div>
                     <h1 className="h1-semibold">Trial Settings</h1>
                 </div>
@@ -262,7 +265,14 @@ export default function TrialSettingsPage({
                     </div>
 
                     {/* Actions */}
-                    <div className="sticky bottom-0 z-20 -mx-4 flex items-center justify-end gap-3 border-y bg-background/95 px-4 py-3 shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.35)] backdrop-blur md:-mx-6 md:px-6">
+                    <div
+                        className={cn(
+                            'fixed right-0 bottom-0 left-0 z-20 flex items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.35)] backdrop-blur transition-[left] duration-200 md:right-2 md:bottom-2 md:rounded-b-xl md:px-6',
+                            sidebarState === 'collapsed'
+                                ? 'md:left-[calc(var(--sidebar-width-icon)+1rem)]'
+                                : 'md:left-[var(--sidebar-width)]',
+                        )}
+                    >
                         <button
                             type="submit"
                             disabled={processing || !isDirty}

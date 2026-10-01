@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\PaymentLog;
 use App\Models\User;
+use App\Support\CustomerAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -24,7 +25,7 @@ class CustomerController extends Controller
         $nearExpiryThresholdDays = 7;
         $currentUserId = auth()->id();
 
-        $customers = User::where('user_type', UserType::Customer)
+        $customers = CustomerAccess::visibleTo(auth()->user())
             ->with([
                 'subscriptions' => fn ($q) => $q
                     ->latest('started_at')
@@ -35,7 +36,7 @@ class CustomerController extends Controller
                     ])]),
             ])
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at'])
+            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at', 'created_by'])
             ->map(function (User $customer) use ($today, $todayStr, $nearExpiryThresholdDays, $currentUserId) {
                 $activeSubscription = $customer->subscriptions->first(
                     fn ($subscription) => $subscription->status?->value === 'active'
@@ -78,8 +79,7 @@ class CustomerController extends Controller
                     ->first()
                     ?->next_payment_date;
 
-                $isMyCustomer = $customer->subscriptions->some(fn ($s) => (int) $s->created_by === $currentUserId)
-                    || $allLogs->some(fn ($l) => (int) $l->created_by === $currentUserId);
+                $isMyCustomer = (int) $customer->created_by === $currentUserId;
 
                 return [
                     'id'                 => $customer->id,
@@ -116,11 +116,14 @@ class CustomerController extends Controller
 
         return Inertia::render('superadmin/customers', [
             'customers' => $customers,
+            'canViewAllCustomers' => auth()->user()->isMasterSuperAdmin(),
         ]);
     }
 
     public function show(User $customer)
     {
+        CustomerAccess::ensureVisible(auth()->user(), $customer);
+
         $customer->load([
             'subscriptions' => fn ($q) => $q->latest('started_at')
                 ->select(['id', 'user_id', 'name', 'amount', 'allowed_questions', 'started_at', 'expired_at', 'duration', 'status']),
@@ -171,6 +174,8 @@ class CustomerController extends Controller
 
     public function showLog(User $customer, AuditLog $log)
     {
+        CustomerAccess::ensureVisible(auth()->user(), $customer);
+
         abort_unless(
             $log->auditable_type === $customer->getMorphClass()
             && (int) $log->auditable_id === (int) $customer->getKey(),
@@ -198,6 +203,8 @@ class CustomerController extends Controller
 
     public function edit(User $customer)
     {
+        CustomerAccess::ensureVisible(auth()->user(), $customer);
+
         return Inertia::render('superadmin/customers/edit', [
             'customer' => $customer->only([
                 'id', 'name', 'email', 'phone',
@@ -259,6 +266,8 @@ class CustomerController extends Controller
 
     public function update(Request $request, User $customer)
     {
+        CustomerAccess::ensureVisible($request->user(), $customer);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($customer->id)],
@@ -338,7 +347,7 @@ class CustomerController extends Controller
 
     public function resetPassword(Request $request, User $customer)
     {
-        abort_unless($customer->isCustomer(), 404);
+        CustomerAccess::ensureVisible($request->user(), $customer);
 
         $validated = $request->validate([
             'password' => ['required', 'string', 'min:3', 'confirmed'],
@@ -360,7 +369,7 @@ class CustomerController extends Controller
 
     public function loginAsCustomer(Request $request, User $customer)
     {
-        abort_unless($customer->isCustomer(), 404);
+        CustomerAccess::ensureVisible($request->user(), $customer);
 
         $request->session()->put('impersonator_id', $request->user()->id);
         Auth::login($customer);

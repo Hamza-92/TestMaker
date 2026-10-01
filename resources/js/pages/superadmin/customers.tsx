@@ -261,10 +261,10 @@ function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 
     );
 }
 
-export default function Customers({ customers }: { customers: Customer[] }) {
+export default function Customers({ customers, canViewAllCustomers }: { customers: Customer[]; canViewAllCustomers: boolean }) {
     const { can } = usePermission();
     const loginForm = useForm({});
-    const [tab, setTab] = useState<'all' | 'mine'>('all');
+    const [tab, setTab] = useState<'all' | 'mine'>(canViewAllCustomers ? 'all' : 'mine');
     const [search, setSearch] = useState('');
     const [accountTypeFilter, setAccountTypeFilter] = useState<string>('all');
     const [accountStatusFilter, setAccountStatusFilter] = useState<string>('all');
@@ -362,7 +362,8 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                 </div>
 
                 {/* Tab toggle */}
-                <div className="flex items-center gap-1 rounded-xl border bg-card p-1 shadow-sm w-fit">
+                {canViewAllCustomers && (
+                    <div className="flex w-fit items-center gap-1 rounded-xl border bg-card p-1 shadow-sm">
                     <button
                         type="button"
                         onClick={() => handleTab('all')}
@@ -401,7 +402,8 @@ export default function Customers({ customers }: { customers: Customer[] }) {
                             {myCount}
                         </span>
                     </button>
-                </div>
+                    </div>
+                )}
 
                 {/* Plan-state summary cards */}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -889,4 +891,3 @@ Customers.layout = {
         { title: 'Customers', href: '/superadmin/customers' },
     ],
 };
-

@@ -194,6 +194,7 @@ it('allows explicitly granted impersonation and returns to the admin dashboard',
     $customer = User::factory()->create([
         'user_type' => UserType::Customer,
         'status' => UserStatus::Active,
+        'created_by' => $admin->id,
     ]);
 
     $this->actingAs($admin)->post("/superadmin/customers/{$customer->id}/login")

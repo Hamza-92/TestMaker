@@ -12,6 +12,7 @@ use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\CustomerAccess;
 use App\Support\SubscriptionAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class CustomerSubscriptionController extends Controller
 {
     public function show(User $customer, Subscription $subscription)
     {
+        CustomerAccess::ensureVisible(auth()->user(), $customer);
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
 
         $subscription->load([
@@ -111,6 +113,7 @@ class CustomerSubscriptionController extends Controller
 
     public function storePaymentLog(Request $request, User $customer, Subscription $subscription)
     {
+        CustomerAccess::ensureVisible($request->user(), $customer);
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
 
         $validated = $this->validatePaymentPayload($request);
@@ -151,6 +154,7 @@ class CustomerSubscriptionController extends Controller
 
     public function updatePaymentLog(User $customer, Subscription $subscription, PaymentLog $paymentLog)
     {
+        CustomerAccess::ensureVisible(auth()->user(), $customer);
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
         abort_unless((int) $paymentLog->subscription_id === (int) $subscription->id, 404);
 
@@ -159,6 +163,7 @@ class CustomerSubscriptionController extends Controller
 
     public function reviewPaymentLog(Request $request, User $customer, Subscription $subscription, PaymentLog $paymentLog)
     {
+        CustomerAccess::ensureVisible($request->user(), $customer);
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
         abort_unless((int) $paymentLog->subscription_id === (int) $subscription->id, 404);
 
@@ -216,6 +221,7 @@ class CustomerSubscriptionController extends Controller
 
     public function edit(User $customer, Subscription $subscription)
     {
+        CustomerAccess::ensureVisible(auth()->user(), $customer);
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
 
         $resources = $this->accessResources();
@@ -247,6 +253,7 @@ class CustomerSubscriptionController extends Controller
 
     public function update(Request $request, User $customer, Subscription $subscription)
     {
+        CustomerAccess::ensureVisible($request->user(), $customer);
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
 
         $resources = $this->accessResources();
@@ -340,6 +347,7 @@ class CustomerSubscriptionController extends Controller
 
     public function create(User $customer)
     {
+        CustomerAccess::ensureVisible(auth()->user(), $customer);
         abort_if(
             $customer->account_type?->value === 'trial',
             403,
@@ -360,6 +368,7 @@ class CustomerSubscriptionController extends Controller
 
     public function store(Request $request, User $customer)
     {
+        CustomerAccess::ensureVisible($request->user(), $customer);
         abort_if(
             $customer->account_type?->value === 'trial',
             403,
