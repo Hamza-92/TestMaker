@@ -36,7 +36,7 @@ class CustomerController extends Controller
                     ])]),
             ])
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at', 'created_by'])
+            ->get(['id', 'name', 'email', 'phone', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at', 'created_by'])
             ->map(function (User $customer) use ($today, $todayStr, $nearExpiryThresholdDays, $currentUserId) {
                 $activeSubscription = $customer->subscriptions->first(
                     fn ($subscription) => $subscription->status?->value === 'active'
@@ -85,6 +85,7 @@ class CustomerController extends Controller
                     'id'                 => $customer->id,
                     'name'               => $customer->name,
                     'email'              => $customer->email,
+                    'phone'              => $customer->phone,
                     'school_name'        => $customer->school_name,
                     'logo'               => $customer->logo,
                     'city'               => $customer->city,

@@ -57,6 +57,7 @@ interface Customer {
     id: number;
     name: string;
     email: string;
+    phone: string | null;
     school_name: string | null;
     logo: string | null;
     city: string | null;
@@ -295,6 +296,7 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
 
     const filtered = useMemo(() => {
         const query = search.trim().toLowerCase();
+        const phoneQuery = /^[+\d\s().-]+$/.test(query) ? query.replace(/\D/g, '') : '';
         return tabCustomers.filter((customer) => {
             const location = [customer.city, customer.province].filter(Boolean).join(', ').toLowerCase();
             const planName = customer.subscription?.name?.toLowerCase() ?? '';
@@ -302,6 +304,8 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
             const matchesSearch = !query ||
                 customer.name.toLowerCase().includes(query) ||
                 customer.email.toLowerCase().includes(query) ||
+                (customer.phone ?? '').toLowerCase().includes(query) ||
+                (phoneQuery !== '' && (customer.phone ?? '').replace(/\D/g, '').includes(phoneQuery)) ||
                 (customer.school_name ?? '').toLowerCase().includes(query) ||
                 location.includes(query) ||
                 planName.includes(query);
