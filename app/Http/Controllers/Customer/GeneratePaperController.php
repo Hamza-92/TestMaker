@@ -214,14 +214,12 @@ class GeneratePaperController extends Controller
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
             ->where('status', 1)
-            ->when($chapterAccess !== null, fn ($query) => $query->whereIn('id', $chapterAccess))
             ->withCount(['questions as question_count' => function ($query) use ($access, $patternId, $classId, $subjectId) {
                 $query->where('status', 1);
                 AppUserAccess::restrictQuestions($query, $access, $patternId, $classId, $subjectId);
             }])
-            ->with(['topics' => function ($q) use ($topicAccess) {
+            ->with(['topics' => function ($q) {
                 $q->where('status', 1)
-                    ->when($topicAccess !== null, fn ($query) => $query->whereIn('id', $topicAccess))
                     ->orderBy('sort_id')
                     ->orderBy('id')
                     ->select('id', 'chapter_id', 'name', 'name_ur')
@@ -233,23 +231,33 @@ class GeneratePaperController extends Controller
             ->orderBy('sort_id')
             ->orderBy('id')
             ->get(['id', 'name', 'name_ur', 'chapter_number', 'group_name', 'group_heading'])
-            ->map(fn (Chapter $c) => [
-                'id' => $c->id,
-                'name' => $this->localizedLabel($c->name, $c->name_ur, $displayMedium),
-                'name_eng' => $c->name,
-                'name_ur' => $c->name_ur,
-                'chapter_number' => $c->chapter_number,
-                'group_name' => $c->group_name,
-                'group_heading' => $c->group_heading,
-                'question_count' => (int) ($c->question_count ?? 0),
-                'topics' => $c->topics->map(fn ($t) => [
-                    'id' => $t->id,
-                    'name' => $this->localizedLabel($t->name, $t->name_ur, $displayMedium),
-                    'name_eng' => $t->name,
-                    'name_ur' => $t->name_ur,
-                    'question_count' => (int) ($t->question_count ?? 0),
-                ])->values(),
-            ])
+            ->map(function (Chapter $c) use ($chapterAccess, $topicAccess, $displayMedium) {
+                $chapterLocked = $chapterAccess !== null && ! in_array($c->id, $chapterAccess, true);
+
+                return [
+                    'id' => $c->id,
+                    'name' => $this->localizedLabel($c->name, $c->name_ur, $displayMedium),
+                    'name_eng' => $c->name,
+                    'name_ur' => $c->name_ur,
+                    'chapter_number' => $c->chapter_number,
+                    'group_name' => $c->group_name,
+                    'group_heading' => $c->group_heading,
+                    'locked' => $chapterLocked,
+                    'question_count' => (int) ($c->question_count ?? 0),
+                    'topics' => $c->topics->map(function ($t) use ($chapterLocked, $topicAccess, $displayMedium) {
+                        $topicLocked = $chapterLocked || ($topicAccess !== null && ! in_array($t->id, $topicAccess, true));
+
+                        return [
+                            'id' => $t->id,
+                            'name' => $this->localizedLabel($t->name, $t->name_ur, $displayMedium),
+                            'name_eng' => $t->name,
+                            'name_ur' => $t->name_ur,
+                            'locked' => $topicLocked,
+                            'question_count' => $topicLocked ? 0 : (int) ($t->question_count ?? 0),
+                        ];
+                    })->values(),
+                ];
+            })
             ->values();
 
         return response()

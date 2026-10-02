@@ -24,6 +24,7 @@ import {
     LayoutTemplateIcon,
     ListChecksIcon,
     Link2Icon,
+    LockKeyholeIcon,
     Loader2Icon,
     MinusIcon,
     PencilIcon,
@@ -156,6 +157,7 @@ interface Topic {
     name_eng?: string | null;
     name_ur?: string | null;
     question_count?: number;
+    locked?: boolean;
 }
 
 interface Chapter {
@@ -167,7 +169,23 @@ interface Chapter {
     group_name: string | null;
     group_heading: string | null;
     question_count?: number;
+    locked?: boolean;
     topics: Topic[];
+}
+
+function selectableTopicIds(chapter: Chapter): number[] {
+    return chapter.locked
+        ? []
+        : chapter.topics
+              .filter((topic) => !topic.locked)
+              .map((topic) => topic.id);
+}
+
+function isChapterSelectable(chapter: Chapter): boolean {
+    return (
+        !chapter.locked &&
+        (chapter.topics.length === 0 || selectableTopicIds(chapter).length > 0)
+    );
 }
 
 interface ChapterGroup {
@@ -2194,11 +2212,13 @@ function TriCheckbox({
     onChange,
     label,
     size = 'md',
+    disabled = false,
 }: {
     state: 'unchecked' | 'checked' | 'indeterminate';
     onChange: () => void;
     label: string;
     size?: 'sm' | 'md';
+    disabled?: boolean;
 }) {
     const checkboxSize = size === 'sm' ? 'size-4' : 'size-[18px]';
 
@@ -2211,8 +2231,9 @@ function TriCheckbox({
             }
             aria-label={label}
             onClick={onChange}
+            disabled={disabled}
             className={cn(
-                'flex shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-all',
+                'flex shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-all disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:border-slate-700 dark:disabled:bg-slate-800',
                 checkboxSize,
                 state === 'checked'
                     ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-white'
@@ -2570,7 +2591,7 @@ function ScopePicker({
                         Bubble Sheet
                     </Button>
                 )}
-                {level === 'ready' && chapters && chapters.length > 0 && (
+                {level === 'ready' && chapters?.some(isChapterSelectable) && (
                     <Button
                         type="button"
                         variant="secondary"
@@ -3822,6 +3843,39 @@ export default function GeneratePaper({
                 }
 
                 setChapters(data.chapters);
+                const availableChapters = new Map(
+                    data.chapters.map((chapter) => [chapter.id, chapter]),
+                );
+
+                setSelected((current) => {
+                    const next: Record<number, Set<number>> = {};
+
+                    for (const [chapterId, selectedTopics] of Object.entries(
+                        current,
+                    )) {
+                        const chapter = availableChapters.get(
+                            Number(chapterId),
+                        );
+
+                        if (!chapter || !isChapterSelectable(chapter)) {
+                            continue;
+                        }
+
+                        const allowedIds =
+                            chapter.topics.length > 0
+                                ? selectableTopicIds(chapter)
+                                : [CHAPTER_ONLY_SELECTION];
+                        const retained = new Set(
+                            allowedIds.filter((id) => selectedTopics.has(id)),
+                        );
+
+                        if (retained.size > 0) {
+                            next[chapter.id] = retained;
+                        }
+                    }
+
+                    return next;
+                });
                 setChapterMedium(data.medium ?? 'English');
             })
             .catch((error) => {
@@ -4507,6 +4561,16 @@ export default function GeneratePaper({
     }
 
     function toggleTopic(chapterId: number, topicId: number) {
+        const chapter = chapters?.find((item) => item.id === chapterId);
+
+        if (
+            !chapter ||
+            !isChapterSelectable(chapter) ||
+            !selectableTopicIds(chapter).includes(topicId)
+        ) {
+            return;
+        }
+
         clearManualQuestionSelections();
         setSelected((current) => {
             const next = { ...current };
@@ -4529,6 +4593,10 @@ export default function GeneratePaper({
     }
 
     function toggleChapter(chapter: Chapter) {
+        if (!isChapterSelectable(chapter)) {
+            return;
+        }
+
         clearManualQuestionSelections();
         setSelected((current) => {
             const next = { ...current };
@@ -4544,7 +4612,7 @@ export default function GeneratePaper({
                 return next;
             }
 
-            const topicIds = chapter.topics.map((topic) => topic.id);
+            const topicIds = selectableTopicIds(chapter);
             const allSelected = topicIds.every((id) => currentSet.has(id));
 
             if (allSelected) {
@@ -4560,6 +4628,10 @@ export default function GeneratePaper({
     function chapterState(
         chapter: Chapter,
     ): 'unchecked' | 'checked' | 'indeterminate' {
+        if (!isChapterSelectable(chapter)) {
+            return 'unchecked';
+        }
+
         const selectedTopics = selected[chapter.id];
 
         if (!selectedTopics || selectedTopics.size === 0) {
@@ -4572,7 +4644,9 @@ export default function GeneratePaper({
                 : 'unchecked';
         }
 
-        if (selectedTopics.size === chapter.topics.length) {
+        if (
+            selectableTopicIds(chapter).every((id) => selectedTopics.has(id))
+        ) {
             return 'checked';
         }
 
@@ -4580,11 +4654,13 @@ export default function GeneratePaper({
     }
 
     function allChaptersState(): 'unchecked' | 'checked' | 'indeterminate' {
-        if (!chapters || chapters.length === 0) {
+        const availableChapters = chapters?.filter(isChapterSelectable) ?? [];
+
+        if (availableChapters.length === 0) {
             return 'unchecked';
         }
 
-        const states = chapters.map((chapter) => chapterState(chapter));
+        const states = availableChapters.map((chapter) => chapterState(chapter));
 
         if (states.every((state) => state === 'checked')) {
             return 'checked';
@@ -4598,7 +4674,13 @@ export default function GeneratePaper({
     function chapterGroupState(
         group: ChapterGroup,
     ): 'unchecked' | 'checked' | 'indeterminate' {
-        const states = group.items.map((chapter) => chapterState(chapter));
+        const availableChapters = group.items.filter(isChapterSelectable);
+
+        if (availableChapters.length === 0) {
+            return 'unchecked';
+        }
+
+        const states = availableChapters.map((chapter) => chapterState(chapter));
 
         if (states.every((state) => state === 'checked')) {
             return 'checked';
@@ -4615,13 +4697,13 @@ export default function GeneratePaper({
         setSelected((current) => {
             const next = { ...current };
 
-            for (const chapter of group.items) {
+            for (const chapter of group.items.filter(isChapterSelectable)) {
                 if (shouldClear) {
                     delete next[chapter.id];
                 } else {
                     next[chapter.id] =
                         chapter.topics.length > 0
-                            ? new Set(chapter.topics.map((topic) => topic.id))
+                            ? new Set(selectableTopicIds(chapter))
                             : new Set([CHAPTER_ONLY_SELECTION]);
                 }
             }
@@ -4631,7 +4713,9 @@ export default function GeneratePaper({
     }
 
     function toggleAllChapters() {
-        if (!chapters || chapters.length === 0) {
+        const availableChapters = chapters?.filter(isChapterSelectable) ?? [];
+
+        if (availableChapters.length === 0) {
             return;
         }
 
@@ -4645,10 +4729,10 @@ export default function GeneratePaper({
 
         const all: Record<number, Set<number>> = {};
 
-        for (const chapter of chapters) {
+        for (const chapter of availableChapters) {
             all[chapter.id] =
                 chapter.topics.length > 0
-                    ? new Set(chapter.topics.map((topic) => topic.id))
+                    ? new Set(selectableTopicIds(chapter))
                     : new Set([CHAPTER_ONLY_SELECTION]);
         }
 
@@ -15029,6 +15113,7 @@ function DirectChapterGroup({
                     state={state}
                     onChange={onToggleGroup}
                     label={`Toggle all chapters in ${heading}`}
+                    disabled={!group.items.some(isChapterSelectable)}
                 />
                 <h3
                     className={cn(
@@ -15071,6 +15156,7 @@ function DirectChapterRow({
     standalone?: boolean;
 }) {
     const isUrdu = medium === 'Urdu';
+    const locked = !isChapterSelectable(chapter);
 
     return (
         <li
@@ -15085,7 +15171,9 @@ function DirectChapterRow({
                         : 'border-slate-200'),
                 checked
                     ? 'bg-brand-50/70 hover:bg-brand-100/70 dark:bg-brand-500/10 dark:hover:bg-brand-500/15'
-                    : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/50',
+                    : locked
+                      ? 'bg-slate-50/50 dark:bg-slate-900/70'
+                      : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/50',
             )}
         >
             <TriCheckbox
@@ -15093,15 +15181,19 @@ function DirectChapterRow({
                 onChange={() => onToggleChapter(chapter)}
                 label={`Toggle ${plainQuestionText(chapter.name)}`}
                 size="sm"
+                disabled={locked}
             />
             <button
                 type="button"
                 onClick={() => onToggleChapter(chapter)}
+                disabled={locked}
                 className={cn(
-                    'flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm transition-colors',
+                    'flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm transition-colors disabled:cursor-not-allowed',
                     isUrdu ? 'text-right' : 'text-left',
                     checked
                         ? 'text-brand-700 dark:text-brand-300'
+                        : locked
+                          ? 'text-slate-400 dark:text-slate-500'
                         : 'text-slate-700 hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300',
                 )}
             >
@@ -15111,6 +15203,14 @@ function DirectChapterRow({
                     medium={medium}
                 />
             </button>
+            {locked && (
+                <span
+                    className="inline-flex shrink-0 items-center text-slate-500 dark:text-slate-400"
+                    aria-label="Locked"
+                >
+                    <LockKeyholeIcon className="size-3.5" aria-hidden="true" />
+                </span>
+            )}
         </li>
     );
 }
@@ -15132,6 +15232,7 @@ function ChapterCard({
 }) {
     const isActive = state !== 'unchecked';
     const isUrdu = medium === 'Urdu';
+    const locked = !isChapterSelectable(chapter);
 
     return (
         <div
@@ -15140,6 +15241,8 @@ function ChapterCard({
                 'overflow-hidden rounded-xl border bg-white shadow-sm shadow-slate-900/[0.02] transition-all dark:shadow-black/10',
                 isActive
                     ? 'border-brand-300 ring-1 ring-brand-500/10 dark:border-brand-500/40 dark:ring-brand-400/10'
+                    : locked
+                      ? 'border-slate-200 dark:border-slate-800'
                     : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-900/[0.04] dark:border-slate-800 dark:hover:border-slate-700 dark:hover:shadow-black/20',
                 'dark:bg-slate-900',
             )}
@@ -15149,16 +15252,35 @@ function ChapterCard({
                     state={state}
                     onChange={onToggleChapter}
                     label={`Toggle all topics in ${plainQuestionText(chapter.name)}`}
+                    disabled={locked}
                 />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                        <h3 className="flex min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        <h3
+                            className={cn(
+                                'flex min-w-0 flex-1 text-sm font-semibold',
+                                locked
+                                    ? 'text-slate-500 dark:text-slate-400'
+                                    : 'text-slate-900 dark:text-slate-100',
+                            )}
+                        >
                             <BilingualPickerName
                                 english={chapter.name_eng ?? chapter.name}
                                 urdu={chapter.name_ur}
                                 medium={medium}
                             />
                         </h3>
+                        {locked && (
+                            <span
+                                className="inline-flex shrink-0 items-center text-slate-500 dark:text-slate-400"
+                                aria-label="Locked"
+                            >
+                                <LockKeyholeIcon
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                />
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -15167,6 +15289,7 @@ function ChapterCard({
                 <ul className="divide-y divide-slate-100 px-2 py-1 dark:divide-slate-800">
                     {chapter.topics.map((topic) => {
                         const checked = selectedTopics.has(topic.id);
+                        const topicLocked = locked || !!topic.locked;
 
                         return (
                             <li
@@ -15175,6 +15298,8 @@ function ChapterCard({
                                     'flex min-h-10 items-center gap-2.5 rounded-lg px-2 transition-colors',
                                     checked
                                         ? 'bg-brand-50/70 text-brand-700 hover:bg-brand-100/70 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/15'
+                                        : topicLocked
+                                          ? 'text-slate-400 dark:text-slate-500'
                                         : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50',
                                 )}
                             >
@@ -15183,12 +15308,14 @@ function ChapterCard({
                                     onChange={() => onToggleTopic(topic.id)}
                                     label={plainQuestionText(topic.name)}
                                     size="sm"
+                                    disabled={topicLocked}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => onToggleTopic(topic.id)}
+                                    disabled={topicLocked}
                                     className={cn(
-                                        'flex min-w-0 flex-1 cursor-pointer items-center text-[13px]',
+                                        'flex min-w-0 flex-1 cursor-pointer items-center text-[13px] disabled:cursor-not-allowed',
                                         isUrdu ? 'text-right' : 'text-left',
                                     )}
                                 >
@@ -15198,6 +15325,12 @@ function ChapterCard({
                                         medium={medium}
                                     />
                                 </button>
+                                {topicLocked && (
+                                    <LockKeyholeIcon
+                                        className="size-3.5 shrink-0"
+                                        aria-label="Locked"
+                                    />
+                                )}
                             </li>
                         );
                     })}

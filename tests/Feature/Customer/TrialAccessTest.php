@@ -45,7 +45,7 @@ it('gives trial customers the full pattern access configured in trial settings',
         ->and(AppUserAccess::allowsClass($access, $pattern->id, $schoolClass->id))->toBeTrue();
 });
 
-it('shows trial customers only selected chapters and topics in the paper generator', function () {
+it('shows locked trial chapters and topics without granting access to their questions', function () {
     $customer = User::factory()->create([
         'user_type' => UserType::Customer->value,
         'account_type' => 'trial',
@@ -97,11 +97,17 @@ it('shows trial customers only selected chapters and topics in the paper generat
     $this->actingAs($customer)->getJson(route('customer.papers.generate.chapters', [
         'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
     ]))->assertOk()
-        ->assertJsonCount(1, 'chapters')
+        ->assertJsonCount(2, 'chapters')
         ->assertJsonPath('chapters.0.id', $allowedChapter->id)
-        ->assertJsonCount(1, 'chapters.0.topics')
+        ->assertJsonPath('chapters.0.locked', false)
+        ->assertJsonCount(2, 'chapters.0.topics')
         ->assertJsonPath('chapters.0.topics.0.id', $allowedTopic->id)
-        ->assertJsonPath('chapters.0.question_count', 1);
+        ->assertJsonPath('chapters.0.topics.0.locked', false)
+        ->assertJsonPath('chapters.0.topics.1.id', $blockedTopic->id)
+        ->assertJsonPath('chapters.0.topics.1.locked', true)
+        ->assertJsonPath('chapters.0.question_count', 1)
+        ->assertJsonPath('chapters.1.id', $blockedChapter->id)
+        ->assertJsonPath('chapters.1.locked', true);
 
     $this->actingAs($customer)->getJson(route('customer.papers.generate.questions', [
         'chapter_ids' => [$allowedChapter->id], 'sources' => [Question::SOURCE_EXERCISE],
@@ -119,5 +125,7 @@ it('shows trial customers only selected chapters and topics in the paper generat
 
     $this->actingAs($customer)->getJson(route('customer.papers.generate.chapters', [
         'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $otherSubject->id,
-    ]))->assertOk()->assertJsonPath('chapters.0.id', $otherChapter->id);
+    ]))->assertOk()
+        ->assertJsonPath('chapters.0.id', $otherChapter->id)
+        ->assertJsonPath('chapters.0.locked', false);
 });
