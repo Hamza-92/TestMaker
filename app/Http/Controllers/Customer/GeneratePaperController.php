@@ -592,6 +592,8 @@ class GeneratePaperController extends Controller
                     ),
                     'summaryTextEn' => $summaryEn,
                     'summaryTextUr' => $summaryUr,
+                    'descriptionTextEn' => $question->questionType->is_objective ? null : $question->description_en,
+                    'descriptionTextUr' => $question->questionType->is_objective ? null : $question->description_ur,
                     'medium' => $displayMedium,
                     'schemaKey' => $schema['key'],
                     'isObjective' => (bool) $question->questionType->is_objective,

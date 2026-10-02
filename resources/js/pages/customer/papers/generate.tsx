@@ -594,6 +594,8 @@ interface ManualQuestion {
     summaryText: string;
     summaryTextEn?: string | null;
     summaryTextUr?: string | null;
+    descriptionTextEn?: string | null;
+    descriptionTextUr?: string | null;
     medium?: ContentMedium | null;
     schemaKey: string;
     isObjective: boolean;
@@ -1386,6 +1388,76 @@ function sameStatementFromManual(question: ManualQuestion): string | null {
     const shared = sharedEn || sharedUr;
 
     return shared === '' ? null : localizedPaperHtml(shared, '', 'English');
+}
+
+function manualQuestionDescriptionForMedium(
+    question: ManualQuestion,
+    medium: 'English' | 'Urdu',
+): string | null {
+    if (question.isObjective) {
+        return null;
+    }
+
+    if (question.schemaKey === 'subjective_same_statement') {
+        return sameStatementFromManual(question);
+    }
+
+    const content = question.content as Record<string, unknown> | null;
+    const primaryKey = medium === 'Urdu' ? 'guidance_ur' : 'guidance_en';
+    const secondaryKey = medium === 'Urdu' ? 'guidance_en' : 'guidance_ur';
+    const primaryContent = content?.[primaryKey];
+    const secondaryContent = content?.[secondaryKey];
+    const description = [
+        primaryContent,
+        medium === 'Urdu'
+            ? question.descriptionTextUr
+            : question.descriptionTextEn,
+        secondaryContent,
+        medium === 'Urdu'
+            ? question.descriptionTextEn
+            : question.descriptionTextUr,
+    ].find((value): value is string =>
+        typeof value === 'string' && value.trim() !== '',
+    );
+
+    if (
+        !description ||
+        description.trim() ===
+            manualQuestionDisplayHtmlForMedium(question, medium).trim()
+    ) {
+        return null;
+    }
+
+    return description.trim();
+}
+
+function ManualPickerSubjectiveDescription({
+    question,
+    medium,
+}: {
+    question: ManualQuestion;
+    medium: 'English' | 'Urdu';
+}) {
+    const description = manualQuestionDescriptionForMedium(question, medium);
+
+    if (!description) {
+        return null;
+    }
+
+    return (
+        <span
+            dir={
+                question.schemaKey === 'subjective_same_statement'
+                    ? 'auto'
+                    : medium === 'Urdu'
+                      ? 'rtl'
+                      : 'ltr'
+            }
+            className="mt-2 block border-s-2 border-slate-200 ps-2 text-xs leading-5 font-normal text-slate-600 dark:border-slate-700 dark:text-slate-300"
+        >
+            <RichTextLabel value={description} />
+        </span>
+    );
 }
 
 function paperQuestionFromManual(
@@ -9106,6 +9178,10 @@ function ManualQuestionPickerModal({
                                                             )}
                                                         />
                                                     </span>
+                                                    <ManualPickerSubjectiveDescription
+                                                        question={question}
+                                                        medium={displayMedium}
+                                                    />
                                                     <ManualPickerObjectiveOptions
                                                         question={question}
                                                         medium={displayMedium}
@@ -9124,6 +9200,10 @@ function ManualQuestionPickerModal({
                                                                 )}
                                                             />
                                                         </span>
+                                                        <ManualPickerSubjectiveDescription
+                                                            question={question}
+                                                            medium="Urdu"
+                                                        />
                                                         <ManualPickerObjectiveOptions
                                                             question={question}
                                                             medium="Urdu"

@@ -69,6 +69,7 @@ function subjectiveAnswerQuestionScope(): array
         'question_type_id' => $questionType->id,
         'chapter_id' => $chapter->id,
         'statement_en' => 'What is velocity?',
+        'description_en' => 'Explain using displacement and time.',
         'answer_en' => 'Velocity is displacement per unit time.',
         'content' => [
             'statement_en' => 'What is velocity?',
@@ -122,6 +123,7 @@ test('subjective answers are removed from question responses without access', fu
         ]))
         ->assertOk()
         ->assertJsonPath('questions.0.summaryTextEn', 'What is velocity?')
+        ->assertJsonPath('questions.0.descriptionTextEn', 'Explain using displacement and time.')
         ->assertJsonPath('questions.0.content.answer_en', null);
 });
 
