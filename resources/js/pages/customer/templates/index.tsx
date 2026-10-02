@@ -46,7 +46,7 @@ interface Props {
 
 /** Violet is the system's tone for templates; it drives the tile and the
  *  hover shadow through --tm-accent. */
-const TEMPLATE_ACCENT = 'oklch(0.606 0.25 292.717)';
+const TEMPLATE_ACCENT = '#8d54ff';
 
 function csrf(): string {
     return (

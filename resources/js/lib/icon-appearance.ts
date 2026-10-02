@@ -23,8 +23,19 @@ function iconColor(color?: string | null): string {
 
 export function iconCardStyle(
     color?: string | null,
-): CSSProperties & { '--tm-accent': string } {
-    return { '--tm-accent': iconColor(color) };
+): CSSProperties & { '--tm-accent': string; '--tm-accent-rgb': string } {
+    const solid = iconColor(color);
+
+    return {
+        '--tm-accent': solid,
+        '--tm-accent-rgb': hexRgb(solid).join(', '),
+    };
+}
+
+function hexRgb(hex: string): [number, number, number] {
+    return [1, 3, 5].map((offset) =>
+        parseInt(hex.slice(offset, offset + 2), 16),
+    ) as [number, number, number];
 }
 
 export function iconContainerStyle(color?: string | null): CSSProperties {
@@ -32,7 +43,7 @@ export function iconContainerStyle(color?: string | null): CSSProperties {
 
     return {
         color: solid,
-        backgroundColor: `color-mix(in srgb, ${solid} 10%, var(--card, white))`,
+        backgroundColor: `rgba(${hexRgb(solid).join(', ')}, 0.1)`,
         boxShadow: `0 3px 9px ${solid}26`,
     };
 }

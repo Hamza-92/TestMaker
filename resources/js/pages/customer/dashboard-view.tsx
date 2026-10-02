@@ -523,7 +523,7 @@ function SchoolMetric({
     tone: string;
 }) {
     return (
-        <div className="flex min-w-0 items-center gap-2.5 border-slate-200/80 py-1 sm:border-l sm:not-first:pl-4 sm:first:border-l-0 sm:first:pl-0 dark:border-slate-700/80">
+        <div className="flex min-w-0 items-center gap-2.5 border-slate-200/80 py-1 sm:border-l sm:[&:not(:first-child)]:pl-4 sm:first:border-l-0 sm:first:pl-0 dark:border-slate-700/80">
             <div
                 className={cn(
                     'flex size-8 shrink-0 items-center justify-center rounded-lg',
