@@ -130,4 +130,13 @@ export default [
             '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: false }],
         },
     },
+    {
+        files: ['*.cjs'],
+        languageOptions: {
+            globals: globals.node,
+        },
+        rules: {
+            '@typescript-eslint/no-require-imports': 'off',
+        },
+    },
 ];
