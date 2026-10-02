@@ -1697,6 +1697,56 @@ function paperOptionsFromManual(
     );
 }
 
+function manualPickerOptionsForMedium(
+    question: ManualQuestion,
+    medium: 'English' | 'Urdu',
+): PaperQuestionOption[] {
+    if (!question.isObjective || question.schemaKey === 'objective_passage_mcq') {
+        return [];
+    }
+
+    return question.schemaKey === 'objective_true_false'
+        ? paperOptionsFromManual(question)
+        : paperOptionsFromContent(
+              question.content.options,
+              `${question.id}_option`,
+              medium,
+          );
+}
+
+function ManualPickerObjectiveOptions({
+    question,
+    medium,
+}: {
+    question: ManualQuestion;
+    medium: 'English' | 'Urdu';
+}) {
+    const options = manualPickerOptionsForMedium(question, medium);
+
+    if (options.length === 0) {
+        return null;
+    }
+
+    return (
+        <span
+            dir={medium === 'Urdu' ? 'rtl' : 'ltr'}
+            className="mt-2 grid gap-x-3 gap-y-1 sm:grid-cols-2"
+        >
+            {options.map((option, index) => (
+                <span
+                    key={option.id}
+                    className="flex min-w-0 items-start gap-1.5 text-xs font-normal text-slate-600 dark:text-slate-300"
+                >
+                    <span className="shrink-0 font-semibold text-slate-500 dark:text-slate-400">
+                        ({String.fromCharCode(65 + index)})
+                    </span>
+                    <RichTextLabel value={option.text} />
+                </span>
+            ))}
+        </span>
+    );
+}
+
 function paperOptionsFromContent(
     options: unknown,
     idPrefix: string,
@@ -9056,6 +9106,10 @@ function ManualQuestionPickerModal({
                                                             )}
                                                         />
                                                     </span>
+                                                    <ManualPickerObjectiveOptions
+                                                        question={question}
+                                                        medium={displayMedium}
+                                                    />
                                                 </span>
                                                 {isBilingual && (
                                                     <span
@@ -9070,6 +9124,10 @@ function ManualQuestionPickerModal({
                                                                 )}
                                                             />
                                                         </span>
+                                                        <ManualPickerObjectiveOptions
+                                                            question={question}
+                                                            medium="Urdu"
+                                                        />
                                                     </span>
                                                 )}
                                             </span>
