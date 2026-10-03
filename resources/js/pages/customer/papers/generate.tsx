@@ -5007,6 +5007,36 @@ export default function GeneratePaper({
             });
         });
     }
+    function deleteMultipartCard(selectionId: string) {
+        setQuestionSelection((current) => {
+            const selections = current.multipart ?? [];
+
+            if (selections.length <= 1) {
+                return current;
+            }
+
+            const remaining = selections.filter(
+                (selection) => selection.id !== selectionId,
+            );
+
+            return withTotalMarks({
+                ...current,
+                multipart: remaining,
+                multipartChoiceCount:
+                    typeof current.multipartChoiceCount === 'number'
+                        ? Math.min(current.multipartChoiceCount, remaining.length)
+                        : current.multipartChoiceCount,
+            });
+        });
+
+        if (
+            manualPickerTarget?.sectionId.startsWith(
+                `multipart_${selectionId}_`,
+            )
+        ) {
+            closeManualQuestionPicker();
+        }
+    }
     function handleMultipartChoiceChange(value: string) {
         setQuestionSelection((current) =>
             withTotalMarks({
@@ -8809,6 +8839,12 @@ export default function GeneratePaper({
                                                         medium={chapterMedium}
                                                         config={multipartConfig}
                                                         value={multipart}
+                                                        canDeleteCard={multipartSelections.length > 1}
+                                                        onDeleteCard={() =>
+                                                            deleteMultipartCard(
+                                                                multipart.id,
+                                                            )
+                                                        }
                                                         onChange={(
                                                             nextMultipart,
                                                         ) =>
@@ -10215,6 +10251,27 @@ function AddMultipartPaperSectionModal({
         setSubmitError(null);
     }
 
+    function deleteCard(selectionId: string) {
+        if (selections.length <= 1) {
+            return;
+        }
+
+        setSelections((current) =>
+            current.length > 1
+                ? current.filter((selection) => selection.id !== selectionId)
+                : current,
+        );
+        setChoiceCount((current) =>
+            current === null ? null : Math.min(current, selections.length - 1),
+        );
+
+        if (manualTarget?.selectionId === selectionId) {
+            setManualTarget(null);
+        }
+
+        setSubmitError(null);
+    }
+
     function changeSources(nextSources: Set<string>) {
         setSelectedSources(nextSources);
         setSelections((current) =>
@@ -10528,6 +10585,8 @@ function AddMultipartPaperSectionModal({
                                 medium={medium}
                                 config={multipartConfig}
                                 value={selection}
+                                canDeleteCard={selections.length > 1}
+                                onDeleteCard={() => deleteCard(selection.id)}
                                 onChange={(nextSelection) =>
                                     updateSelection(selection.id, nextSelection)
                                 }
@@ -15527,6 +15586,8 @@ function MultipartSelectionCard({
     medium,
     config,
     value,
+    canDeleteCard,
+    onDeleteCard,
     onChange,
     onAutoPickChange,
     onOpenManualPicker,
@@ -15535,6 +15596,8 @@ function MultipartSelectionCard({
     medium: ContentMedium;
     config: MultipartConfig;
     value: MultipartSelectionState;
+    canDeleteCard: boolean;
+    onDeleteCard: () => void;
     onChange: (value: MultipartSelectionState) => void;
     onAutoPickChange: (enabled: boolean) => void;
     onOpenManualPicker: (rowId: string) => void;
@@ -15625,6 +15688,20 @@ function MultipartSelectionCard({
                         className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-500/30 dark:bg-slate-900 dark:text-brand-200 dark:hover:bg-brand-500/10"
                     >
                         <PlusIcon className="size-4" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onDeleteCard}
+                        disabled={!canDeleteCard}
+                        aria-label="Delete multipart card"
+                        title={
+                            canDeleteCard
+                                ? 'Delete multipart card'
+                                : 'At least one card is required'
+                        }
+                        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10"
+                    >
+                        <Trash2Icon className="size-4" />
                     </button>
                 </div>
             </div>
