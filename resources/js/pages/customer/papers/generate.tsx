@@ -1063,7 +1063,7 @@ function currentMultipartSelection(
                   }))
             : [];
     const rows =
-        existingRows.length >= 2
+        existingRows.length >= 1
             ? existingRows.slice(0, config.maxParts)
             : [1, 2].map((index) =>
                   createMultipartPartRow(`multipart_part_${index}`, null),
@@ -3595,7 +3595,7 @@ export default function GeneratePaper({
         !multipartConfig ||
         configuredMultipartSelections.every(
             (selection) =>
-                selection.rows.length >= 2 &&
+                selection.rows.length >= 1 &&
                 selection.rows.every(
                     (row) =>
                         typeof row.questionTypeId === 'number' &&
@@ -7038,9 +7038,9 @@ export default function GeneratePaper({
             const newSections: GeneratedPaperSection[] = [];
 
             for (const [cardIndex, card] of values.cards.entries()) {
-                if (card.parts.length < 2) {
+                if (card.parts.length < 1) {
                     throw new Error(
-                        `Multipart question ${cardIndex + 1} needs at least two parts.`,
+                        `Multipart question ${cardIndex + 1} needs at least one part.`,
                     );
                 }
 
@@ -10045,7 +10045,7 @@ function AddMultipartPaperSectionModal({
     const configuredSelections = selections.filter(multipartSelectionHasInput);
     const hasIncompleteCard = configuredSelections.some(
         (selection) =>
-            selection.rows.length < 2 ||
+            selection.rows.length < 1 ||
             selection.rows.some(
                 (row) =>
                     row.questionTypeId === null ||
@@ -11577,7 +11577,7 @@ function AddSpecialPaperSectionModal({
         activeQuestionTypeId !== null && hasScope && !loadingQuestions;
     const multipartReady =
         multipartConfig !== null &&
-        parts.length >= 2 &&
+        parts.length >= 1 &&
         parts.every(
             (part) =>
                 toNumber(part.questionTypeId) > 0 &&
@@ -12252,7 +12252,7 @@ function AddSpecialPaperSectionModal({
                                         </button>
                                         <button
                                             type="button"
-                                            disabled={parts.length <= 2}
+                                            disabled={parts.length <= 1}
                                             onClick={() =>
                                                 setParts((current) => {
                                                     const next = current.filter(
@@ -15544,7 +15544,7 @@ function MultipartSelectionCard({
         label: medium === 'Urdu' ? type.nameUrdu || type.name : type.name,
     }));
     const canAddPart = value.rows.length < config.maxParts;
-    const canDeletePart = value.rows.length > 2;
+    const canDeletePart = value.rows.length > 1;
 
     const updateRows = (rows: MultipartPartRow[]) => {
         const configuredRows = rows.filter(
@@ -15577,7 +15577,13 @@ function MultipartSelectionCard({
             return;
         }
 
-        const nextIndex = value.rows.length + 1;
+        const nextIndex =
+            Math.max(
+                0,
+                ...value.rows.map((row) =>
+                    Number(row.id.match(/^multipart_part_(\d+)$/)?.[1] ?? 0),
+                ),
+            ) + 1;
         updateRows([
             ...value.rows,
             createMultipartPartRow(`multipart_part_${nextIndex}`, null),
@@ -15712,7 +15718,7 @@ function MultipartSelectionCard({
                                 title={
                                     canDeletePart
                                         ? 'Delete part'
-                                        : 'At least two parts are required'
+                                        : 'At least one part is required'
                                 }
                                 className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-rose-500/30 dark:hover:bg-rose-500/10"
                             >
