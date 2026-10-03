@@ -6,6 +6,7 @@ use App\Models\Chapter;
 use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\Topic;
+use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -24,8 +25,6 @@ class QuestionBulkImportRequest extends FormRequest
 
         if ($this->routeIs('superadmin.questions.import.preview')) {
             $fileRules[0] = 'required';
-        } elseif (! filled($this->input('preview_token'))) {
-            $fileRules[0] = 'required';
         }
 
         return [
@@ -34,7 +33,14 @@ class QuestionBulkImportRequest extends FormRequest
             'topic_id' => ['nullable', 'integer', Rule::exists('topics', 'id')],
             'source' => ['nullable', 'string', 'max:100', Rule::in(Question::sourceValues())],
             'status' => ['required', 'boolean'],
-            'preview_token' => ['nullable', 'string', 'max:120'],
+            'medium_id' => ['nullable', 'integer', Rule::exists('mediums', 'id')],
+            'preview_token' => $this->routeIs('superadmin.questions.import.store')
+                ? ['required', 'uuid']
+                : ['nullable', 'uuid'],
+            'selected_row_numbers' => $this->routeIs('superadmin.questions.import.store')
+                ? ['required', 'array', 'min:1', 'max:1000']
+                : ['prohibited'],
+            'selected_row_numbers.*' => ['integer', 'min:2', 'distinct'],
             'file' => $fileRules,
         ];
     }
@@ -43,6 +49,21 @@ class QuestionBulkImportRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             $questionType = QuestionType::query()->find($this->input('question_type_id'));
+            $chapter = Chapter::query()->with([
+                'subject:id,subject_type',
+                'topics' => fn ($query) => $query
+                    ->where('status', 1)
+                    ->select('id', 'chapter_id'),
+            ])->find($this->input('chapter_id'));
+
+            if ($questionType && $chapter) {
+                $questionType = QuestionTypeHeadingResolver::one(
+                    $questionType,
+                    (int) $chapter->pattern_id,
+                    (int) $chapter->class_id,
+                    (int) $chapter->subject_id,
+                );
+            }
 
             if ($questionType && ! QuestionTypeSchemaRegistry::supportsSimpleImport($questionType)) {
                 $validator->errors()->add(
@@ -50,13 +71,6 @@ class QuestionBulkImportRequest extends FormRequest
                     'Bulk import currently supports only simple single-prompt question types.',
                 );
             }
-
-            $chapter = Chapter::query()->with([
-                'subject:id,subject_type',
-                'topics' => fn ($query) => $query
-                    ->where('status', 1)
-                    ->select('id', 'chapter_id'),
-            ])->find($this->input('chapter_id'));
 
             if (! $chapter) {
                 return;
@@ -103,6 +117,9 @@ class QuestionBulkImportRequest extends FormRequest
             'source' => Question::normalizeSource($this->input('source')),
             'preview_token' => $this->normalizeNullableString($this->input('preview_token')),
             'status' => $this->boolean('status'),
+            'medium_id' => filled($this->input('medium_id'))
+                ? (int) $this->input('medium_id')
+                : null,
         ]);
     }
 

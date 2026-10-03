@@ -26,6 +26,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -380,12 +381,14 @@ class QuestionController extends Controller
             'questionTypes' => $this->questionTypeFormOptions(),
             'chapters' => $this->chapterFormOptions(),
             'sourceOptions' => $this->sourceOptions(),
+            'mediumOptions' => $this->mediumOptions(),
             'defaults' => [
                 'question_type_id' => (string) $request->query('question_type_id', ''),
                 'chapter_id' => (string) $request->query('chapter_id', ''),
                 'topic_id' => (string) $request->query('topic_id', ''),
                 'source' => (string) $request->query('source', ''),
                 'status' => in_array($status, ['0', '1'], true) ? $status : '1',
+                'medium_id' => (string) $request->query('medium_id', ''),
             ],
             'lockedChapterId' => null,
             'backHref' => '/superadmin/questions',
@@ -461,12 +464,14 @@ class QuestionController extends Controller
             'questionTypes' => $this->questionTypeFormOptions(),
             'chapters' => $this->chapterFormOptions(includeInactive: true),
             'sourceOptions' => $this->sourceOptions(),
+            'mediumOptions' => $this->mediumOptions(),
             'defaults' => [
                 'question_type_id' => (string) $request->query('question_type_id', ''),
                 'chapter_id' => (string) $chapter->id,
                 'topic_id' => (string) $request->query('topic_id', ''),
                 'source' => (string) $request->query('source', ''),
                 'status' => in_array($status, ['0', '1'], true) ? $status : '1',
+                'medium_id' => (string) $request->query('medium_id', ''),
             ],
             'lockedChapterId' => $chapter->id,
             'backHref' => route('superadmin.subjects.chapters.questions', [$subject, $chapter], false),
@@ -495,11 +500,12 @@ class QuestionController extends Controller
             topic: $topic,
             defaultSource: $validated['source'] ?? null,
             defaultStatus: $validated['status'],
+            mediumId: $validated['medium_id'] ?? null,
         );
 
         $redirect = $this->importRedirect($request, $validated);
 
-        if ($preview['status'] !== 'success') {
+        if ($preview['total_rows'] === 0) {
             return $redirect->with(
                 'question_import_preview',
                 Arr::except($preview, ['records']),
@@ -514,15 +520,46 @@ class QuestionController extends Controller
             'topic_id' => $topic?->id,
             'source' => $validated['source'] ?? null,
             'status' => $validated['status'],
+            'medium_id' => $validated['medium_id'] ?? null,
             'records' => $preview['records'],
+            'rows' => $preview['rows'],
+            'total_rows' => $preview['total_rows'],
+            'ready_rows' => $preview['ready_rows'],
+            'failed_rows' => $preview['failed_rows'],
+            'duplicate_rows' => $preview['duplicate_rows'],
         ]);
 
         return $redirect
             ->with(
                 'question_import_preview',
-                Arr::except($preview, ['records']),
+                [
+                    ...Arr::except($preview, ['records', 'rows']),
+                    'rows' => array_slice($preview['rows'], 0, QuestionBulkImporter::PREVIEW_PAGE_SIZE),
+                ],
             )
             ->with('question_import_preview_token', $token);
+    }
+
+    public function previewImportRows(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'preview_token' => ['required', 'uuid'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $preview = $this->findImportPreview($request, $validated['preview_token']);
+        abort_unless($preview, 404);
+
+        $page = (int) ($validated['page'] ?? 1);
+
+        return response()->json([
+            'rows' => array_slice(
+                $preview['rows'],
+                ($page - 1) * QuestionBulkImporter::PREVIEW_PAGE_SIZE,
+                QuestionBulkImporter::PREVIEW_PAGE_SIZE,
+            ),
+            'page' => $page,
+            'page_count' => (int) ceil($preview['total_rows'] / QuestionBulkImporter::PREVIEW_PAGE_SIZE),
+        ]);
     }
 
     public function storeImport(
@@ -531,29 +568,35 @@ class QuestionController extends Controller
     ): RedirectResponse {
         $validated = $request->validated();
 
-        if ($validated['preview_token'] ?? null) {
-            return $this->storeImportFromPreview($request, $importer, $validated);
-        }
-
-        [$questionType, $chapter, $topic] = $this->resolveImportContext($validated);
-
-        $report = $importer->import(
-            file: $request->file('file'),
-            questionType: $questionType,
-            chapter: $chapter,
-            topic: $topic,
-            defaultSource: $validated['source'] ?? null,
-            defaultStatus: $validated['status'],
-            creatorId: auth()->id(),
-        );
-
-        return $this->importRedirect($request, $validated)
-            ->with('question_import_report', $report);
+        return $this->storeImportFromPreview($request, $importer, $validated);
     }
 
-    public function downloadImportTemplate(QuestionBulkImporter $importer): StreamedResponse
+    public function downloadImportTemplate(Request $request, QuestionBulkImporter $importer): StreamedResponse
     {
-        $headers = $importer->templateHeaders();
+        $validated = $request->validate([
+            'question_type_id' => ['required', 'integer', 'exists:question_types,id'],
+            'chapter_id' => ['required', 'integer', 'exists:chapters,id'],
+            'format' => ['required', 'in:csv,xlsx'],
+        ]);
+        $questionType = QuestionType::query()->findOrFail($validated['question_type_id']);
+        $chapter = Chapter::query()->findOrFail($validated['chapter_id']);
+        $questionType = QuestionTypeHeadingResolver::one(
+            $questionType,
+            (int) $chapter->pattern_id,
+            (int) $chapter->class_id,
+            (int) $chapter->subject_id,
+        );
+        abort_unless(QuestionTypeSchemaRegistry::supportsSimpleImport($questionType), 422);
+        $headers = $importer->templateHeaders($questionType);
+
+        if ($validated['format'] === 'csv') {
+            return response()->streamDownload(function () use ($headers): void {
+                $stream = fopen('php://output', 'w');
+                fwrite($stream, "\xEF\xBB\xBF");
+                fputcsv($stream, $headers);
+                fclose($stream);
+            }, 'question-import-template.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
 
         return response()->streamDownload(function () use ($headers): void {
             $spreadsheet = new Spreadsheet;
@@ -812,7 +855,7 @@ class QuestionController extends Controller
         QuestionBulkImporter $importer,
         array $validated,
     ): RedirectResponse {
-        $preview = $this->pullImportPreview($request, $validated['preview_token']);
+        $preview = $this->findImportPreview($request, $validated['preview_token']);
 
         if (! is_array($preview)) {
             return $this->importRedirect($request, $validated)
@@ -822,6 +865,38 @@ class QuestionController extends Controller
                     'imported_rows' => 0,
                     'failed_rows' => 0,
                     'errors' => ['Preview expired. Preview the file again.'],
+                ]);
+        }
+
+        if (
+            (int) $validated['question_type_id'] !== (int) $preview['question_type_id']
+            || (int) $validated['chapter_id'] !== (int) $preview['chapter_id']
+            || (int) ($validated['topic_id'] ?? 0) !== (int) ($preview['topic_id'] ?? 0)
+            || ($validated['source'] ?? null) !== ($preview['source'] ?? null)
+            || (int) $validated['status'] !== (int) $preview['status']
+            || (int) ($validated['medium_id'] ?? 0) !== (int) ($preview['medium_id'] ?? 0)
+        ) {
+            return $this->importRedirect($request, $validated)
+                ->with('question_import_report', [
+                    'status' => 'error',
+                    'total_rows' => 0,
+                    'imported_rows' => 0,
+                    'failed_rows' => 0,
+                    'errors' => ['Import settings changed. Preview the file again.'],
+                ]);
+        }
+
+        $selectedRowNumbers = collect($validated['selected_row_numbers'])->map(fn ($number) => (int) $number)->all();
+        $validRowNumbers = array_column($preview['records'], 'row_number');
+
+        if (array_diff($selectedRowNumbers, $validRowNumbers) !== []) {
+            return $this->importRedirect($request, $validated)
+                ->with('question_import_report', [
+                    'status' => 'error',
+                    'total_rows' => 0,
+                    'imported_rows' => 0,
+                    'failed_rows' => 0,
+                    'errors' => ['Selection is invalid. Preview the file again.'],
                 ]);
         }
 
@@ -850,12 +925,22 @@ class QuestionController extends Controller
             (int) $chapter->subject_id,
         );
 
+        $this->forgetImportPreview($request, $validated['preview_token']);
+        $selectedRecords = collect($preview['records'])
+            ->filter(fn (array $record) => in_array($record['row_number'], $selectedRowNumbers, true))
+            ->values()
+            ->all();
+
         $report = $importer->importRecords(
-            records: $preview['records'] ?? [],
+            records: $selectedRecords,
             questionType: $questionType,
             chapter: $chapter,
             topic: $topic,
             creatorId: auth()->id(),
+            totalRows: $preview['total_rows'],
+            failedRows: $preview['failed_rows'] - $preview['duplicate_rows'],
+            unselectedRows: $preview['ready_rows'] - count($selectedRecords),
+            previewDuplicateRows: $preview['duplicate_rows'],
         );
 
         return $this->importRedirect($request, $preview)
@@ -896,6 +981,7 @@ class QuestionController extends Controller
             'topic_id' => $topicId ? (string) $topicId : null,
             'source' => $values['source'] ?? null,
             'status' => (string) ((int) ($values['status'] ?? 1)),
+            'medium_id' => isset($values['medium_id']) ? (string) $values['medium_id'] : null,
         ];
     }
 
@@ -918,33 +1004,27 @@ class QuestionController extends Controller
 
     private function storeImportPreview(Request $request, string $token, array $preview): void
     {
-        $previews = $request->session()->get('question_import_previews', []);
-        $previews[$token] = $preview;
-
-        $request->session()->put('question_import_previews', $previews);
+        Cache::put('question-import-preview:'.$token, [
+            ...$preview,
+            'user_id' => (int) $request->user()->id,
+        ], now()->addMinutes(30));
     }
 
-    private function pullImportPreview(Request $request, string $token): ?array
+    private function findImportPreview(Request $request, string $token): ?array
     {
-        $previews = $request->session()->get('question_import_previews', []);
-        $preview = $previews[$token] ?? null;
+        $preview = Cache::get('question-import-preview:'.$token);
 
-        unset($previews[$token]);
-        $request->session()->put('question_import_previews', $previews);
-
-        return is_array($preview) ? $preview : null;
+        return is_array($preview)
+            && ($preview['user_id'] ?? null) === (int) $request->user()->id
+                ? $preview
+                : null;
     }
 
     private function forgetImportPreview(Request $request, string $token): void
     {
-        $previews = $request->session()->get('question_import_previews', []);
-
-        if (! array_key_exists($token, $previews)) {
-            return;
+        if ($this->findImportPreview($request, $token)) {
+            Cache::forget('question-import-preview:'.$token);
         }
-
-        unset($previews[$token]);
-        $request->session()->put('question_import_previews', $previews);
     }
 
     private function questionTypeFormOptions(bool $includeInactive = false): Collection
@@ -961,6 +1041,7 @@ class QuestionController extends Controller
                 'options_only',
                 'is_single',
                 'have_answer',
+                'have_description',
                 'schema_key',
                 'objective_type_id',
                 'column_per_row',
@@ -1361,6 +1442,7 @@ class QuestionController extends Controller
                         'class_id' => $rule->class_id === null ? null : (int) $rule->class_id,
                         'subject_id' => $rule->subject_id === null ? null : (int) $rule->subject_id,
                         'schema_key' => $rule->schema_key,
+                        'supports_simple_import' => QuestionTypeSchemaRegistry::supportsSimpleImportSchema($rule->schema_key),
                         'schema' => QuestionTypeSchemaRegistry::resolve(
                             $rule->schema_key,
                             (bool) $questionType->is_objective,

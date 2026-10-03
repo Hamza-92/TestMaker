@@ -11,6 +11,7 @@ import {
     PencilIcon,
     SearchIcon,
     Trash2Icon,
+    UploadIcon,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlusIcon from '@/components/icons/PlusIcon';
@@ -524,6 +525,9 @@ export default function Questions({
         : chapterId
           ? `/superadmin/questions/chapters/${chapterId}/add`
           : '/superadmin/questions/add';
+    const importHref = chapterId
+        ? `/superadmin/questions/import?chapter_id=${chapterId}${topicId ? `&topic_id=${topicId}` : ''}`
+        : '/superadmin/questions/import';
 
     // ── Chapter label helper ──────────────────────────────────────────────────
     const chapterLabel = (c: ChapterOption) => {
@@ -640,7 +644,7 @@ export default function Questions({
                             </p>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         {sortingEnabled ? (
                             <>
                                 <Button
@@ -692,6 +696,14 @@ export default function Questions({
                             >
                                 <ArrowUpDownIcon className="size-4" />
                                 Sort
+                            </Button>
+                        )}
+                        {!sortingEnabled && can('questions.import') && (
+                            <Button asChild variant="outline">
+                                <Link href={importHref}>
+                                    <UploadIcon className="size-4" />
+                                    Import Questions
+                                </Link>
                             </Button>
                         )}
                         {!sortingEnabled &&
@@ -890,7 +902,7 @@ export default function Questions({
                         {/* Table toolbar */}
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="relative min-w-48 flex-1">
-                                <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                                 <input
                                     type="text"
                                     placeholder="Search questions…"
@@ -900,7 +912,7 @@ export default function Questions({
                                         setSearch(e.target.value);
                                         setPage(1);
                                     }}
-                                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 pl-9 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 pl-9 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 />
                             </div>
                             <Select
@@ -1083,7 +1095,7 @@ export default function Questions({
                                                                 />
                                                             </td>
                                                         )}
-                                                    <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
+                                                    <td className="px-3 py-3 text-xs tabular-nums text-muted-foreground">
                                                         <span className="inline-flex items-center gap-1.5">
                                                             {sortingEnabled && (
                                                                 <GripVerticalIcon className="size-4" />

@@ -21,7 +21,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import type { ChapterOption, QuestionTypeOption, SourceOption } from './form';
+import type {
+    ChapterOption,
+    MediumOption,
+    QuestionTypeOption,
+    SourceOption,
+} from './form';
 
 interface PatternFilterOption {
     id: number;
@@ -46,6 +51,7 @@ interface ImportDefaults {
     topic_id: string;
     source: string;
     status: string;
+    medium_id: string;
 }
 
 interface ImportReport {
@@ -53,11 +59,15 @@ interface ImportReport {
     total_rows: number;
     imported_rows: number;
     failed_rows: number;
+    unselected_rows?: number;
+    duplicate_rows?: number;
     errors: string[];
 }
 
 interface PreviewRow {
     row_number: number;
+    valid: boolean;
+    issues: string[];
     statement_en: string | null;
     statement_ur: string | null;
     description_en: string | null;
@@ -65,7 +75,7 @@ interface PreviewRow {
     answer_en: string | null;
     answer_ur: string | null;
     source: string | null;
-    status: number;
+    status: number | null;
     options: Array<{
         text_en: string | null;
         text_ur: string | null;
@@ -79,6 +89,8 @@ interface ImportPreview {
     total_rows: number;
     ready_rows: number;
     failed_rows: number;
+    duplicate_rows: number;
+    valid_row_numbers: number[];
     errors: string[];
     rows: PreviewRow[];
 }
@@ -89,6 +101,7 @@ interface ImportFormData {
     topic_id: string;
     source: string;
     status: string;
+    medium_id: string;
     preview_token: string;
     file: File | null;
     [key: string]: File | null | string;
@@ -150,6 +163,41 @@ function chapterTitle(chapter: ChapterOption) {
     return chapter.group_name ? `${chapter.group_name} / ${title}` : title;
 }
 
+function supportsImportForChapter(
+    questionType: QuestionTypeOption,
+    chapter: ChapterOption | null,
+) {
+    if (!chapter) {
+        return (
+            questionType.supports_simple_import ||
+            questionType.scope_rules.some((rule) => rule.supports_simple_import)
+        );
+    }
+
+    const scopedRule = questionType.scope_rules
+        .filter(
+            (rule) =>
+                rule.pattern_id === chapter.pattern.id &&
+                (rule.class_id === null ||
+                    rule.class_id === chapter.class.id) &&
+                (rule.subject_id === null ||
+                    rule.subject_id === chapter.subject.id),
+        )
+        .sort(
+            (left, right) =>
+                Number(left.class_id !== null) -
+                    Number(right.class_id !== null) ||
+                Number(left.subject_id !== null) -
+                    Number(right.subject_id !== null),
+        )
+        .at(-1);
+
+    return (
+        scopedRule?.supports_simple_import ??
+        questionType.supports_simple_import
+    );
+}
+
 function truncateText(value: string, maxLength = 100) {
     return value.length > maxLength
         ? `${value.slice(0, maxLength - 1)}...`
@@ -178,7 +226,7 @@ function previewSubline(row: PreviewRow) {
     );
 }
 
-function statusBadge(status: number) {
+function statusBadge(status: number | null) {
     return status === 1 ? (
         <Badge
             variant="outline"
@@ -202,6 +250,7 @@ export default function ImportQuestions({
     questionTypes,
     chapters,
     sourceOptions,
+    mediumOptions,
     defaults,
     lockedChapterId,
     backHref = '/superadmin/questions',
@@ -212,6 +261,7 @@ export default function ImportQuestions({
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
     sourceOptions: SourceOption[];
+    mediumOptions: MediumOption[];
     defaults: ImportDefaults;
     lockedChapterId?: number | null;
     backHref?: string;
@@ -225,6 +275,7 @@ export default function ImportQuestions({
         topic_id: defaults.topic_id,
         source: defaults.source,
         status: defaults.status,
+        medium_id: defaults.medium_id,
         preview_token: previewToken ?? '',
         file: null,
     });
@@ -235,6 +286,14 @@ export default function ImportQuestions({
         previewToken ?? '',
     );
     const [isImporting, setIsImporting] = useState(false);
+    const [selectedRowNumbers, setSelectedRowNumbers] = useState<Set<number>>(
+        () => new Set(preview?.valid_row_numbers ?? []),
+    );
+    const [visibleRows, setVisibleRows] = useState<PreviewRow[]>(
+        preview?.rows ?? [],
+    );
+    const [previewPage, setPreviewPage] = useState(1);
+    const [loadingPreviewPage, setLoadingPreviewPage] = useState(false);
     const isChapterLocked =
         lockedChapterId !== null && lockedChapterId !== undefined;
 
@@ -253,7 +312,7 @@ export default function ImportQuestions({
     );
     const importUnsupported =
         selectedQuestionType !== null &&
-        !selectedQuestionType.supports_simple_import;
+        !supportsImportForChapter(selectedQuestionType, selectedChapter);
 
     const [patternFilter, setPatternFilter] = useState(() =>
         selectedChapter ? String(selectedChapter.pattern.id) : 'all',
@@ -357,18 +416,25 @@ export default function ImportQuestions({
     const availableTopics = usesTopicSelection
         ? (selectedChapter?.topics ?? [])
         : [];
-    const previewRows = activePreview?.rows ?? [];
+    const previewRows = visibleRows;
+    const previewPageCount = Math.ceil((activePreview?.total_rows ?? 0) / 25);
 
     const clearPreview = () => {
         setActivePreview(null);
         setActivePreviewToken('');
         form.setData('preview_token', '');
+        setSelectedRowNumbers(new Set());
+        setVisibleRows([]);
+        setPreviewPage(1);
     };
 
     useEffect(() => {
         setActivePreview(preview);
         setActivePreviewToken(previewToken ?? '');
         form.setData('preview_token', previewToken ?? '');
+        setSelectedRowNumbers(new Set(preview?.valid_row_numbers ?? []));
+        setVisibleRows(preview?.rows ?? []);
+        setPreviewPage(1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [preview, previewToken]);
 
@@ -432,7 +498,11 @@ export default function ImportQuestions({
     };
 
     const handleImport = () => {
-        if (!activePreviewToken || activePreview?.status !== 'success') {
+        if (
+            !activePreviewToken ||
+            activePreview?.status !== 'success' ||
+            selectedRowNumbers.size === 0
+        ) {
             return;
         }
 
@@ -445,7 +515,9 @@ export default function ImportQuestions({
                 topic_id: form.data.topic_id,
                 source: form.data.source,
                 status: form.data.status,
+                medium_id: form.data.medium_id,
                 preview_token: activePreviewToken,
+                selected_row_numbers: [...selectedRowNumbers],
                 chapter_scoped: isChapterLocked ? '1' : '0',
             },
             {
@@ -455,11 +527,55 @@ export default function ImportQuestions({
         );
     };
 
+    const loadPreviewPage = async (page: number) => {
+        if (!activePreviewToken || page < 1 || page > previewPageCount) {
+            return;
+        }
+
+        setLoadingPreviewPage(true);
+
+        try {
+            const response = await fetch(
+                `/superadmin/questions/import/preview-rows?preview_token=${encodeURIComponent(activePreviewToken)}&page=${page}`,
+                { credentials: 'same-origin' },
+            );
+
+            if (!response.ok) {
+                throw new Error('Preview expired. Upload the file again.');
+            }
+
+            const result = (await response.json()) as {
+                rows: PreviewRow[];
+                page: number;
+            };
+            setVisibleRows(result.rows);
+            setPreviewPage(result.page);
+        } catch {
+            clearPreview();
+        } finally {
+            setLoadingPreviewPage(false);
+        }
+    };
+
+    const toggleRow = (rowNumber: number) => {
+        setSelectedRowNumbers((current) => {
+            const next = new Set(current);
+
+            if (next.has(rowNumber)) {
+                next.delete(rowNumber);
+            } else {
+                next.add(rowNumber);
+            }
+
+            return next;
+        });
+    };
+
     return (
         <>
             <Head title="Bulk Import Questions" />
 
-            <div className="mx-auto w-full max-w-5xl min-w-0 space-y-6 p-4 md:p-6">
+            <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6 p-4 md:p-6">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-4">
                         <Link
@@ -488,17 +604,53 @@ export default function ImportQuestions({
                         </div>
                     </div>
 
-                    <Button asChild variant="outline" className="sm:shrink-0">
-                        <a href="/superadmin/questions/import/template">
-                            <DownloadIcon className="size-4" />
-                            Download Template
-                        </a>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        {(['csv', 'xlsx'] as const).map((format) => (
+                            <Button
+                                key={format}
+                                asChild
+                                variant="outline"
+                                className="sm:shrink-0"
+                                disabled={
+                                    !selectedQuestionType ||
+                                    !selectedChapter ||
+                                    importUnsupported
+                                }
+                            >
+                                <a
+                                    href={
+                                        selectedQuestionType &&
+                                        selectedChapter &&
+                                        !importUnsupported
+                                            ? `/superadmin/questions/import/template?question_type_id=${selectedQuestionType.id}&chapter_id=${selectedChapter.id}&format=${format}`
+                                            : undefined
+                                    }
+                                    aria-disabled={
+                                        !selectedQuestionType ||
+                                        !selectedChapter ||
+                                        importUnsupported
+                                    }
+                                    onClick={(event) => {
+                                        if (
+                                            !selectedQuestionType ||
+                                            !selectedChapter ||
+                                            importUnsupported
+                                        ) {
+                                            event.preventDefault();
+                                        }
+                                    }}
+                                >
+                                    <DownloadIcon className="size-4" />
+                                    {format.toUpperCase()} template
+                                </a>
+                            </Button>
+                        ))}
+                    </div>
                 </div>
 
                 {report ? (
                     <div className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-4">
+                        <div className="grid gap-4 md:grid-cols-5">
                             <div className="rounded-xl border p-4 shadow-sm">
                                 <p className="text-xs text-muted-foreground">
                                     Status
@@ -525,10 +677,19 @@ export default function ImportQuestions({
                             </div>
                             <div className="rounded-xl border p-4 shadow-sm">
                                 <p className="text-xs text-muted-foreground">
-                                    Issues
+                                    Invalid
                                 </p>
                                 <p className="mt-1 font-semibold">
                                     {report.failed_rows}
+                                </p>
+                            </div>
+                            <div className="rounded-xl border p-4 shadow-sm">
+                                <p className="text-xs text-muted-foreground">
+                                    Unselected / duplicates
+                                </p>
+                                <p className="mt-1 font-semibold">
+                                    {report.unselected_rows ?? 0} /{' '}
+                                    {report.duplicate_rows ?? 0}
                                 </p>
                             </div>
                         </div>
@@ -544,7 +705,7 @@ export default function ImportQuestions({
 
                 {activePreview ? (
                     <div className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-4">
+                        <div className="grid gap-4 md:grid-cols-5">
                             <div className="rounded-xl border p-4 shadow-sm">
                                 <p className="text-xs text-muted-foreground">
                                     Preview
@@ -575,6 +736,14 @@ export default function ImportQuestions({
                                 </p>
                                 <p className="mt-1 font-semibold">
                                     {activePreview.failed_rows}
+                                </p>
+                            </div>
+                            <div className="rounded-xl border p-4 shadow-sm">
+                                <p className="text-xs text-muted-foreground">
+                                    Selected
+                                </p>
+                                <p className="mt-1 font-semibold">
+                                    {selectedRowNumbers.size}
                                 </p>
                             </div>
                         </div>
@@ -612,6 +781,34 @@ export default function ImportQuestions({
                                                 </Badge>
                                             ) : null}
                                         </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setSelectedRowNumbers(
+                                                        new Set(
+                                                            activePreview.valid_row_numbers,
+                                                        ),
+                                                    )
+                                                }
+                                            >
+                                                Select all valid
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setSelectedRowNumbers(
+                                                        new Set(),
+                                                    )
+                                                }
+                                            >
+                                                Clear selection
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     <div className="overflow-hidden rounded-xl border">
@@ -619,6 +816,9 @@ export default function ImportQuestions({
                                             <table className="w-full text-sm">
                                                 <thead>
                                                     <tr className="border-b bg-muted/40">
+                                                        <th className="w-12 px-4 py-3 text-left font-medium text-muted-foreground">
+                                                            Use
+                                                        </th>
                                                         <th className="w-20 px-4 py-3 text-left font-medium text-muted-foreground">
                                                             Row
                                                         </th>
@@ -645,6 +845,23 @@ export default function ImportQuestions({
                                                                 }
                                                                 className={`transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-accent/50`}
                                                             >
+                                                                <td className="px-4 py-3">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        aria-label={`Import row ${row.row_number}`}
+                                                                        checked={selectedRowNumbers.has(
+                                                                            row.row_number,
+                                                                        )}
+                                                                        disabled={
+                                                                            !row.valid
+                                                                        }
+                                                                        onChange={() =>
+                                                                            toggleRow(
+                                                                                row.row_number,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </td>
                                                                 <td className="px-4 py-3 font-medium tabular-nums">
                                                                     {
                                                                         row.row_number
@@ -658,6 +875,105 @@ export default function ImportQuestions({
                                                                             ),
                                                                         )}
                                                                     </p>
+                                                                    {row.issues
+                                                                        .length >
+                                                                    0 ? (
+                                                                        <p className="mt-1 text-xs text-destructive">
+                                                                            {row.issues.join(
+                                                                                ' ',
+                                                                            )}
+                                                                        </p>
+                                                                    ) : null}
+                                                                    <details className="mt-2 text-xs">
+                                                                        <summary className="cursor-pointer text-primary">
+                                                                            View
+                                                                            full
+                                                                            question
+                                                                        </summary>
+                                                                        <div className="mt-2 space-y-1 whitespace-pre-wrap break-words">
+                                                                            {row.statement_en && (
+                                                                                <p>
+                                                                                    English:{' '}
+                                                                                    {
+                                                                                        row.statement_en
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {row.statement_ur && (
+                                                                                <p dir="rtl">
+                                                                                    Urdu:{' '}
+                                                                                    {
+                                                                                        row.statement_ur
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {row.description_en && (
+                                                                                <p>
+                                                                                    Guidance:{' '}
+                                                                                    {
+                                                                                        row.description_en
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {row.description_ur && (
+                                                                                <p dir="rtl">
+                                                                                    Guidance:{' '}
+                                                                                    {
+                                                                                        row.description_ur
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {row.answer_en && (
+                                                                                <p>
+                                                                                    Answer:{' '}
+                                                                                    {
+                                                                                        row.answer_en
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {row.answer_ur && (
+                                                                                <p dir="rtl">
+                                                                                    Answer:{' '}
+                                                                                    {
+                                                                                        row.answer_ur
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                            {row.options.map(
+                                                                                (
+                                                                                    option,
+                                                                                ) => (
+                                                                                    <div
+                                                                                        key={
+                                                                                            option.sort_order
+                                                                                        }
+                                                                                    >
+                                                                                        <p>
+                                                                                            Option{' '}
+                                                                                            {
+                                                                                                option.sort_order
+                                                                                            }
+                                                                                            {option.is_correct
+                                                                                                ? ' (correct)'
+                                                                                                : ''}
+
+                                                                                            :{' '}
+                                                                                            {option.text_en ||
+                                                                                                option.text_ur}
+                                                                                        </p>
+                                                                                        {option.text_en &&
+                                                                                            option.text_ur && (
+                                                                                                <p dir="rtl">
+                                                                                                    {
+                                                                                                        option.text_ur
+                                                                                                    }
+                                                                                                </p>
+                                                                                            )}
+                                                                                    </div>
+                                                                                ),
+                                                                            )}
+                                                                        </div>
+                                                                    </details>
                                                                     {previewSubline(
                                                                         row,
                                                                     ) ? (
@@ -727,6 +1043,47 @@ export default function ImportQuestions({
                                             </table>
                                         </div>
                                     </div>
+                                    {previewPageCount > 1 && (
+                                        <div className="flex items-center justify-end gap-3">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={
+                                                    loadingPreviewPage ||
+                                                    previewPage <= 1
+                                                }
+                                                onClick={() =>
+                                                    void loadPreviewPage(
+                                                        previewPage - 1,
+                                                    )
+                                                }
+                                            >
+                                                Previous
+                                            </Button>
+                                            <span className="text-sm">
+                                                Page {previewPage} of{' '}
+                                                {previewPageCount}
+                                            </span>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={
+                                                    loadingPreviewPage ||
+                                                    previewPage >=
+                                                        previewPageCount
+                                                }
+                                                onClick={() =>
+                                                    void loadPreviewPage(
+                                                        previewPage + 1,
+                                                    )
+                                                }
+                                            >
+                                                Next
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             </SectionCard>
                         ) : null}
@@ -767,27 +1124,27 @@ export default function ImportQuestions({
                                             <SelectItem value="none">
                                                 Select type
                                             </SelectItem>
-                                            {questionTypes.map((item) => (
-                                                <SelectItem
-                                                    key={item.id}
-                                                    value={String(item.id)}
-                                                    disabled={
-                                                        !item.supports_simple_import
-                                                    }
-                                                >
-                                                    {item.supports_simple_import
-                                                        ? item.name
-                                                        : `${item.name} (manual only)`}
-                                                </SelectItem>
-                                            ))}
+                                            {questionTypes.map((item) => {
+                                                const importable =
+                                                    supportsImportForChapter(
+                                                        item,
+                                                        selectedChapter,
+                                                    );
+
+                                                return (
+                                                    <SelectItem
+                                                        key={item.id}
+                                                        value={String(item.id)}
+                                                        disabled={!importable}
+                                                    >
+                                                        {importable
+                                                            ? item.name
+                                                            : `${item.name} (manual only)`}
+                                                    </SelectItem>
+                                                );
+                                            })}
                                         </SelectContent>
                                     </Select>
-                                    <p className="text-xs text-muted-foreground">
-                                        Flat bulk import currently supports
-                                        standard MCQ, true/false, blank without
-                                        options, and standard subjective
-                                        questions.
-                                    </p>
                                     {importUnsupported ? (
                                         <p className="text-xs text-destructive">
                                             This question type needs the manual
@@ -1073,6 +1430,36 @@ export default function ImportQuestions({
                                 </Select>
                             </Field>
 
+                            <Field label="Medium" error={form.errors.medium_id}>
+                                <Select
+                                    value={form.data.medium_id || 'none'}
+                                    onValueChange={(value) => {
+                                        clearPreview();
+                                        form.setData(
+                                            'medium_id',
+                                            value === 'none' ? '' : value,
+                                        );
+                                    }}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select medium" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Default
+                                        </SelectItem>
+                                        {mediumOptions.map((medium) => (
+                                            <SelectItem
+                                                key={medium.id}
+                                                value={String(medium.id)}
+                                            >
+                                                {medium.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+
                             <div className="md:col-span-2 xl:col-span-3">
                                 <Field
                                     label="File"
@@ -1122,13 +1509,17 @@ export default function ImportQuestions({
                         activePreview?.status === 'success' ? (
                             <Button
                                 type="button"
-                                disabled={isImporting || importUnsupported}
+                                disabled={
+                                    isImporting ||
+                                    importUnsupported ||
+                                    selectedRowNumbers.size === 0
+                                }
                                 onClick={handleImport}
                             >
                                 <FileUpIcon className="size-4" />
                                 {isImporting
                                     ? 'Importing...'
-                                    : 'Import Questions'}
+                                    : `Import ${selectedRowNumbers.size} questions`}
                             </Button>
                         ) : null}
                     </div>

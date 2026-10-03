@@ -49,6 +49,7 @@ export interface QuestionTypeOption {
         class_id: number | null;
         subject_id: number | null;
         schema_key: string;
+        supports_simple_import: boolean;
         schema: QuestionSchemaOption;
     }[];
     status: number;

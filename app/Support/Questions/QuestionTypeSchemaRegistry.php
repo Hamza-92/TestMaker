@@ -741,7 +741,12 @@ class QuestionTypeSchemaRegistry
             'have_answer' => $questionType->have_answer,
         ]);
 
-        return in_array($schema['key'], [
+        return self::supportsSimpleImportSchema($schema['key']);
+    }
+
+    public static function supportsSimpleImportSchema(string $schemaKey): bool
+    {
+        return in_array($schemaKey, [
             self::OBJECTIVE_MCQ,
             self::OBJECTIVE_TRUE_FALSE,
             self::OBJECTIVE_BLANK_CHOICE,

@@ -2,16 +2,21 @@
 
 use App\Enums\UserType;
 use App\Models\Chapter;
+use App\Models\Medium;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
+use App\Models\QuestionTypeHeading;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Models\User;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 uses(RefreshDatabase::class);
 
@@ -101,7 +106,7 @@ function makeImportContext(User $creator, string $subjectType = 'chapter-wise'):
     return compact('pattern', 'class', 'subject', 'chapter', 'topic');
 }
 
-it('imports subjective questions from csv', function () {
+it('requires a preview before importing questions', function () {
     $admin = makeImportSuperAdmin();
     $questionType = makeImportQuestionType($admin, [
         'name' => 'Short Questions',
@@ -126,17 +131,8 @@ it('imports subjective questions from csv', function () {
             'file' => UploadedFile::fake()->createWithContent('questions.csv', $csv),
         ]);
 
-    $response->assertRedirect(route('superadmin.questions.import', [
-        'question_type_id' => (string) $questionType->id,
-        'chapter_id' => (string) $context['chapter']->id,
-        'status' => '1',
-    ]));
-    $response->assertSessionHas('question_import_report.status', 'success');
-
-    expect(Question::query()->count())->toBe(2)
-        ->and(Question::query()->where('chapter_id', $context['chapter']->id)->count())->toBe(2)
-        ->and(Question::query()->where('source', 'exercise')->exists())->toBeTrue()
-        ->and(Question::query()->where('source', 'additional')->exists())->toBeTrue();
+    $response->assertSessionHasErrors(['preview_token', 'selected_row_numbers']);
+    expect(Question::query()->count())->toBe(0);
 });
 
 it('previews questions before import', function () {
@@ -148,9 +144,9 @@ it('previews questions before import', function () {
     $context = makeImportContext($admin);
 
     $csv = implode("\n", [
-        'statement_en,answer_en,source,status',
-        '"What is heat?","A form of energy.",exercise,active',
-        '"What is motion?","Change in position.",additional,1',
+        'statement_en,answer_en',
+        '"What is heat?","A form of energy."',
+        '"What is motion?","Change in position."',
     ]);
 
     $response = $this
@@ -186,9 +182,9 @@ it('imports a previewed file without re-uploading it', function () {
     $context = makeImportContext($admin);
 
     $csv = implode("\n", [
-        'statement_en,answer_en,source,status',
-        '"What is light?","A form of energy.",exercise,active',
-        '"What is sound?","A vibration.",additional,1',
+        'statement_en,answer_en',
+        '"What is light?","A form of energy."',
+        '"What is sound?","A vibration."',
     ]);
 
     $this
@@ -214,6 +210,7 @@ it('imports a previewed file without re-uploading it', function () {
             'source' => '',
             'status' => true,
             'preview_token' => $previewToken,
+            'selected_row_numbers' => [2, 3],
         ]);
 
     $response->assertRedirect(route('superadmin.questions.import', [
@@ -224,9 +221,7 @@ it('imports a previewed file without re-uploading it', function () {
     $response->assertSessionHas('question_import_report.status', 'success');
     $response->assertSessionHas('question_import_report.imported_rows', 2);
 
-    expect(Question::query()->count())->toBe(2)
-        ->and(Question::query()->where('source', 'exercise')->exists())->toBeTrue()
-        ->and(Question::query()->where('source', 'additional')->exists())->toBeTrue();
+    expect(Question::query()->count())->toBe(2);
 });
 
 it('imports objective questions with options', function () {
@@ -241,13 +236,13 @@ it('imports objective questions with options', function () {
     $context = makeImportContext($admin);
 
     $csv = implode("\n", [
-        'statement_en,source,status,option_1_en,option_1_correct,option_2_en,option_2_correct,option_3_en,option_3_correct',
-        '"Choose the correct answer",exercise,active,"Option A",yes,"Option B",no,"Option C",no',
+        'statement_en,option_1_en,option_1_correct,option_2_en,option_2_correct,option_3_en,option_3_correct',
+        '"Choose the correct answer","Option A",yes,"Option B",no,"Option C",no',
     ]);
 
     $response = $this
         ->actingAs($admin)
-        ->post(route('superadmin.questions.import.store'), [
+        ->post(route('superadmin.questions.import.preview'), [
             'question_type_id' => $questionType->id,
             'chapter_id' => $context['chapter']->id,
             'topic_id' => null,
@@ -261,8 +256,14 @@ it('imports objective questions with options', function () {
         'chapter_id' => (string) $context['chapter']->id,
         'status' => '1',
     ]));
-    $response->assertSessionHas('question_import_report.status', 'success');
-    $response->assertSessionHas('question_import_report.imported_rows', 1);
+    $response->assertSessionHas('question_import_preview.status', 'success');
+    $this->actingAs($admin)->post(route('superadmin.questions.import.store'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $context['chapter']->id,
+        'status' => true,
+        'preview_token' => session('question_import_preview_token'),
+        'selected_row_numbers' => [2],
+    ])->assertSessionHas('question_import_report.imported_rows', 1);
 
     $question = Question::query()->with('options')->sole();
 
@@ -292,7 +293,7 @@ it('fails objective import when a single-answer row has multiple correct options
 
     $response = $this
         ->actingAs($admin)
-        ->post(route('superadmin.questions.import.store'), [
+        ->post(route('superadmin.questions.import.preview'), [
             'question_type_id' => $questionType->id,
             'chapter_id' => $context['chapter']->id,
             'topic_id' => null,
@@ -307,8 +308,293 @@ it('fails objective import when a single-answer row has multiple correct options
         'source' => 'exercise',
         'status' => '1',
     ]));
-    $response->assertSessionHas('question_import_report.status', 'error');
-    $response->assertSessionHas('question_import_report.failed_rows', 1);
+    $response->assertSessionHas('question_import_preview.status', 'error');
+    $response->assertSessionHas('question_import_preview.failed_rows', 1);
 
     expect(Question::query()->count())->toBe(0);
+});
+
+it('imports only selected valid rows and reports skipped and duplicate rows', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin);
+    $chapter = makeImportContext($admin)['chapter'];
+    $csv = implode("\n", [
+        'statement_en,answer_en',
+        '"First question","First answer"',
+        '"Second question","Second answer"',
+        '"First question","First answer"',
+        ',"Answer without question"',
+    ]);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'file' => UploadedFile::fake()->createWithContent('selection.csv', $csv),
+    ])->assertSessionHas('question_import_preview.ready_rows', 2)
+        ->assertSessionHas('question_import_preview.failed_rows', 2)
+        ->assertSessionHas('question_import_preview.duplicate_rows', 1);
+
+    $token = session('question_import_preview_token');
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.store'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'preview_token' => $token,
+        'selected_row_numbers' => [3],
+    ])->assertSessionHas('question_import_report.imported_rows', 1)
+        ->assertSessionHas('question_import_report.failed_rows', 1)
+        ->assertSessionHas('question_import_report.unselected_rows', 1)
+        ->assertSessionHas('question_import_report.duplicate_rows', 1);
+
+    expect(Question::query()->sole()->statement_en)->toBe('Second question');
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.store'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'preview_token' => $token,
+        'selected_row_numbers' => [2],
+    ])->assertSessionHas('question_import_report.status', 'error');
+
+    expect(Question::query()->count())->toBe(1);
+});
+
+it('rejects selection of an invalid preview row', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin);
+    $chapter = makeImportContext($admin)['chapter'];
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'file' => UploadedFile::fake()->createWithContent('invalid.csv', "statement_en,answer_en\nValid,Answer\n,Answer"),
+    ])->assertSessionHas('question_import_preview.ready_rows', 1);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.store'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'preview_token' => session('question_import_preview_token'),
+        'selected_row_numbers' => [3],
+    ])->assertSessionHas('question_import_report.status', 'error');
+
+    expect(Question::query()->count())->toBe(0);
+});
+
+it('paginates every previewed row and keeps the template content-only', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin);
+    $chapter = makeImportContext($admin)['chapter'];
+    $rows = ['statement_en,answer_en'];
+
+    foreach (range(1, 27) as $number) {
+        $rows[] = "Question {$number},Answer {$number}";
+    }
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'file' => UploadedFile::fake()->createWithContent('many.csv', implode("\n", $rows)),
+    ])->assertSessionHas('question_import_preview.total_rows', 27)
+        ->assertSessionHas('question_import_preview.rows', fn ($value) => count($value) === 25);
+
+    $this->actingAs($admin)->getJson(route('superadmin.questions.import.preview-rows', [
+        'preview_token' => session('question_import_preview_token'),
+        'page' => 2,
+    ]))->assertOk()->assertJsonCount(2, 'rows')->assertJsonPath('rows.0.row_number', 27);
+
+    $this->actingAs($admin)->get(route('superadmin.questions.import.template', [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'format' => 'csv',
+    ]))->assertOk()->assertDownload('question-import-template.csv');
+});
+
+it('previews Excel files and rejects another users preview token', function () {
+    $admin = makeImportSuperAdmin();
+    $otherAdmin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin);
+    $chapter = makeImportContext($admin)['chapter'];
+    $spreadsheet = new Spreadsheet;
+    $spreadsheet->getActiveSheet()->fromArray([
+        ['statement_en', 'answer_en'],
+        ['Excel question', 'Excel answer'],
+    ]);
+    $path = tempnam(sys_get_temp_dir(), 'question-import-');
+    (new Xlsx($spreadsheet))->save($path);
+    $contents = file_get_contents($path);
+    unlink($path);
+    $spreadsheet->disconnectWorksheets();
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'file' => UploadedFile::fake()->createWithContent('questions.xlsx', $contents),
+    ])->assertSessionHas('question_import_preview.ready_rows', 1);
+
+    $token = session('question_import_preview_token');
+
+    $this->actingAs($otherAdmin)->getJson(route('superadmin.questions.import.preview-rows', [
+        'preview_token' => $token,
+        'page' => 1,
+    ]))->assertNotFound();
+
+    $this->actingAs($admin)->get(route('superadmin.questions.import.template', [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'format' => 'xlsx',
+    ]))->assertOk()->assertDownload('question-import-template.xlsx');
+});
+
+it('marks an already imported question as a duplicate on the next preview', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin);
+    $chapter = makeImportContext($admin)['chapter'];
+    $data = [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+    ];
+    $file = UploadedFile::fake()->createWithContent('repeat.csv', "statement_en,answer_en\nRepeated question,Repeated answer");
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        ...$data,
+        'file' => $file,
+    ])->assertSessionHas('question_import_preview.ready_rows', 1);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.store'), [
+        ...$data,
+        'preview_token' => session('question_import_preview_token'),
+        'selected_row_numbers' => [2],
+    ])->assertSessionHas('question_import_report.imported_rows', 1);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        ...$data,
+        'file' => UploadedFile::fake()->createWithContent('repeat.csv', "statement_en,answer_en\nRepeated question,Repeated answer"),
+    ])->assertSessionHas('question_import_preview.ready_rows', 0)
+        ->assertSessionHas('question_import_preview.duplicate_rows', 1);
+});
+
+it('detects existing option-only questions without a statement', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin, [
+        'name' => 'Option-only MCQs',
+        'heading_en' => 'Option-only MCQs',
+        'have_statement' => false,
+        'have_answer' => false,
+        'is_objective' => true,
+        'options_only' => true,
+    ]);
+    $chapter = makeImportContext($admin)['chapter'];
+    $data = [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+    ];
+    $csv = "option_1_en,option_1_correct,option_2_en,option_2_correct\nFirst choice,yes,Second choice,no";
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        ...$data,
+        'file' => UploadedFile::fake()->createWithContent('options.csv', $csv),
+    ])->assertSessionHas('question_import_preview.ready_rows', 1);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.store'), [
+        ...$data,
+        'preview_token' => session('question_import_preview_token'),
+        'selected_row_numbers' => [2],
+    ])->assertSessionHas('question_import_report.imported_rows', 1);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        ...$data,
+        'file' => UploadedFile::fake()->createWithContent('options.csv', $csv),
+    ])->assertSessionHas('question_import_preview.ready_rows', 0)
+        ->assertSessionHas('question_import_preview.duplicate_rows', 1);
+});
+
+it('uses the chapter scoped schema for templates and preview validation', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin, [
+        'schema_key' => QuestionTypeSchemaRegistry::SUBJECTIVE_STANDARD,
+        'have_description' => false,
+    ]);
+    $chapter = makeImportContext($admin)['chapter'];
+
+    QuestionTypeHeading::create([
+        'question_type_id' => $questionType->id,
+        'pattern_id' => $chapter->pattern_id,
+        'class_id' => $chapter->class_id,
+        'subject_id' => $chapter->subject_id,
+        'scope_key' => QuestionTypeHeading::scopeKey(
+            $chapter->pattern_id,
+            $chapter->class_id,
+            $chapter->subject_id,
+        ),
+        'heading_en' => 'Shared Statement Questions',
+        'schema_key' => QuestionTypeSchemaRegistry::SUBJECTIVE_SAME_STATEMENT,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('superadmin.questions.import.template', [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'format' => 'csv',
+    ]));
+    $response->assertOk()->assertDownload('question-import-template.csv');
+    expect($response->streamedContent())->toContain('description_en');
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'status' => true,
+        'file' => UploadedFile::fake()->createWithContent(
+            'scoped.csv',
+            "statement_en,description_en,answer_en\nQuestion,Shared statement,Answer",
+        ),
+    ])->assertSessionHas('question_import_preview.ready_rows', 1);
+});
+
+it('takes source status and medium from the form instead of spreadsheet columns', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin);
+    $chapter = makeImportContext($admin)['chapter'];
+    $medium = Medium::query()->create(['name' => 'English']);
+    $data = [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $chapter->id,
+        'source' => 'exercise',
+        'status' => false,
+        'medium_id' => $medium->id,
+    ];
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        ...$data,
+        'file' => UploadedFile::fake()->createWithContent(
+            'metadata.csv',
+            "statement_en,answer_en,source\nQuestion,Answer,additional",
+        ),
+    ])->assertSessionHas('question_import_preview.status', 'error')
+        ->assertSessionHas('question_import_preview.total_rows', 0);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.preview'), [
+        ...$data,
+        'file' => UploadedFile::fake()->createWithContent(
+            'content.csv',
+            "statement_en,answer_en\nQuestion,Answer",
+        ),
+    ])->assertSessionHas('question_import_preview.ready_rows', 1);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.import.store'), [
+        ...$data,
+        'preview_token' => session('question_import_preview_token'),
+        'selected_row_numbers' => [2],
+    ])->assertSessionHas('question_import_report.imported_rows', 1);
+
+    $question = Question::query()->sole();
+    expect($question->source)->toBe('exercise')
+        ->and($question->status)->toBe(0)
+        ->and($question->medium_id)->toBe($medium->id);
 });

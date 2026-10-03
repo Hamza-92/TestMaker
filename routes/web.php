@@ -285,6 +285,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/questions/add', [QuestionController::class, 'create'])->name('superadmin.questions.add')->middleware('permission:questions.create');
         Route::get('superadmin/questions/import', [QuestionController::class, 'import'])->name('superadmin.questions.import')->middleware('permission:questions.import');
         Route::post('superadmin/questions/import/preview', [QuestionController::class, 'previewImport'])->name('superadmin.questions.import.preview')->middleware('permission:questions.import');
+        Route::get('superadmin/questions/import/preview-rows', [QuestionController::class, 'previewImportRows'])->name('superadmin.questions.import.preview-rows')->middleware('permission:questions.import');
         Route::post('superadmin/questions/import', [QuestionController::class, 'storeImport'])->name('superadmin.questions.import.store')->middleware('permission:questions.import');
         Route::get('superadmin/questions/import/template', [QuestionController::class, 'downloadImportTemplate'])->name('superadmin.questions.import.template')->middleware('permission:questions.import');
         Route::patch('superadmin/questions/type', [QuestionController::class, 'bulkUpdateType'])->name('superadmin.questions.type.update')->middleware('permission:questions.edit');

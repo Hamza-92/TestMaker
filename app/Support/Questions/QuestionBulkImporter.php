@@ -20,7 +20,7 @@ class QuestionBulkImporter
 
     private const MAX_ERROR_MESSAGES = 60;
 
-    private const PREVIEW_ROW_LIMIT = 25;
+    public const PREVIEW_PAGE_SIZE = 25;
 
     private ?int $bothMediumId = null;
 
@@ -33,6 +33,7 @@ class QuestionBulkImporter
         ?Topic $topic,
         ?string $defaultSource,
         int $defaultStatus,
+        ?int $mediumId = null,
     ): array {
         if (! QuestionTypeSchemaRegistry::supportsSimpleImport($questionType)) {
             return $this->previewReport(
@@ -46,7 +47,7 @@ class QuestionBulkImporter
             );
         }
 
-        [$rows, $optionIndexes, $headerErrors] = $this->readRows($file);
+        [$rows, $optionIndexes, $headerErrors] = $this->readRows($file, $questionType);
 
         if ($headerErrors !== []) {
             return $this->previewReport(
@@ -63,7 +64,11 @@ class QuestionBulkImporter
         $errors = [];
         $overflowErrors = 0;
         $records = [];
+        $previewRows = [];
+        $seenSignatures = [];
+        $existingSignatures = $this->existingSignatures($questionType, $chapter, $topic, $rows);
         $failedRows = 0;
+        $duplicateRows = 0;
         $totalRows = count($rows);
 
         if ($totalRows === 0) {
@@ -88,7 +93,24 @@ class QuestionBulkImporter
                 topic: $topic,
                 defaultSource: $defaultSource,
                 defaultStatus: $defaultStatus,
+                mediumId: $mediumId,
             );
+
+            if ($issues['errors'] === []) {
+                $signature = $this->contentSignature($issues['record']['payload']['content']);
+
+                if (isset($seenSignatures[$signature])) {
+                    $issues['errors'][] = "Row {$row['number']}: Duplicate of row {$seenSignatures[$signature]}.";
+                    $duplicateRows++;
+                } elseif (isset($existingSignatures[$signature])) {
+                    $issues['errors'][] = "Row {$row['number']}: This question already exists in the selected chapter and question type.";
+                    $duplicateRows++;
+                } else {
+                    $seenSignatures[$signature] = $row['number'];
+                }
+            }
+
+            $previewRows[] = $this->buildPreviewRow($row, $optionIndexes, $issues);
 
             if ($issues['errors'] !== []) {
                 $failedRows++;
@@ -117,13 +139,14 @@ class QuestionBulkImporter
         }
 
         return $this->previewReport(
-            status: $errors === [] ? 'success' : 'error',
+            status: $records === [] ? 'error' : 'success',
             totalRows: $totalRows,
             readyRows: count($records),
             failedRows: $failedRows,
             errors: $errors,
-            rows: $this->buildPreviewRows($records),
-            records: $errors === [] ? $records : [],
+            rows: $previewRows,
+            records: $records,
+            duplicateRows: $duplicateRows,
         );
     }
 
@@ -135,6 +158,7 @@ class QuestionBulkImporter
         ?string $defaultSource,
         int $defaultStatus,
         int $creatorId,
+        ?int $mediumId = null,
     ): array {
         if (! QuestionTypeSchemaRegistry::supportsSimpleImport($questionType)) {
             return $this->importReport(
@@ -153,6 +177,7 @@ class QuestionBulkImporter
             topic: $topic,
             defaultSource: $defaultSource,
             defaultStatus: $defaultStatus,
+            mediumId: $mediumId,
         );
 
         if ($preview['status'] !== 'success') {
@@ -180,6 +205,10 @@ class QuestionBulkImporter
         Chapter $chapter,
         ?Topic $topic,
         int $creatorId,
+        int $totalRows = 0,
+        int $failedRows = 0,
+        int $unselectedRows = 0,
+        int $previewDuplicateRows = 0,
     ): array {
         if (! QuestionTypeSchemaRegistry::supportsSimpleImport($questionType)) {
             return $this->importReport(
@@ -191,8 +220,25 @@ class QuestionBulkImporter
             );
         }
 
-        DB::transaction(function () use ($creatorId, $questionType, $chapter, $topic, $records): void {
-            foreach ($records as $record) {
+        $existingSignatures = $this->existingSignatures($questionType, $chapter, $topic, $records, true);
+        $uniqueRecords = [];
+        $newDuplicateRows = 0;
+
+        foreach ($records as $record) {
+            $signature = $this->contentSignature($record['payload']['content']);
+
+            if (isset($existingSignatures[$signature])) {
+                $newDuplicateRows++;
+
+                continue;
+            }
+
+            $existingSignatures[$signature] = true;
+            $uniqueRecords[] = $record;
+        }
+
+        DB::transaction(function () use ($creatorId, $questionType, $chapter, $topic, $uniqueRecords): void {
+            foreach ($uniqueRecords as $record) {
                 $question = Question::query()->create([
                     ...$record['payload'],
                     'created_by' => $creatorId,
@@ -220,41 +266,46 @@ class QuestionBulkImporter
         });
 
         return $this->importReport(
-            status: 'success',
-            totalRows: count($records),
-            importedRows: count($records),
-            failedRows: 0,
-            errors: [],
+            status: $uniqueRecords === [] ? 'error' : 'success',
+            totalRows: $totalRows ?: count($records),
+            importedRows: count($uniqueRecords),
+            failedRows: $failedRows,
+            errors: $uniqueRecords === [] ? ['No selected questions were imported; they already exist.'] : [],
+            unselectedRows: $unselectedRows,
+            duplicateRows: $previewDuplicateRows + $newDuplicateRows,
         );
     }
 
-    public function templateHeaders(): array
+    public function templateHeaders(QuestionType $questionType): array
     {
-        return [
-            'statement_en',
-            'statement_ur',
-            'description_en',
-            'description_ur',
-            'answer_en',
-            'answer_ur',
-            'source',
-            'status',
-            'option_1_en',
-            'option_1_ur',
-            'option_1_correct',
-            'option_2_en',
-            'option_2_ur',
-            'option_2_correct',
-            'option_3_en',
-            'option_3_ur',
-            'option_3_correct',
-            'option_4_en',
-            'option_4_ur',
-            'option_4_correct',
-        ];
+        $schema = QuestionTypeSchemaRegistry::resolve($questionType->schema_key, $questionType->is_objective, [
+            'objective_type_id' => $questionType->objective_type_id,
+            'have_description' => $questionType->have_description,
+            'have_answer' => $questionType->have_answer,
+        ]);
+        $headers = $questionType->options_only ? [] : ['statement_en', 'statement_ur'];
+
+        if (in_array($schema['key'], [QuestionTypeSchemaRegistry::OBJECTIVE_MCQ, QuestionTypeSchemaRegistry::OBJECTIVE_BLANK_CHOICE], true)) {
+            foreach (range(1, 4) as $index) {
+                array_push($headers, "option_{$index}_en", "option_{$index}_ur", "option_{$index}_correct");
+            }
+
+            return $headers;
+        }
+
+        if (in_array($schema['key'], [QuestionTypeSchemaRegistry::SUBJECTIVE_STANDARD, QuestionTypeSchemaRegistry::SUBJECTIVE_SAME_STATEMENT], true)
+            && ($questionType->have_description || $schema['key'] === QuestionTypeSchemaRegistry::SUBJECTIVE_SAME_STATEMENT)) {
+            array_push($headers, 'description_en', 'description_ur');
+        }
+
+        if ($questionType->have_answer || in_array($schema['key'], [QuestionTypeSchemaRegistry::OBJECTIVE_TRUE_FALSE, QuestionTypeSchemaRegistry::OBJECTIVE_BLANK_OPEN], true)) {
+            array_push($headers, 'answer_en', 'answer_ur');
+        }
+
+        return $headers;
     }
 
-    private function readRows(UploadedFile $file): array
+    private function readRows(UploadedFile $file, QuestionType $questionType): array
     {
         try {
             $reader = IOFactory::createReaderForFile($file->getRealPath());
@@ -266,7 +317,7 @@ class QuestionBulkImporter
 
         $rawRows = $spreadsheet->getActiveSheet()->toArray(
             null,
-            true,
+            false,
             true,
             false,
         );
@@ -290,6 +341,20 @@ class QuestionBulkImporter
 
         if ($duplicateHeaders !== []) {
             return [[], [], ['The file contains duplicate column names.']];
+        }
+
+        $allowedHeaders = $this->templateHeaders($questionType);
+
+        if (in_array('option_1_en', $allowedHeaders, true)) {
+            foreach ([5, 6] as $index) {
+                array_push($allowedHeaders, "option_{$index}_en", "option_{$index}_ur", "option_{$index}_correct");
+            }
+        }
+
+        $unknownHeaders = array_values(array_diff(array_filter($headers), $allowedHeaders));
+
+        if ($unknownHeaders !== []) {
+            return [[], [], ['Remove unsupported columns: '.implode(', ', $unknownHeaders).'. Select source, status, and medium in the form.']];
         }
 
         $rows = [];
@@ -335,6 +400,7 @@ class QuestionBulkImporter
         ?Topic $topic,
         ?string $defaultSource,
         int $defaultStatus,
+        ?int $mediumId,
     ): array {
         $errors = [];
         $schema = QuestionTypeSchemaRegistry::resolve($questionType->schema_key, $questionType->is_objective, [
@@ -453,7 +519,7 @@ class QuestionBulkImporter
                 'payload' => [
                     'question_type_id' => $questionType->id,
                     'schema_key' => $schema['key'],
-                    'medium_id' => $this->defaultMediumId(),
+                    'medium_id' => $mediumId ?? $this->defaultMediumId(),
                     'chapter_id' => $chapter->id,
                     'topic_id' => $chapter->effectiveSubjectType() === 'topic-wise'
                         ? $topic?->id
@@ -644,23 +710,76 @@ class QuestionBulkImporter
             ->all();
     }
 
-    private function buildPreviewRows(array $records): array
+    private function buildPreviewRow(array $row, array $optionIndexes, array $issues): array
     {
-        return collect($records)
-            ->take(self::PREVIEW_ROW_LIMIT)
-            ->map(fn (array $record) => [
-                'row_number' => $record['row_number'],
-                'statement_en' => $record['payload']['statement_en'],
-                'statement_ur' => $record['payload']['statement_ur'],
-                'description_en' => $record['payload']['description_en'],
-                'description_ur' => $record['payload']['description_ur'],
-                'answer_en' => $record['payload']['answer_en'],
-                'answer_ur' => $record['payload']['answer_ur'],
-                'source' => $record['payload']['source'],
-                'status' => $record['payload']['status'],
-                'options' => $record['options'],
-            ])
-            ->values()
+        $data = $row['data'];
+        $record = $issues['record'] ?? null;
+
+        return [
+            'row_number' => $row['number'],
+            'valid' => $issues['errors'] === [],
+            'issues' => $issues['errors'],
+            'statement_en' => $record['payload']['statement_en'] ?? $data['statement_en'] ?? null,
+            'statement_ur' => $record['payload']['statement_ur'] ?? $data['statement_ur'] ?? null,
+            'description_en' => $record['payload']['description_en'] ?? $data['description_en'] ?? null,
+            'description_ur' => $record['payload']['description_ur'] ?? $data['description_ur'] ?? null,
+            'answer_en' => $record['payload']['answer_en'] ?? $data['answer_en'] ?? null,
+            'answer_ur' => $record['payload']['answer_ur'] ?? $data['answer_ur'] ?? null,
+            'source' => $record['payload']['source'] ?? null,
+            'status' => $record['payload']['status'] ?? null,
+            'options' => $record['options'] ?? collect($optionIndexes)
+                ->map(fn (int $index) => [
+                    'text_en' => $data["option_{$index}_en"] ?? null,
+                    'text_ur' => $data["option_{$index}_ur"] ?? null,
+                    'is_correct' => $this->normalizeOptionCorrect($data["option_{$index}_correct"] ?? null) === true,
+                    'sort_order' => $index,
+                ])
+                ->filter(fn (array $option) => $option['text_en'] !== null || $option['text_ur'] !== null)
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function contentSignature(?array $content): string
+    {
+        return hash('sha256', json_encode($content ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function existingSignatures(QuestionType $questionType, Chapter $chapter, ?Topic $topic, array $rows, bool $records = false): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $english = collect($rows)->map(fn (array $row) => $records
+            ? ($row['payload']['statement_en'] ?? null)
+            : ($row['data']['statement_en'] ?? null))->filter()->unique()->values()->all();
+        $urdu = collect($rows)->map(fn (array $row) => $records
+            ? ($row['payload']['statement_ur'] ?? null)
+            : ($row['data']['statement_ur'] ?? null))->filter()->unique()->values()->all();
+
+        $query = Question::query()
+            ->where('question_type_id', $questionType->id)
+            ->where('chapter_id', $chapter->id)
+            ->when($topic === null, fn ($query) => $query->whereNull('topic_id'), fn ($query) => $query->where('topic_id', $topic->id));
+
+        if ($english === [] && $urdu === []) {
+            $query->whereNull('statement_en')->whereNull('statement_ur');
+        } else {
+            $query->where(function ($query) use ($english, $urdu): void {
+                if ($english !== []) {
+                    $query->whereIn('statement_en', $english);
+                }
+
+                if ($urdu !== []) {
+                    $english === [] ? $query->whereIn('statement_ur', $urdu) : $query->orWhereIn('statement_ur', $urdu);
+                }
+            });
+        }
+
+        return $query
+            ->pluck('content')
+            ->mapWithKeys(fn ($content) => [$this->contentSignature(is_array($content) ? $content : json_decode((string) $content, true)) => true])
             ->all();
     }
 
@@ -672,15 +791,18 @@ class QuestionBulkImporter
         array $errors,
         array $rows,
         array $records,
+        int $duplicateRows = 0,
     ): array {
         return [
             'status' => $status,
             'total_rows' => $totalRows,
             'ready_rows' => $readyRows,
             'failed_rows' => $failedRows,
+            'duplicate_rows' => $duplicateRows,
             'errors' => $errors,
             'rows' => $rows,
             'records' => $records,
+            'valid_row_numbers' => array_column($records, 'row_number'),
         ];
     }
 
@@ -690,12 +812,16 @@ class QuestionBulkImporter
         int $importedRows,
         int $failedRows,
         array $errors,
+        int $unselectedRows = 0,
+        int $duplicateRows = 0,
     ): array {
         return [
             'status' => $status,
             'total_rows' => $totalRows,
             'imported_rows' => $importedRows,
             'failed_rows' => $failedRows,
+            'unselected_rows' => $unselectedRows,
+            'duplicate_rows' => $duplicateRows,
             'errors' => $errors,
         ];
     }
