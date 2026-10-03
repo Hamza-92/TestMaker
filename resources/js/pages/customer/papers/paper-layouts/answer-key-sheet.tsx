@@ -504,7 +504,11 @@ function MultipartAnswers({
                                 key={`${rowIndex}-${part.key}`}
                                 className="mr-4 inline-flex gap-1"
                             >
-                                <span className="font-medium">{part.key})</span>
+                                {row.parts.length > 1 && (
+                                    <span className="font-medium">
+                                        {part.key})
+                                    </span>
+                                )}
                                 <QuestionContent
                                     as="span"
                                     inline

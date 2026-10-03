@@ -169,16 +169,21 @@ export function MultipartSection({
                         className="break-inside-avoid"
                     >
                         {row.parts.map((part, partIndex) => {
-                            const englishPartLabel = `(${paperPartLabel(partIndex, 'English')}`;
-                            const urduPartLabel = `(${paperPartLabel(partIndex, 'Urdu')}`;
+                            const singlePart = row.parts.length === 1;
+                            const englishPartLabel = singlePart
+                                ? ''
+                                : `(${paperPartLabel(partIndex, 'English')}`;
+                            const urduPartLabel = singlePart
+                                ? ''
+                                : `(${paperPartLabel(partIndex, 'Urdu')}`;
                             const indexLabel =
                                 partIndex === 0 && headingNumber !== null
-                                    ? `Q.${headingNumber}:- ${englishPartLabel}`
+                                    ? `Q.${headingNumber}:-${singlePart ? '' : ` ${englishPartLabel}`}`
                                     : englishPartLabel;
 
                             const urduIndexLabel =
                                 partIndex === 0 && headingNumber !== null
-                                    ? `سوال نمبر ${headingNumber}:- ${urduPartLabel}`
+                                    ? `سوال نمبر ${headingNumber}:-${singlePart ? '' : ` ${urduPartLabel}`}`
                                     : urduPartLabel;
 
                             const questionValue = part.question.text || ' ';
@@ -187,6 +192,7 @@ export function MultipartSection({
                                     value={questionValue}
                                     indexLabel={indexLabel}
                                     urduIndexLabel={urduIndexLabel}
+                                    labelSuffix={singlePart ? '' : ')'}
                                     indexPrefix={
                                         partIndex > 0 && headingNumber !== null
                                             ? `Q.${headingNumber}:- `

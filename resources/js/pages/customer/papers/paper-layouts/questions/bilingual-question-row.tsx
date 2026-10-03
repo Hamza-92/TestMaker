@@ -5,6 +5,7 @@ interface BilingualQuestionRowProps {
     value: string;
     indexLabel: string;
     urduIndexLabel?: string;
+    labelSuffix?: string;
     indexPrefix?: string;
     urduIndexPrefix?: string;
     marks: number;
@@ -59,6 +60,7 @@ export function BilingualQuestionRow({
     value,
     indexLabel,
     urduIndexLabel = indexLabel,
+    labelSuffix = ')',
     indexPrefix = '',
     urduIndexPrefix = '',
     marks,
@@ -78,7 +80,8 @@ export function BilingualQuestionRow({
                     {prefix}
                 </span>
             )}
-            {text})
+            {text}
+            {labelSuffix}
         </>
     );
 
