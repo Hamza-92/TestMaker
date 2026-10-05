@@ -220,7 +220,10 @@ export type PaperUrduFont =
     | 'jameel-noori'
     | 'noto-nastaliq'
     | 'mehr-nastaliq'
-    | 'noto-naskh-arabic';
+    | 'noto-naskh-arabic'
+    | 'amiri'
+    | 'noto-sans-arabic'
+    | 'noto-kufi-arabic';
 /**
  * Arabic-script fonts have different x-heights and built-in vertical metrics.
  * These per-family adjustments keep them visually comparable to the selected
@@ -248,6 +251,21 @@ export const PAPER_URDU_FONT_METRICS: Record<
     'noto-naskh-arabic': {
         sizeScale: 1.05,
         lineHeightScale: 1.08,
+        verticalOffsetEm: 0,
+    },
+    amiri: {
+        sizeScale: 1.05,
+        lineHeightScale: 1.12,
+        verticalOffsetEm: 0,
+    },
+    'noto-sans-arabic': {
+        sizeScale: 1.02,
+        lineHeightScale: 1.1,
+        verticalOffsetEm: 0,
+    },
+    'noto-kufi-arabic': {
+        sizeScale: 1.02,
+        lineHeightScale: 1.1,
         verticalOffsetEm: 0,
     },
 };
@@ -558,6 +576,9 @@ const URDU_FONT_VALUES = new Set<PaperUrduFont>([
     'noto-nastaliq',
     'mehr-nastaliq',
     'noto-naskh-arabic',
+    'amiri',
+    'noto-sans-arabic',
+    'noto-kufi-arabic',
 ]);
 
 /**

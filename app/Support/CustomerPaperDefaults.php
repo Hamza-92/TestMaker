@@ -48,7 +48,7 @@ class CustomerPaperDefaults
         }
         foreach ([
             'englishFont' => ['times-new-roman', 'jameel-noori', 'sans', 'serif', 'mono'],
-            'urduFont' => ['jameel-noori', 'noto-nastaliq', 'mehr-nastaliq', 'noto-naskh-arabic'],
+            'urduFont' => ['jameel-noori', 'noto-nastaliq', 'mehr-nastaliq', 'noto-naskh-arabic', 'amiri', 'noto-sans-arabic', 'noto-kufi-arabic'],
             'headerBorderStyle' => ['solid', 'dashed', 'dotted'],
             'headingBorderStyle' => ['solid', 'dashed', 'dotted'],
             'questionBorderStyle' => ['solid', 'dashed', 'dotted'],

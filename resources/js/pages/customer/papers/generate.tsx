@@ -13529,6 +13529,11 @@ export function GeneratedPaperView({
             '"Mehr Nastaliq Web", "Arabic Typesetting", "Urdu Typesetting", serif',
         'noto-naskh-arabic':
             '"Noto Naskh Arabic", "Jameel Noori Nastaleeq", serif',
+        amiri: '"Amiri", "Noto Naskh Arabic", serif',
+        'noto-sans-arabic':
+            '"Noto Sans Arabic", "Noto Naskh Arabic", sans-serif',
+        'noto-kufi-arabic':
+            '"Noto Kufi Arabic", "Noto Naskh Arabic", sans-serif',
     };
     const pageDims = getPageDimensions(
         settings.paperSize,

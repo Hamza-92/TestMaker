@@ -137,6 +137,51 @@ interface PaperTableBorder {
     rowBoundaries: number[];
 }
 
+interface PaperQuestionGroupBorder {
+    top: number;
+    bottom: number;
+    left: number;
+    width: number;
+    color: string;
+}
+
+function paperQuestionGroupBorders(root: HTMLElement): PaperQuestionGroupBorder[] {
+    const rootRect = root.getBoundingClientRect();
+
+    return Array.from(
+        root.querySelectorAll<HTMLElement>('[data-paper-question-group]'),
+    ).flatMap((group) => {
+        const style = getComputedStyle(group);
+        const rect = group.getBoundingClientRect();
+
+        if (
+            style.borderTopStyle === 'none' ||
+            Number.parseFloat(style.borderTopWidth) <= 0 ||
+            rect.width <= 0 ||
+            rect.height <= 0
+        ) {
+            return [];
+        }
+
+        return [{
+            top: rect.top - rootRect.top,
+            bottom: rect.bottom - rootRect.top,
+            left: rect.left - rootRect.left,
+            width: rect.width,
+            color: style.borderTopColor,
+        }];
+    });
+}
+
+function questionGroupsAtBreak(
+    groups: PaperQuestionGroupBorder[],
+    position: number,
+): PaperQuestionGroupBorder[] {
+    return groups.filter(
+        (group) => position > group.top + 1 && position < group.bottom - 1,
+    );
+}
+
 function paperTableBorders(root: HTMLElement): PaperTableBorder[] {
     const rootRect = root.getBoundingClientRect();
 
@@ -366,6 +411,7 @@ export async function downloadPaperPdf({
 
             const geometry = measure(clone);
             const tableBorders = paperTableBorders(clone);
+            const questionGroupBorders = paperQuestionGroupBorders(clone);
             const totalHeight = clone.getBoundingClientRect().height;
             const cloneRect = clone.getBoundingClientRect();
             const tableHeaders: Array<{
@@ -503,15 +549,18 @@ export async function downloadPaperPdf({
                 viewport.append(content);
                 page.append(viewport);
 
-                // A collapsed table border straddles its row boundary. When
-                // a PDF page ends exactly there, clipping removes half of the
-                // rule, so draw the boundary inside both page captures.
+                // Clipping removes the horizontal edge of a question group
+                // that continues onto another page. Collapsed table borders
+                // can likewise lose half their rule at a row boundary.
                 if (settings.questionBorderWidth > 0) {
                     const appendBoundary = (
-                        table: PaperTableBorder | undefined,
+                        border:
+                            | PaperTableBorder
+                            | PaperQuestionGroupBorder
+                            | undefined,
                         top: number,
                     ) => {
-                        if (!table) {
+                        if (!border) {
                             return;
                         }
 
@@ -519,9 +568,9 @@ export async function downloadPaperPdf({
                         Object.assign(rule.style, {
                             position: 'absolute',
                             top: `${top}px`,
-                            left: `${table.left}px`,
-                            width: `${table.width}px`,
-                            borderTop: `${settings.questionBorderWidth}px ${settings.questionBorderStyle} ${table.color}`,
+                            left: `${border.left}px`,
+                            width: `${border.width}px`,
+                            borderTop: `${settings.questionBorderWidth}px ${settings.questionBorderStyle} ${border.color}`,
                             zIndex: '3',
                             pointerEvents: 'none',
                         });
@@ -533,19 +582,30 @@ export async function downloadPaperPdf({
                             tableAtStart,
                             repeatedTableHeaderHeight + bleed,
                         );
+                        questionGroupsAtBreak(questionGroupBorders, start).forEach(
+                            (group) =>
+                                appendBoundary(
+                                    group,
+                                    repeatedTableHeaderHeight,
+                                ),
+                        );
                     }
 
                     if (end < totalHeight - 0.5) {
+                        const bottomRuleTop = Math.min(
+                            height - settings.questionBorderWidth,
+                            repeatedTableHeaderHeight +
+                                end -
+                                start +
+                                bleed -
+                                settings.questionBorderWidth,
+                        );
                         appendBoundary(
                             tableBorderAt(tableBorders, end, 'end'),
-                            Math.min(
-                                height - settings.questionBorderWidth,
-                                repeatedTableHeaderHeight +
-                                    end -
-                                    start +
-                                    bleed -
-                                    settings.questionBorderWidth,
-                            ),
+                            bottomRuleTop,
+                        );
+                        questionGroupsAtBreak(questionGroupBorders, end).forEach(
+                            (group) => appendBoundary(group, bottomRuleTop),
                         );
                     }
                 }

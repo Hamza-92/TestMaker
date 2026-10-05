@@ -19,6 +19,38 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: 'Amiri';
+    src: url('/fonts/Amiri-Regular.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Amiri';
+    src: url('/fonts/Amiri-Bold.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Noto Sans Arabic';
+    src: url('/fonts/NotoSansArabic-Variable.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Noto Kufi Arabic';
+    src: url('/fonts/NotoKufiArabic-Variable.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
 /* Keep Urdu labels legible throughout paper setup, picker modals, and saved
    paper editing. Print-paper rules below remain responsible for the font
    selected in the paper settings. */

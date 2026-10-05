@@ -116,6 +116,21 @@ const URDU_FONT_OPTIONS: Array<FontOption<PaperUrduFont>> = [
         previewFontFamily:
             '"Noto Naskh Arabic", "Jameel Noori Nastaleeq", serif',
     },
+    {
+        value: 'amiri',
+        label: 'Amiri',
+        previewFontFamily: '"Amiri", "Noto Naskh Arabic", serif',
+    },
+    {
+        value: 'noto-sans-arabic',
+        label: 'Noto Sans Arabic',
+        previewFontFamily: '"Noto Sans Arabic", "Noto Naskh Arabic", sans-serif',
+    },
+    {
+        value: 'noto-kufi-arabic',
+        label: 'Noto Kufi Arabic',
+        previewFontFamily: '"Noto Kufi Arabic", "Noto Naskh Arabic", sans-serif',
+    },
 ];
 
 const SIZE_BOUNDS = {
@@ -487,7 +502,7 @@ export function PaperSettingsPanel({
                                         : 'mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500'
                                 }
                             >
-                                {inline ? 'Urdu Font' : 'Urdu'}
+                                {inline ? 'Urdu / Arabic Font' : 'Urdu / Arabic'}
                             </p>
                             <FontPicker
                                 value={settings.urduFont}
