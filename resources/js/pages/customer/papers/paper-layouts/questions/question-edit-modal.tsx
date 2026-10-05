@@ -94,7 +94,7 @@ export function QuestionEditModal({
 }: QuestionEditModalProps) {
     const editorRef = useRef<TinyMCEEditor | null>(null);
     const editingEquationRef = useRef<HTMLElement | null>(null);
-    const [value, setValue] = useState(() =>
+    const [initialValue] = useState(() =>
         questionTextToEditorHtml(question.text),
     );
     const [equationDialog, setEquationDialog] =
@@ -140,13 +140,12 @@ export function QuestionEditModal({
             }
         });
 
-        setValue(sanitizeQuestionHtml(editor.getContent()));
         editingEquationRef.current = null;
         setEquationDialog(null);
     }
 
     function handleSave() {
-        const editorContent = editorRef.current?.getContent() ?? value;
+        const editorContent = editorRef.current?.getContent() ?? initialValue;
 
         onSave(sanitizeQuestionHtml(editorContent));
     }
@@ -184,13 +183,10 @@ export function QuestionEditModal({
                 <div className="min-h-0 flex-1 overflow-y-auto p-5">
                     <Editor
                         licenseKey="gpl"
-                        initialValue={value}
+                        initialValue={initialValue}
                         onInit={(_event, editor) => {
                             editorRef.current = editor;
                         }}
-                        onEditorChange={(content) =>
-                            setValue(sanitizeQuestionHtml(content))
-                        }
                         init={{
                             branding: false,
                             browser_spellcheck: true,
