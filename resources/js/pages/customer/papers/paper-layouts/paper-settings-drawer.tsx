@@ -515,13 +515,7 @@ export function PaperSettingsPanel({
                     </div>
                 </div>
 
-                {/* Paper size + orientation — drives both the on-screen
-                shell dimensions and the printed @page rule. */}
-                <div
-                    className={
-                        inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'
-                    }
-                >
+                <div className={inline ? 'contents' : 'mt-4'}>
                     <div>
                         <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                             Paper Size
@@ -534,18 +528,55 @@ export function PaperSettingsPanel({
                             }
                         />
                     </div>
-                    <div>
-                        <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                            Orientation
-                        </p>
-                        <FontPicker
-                            value={settings.orientation}
-                            options={ORIENTATION_OPTIONS}
-                            onChange={(value: PaperOrientation) =>
-                                onChange({ orientation: value })
-                            }
-                        />
-                    </div>
+                    {inline && (
+                        <div>
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Default Orientation
+                            </p>
+                            <FontPicker
+                                value={settings.orientation}
+                                options={ORIENTATION_OPTIONS}
+                                onChange={(value: PaperOrientation) =>
+                                    onChange({ orientation: value })
+                                }
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <div className={inline ? 'col-span-full' : 'mt-4'}>
+                    <CheckboxField
+                        label="Multiple papers per sheet"
+                        checked={settings.multiplePerSheetEnabled}
+                        onChange={(checked) =>
+                            onChange({ multiplePerSheetEnabled: checked })
+                        }
+                    />
+                    {settings.multiplePerSheetEnabled && (
+                        <div className="mt-2">
+                            <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Papers per sheet
+                            </p>
+                            <select
+                                value={settings.papersPerSheet}
+                                onChange={(event) =>
+                                    onChange({
+                                        papersPerSheet: Number(event.target.value),
+                                    })
+                                }
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            >
+                                {[2, 3, 4].map((count) => (
+                                    <option key={count} value={count}>
+                                        {count} papers
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                Short papers share a sheet. Longer papers keep normal pages.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Page margins — millimetres on all four sides. */}

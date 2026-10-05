@@ -346,6 +346,12 @@ export interface PaperSettings {
     paperSize: PaperSize;
     /** Page orientation — swaps the long/short dimension. */
     orientation: PaperOrientation;
+    /** Identical copies to print for each set. */
+    printCopies: number;
+    /** Place short papers together on one physical sheet. */
+    multiplePerSheetEnabled: boolean;
+    /** Maximum logical papers on a physical sheet when enabled. */
+    papersPerSheet: number;
     /** Page margins in millimetres (4 sides). 0 = no margin (content runs to the edge). */
     marginTop: number;
     marginRight: number;
@@ -434,6 +440,9 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     questionBorderStyle: 'solid',
     paperSize: 'A4',
     orientation: 'portrait',
+    printCopies: 1,
+    multiplePerSheetEnabled: false,
+    papersPerSheet: 2,
     marginTop: 10,
     marginRight: 10,
     marginBottom: 10,
@@ -739,6 +748,20 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             ORIENTATION_VALUES.has(source.orientation as PaperOrientation)
                 ? (source.orientation as PaperOrientation)
                 : DEFAULT_PAPER_SETTINGS.orientation,
+        printCopies:
+            typeof source.printCopies === 'number' &&
+            Number.isFinite(source.printCopies)
+                ? Math.min(Math.max(Math.round(source.printCopies), 1), 4)
+                : DEFAULT_PAPER_SETTINGS.printCopies,
+        multiplePerSheetEnabled:
+            typeof source.multiplePerSheetEnabled === 'boolean'
+                ? source.multiplePerSheetEnabled
+                : DEFAULT_PAPER_SETTINGS.multiplePerSheetEnabled,
+        papersPerSheet:
+            typeof source.papersPerSheet === 'number' &&
+            Number.isFinite(source.papersPerSheet)
+                ? Math.min(Math.max(Math.round(source.papersPerSheet), 2), 4)
+                : DEFAULT_PAPER_SETTINGS.papersPerSheet,
         marginTop:
             typeof source.marginTop === 'number'
                 ? source.marginTop

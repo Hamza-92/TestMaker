@@ -63,6 +63,7 @@ async function loadAssets(root: HTMLElement): Promise<number> {
 
 function cleanClone(source: HTMLElement): HTMLElement {
     const clone = source.cloneNode(true) as HTMLElement;
+    const isComposedSheet = source.hasAttribute('data-multi-paper-sheet');
 
     // Additional sets are mounted for printing with `hidden print:block`.
     // They must be displayed when measured and captured outside print media.
@@ -98,6 +99,11 @@ function cleanClone(source: HTMLElement): HTMLElement {
         boxShadow: 'none',
         transform: 'none',
     });
+
+    if (isComposedSheet) {
+        clone.style.setProperty('height', source.style.height, 'important');
+        clone.style.setProperty('overflow', 'hidden');
+    }
 
     return clone;
 }
@@ -402,12 +408,16 @@ export async function downloadPaperPdf({
 
         for (let setIndex = 0; setIndex < clones.length; setIndex++) {
             const clone = clones[setIndex];
+            const isComposedSheet = clone.hasAttribute('data-multi-paper-sheet');
             // Reuse the actual watermark on every exported page, including
             // secondary sets whose print-only markup omits it.
-            const watermark = (
+            const watermark = isComposedSheet ? undefined : (
                 clone.querySelector('[data-paper-watermark]') ?? sharedWatermark
             )?.cloneNode(true) as HTMLElement | undefined;
-            clone.querySelector('[data-paper-watermark]')?.remove();
+
+            if (!isComposedSheet) {
+                clone.querySelector('[data-paper-watermark]')?.remove();
+            }
 
             const geometry = measure(clone);
             const tableBorders = paperTableBorders(clone);

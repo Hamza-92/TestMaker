@@ -30,6 +30,9 @@ import {
     PencilIcon,
     PlusIcon,
     PrinterIcon,
+    CopyIcon,
+    RectangleHorizontalIcon,
+    RectangleVerticalIcon,
     RotateCcwIcon,
     SaveIcon,
     SearchIcon,
@@ -48,6 +51,13 @@ import { toast } from 'sonner';
 import { Button, Card } from '@/components/tm';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { iconCardStyle, iconContainerStyle } from '@/lib/icon-appearance';
 import { patternIcon } from '@/lib/pattern-appearance';
 import { cn } from '@/lib/utils';
@@ -75,6 +85,7 @@ import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { preferredPaperSettings } from './paper-layouts/paper-preferences';
 import type { PaperPreferences } from './paper-layouts/paper-preferences';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
+import { composePaperSheets } from './paper-layouts/paper-sheet-layout';
 import {
     SET_LABELS,
     setLabelFor,
@@ -123,6 +134,20 @@ import type {
     PaperSettings,
     PaperViewMode,
 } from './paper-layouts/types';
+
+function printablePapers(): HTMLElement[] {
+    return Array.from(
+        document.querySelectorAll<HTMLElement>(
+            '[data-paper-shell] [data-print-paper][data-paper-set-index]',
+        ),
+    ).sort(
+        (left, right) =>
+            Number(left.dataset.paperSetIndex) -
+                Number(right.dataset.paperSetIndex) ||
+            Number(left.dataset.paperCopyIndex) -
+                Number(right.dataset.paperCopyIndex),
+    );
+}
 
 interface Pattern {
     id: number;
@@ -6157,6 +6182,45 @@ export default function GeneratePaper({
         );
     }
 
+    async function printGeneratedPaper() {
+        if (!generatedPaper) {
+            return;
+        }
+
+        flushSync(() => setPrintAllSets(true));
+        let printRoot: HTMLElement | null = null;
+        const cleanup = () => {
+            window.removeEventListener('afterprint', cleanup);
+            printRoot?.remove();
+            document.body.removeAttribute('data-multi-paper-print');
+            setPrintAllSets(false);
+        };
+
+        try {
+            const settings = normalizePaperSettings(generatedPaper.settings);
+            const papers = printablePapers();
+            const sheets = await composePaperSheets(papers, settings);
+
+            if (sheets) {
+                printRoot = document.createElement('div');
+                printRoot.setAttribute('data-multi-paper-print-root', '');
+                printRoot.append(...sheets);
+                document.body.append(printRoot);
+                document.body.setAttribute('data-multi-paper-print', '');
+            } else if (settings.multiplePerSheetEnabled && papers.length > 1) {
+                toast.info('This paper needs full pages, so it will print one per page.');
+            }
+
+            window.addEventListener('afterprint', cleanup);
+            window.print();
+        } catch (error) {
+            cleanup();
+            toast.error(
+                error instanceof Error ? error.message : 'Could not prepare the paper for printing.',
+            );
+        }
+    }
+
     async function downloadGeneratedPaperPdf() {
         if (!generatedPaper || pdfDownloadBusy.current) {
             return;
@@ -6174,16 +6238,12 @@ export default function GeneratePaper({
             // Mount the existing print variants; use their DOM, never a second
             // implementation of question selection or paper layout.
             flushSync(() => setPrintAllSets(true));
-            const papers = Array.from(
-                document.querySelectorAll<HTMLElement>('[data-print-paper]'),
-            ).sort(
-                (left, right) =>
-                    Number(left.dataset.paperSetIndex) -
-                    Number(right.dataset.paperSetIndex),
-            );
+            const papers = printablePapers();
+            const settings = normalizePaperSettings(generatedPaper.settings);
+            const sheets = await composePaperSheets(papers, settings);
             await downloadPaperPdf({
-                papers,
-                settings: normalizePaperSettings(generatedPaper.settings),
+                papers: sheets ?? papers,
+                settings,
                 name,
                 onProgress: (message) =>
                     toast.loading(message, { id: progress }),
@@ -6194,7 +6254,11 @@ export default function GeneratePaper({
             toast.success(
                 missingImages
                     ? 'PDF downloaded. Unavailable images were omitted.'
-                    : 'PDF downloaded',
+                    : sheets === null &&
+                        settings.multiplePerSheetEnabled &&
+                        papers.length > 1
+                      ? 'PDF downloaded one paper per page because the paper is too long to share a sheet.'
+                      : 'PDF downloaded',
                 { id: progress },
             );
         } catch (error) {
@@ -8339,13 +8403,7 @@ export default function GeneratePaper({
                         onNumSetsChange={setNumSets}
                         onViewModeChange={setViewMode}
                         printAllSets={printAllSets}
-                        onPrintAllSets={() => {
-                            setPrintAllSets(true);
-                            setTimeout(() => {
-                                window.print();
-                                setPrintAllSets(false);
-                            }, 50);
-                        }}
+                        onPrintAllSets={() => void printGeneratedPaper()}
                         isDownloadingPdf={isDownloadingPdf}
                         onDownloadPdf={() => void downloadGeneratedPaperPdf()}
                         totalMarks={paperTotalMarks(generatedPaper)}
@@ -13475,6 +13533,12 @@ export function GeneratedPaperView({
     const effectiveSchoolAddress =
         rawPaper.header.schoolAddress ??
         (showSchoolAddress ? schoolAddress : '');
+    const printJobs = Array.from({ length: numSets }).flatMap((_, setIndex) =>
+        Array.from({ length: settings.printCopies }, (_, copyIndex) => ({
+            setIndex,
+            copyIndex,
+        })),
+    );
 
     useEffect(() => {
         if (!isSetsMenuOpen) {
@@ -14626,6 +14690,91 @@ export function GeneratedPaperView({
                                 )}
                             </div>
                         )}
+                        <Select
+                            value={String(settings.printCopies)}
+                            onValueChange={(value) =>
+                                onSettingsChange({ printCopies: Number(value) })
+                            }
+                        >
+                            <SelectTrigger
+                                aria-label="Copies per set"
+                                className="h-9 w-auto min-w-0 gap-1.5 rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                            >
+                                <CopyIcon className="size-3.5 text-slate-400" />
+                                <span className="text-slate-500 dark:text-slate-400">Copies</span>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="start">
+                                {[1, 2, 3, 4].map((count) => (
+                                    <SelectItem key={count} value={String(count)}>
+                                        {count}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <div className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={settings.multiplePerSheetEnabled}
+                                onClick={() =>
+                                    onSettingsChange({
+                                        multiplePerSheetEnabled:
+                                            !settings.multiplePerSheetEnabled,
+                                    })
+                                }
+                                className="h-full cursor-pointer px-2.5 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                                Per sheet {settings.multiplePerSheetEnabled ? 'On' : 'Off'}
+                            </button>
+                            {settings.multiplePerSheetEnabled && (
+                                <Select
+                                    value={String(settings.papersPerSheet)}
+                                    onValueChange={(value) =>
+                                        onSettingsChange({ papersPerSheet: Number(value) })
+                                    }
+                                >
+                                    <SelectTrigger
+                                        aria-label="Papers per sheet"
+                                        className="h-9 w-auto min-w-0 rounded-none border-0 border-l border-slate-200 bg-transparent px-2 text-xs font-bold shadow-none focus-visible:ring-0 dark:border-slate-700"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent align="end">
+                                        {[2, 3, 4].map((count) => (
+                                            <SelectItem key={count} value={String(count)}>
+                                                {count}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </div>
+                        <Select
+                            value={settings.orientation}
+                            onValueChange={(value) =>
+                                onSettingsChange({
+                                    orientation:
+                                        value === 'landscape' ? 'landscape' : 'portrait',
+                                })
+                            }
+                        >
+                            <SelectTrigger
+                                aria-label="Paper orientation"
+                                className="h-9 w-auto min-w-0 gap-1.5 rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                            >
+                                {settings.orientation === 'portrait' ? (
+                                    <RectangleVerticalIcon className="size-3.5 text-slate-400" />
+                                ) : (
+                                    <RectangleHorizontalIcon className="size-3.5 text-slate-400" />
+                                )}
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                                <SelectItem value="portrait">Portrait</SelectItem>
+                                <SelectItem value="landscape">Landscape</SelectItem>
+                            </SelectContent>
+                        </Select>
                         {!isStandaloneBubbleSheet &&
                             isDraft &&
                             savedPaperId !== null && (
@@ -14721,13 +14870,13 @@ export function GeneratedPaperView({
                         </button>
                         <button
                             type="button"
-                            onClick={() =>
-                                numSets > 1 ? onPrintAllSets() : window.print()
-                            }
+                            onClick={onPrintAllSets}
                             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white"
                         >
                             <PrinterIcon className="size-3.5" />
-                            {numSets > 1 ? `Print ${numSets} Sets` : 'Print'}
+                            {printJobs.length > 1
+                                ? `Print ${printJobs.length} Papers`
+                                : 'Print'}
                         </button>
                     </div>
                 </div>
@@ -14739,6 +14888,7 @@ export function GeneratedPaperView({
                         settings.repeatTableHeaders ? 'true' : undefined
                     }
                     data-paper-set-index={activeSetIndex}
+                    data-paper-copy-index={0}
                     data-paper-forced-page-break={
                         bubbleSheetVisible &&
                         !bubbleSheetOnly &&
@@ -14855,25 +15005,26 @@ export function GeneratedPaperView({
                     </div>
                 </main>
 
-                {printAllSets && numSets > 1 && (
+                {printAllSets && printJobs.length > 1 && (
                     <div data-print-set-list className="hidden print:block">
-                        {Array.from({ length: numSets }).map((_, index) => {
-                            if (index === activeSetIndex) {
+                        {printJobs.map(({ setIndex, copyIndex }) => {
+                            if (setIndex === activeSetIndex && copyIndex === 0) {
                                 return null;
                             }
 
-                            const variantPaper = variantForSet(rawPaper, index);
+                            const variantPaper = variantForSet(rawPaper, setIndex);
 
                             return (
                                 <main
-                                    key={`variant-${index}`}
+                                    key={`variant-${setIndex}-${copyIndex}`}
                                     data-print-paper
                                     data-repeat-table-headers={
                                         settings.repeatTableHeaders
                                             ? 'true'
                                             : undefined
                                     }
-                                    data-paper-set-index={index}
+                                    data-paper-set-index={setIndex}
+                                    data-paper-copy-index={copyIndex}
                                     data-paper-forced-page-break={
                                         bubbleSheetVisible &&
                                         !bubbleSheetOnly &&
@@ -14885,6 +15036,34 @@ export function GeneratedPaperView({
                                     style={paperShellStyle}
                                     className="relative mx-auto overflow-hidden bg-white print:overflow-visible print:shadow-none"
                                 >
+                                    {(shouldShowTextWatermark || shouldShowLogoWatermark) && (
+                                        <div
+                                            data-paper-watermark
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
+                                            style={{ opacity: watermarkOpacity }}
+                                        >
+                                            {shouldShowTextWatermark ? (
+                                                <span
+                                                    className="text-center font-bold uppercase select-none"
+                                                    style={{
+                                                        fontSize: '5.5rem',
+                                                        transform: 'rotate(-30deg)',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    {settings.watermarkText}
+                                                </span>
+                                            ) : (
+                                                <img
+                                                    src={activeWatermarkLogoUrl}
+                                                    alt=""
+                                                    draggable={false}
+                                                    className="max-h-[45%] max-w-[45%] object-contain select-none"
+                                                />
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="relative z-10">
                                         <SchoolIdentity
                                             schoolName={
@@ -14898,11 +15077,13 @@ export function GeneratedPaperView({
                                             header={{
                                                 ...variantPaper.header,
                                                 marks: totalMarks,
-                                                type: answersTitle
-                                                    ? `${answersTitle} — Set ${setLabelFor(index)}`
+                                                type: numSets === 1
+                                                    ? (answersTitle ?? variantPaper.header.type)
+                                                    : answersTitle
+                                                    ? `${answersTitle} — Set ${setLabelFor(setIndex)}`
                                                     : variantPaper.header.type
-                                                      ? `Set ${setLabelFor(index)} · ${variantPaper.header.type}`
-                                                      : `Set ${setLabelFor(index)}`,
+                                                      ? `Set ${setLabelFor(setIndex)} · ${variantPaper.header.type}`
+                                                      : `Set ${setLabelFor(setIndex)}`,
                                             }}
                                             logoUrl={defaultWatermarkLogoUrl}
                                             address={effectiveSchoolAddress}
@@ -14945,7 +15126,7 @@ export function GeneratedPaperView({
                                               'answer_key' ? (
                                                 <AnswerKeySheet
                                                     paper={variantPaper}
-                                                    setIndex={index}
+                                                    setIndex={setIndex}
                                                     showSetLabel={numSets > 1}
                                                     settings={settings}
                                                     style={{}}
@@ -14954,7 +15135,7 @@ export function GeneratedPaperView({
                                               'subjective_answers' ? (
                                                 <SubjectiveAnswerSheet
                                                     paper={variantPaper}
-                                                    setIndex={index}
+                                                    setIndex={setIndex}
                                                     showSetLabel={numSets > 1}
                                                     settings={settings}
                                                     style={{}}

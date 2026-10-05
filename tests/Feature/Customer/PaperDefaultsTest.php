@@ -67,6 +67,27 @@ test('customers can save an Arabic paper font', function (string $font) {
         ->toBe($font);
 })->with(['noto-naskh-arabic', 'amiri', 'noto-sans-arabic', 'noto-kufi-arabic']);
 
+test('customers can save print copies and multiple papers per sheet', function () {
+    $customer = paperDefaultsCustomer();
+    $payload = paperDefaultsPayload();
+    $payload['settings'] += [
+        'printCopies' => 3,
+        'multiplePerSheetEnabled' => true,
+        'papersPerSheet' => 3,
+        'orientation' => 'landscape',
+    ];
+
+    $this->actingAs($customer)->put(route('customer.settings.update'), $payload)
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
+    expect($settings['printCopies'])->toBe(3);
+    expect($settings['multiplePerSheetEnabled'])->toBeTrue();
+    expect($settings['papersPerSheet'])->toBe(3);
+    expect($settings['orientation'])->toBe('landscape');
+});
+
 test('generation receives school defaults for the customer and their teachers', function () {
     $customer = paperDefaultsCustomer();
     $this->actingAs($customer)->put(route('customer.settings.update'), paperDefaultsPayload())->assertRedirect();
@@ -118,6 +139,8 @@ test('invalid paper defaults and structural assignment overrides are rejected', 
     ['settings.paperLayout', 'federal-board', 'settings'],
     ['settings.objectiveLayout', 'federal-row', 'settings'],
     ['settings.watermarkLogoUrl', 'javascript:alert(1)', 'settings.watermarkLogoUrl'],
+    ['settings.printCopies', 5, 'settings.printCopies'],
+    ['settings.papersPerSheet', 5, 'settings.papersPerSheet'],
     ['header.marks', 900, 'header'],
     ['numSets', 9, 'numSets'],
     ['viewMode', 'subjective_answers', 'viewMode'],
