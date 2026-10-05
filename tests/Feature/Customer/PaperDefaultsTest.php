@@ -54,6 +54,19 @@ test('customers can save and reload their paper defaults without changing existi
     expect($page['props']['paperDefaults'])->toBeNull();
 });
 
+test('customers can save Noto Naskh Arabic as their paper font', function () {
+    $customer = paperDefaultsCustomer();
+    $payload = paperDefaultsPayload();
+    $payload['settings']['urduFont'] = 'noto-naskh-arabic';
+
+    $this->actingAs($customer)->put(route('customer.settings.update'), $payload)
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect(PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings['urduFont'])
+        ->toBe('noto-naskh-arabic');
+});
+
 test('generation receives school defaults for the customer and their teachers', function () {
     $customer = paperDefaultsCustomer();
     $this->actingAs($customer)->put(route('customer.settings.update'), paperDefaultsPayload())->assertRedirect();

@@ -195,6 +195,8 @@ export function clampSectionColumns(
 
 export interface GeneratedPaperHeader {
     schoolName: string;
+    /** Per-paper override; older papers fall back to the account address. */
+    schoolAddress?: string;
     exam: string;
     className: string;
     section: string;
@@ -214,11 +216,15 @@ export type PaperEnglishFont =
     | 'sans'
     | 'serif'
     | 'mono';
-export type PaperUrduFont = 'jameel-noori' | 'noto-nastaliq' | 'mehr-nastaliq';
+export type PaperUrduFont =
+    | 'jameel-noori'
+    | 'noto-nastaliq'
+    | 'mehr-nastaliq'
+    | 'noto-naskh-arabic';
 /**
- * Nastaliq fonts have different x-heights and built-in vertical metrics.
- * These small per-family adjustments keep Urdu visually comparable to the
- * selected English size while preserving enough leading for tall glyphs.
+ * Arabic-script fonts have different x-heights and built-in vertical metrics.
+ * These per-family adjustments keep them visually comparable to the selected
+ * English size while preserving enough leading for tall glyphs.
  */
 export const PAPER_URDU_FONT_METRICS: Record<
     PaperUrduFont,
@@ -238,6 +244,11 @@ export const PAPER_URDU_FONT_METRICS: Record<
         sizeScale: 1.18,
         lineHeightScale: 1.22,
         verticalOffsetEm: -0.16,
+    },
+    'noto-naskh-arabic': {
+        sizeScale: 1.05,
+        lineHeightScale: 1.08,
+        verticalOffsetEm: 0,
     },
 };
 export type PaperSize = 'A4' | 'Letter' | 'Legal';
@@ -546,6 +557,7 @@ const URDU_FONT_VALUES = new Set<PaperUrduFont>([
     'jameel-noori',
     'noto-nastaliq',
     'mehr-nastaliq',
+    'noto-naskh-arabic',
 ]);
 
 /**

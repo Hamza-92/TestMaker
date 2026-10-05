@@ -110,6 +110,12 @@ const URDU_FONT_OPTIONS: Array<FontOption<PaperUrduFont>> = [
         previewFontFamily:
             '"Mehr Nastaliq Web", "Arabic Typesetting", "Urdu Typesetting", serif',
     },
+    {
+        value: 'noto-naskh-arabic',
+        label: 'Noto Naskh Arabic',
+        previewFontFamily:
+            '"Noto Naskh Arabic", "Jameel Noori Nastaleeq", serif',
+    },
 ];
 
 const SIZE_BOUNDS = {

@@ -11,6 +11,14 @@
     font-display: swap;
 }
 
+@font-face {
+    font-family: 'Noto Naskh Arabic';
+    src: url('/fonts/NotoNaskhArabic-Variable.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+}
+
 /* Keep Urdu labels legible throughout paper setup, picker modals, and saved
    paper editing. Print-paper rules below remain responsible for the font
    selected in the paper settings. */
@@ -809,9 +817,9 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 /*
- * Urdu typefaces do not share the same x-height or line box. Use the
+ * Arabic-script typefaces do not share the same x-height or line box. Use the
  * paper-wide font-size/leading settings as the baseline, then apply the
- * selected family's calibrated metrics so Nastaliq glyphs neither look too
+ * selected family's calibrated metrics so glyphs neither look too
  * small beside Latin text nor clip into the line above/below.
  */
 [data-print-paper] [data-paper-header] [data-paper-urdu-content],

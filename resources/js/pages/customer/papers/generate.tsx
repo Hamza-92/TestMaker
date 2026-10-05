@@ -3033,32 +3033,109 @@ function storageAssetUrl(value: unknown): string {
 function SchoolIdentity({
     schoolName,
     address,
-    showAddress,
+    editable,
+    onSchoolNameChange,
+    onAddressChange,
 }: {
     schoolName: string;
     address: string;
-    showAddress: boolean;
+    editable: boolean;
+    onSchoolNameChange?: (value: string) => void;
+    onAddressChange?: (value: string) => void;
 }) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [draftName, setDraftName] = useState(schoolName);
+    const [draftAddress, setDraftAddress] = useState(address);
     const visibleSchoolName = schoolName.trim();
-    const visibleAddress = showAddress ? address.trim() : '';
+    const visibleAddress = address.trim();
 
-    if (visibleSchoolName === '') {
+    if (visibleSchoolName === '' && visibleAddress === '' && !editable) {
         return null;
+    }
+
+    function saveChanges() {
+        onSchoolNameChange?.(draftName.trim());
+        onAddressChange?.(draftAddress.trim());
+        setIsEditing(false);
     }
 
     return (
         <div
             data-paper-school-identity
-            className="mb-1.5 text-center"
+            className="relative mb-1.5 text-center"
             dir="auto"
         >
-            <div className="text-[14px] leading-tight font-bold">
-                {visibleSchoolName}
-            </div>
+            {visibleSchoolName !== '' && (
+                <div className="text-[14px] leading-tight font-bold">
+                    {visibleSchoolName}
+                </div>
+            )}
             {visibleAddress !== '' && (
-                <div className="mt-0.5 text-[11px] leading-tight font-normal">
+                <div className="mt-0.5 whitespace-pre-line text-[11px] leading-tight font-normal">
                     ({visibleAddress})
                 </div>
+            )}
+            {editable && (
+                <button
+                    type="button"
+                    aria-label="Edit school name and address"
+                    title="Edit school name and address"
+                    onClick={() => {
+                        setDraftName(schoolName);
+                        setDraftAddress(address);
+                        setIsEditing(true);
+                    }}
+                    data-pdf-exclude
+                    className="absolute top-0 right-0 inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-brand-700 print:hidden"
+                >
+                    <PencilIcon className="size-3.5" />
+                </button>
+            )}
+            {editable && isEditing && (
+                <form
+                    data-pdf-exclude
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        saveChanges();
+                    }}
+                    className="absolute top-full left-1/2 z-30 mt-1 w-72 max-w-full -translate-x-1/2 space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-xl print:hidden"
+                >
+                    <label className="block text-xs font-medium text-slate-700">
+                        School name
+                        <input
+                            autoFocus
+                            dir="auto"
+                            value={draftName}
+                            onChange={(event) => setDraftName(event.target.value)}
+                            className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+                        />
+                    </label>
+                    <label className="block text-xs font-medium text-slate-700">
+                        Address
+                        <textarea
+                            dir="auto"
+                            rows={2}
+                            value={draftAddress}
+                            onChange={(event) => setDraftAddress(event.target.value)}
+                            className="mt-1 w-full resize-y rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+                        />
+                    </label>
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setIsEditing(false)}
+                            className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="rounded-md bg-brand-600 px-2 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
             )}
         </div>
     );
@@ -5622,6 +5699,7 @@ export default function GeneratePaper({
                 id: `paper_${Date.now()}`,
                 header: {
                     schoolName: defaultSchoolName,
+                    schoolAddress: showSchoolAddress ? schoolAddress : '',
                     exam: '',
                     className: klass?.label ?? '',
                     section: '',
@@ -5692,6 +5770,7 @@ export default function GeneratePaper({
             documentKind: 'bubble-sheet',
             header: {
                 schoolName: defaultSchoolName,
+                schoolAddress: showSchoolAddress ? schoolAddress : '',
                 exam: '',
                 className: '',
                 section: '',
@@ -13393,6 +13472,9 @@ export function GeneratedPaperView({
         isStandaloneBubbleSheet ||
         (settings.bubbleSheetEnabled && settings.bubbleSheetMode === 'only');
     const bubbleSheetMedium = paper.sectioning?.medium ?? 'English';
+    const effectiveSchoolAddress =
+        rawPaper.header.schoolAddress ??
+        (showSchoolAddress ? schoolAddress : '');
 
     useEffect(() => {
         if (!isSetsMenuOpen) {
@@ -13445,6 +13527,8 @@ export function GeneratedPaperView({
             '"Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Urdu Typesetting", serif',
         'mehr-nastaliq':
             '"Mehr Nastaliq Web", "Arabic Typesetting", "Urdu Typesetting", serif',
+        'noto-naskh-arabic':
+            '"Noto Naskh Arabic", "Jameel Noori Nastaleeq", serif',
     };
     const pageDims = getPageDimensions(
         settings.paperSize,
@@ -14694,8 +14778,14 @@ export function GeneratedPaperView({
                     <div className="relative z-10">
                         <SchoolIdentity
                             schoolName={paper.header.schoolName}
-                            address={schoolAddress}
-                            showAddress={showSchoolAddress}
+                            address={effectiveSchoolAddress}
+                            editable={!previewOnly}
+                            onSchoolNameChange={(value) =>
+                                onHeaderChange('schoolName', value)
+                            }
+                            onAddressChange={(value) =>
+                                onHeaderChange('schoolAddress', value)
+                            }
                         />
                         <PaperHeader
                             template={settings.headerTemplate}
@@ -14707,8 +14797,8 @@ export function GeneratedPaperView({
                                     : paper.header.type,
                             }}
                             logoUrl={defaultWatermarkLogoUrl}
-                            address={schoolAddress}
-                            showAddress={showSchoolAddress}
+                            address={effectiveSchoolAddress}
+                            showAddress={effectiveSchoolAddress.trim() !== ''}
                             onChange={answersTitle ? () => {} : onHeaderChange}
                             paddingX={settings.headerPaddingX}
                             paddingY={settings.headerPaddingY}
@@ -14795,8 +14885,8 @@ export function GeneratedPaperView({
                                             schoolName={
                                                 variantPaper.header.schoolName
                                             }
-                                            address={schoolAddress}
-                                            showAddress={showSchoolAddress}
+                                            address={effectiveSchoolAddress}
+                                            editable={false}
                                         />
                                         <PaperHeader
                                             template={settings.headerTemplate}
@@ -14810,8 +14900,8 @@ export function GeneratedPaperView({
                                                       : `Set ${setLabelFor(index)}`,
                                             }}
                                             logoUrl={defaultWatermarkLogoUrl}
-                                            address={schoolAddress}
-                                            showAddress={showSchoolAddress}
+                                            address={effectiveSchoolAddress}
+                                            showAddress={effectiveSchoolAddress.trim() !== ''}
                                             onChange={() => {}}
                                             paddingX={settings.headerPaddingX}
                                             paddingY={settings.headerPaddingY}
