@@ -67,13 +67,11 @@ test('customers can save an Arabic paper font', function (string $font) {
         ->toBe($font);
 })->with(['noto-naskh-arabic', 'amiri', 'noto-sans-arabic', 'noto-kufi-arabic']);
 
-test('customers can save print copies and multiple papers per sheet', function () {
+test('customers can save print copies and orientation', function () {
     $customer = paperDefaultsCustomer();
     $payload = paperDefaultsPayload();
     $payload['settings'] += [
         'printCopies' => 3,
-        'multiplePerSheetEnabled' => true,
-        'papersPerSheet' => 3,
         'orientation' => 'landscape',
     ];
 
@@ -83,8 +81,6 @@ test('customers can save print copies and multiple papers per sheet', function (
 
     $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
     expect($settings['printCopies'])->toBe(3);
-    expect($settings['multiplePerSheetEnabled'])->toBeTrue();
-    expect($settings['papersPerSheet'])->toBe(3);
     expect($settings['orientation'])->toBe('landscape');
 });
 
@@ -140,7 +136,8 @@ test('invalid paper defaults and structural assignment overrides are rejected', 
     ['settings.objectiveLayout', 'federal-row', 'settings'],
     ['settings.watermarkLogoUrl', 'javascript:alert(1)', 'settings.watermarkLogoUrl'],
     ['settings.printCopies', 5, 'settings.printCopies'],
-    ['settings.papersPerSheet', 5, 'settings.papersPerSheet'],
+    ['settings.multiplePerSheetEnabled', true, 'settings'],
+    ['settings.papersPerSheet', 2, 'settings'],
     ['header.marks', 900, 'header'],
     ['numSets', 9, 'numSets'],
     ['viewMode', 'subjective_answers', 'viewMode'],

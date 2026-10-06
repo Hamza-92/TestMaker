@@ -872,25 +872,7 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: var(--paper-urdu-question-line-height) !important;
 }
 
-[data-multi-paper-print-root] {
-    display: none;
-}
-
 @media print {
-    body[data-multi-paper-print] #app {
-        display: none !important;
-    }
-
-    body[data-multi-paper-print] [data-multi-paper-print-root] {
-        display: block !important;
-    }
-
-    body[data-multi-paper-print]
-        [data-multi-paper-sheet]:not(:last-child) {
-        break-after: page;
-        page-break-after: always;
-    }
-
     /* The @page size/margin rule is injected per-paper by the React component
        so it can react to the user's paper-size + margin settings. */
 

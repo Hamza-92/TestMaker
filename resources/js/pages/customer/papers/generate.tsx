@@ -85,7 +85,6 @@ import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { preferredPaperSettings } from './paper-layouts/paper-preferences';
 import type { PaperPreferences } from './paper-layouts/paper-preferences';
 import { PaperSettingsDrawer } from './paper-layouts/paper-settings-drawer';
-import { composePaperSheets } from './paper-layouts/paper-sheet-layout';
 import {
     SET_LABELS,
     setLabelFor,
@@ -6182,36 +6181,20 @@ export default function GeneratePaper({
         );
     }
 
-    async function printGeneratedPaper() {
+    function printGeneratedPaper() {
         if (!generatedPaper) {
             return;
         }
 
         flushSync(() => setPrintAllSets(true));
-        let printRoot: HTMLElement | null = null;
         const cleanup = () => {
             window.removeEventListener('afterprint', cleanup);
-            printRoot?.remove();
-            document.body.removeAttribute('data-multi-paper-print');
             setPrintAllSets(false);
         };
 
+        window.addEventListener('afterprint', cleanup);
+
         try {
-            const settings = normalizePaperSettings(generatedPaper.settings);
-            const papers = printablePapers();
-            const sheets = await composePaperSheets(papers, settings);
-
-            if (sheets) {
-                printRoot = document.createElement('div');
-                printRoot.setAttribute('data-multi-paper-print-root', '');
-                printRoot.append(...sheets);
-                document.body.append(printRoot);
-                document.body.setAttribute('data-multi-paper-print', '');
-            } else if (settings.multiplePerSheetEnabled && papers.length > 1) {
-                toast.info('This paper needs full pages, so it will print one per page.');
-            }
-
-            window.addEventListener('afterprint', cleanup);
             window.print();
         } catch (error) {
             cleanup();
@@ -6240,9 +6223,8 @@ export default function GeneratePaper({
             flushSync(() => setPrintAllSets(true));
             const papers = printablePapers();
             const settings = normalizePaperSettings(generatedPaper.settings);
-            const sheets = await composePaperSheets(papers, settings);
             await downloadPaperPdf({
-                papers: sheets ?? papers,
+                papers,
                 settings,
                 name,
                 onProgress: (message) =>
@@ -6254,11 +6236,7 @@ export default function GeneratePaper({
             toast.success(
                 missingImages
                     ? 'PDF downloaded. Unavailable images were omitted.'
-                    : sheets === null &&
-                        settings.multiplePerSheetEnabled &&
-                        papers.length > 1
-                      ? 'PDF downloaded one paper per page because the paper is too long to share a sheet.'
-                      : 'PDF downloaded',
+                    : 'PDF downloaded',
                 { id: progress },
             );
         } catch (error) {
@@ -14712,44 +14690,6 @@ export function GeneratedPaperView({
                                 ))}
                             </SelectContent>
                         </Select>
-                        <div className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={settings.multiplePerSheetEnabled}
-                                onClick={() =>
-                                    onSettingsChange({
-                                        multiplePerSheetEnabled:
-                                            !settings.multiplePerSheetEnabled,
-                                    })
-                                }
-                                className="h-full cursor-pointer px-2.5 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            >
-                                Per sheet {settings.multiplePerSheetEnabled ? 'On' : 'Off'}
-                            </button>
-                            {settings.multiplePerSheetEnabled && (
-                                <Select
-                                    value={String(settings.papersPerSheet)}
-                                    onValueChange={(value) =>
-                                        onSettingsChange({ papersPerSheet: Number(value) })
-                                    }
-                                >
-                                    <SelectTrigger
-                                        aria-label="Papers per sheet"
-                                        className="h-9 w-auto min-w-0 rounded-none border-0 border-l border-slate-200 bg-transparent px-2 text-xs font-bold shadow-none focus-visible:ring-0 dark:border-slate-700"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent align="end">
-                                        {[2, 3, 4].map((count) => (
-                                            <SelectItem key={count} value={String(count)}>
-                                                {count}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
-                        </div>
                         <Select
                             value={settings.orientation}
                             onValueChange={(value) =>

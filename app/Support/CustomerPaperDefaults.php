@@ -73,8 +73,6 @@ class CustomerPaperDefaults
         }
         $settings['bubbleSheetQuestionCount'] = ['sometimes', 'integer', 'min:1', 'max:200'];
         $settings['printCopies'] = ['sometimes', 'integer', 'min:1', 'max:4'];
-        $settings['papersPerSheet'] = ['sometimes', 'integer', 'min:2', 'max:4'];
-        $settings['multiplePerSheetEnabled'] = ['sometimes', 'boolean'];
         $settings['bubbleSheetHeading'] = ['sometimes', 'nullable', 'string', 'max:20000'];
         $settings['watermarkText'] = ['sometimes', 'nullable', 'string', 'max:500'];
         $settings['watermarkLogoUrl'] = ['sometimes', 'nullable', 'string', 'max:3000000', function ($attribute, $value, $fail) {
