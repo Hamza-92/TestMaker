@@ -202,6 +202,7 @@ function SubjectiveQuestionItem({
                 urduOnly={Boolean(section.titleUrdu && !section.titleEnglish)}
                 forceRtl={section.questionTextRtl}
                 hideMarks
+                spaceAfterIndex
                 sameStatement={question.sameStatement}
             />
             {(question.imageUrl ||
