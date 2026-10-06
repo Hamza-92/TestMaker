@@ -29,6 +29,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
     numberingFormat,
     hideHeadingMarks,
     showCorrectAnswers = false,
+    showOptionBubbles = false,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -148,6 +149,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                         <span
                                             key={option.id}
                                             data-paper-correct-option={
+                                                !showOptionBubbles &&
                                                 isObjective &&
                                                 showCorrectAnswers &&
                                                 option.isCorrect === true
@@ -167,6 +169,10 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                                     showCorrectAnswers &&
                                                     option.isCorrect === true
                                                 }
+                                                circleLabel={
+                                                    isObjective &&
+                                                    showOptionBubbles
+                                                }
                                             />
                                         </span>
                                     ))}
@@ -179,6 +185,9 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                     rtl={section.questionTextRtl}
                                     showCorrectAnswers={
                                         isObjective && showCorrectAnswers
+                                    }
+                                    showOptionBubbles={
+                                        isObjective && showOptionBubbles
                                     }
                                     numberOffset={
                                         isObjective ? expandedIndex : 0

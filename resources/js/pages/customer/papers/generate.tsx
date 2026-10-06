@@ -13865,6 +13865,7 @@ export function GeneratedPaperView({
                 numberingFormat={settings.questionNumberingFormat}
                 hideHeadingMarks={useFederalStructure}
                 showObjectiveBubbles={settings.objectiveBubblesEnabled}
+                showOptionBubbles={settings.objectiveOptionBubblesEnabled}
                 showCorrectAnswers={
                     activeViewMode === 'answers_on_paper' &&
                     section.category === 'Objective Questions'
@@ -14431,6 +14432,46 @@ export function GeneratedPaperView({
                                         </span>
                                     </button>
                                 )}
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={
+                                        settings.objectiveOptionBubblesEnabled
+                                    }
+                                    onClick={() =>
+                                        onSettingsChange({
+                                            objectiveOptionBubblesEnabled:
+                                                !settings.objectiveOptionBubblesEnabled,
+                                        })
+                                    }
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    <CircleDotIcon className="size-3.5 text-slate-400" />
+                                    <span>Circular Labels</span>
+                                    <span className="font-bold">
+                                        {settings.objectiveOptionBubblesEnabled
+                                            ? 'On'
+                                            : 'Off'}
+                                    </span>
+                                    <span
+                                        aria-hidden="true"
+                                        className={cn(
+                                            'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                            settings.objectiveOptionBubblesEnabled
+                                                ? 'bg-brand-600'
+                                                : 'bg-slate-200 dark:bg-slate-700',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                settings.objectiveOptionBubblesEnabled
+                                                    ? 'translate-x-3.5'
+                                                    : 'translate-x-0',
+                                            )}
+                                        />
+                                    </span>
+                                </button>
                             </>
                         )}
                         <div ref={bubbleSheetMenuRef} className="relative">

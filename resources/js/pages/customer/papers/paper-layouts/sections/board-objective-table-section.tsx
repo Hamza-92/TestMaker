@@ -1,4 +1,7 @@
-import { CorrectAnswerTick } from '../questions/bilingual-option-content';
+import {
+    CorrectAnswerTick,
+    OptionBubbleLabel,
+} from '../questions/bilingual-option-content';
 import {
     bilingualPartsHaveSameVisibleText,
     containsUrduScript,
@@ -59,7 +62,13 @@ export function BoardObjectiveTableSection(props: SectionTemplateProps) {
                                 key={heading}
                                 className="px-1 py-1 text-center font-bold"
                             >
-                                {heading}
+                                {props.showOptionBubbles ? (
+                                    <OptionBubbleLabel
+                                        label={heading.slice(1, -1)}
+                                    />
+                                ) : (
+                                    heading
+                                )}
                             </th>
                         ))}
                     </tr>
@@ -170,6 +179,7 @@ function BoardObjectiveTableRow({
                         key={option?.id ?? `empty-${optionIndex}`}
                         data-paper-correct-option={
                             option &&
+                            !props.showOptionBubbles &&
                             props.showCorrectAnswers === true &&
                             option.isCorrect === true
                                 ? true
@@ -177,7 +187,31 @@ function BoardObjectiveTableRow({
                         }
                         className="px-2 py-1 text-center align-middle font-normal"
                     >
-                        {option && (
+                        {option && props.showOptionBubbles ? (
+                            <div
+                                dir={urduOnly ? 'rtl' : undefined}
+                                className="flex min-w-0 items-start justify-center gap-1"
+                            >
+                                <OptionBubbleLabel
+                                    label={OPTION_HEADINGS[optionIndex].slice(
+                                        1,
+                                        -1,
+                                    )}
+                                    filled={
+                                        props.showCorrectAnswers === true &&
+                                        option.isCorrect === true
+                                    }
+                                />
+                                <div className="min-w-0">
+                                    <BilingualTableContent
+                                        value={option.text}
+                                        urduOnly={urduOnly}
+                                        forceRtl={section.questionTextRtl}
+                                        collapseIdentical
+                                    />
+                                </div>
+                            </div>
+                        ) : option ? (
                             <BilingualTableContent
                                 value={option.text}
                                 urduOnly={urduOnly}
@@ -189,7 +223,7 @@ function BoardObjectiveTableRow({
                                     option.isCorrect === true
                                 }
                             />
-                        )}
+                        ) : null}
                     </td>
                 );
             })}

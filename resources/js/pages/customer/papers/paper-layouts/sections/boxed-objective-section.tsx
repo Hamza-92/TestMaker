@@ -27,6 +27,7 @@ interface BoxedObjectiveSectionProps {
     numberingFormat: PaperQuestionNumberingFormat;
     hideHeadingMarks?: boolean;
     showCorrectAnswers?: boolean;
+    showOptionBubbles?: boolean;
     canMoveUp: boolean;
     canMoveDown: boolean;
     onEditSection: (sectionId: string) => void;
@@ -71,6 +72,7 @@ export function BoxedObjectiveSection({
     numberingFormat,
     hideHeadingMarks,
     showCorrectAnswers = false,
+    showOptionBubbles = false,
     canMoveUp,
     canMoveDown,
     onEditSection,
@@ -147,6 +149,7 @@ export function BoxedObjectiveSection({
                         }
                         numberingFormat={numberingFormat}
                         showCorrectAnswers={showCorrectAnswers}
+                        showOptionBubbles={showOptionBubbles}
                         section={section}
                         onEditQuestion={onEditQuestion}
                         onRandomQuestion={onRandomQuestion}
@@ -181,6 +184,7 @@ function ObjectiveQuestionRow({
     index,
     numberingFormat,
     showCorrectAnswers,
+    showOptionBubbles,
     section,
     onEditQuestion,
     onRandomQuestion,
@@ -194,6 +198,7 @@ function ObjectiveQuestionRow({
     index: number;
     numberingFormat: PaperQuestionNumberingFormat;
     showCorrectAnswers: boolean;
+    showOptionBubbles: boolean;
     section: GeneratedPaperSection;
     onEditQuestion: (sectionId: string, questionId: string) => void;
     onRandomQuestion: (sectionId: string, questionId: string) => void;
@@ -300,6 +305,7 @@ function ObjectiveQuestionRow({
                         questions={question.passageQuestions}
                         rtl={section.questionTextRtl}
                         showCorrectAnswers={showCorrectAnswers}
+                        showOptionBubbles={showOptionBubbles}
                         numberOffset={index}
                     />
                 </div>
@@ -340,6 +346,7 @@ function ObjectiveQuestionRow({
                                 key={option.id}
                                 data-paper-question-divider="r"
                                 data-paper-correct-option={
+                                    !showOptionBubbles &&
                                     showCorrectAnswers &&
                                     option.isCorrect === true
                                         ? true
@@ -359,6 +366,7 @@ function ObjectiveQuestionRow({
                                         showCorrectAnswers &&
                                         option.isCorrect === true
                                     }
+                                    circleLabel={showOptionBubbles}
                                 />
                             </div>
                         ))}

@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import { OptionBubbleLabel } from '../questions/bilingual-option-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
 import type { SectionTemplateProps } from '../templates/template-props';
 import { objectiveQuestionCount } from '../types';
@@ -62,7 +63,10 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
                                 <BubbleHeaders optionIndexes={optionIndexes} />
                             )}
                             {urduOnly && (
-                                <OptionHeaders optionIndexes={optionIndexes} />
+                                <OptionHeaders
+                                    optionIndexes={optionIndexes}
+                                    showOptionBubbles={props.showOptionBubbles}
+                                />
                             )}
                             {!urduOnly && (
                                 <th className="px-1 py-1 text-center font-bold">
@@ -78,7 +82,10 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
                                 </th>
                             )}
                             {!urduOnly && (
-                                <OptionHeaders optionIndexes={optionIndexes} />
+                                <OptionHeaders
+                                    optionIndexes={optionIndexes}
+                                    showOptionBubbles={props.showOptionBubbles}
+                                />
                             )}
                             {!urduOnly && showBubbles && (
                                 <BubbleHeaders optionIndexes={optionIndexes} />
@@ -194,7 +201,13 @@ function FederalRowColumns({
     );
 }
 
-function OptionHeaders({ optionIndexes }: { optionIndexes: number[] }) {
+function OptionHeaders({
+    optionIndexes,
+    showOptionBubbles = false,
+}: {
+    optionIndexes: number[];
+    showOptionBubbles?: boolean;
+}) {
     return (
         <>
             {optionIndexes.map((optionIndex) => (
@@ -202,7 +215,11 @@ function OptionHeaders({ optionIndexes }: { optionIndexes: number[] }) {
                     key={`option-heading-${optionIndex}`}
                     className="px-1 py-1 text-center font-bold"
                 >
-                    {OPTION_LABELS[optionIndex]}
+                    {showOptionBubbles ? (
+                        <OptionBubbleLabel label={OPTION_LABELS[optionIndex]} />
+                    ) : (
+                        OPTION_LABELS[optionIndex]
+                    )}
                 </th>
             ))}
         </>
@@ -320,9 +337,11 @@ function FederalRow({
             {urduOnly && (
                 <OptionCells
                     options={options}
+                    optionIndexes={optionIndexes}
                     urduOnly
                     forceRtl={section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
+                    showOptionBubbles={props.showOptionBubbles === true}
                 />
             )}
             {!urduOnly && <SerialCell number={number} />}
@@ -372,9 +391,11 @@ function FederalRow({
             {!urduOnly && (
                 <OptionCells
                     options={options}
+                    optionIndexes={optionIndexes}
                     urduOnly={false}
                     forceRtl={section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
+                    showOptionBubbles={props.showOptionBubbles === true}
                 />
             )}
             {!urduOnly && showBubbles && (
@@ -417,9 +438,11 @@ function FederalPassageQuestionRow({
             {urduOnly && (
                 <OptionCells
                     options={options}
+                    optionIndexes={optionIndexes}
                     urduOnly
                     forceRtl={props.section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
+                    showOptionBubbles={props.showOptionBubbles === true}
                 />
             )}
             {!urduOnly && <SerialCell number={number} />}
@@ -434,9 +457,11 @@ function FederalPassageQuestionRow({
             {!urduOnly && (
                 <OptionCells
                     options={options}
+                    optionIndexes={optionIndexes}
                     urduOnly={false}
                     forceRtl={props.section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
+                    showOptionBubbles={props.showOptionBubbles === true}
                 />
             )}
             {!urduOnly && showBubbles && (
@@ -459,14 +484,18 @@ function SerialCell({ number }: { number: number }) {
 
 function OptionCells({
     options,
+    optionIndexes,
     urduOnly,
     forceRtl,
     showCorrectAnswers,
+    showOptionBubbles,
 }: {
     options: Array<PaperQuestionOption | undefined>;
+    optionIndexes: number[];
     urduOnly: boolean;
     forceRtl?: boolean;
     showCorrectAnswers: boolean;
+    showOptionBubbles: boolean;
 }) {
     return (
         <>
@@ -474,13 +503,36 @@ function OptionCells({
                 <td
                     key={option?.id ?? `empty-option-${index}`}
                     data-paper-correct-option={
-                        option?.isCorrect && showCorrectAnswers
+                        option?.isCorrect &&
+                        showCorrectAnswers &&
+                        !showOptionBubbles
                             ? true
                             : undefined
                     }
                     className="px-1.5 py-1 text-center align-middle font-normal"
                 >
-                    {option && (
+                    {option && showOptionBubbles ? (
+                        <div
+                            dir={urduOnly ? 'rtl' : undefined}
+                            className="flex min-w-0 items-start justify-center gap-1"
+                        >
+                            <OptionBubbleLabel
+                                label={OPTION_LABELS[optionIndexes[index]]}
+                                filled={
+                                    showCorrectAnswers &&
+                                    option.isCorrect === true
+                                }
+                            />
+                            <div className="min-w-0">
+                                <BilingualTableContent
+                                    value={option.text}
+                                    urduOnly={urduOnly}
+                                    forceRtl={forceRtl}
+                                    collapseIdentical
+                                />
+                            </div>
+                        </div>
+                    ) : option ? (
                         <BilingualTableContent
                             value={option.text}
                             urduOnly={urduOnly}
@@ -491,7 +543,7 @@ function OptionCells({
                                 showCorrectAnswers && option.isCorrect === true
                             }
                         />
-                    )}
+                    ) : null}
                 </td>
             ))}
         </>

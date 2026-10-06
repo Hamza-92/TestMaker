@@ -63,6 +63,7 @@ async function loadAssets(root: HTMLElement): Promise<number> {
 
 function cleanClone(source: HTMLElement): HTMLElement {
     const clone = source.cloneNode(true) as HTMLElement;
+    clone.setAttribute('data-paper-pdf-export', '');
 
     // Additional sets are mounted for printing with `hidden print:block`.
     // They must be displayed when measured and captured outside print media.

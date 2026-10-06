@@ -10,6 +10,27 @@ interface BilingualOptionContentProps {
     label: string;
     urduOnly?: boolean;
     showCorrectAnswer?: boolean;
+    circleLabel?: boolean;
+}
+
+export function OptionBubbleLabel({
+    label,
+    filled = false,
+}: {
+    label: string;
+    filled?: boolean;
+}) {
+    return (
+        <span
+            data-paper-option-bubble
+            data-filled={filled ? true : undefined}
+            dir="ltr"
+            className="paper-option-bubble"
+            aria-label={filled ? `Correct option ${label}` : `Option ${label}`}
+        >
+            {label}
+        </span>
+    );
 }
 
 export function CorrectAnswerTick({ show }: { show: boolean }) {
@@ -59,8 +80,18 @@ export function BilingualOptionContent({
     label,
     urduOnly = false,
     showCorrectAnswer = false,
+    circleLabel = false,
 }: BilingualOptionContentProps) {
     const parts = splitBilingualParts(value);
+    const optionLabel = (showTick = true) =>
+        circleLabel ? (
+            <OptionBubbleLabel label={label} filled={showCorrectAnswer} />
+        ) : (
+            <>
+                ({label})
+                <CorrectAnswerTick show={showTick && showCorrectAnswer} />
+            </>
+        );
 
     if (parts && bilingualPartsHaveSameVisibleText(parts)) {
         const isUrdu = containsUrduScript(parts.english);
@@ -69,7 +100,9 @@ export function BilingualOptionContent({
             <span
                 dir={isUrdu ? 'rtl' : 'ltr'}
                 data-paper-urdu-content={isUrdu ? true : undefined}
-                data-paper-correct-option={showCorrectAnswer ? true : undefined}
+                data-paper-correct-option={
+                    showCorrectAnswer && !circleLabel ? true : undefined
+                }
                 className={
                     isUrdu
                         ? 'paper-option-line text-right'
@@ -82,8 +115,7 @@ export function BilingualOptionContent({
                 }
             >
                 <span dir="ltr" className="font-semibold">
-                    ({label})
-                    <CorrectAnswerTick show={showCorrectAnswer} />
+                    {optionLabel()}
                 </span>{' '}
                 <QuestionContent
                     value={parts.english}
@@ -98,14 +130,13 @@ export function BilingualOptionContent({
         return (
             <span
                 data-paper-bilingual-option
-                data-paper-correct-option={showCorrectAnswer ? true : undefined}
+                data-paper-correct-option={
+                    showCorrectAnswer && !circleLabel ? true : undefined
+                }
                 className="paper-bilingual-option paper-bilingual-option--compact"
             >
                 <span dir="ltr" className="paper-bilingual-option__english">
-                    <span className="font-semibold">
-                        ({label})
-                        <CorrectAnswerTick show={showCorrectAnswer} />
-                    </span>{' '}
+                    <span className="font-semibold">{optionLabel()}</span>{' '}
                     <QuestionContent
                         value={parts.english}
                         inline
@@ -138,14 +169,13 @@ export function BilingualOptionContent({
         return (
             <span
                 data-paper-bilingual-option
-                data-paper-correct-option={showCorrectAnswer ? true : undefined}
+                data-paper-correct-option={
+                    showCorrectAnswer && !circleLabel ? true : undefined
+                }
                 className="paper-bilingual-option"
             >
                 <span dir="ltr" className="paper-bilingual-option__english">
-                    <span className="font-semibold">
-                        ({label})
-                        <CorrectAnswerTick show={showCorrectAnswer} />
-                    </span>{' '}
+                    <span className="font-semibold">{optionLabel()}</span>{' '}
                     <QuestionContent
                         value={parts.english}
                         inline
@@ -159,7 +189,7 @@ export function BilingualOptionContent({
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
                     <span dir="ltr" className="font-semibold">
-                        ({label})
+                        {optionLabel(false)}
                     </span>{' '}
                     <QuestionContent
                         value={parts.urdu}
@@ -175,7 +205,9 @@ export function BilingualOptionContent({
         <span
             dir={urduOnly ? 'rtl' : 'ltr'}
             data-paper-urdu-content={urduOnly ? true : undefined}
-            data-paper-correct-option={showCorrectAnswer ? true : undefined}
+            data-paper-correct-option={
+                showCorrectAnswer && !circleLabel ? true : undefined
+            }
             className={
                 urduOnly ? 'paper-option-line text-right' : 'paper-option-line'
             }
@@ -183,8 +215,10 @@ export function BilingualOptionContent({
                 urduOnly ? { fontFamily: 'var(--paper-urdu-font)' } : undefined
             }
         >
-            <span className="font-semibold">({label})</span>{' '}
-            <CorrectAnswerTick show={showCorrectAnswer} />{' '}
+            <span className="font-semibold">
+                {circleLabel ? optionLabel() : `(${label})`}
+            </span>{' '}
+            {!circleLabel && <CorrectAnswerTick show={showCorrectAnswer} />}{' '}
             <QuestionContent value={value} inline className="align-baseline" />
         </span>
     );

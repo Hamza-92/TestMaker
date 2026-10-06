@@ -562,6 +562,36 @@ input[type='date']::-webkit-calendar-picker-indicator {
     display: inline;
 }
 
+[data-print-paper] [data-paper-option-bubble] {
+    display: inline-flex;
+    width: 1.45em;
+    height: 1.45em;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    box-sizing: border-box;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font-family: Arial, sans-serif !important;
+    font-size: 0.9em !important;
+    font-weight: 700;
+    line-height: 1 !important;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+[data-print-paper] [data-paper-option-bubble][data-filled] {
+    border-color: #15803d !important;
+    background-color: #15803d !important;
+    color: #fff !important;
+}
+
+[data-paper-pdf-export] [data-paper-option-bubble][data-filled] {
+    border-color: #000 !important;
+    background-color: #000 !important;
+    color: #fff !important;
+}
+
 .paper-rich-text :where(a) {
     color: inherit;
     text-decoration: underline;
@@ -940,6 +970,14 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 @media print {
+    [data-print-paper] [data-paper-option-bubble][data-filled] {
+        border-color: #000 !important;
+        background-color: #000 !important;
+        color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
     body[data-side-by-side-print] #app {
         display: none !important;
     }

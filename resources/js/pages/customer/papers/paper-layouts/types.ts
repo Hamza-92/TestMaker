@@ -1,5 +1,9 @@
 export type PaperImageSize = 'sm' | 'md' | 'lg';
-export type PaperViewMode = 'paper' | 'answer_key' | 'answers_on_paper' | 'subjective_answers';
+export type PaperViewMode =
+    | 'paper'
+    | 'answer_key'
+    | 'answers_on_paper'
+    | 'subjective_answers';
 export type PaperSectionCategory =
     | 'Objective Questions'
     | 'Subjective Questions';
@@ -386,6 +390,8 @@ export interface PaperSettings {
     objectiveLayout: PaperObjectiveLayout;
     /** Show an A-D bubble column in the subject-assigned Federal objective row layout. */
     objectiveBubblesEnabled: boolean;
+    /** Draw a circle around each objective option label. */
+    objectiveOptionBubblesEnabled: boolean;
     /** How paired subjective alternatives are arranged on the paper. */
     orGroupLayout: PaperOrGroupLayout;
     /** Visual treatment of the OR marker between paired alternatives. */
@@ -458,6 +464,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     questionLayout: 'default',
     objectiveLayout: 'standard',
     objectiveBubblesEnabled: false,
+    objectiveOptionBubblesEnabled: false,
     orGroupLayout: 'stacked',
     orGroupDividerStyle: 'line',
     orGroupLabel: 'auto',
@@ -834,6 +841,10 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             typeof source.objectiveBubblesEnabled === 'boolean'
                 ? source.objectiveBubblesEnabled
                 : DEFAULT_PAPER_SETTINGS.objectiveBubblesEnabled,
+        objectiveOptionBubblesEnabled:
+            typeof source.objectiveOptionBubblesEnabled === 'boolean'
+                ? source.objectiveOptionBubblesEnabled
+                : DEFAULT_PAPER_SETTINGS.objectiveOptionBubblesEnabled,
         orGroupLayout: pickEnum(
             source.orGroupLayout,
             OR_GROUP_LAYOUT_VALUES,

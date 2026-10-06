@@ -1,6 +1,9 @@
 import { cn } from '@/lib/utils';
 import type { GeneratedPaperPassageQuestion } from '../types';
-import { CorrectAnswerTick } from './bilingual-option-content';
+import {
+    CorrectAnswerTick,
+    OptionBubbleLabel,
+} from './bilingual-option-content';
 import {
     bilingualPartsHaveSameVisibleText,
     containsUrduScript,
@@ -15,12 +18,14 @@ export function PassageQuestionContent({
     inline = false,
     rtl = false,
     showCorrectAnswers = false,
+    showOptionBubbles = false,
     numberOffset = 0,
 }: {
     questions: GeneratedPaperPassageQuestion[];
     inline?: boolean;
     rtl?: boolean;
     showCorrectAnswers?: boolean;
+    showOptionBubbles?: boolean;
     numberOffset?: number;
 }) {
     if (inline) {
@@ -30,7 +35,7 @@ export function PassageQuestionContent({
                 data-paper-urdu-content={rtl ? true : undefined}
                 className={cn(
                     'ml-2 block align-top',
-                    rtl && 'mr-2 ml-0 text-right',
+                    rtl && 'ml-0 mr-2 text-right',
                 )}
                 style={
                     rtl ? { fontFamily: 'var(--paper-urdu-font)' } : undefined
@@ -55,6 +60,7 @@ export function PassageQuestionContent({
                                 inline
                                 rtl={rtl}
                                 showCorrectAnswers={showCorrectAnswers}
+                                showOptionBubbles={showOptionBubbles}
                             />
                         </span>
                     ))}
@@ -85,6 +91,7 @@ export function PassageQuestionContent({
                         options={question.options}
                         rtl={rtl}
                         showCorrectAnswers={showCorrectAnswers}
+                        showOptionBubbles={showOptionBubbles}
                     />
                 </div>
             ))}
@@ -97,11 +104,13 @@ function PassageOptions({
     inline = false,
     rtl = false,
     showCorrectAnswers = false,
+    showOptionBubbles = false,
 }: {
     options: GeneratedPaperPassageQuestion['options'];
     inline?: boolean;
     rtl?: boolean;
     showCorrectAnswers?: boolean;
+    showOptionBubbles?: boolean;
 }) {
     if (options.length === 0) {
         return null;
@@ -114,19 +123,25 @@ function PassageOptions({
                     <span
                         key={option.id}
                         data-paper-correct-option={
-                            showCorrectAnswers && option.isCorrect === true
+                            !showOptionBubbles &&
+                            showCorrectAnswers &&
+                            option.isCorrect === true
                                 ? true
                                 : undefined
                         }
                         className="inline-flex items-baseline"
                     >
                         <span className="font-semibold">
-                            ({optionLabels[optionIndex] ?? optionIndex + 1})
-                            <CorrectAnswerTick
-                                show={
+                            <PassageOptionLabel
+                                label={String(
+                                    optionLabels[optionIndex] ??
+                                        optionIndex + 1,
+                                )}
+                                filled={
                                     showCorrectAnswers &&
                                     option.isCorrect === true
                                 }
+                                bubble={showOptionBubbles}
                             />
                         </span>{' '}
                         <PassageOptionValue value={option.text} inline />
@@ -147,24 +162,48 @@ function PassageOptions({
                 <div
                     key={option.id}
                     data-paper-correct-option={
-                        showCorrectAnswers && option.isCorrect === true
+                        !showOptionBubbles &&
+                        showCorrectAnswers &&
+                        option.isCorrect === true
                             ? true
                             : undefined
                     }
                     className="flex items-start gap-1"
                 >
                     <span className="shrink-0 font-semibold">
-                        ({optionLabels[optionIndex] ?? optionIndex + 1})
-                        <CorrectAnswerTick
-                            show={
+                        <PassageOptionLabel
+                            label={String(
+                                optionLabels[optionIndex] ?? optionIndex + 1,
+                            )}
+                            filled={
                                 showCorrectAnswers && option.isCorrect === true
                             }
+                            bubble={showOptionBubbles}
                         />
                     </span>
                     <PassageOptionValue value={option.text} inline />
                 </div>
             ))}
         </div>
+    );
+}
+
+function PassageOptionLabel({
+    label,
+    filled,
+    bubble,
+}: {
+    label: string;
+    filled: boolean;
+    bubble: boolean;
+}) {
+    return bubble ? (
+        <OptionBubbleLabel label={label} filled={filled} />
+    ) : (
+        <>
+            ({label})
+            <CorrectAnswerTick show={filled} />
+        </>
     );
 }
 
