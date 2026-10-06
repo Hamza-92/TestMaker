@@ -67,11 +67,12 @@ test('customers can save an Arabic paper font', function (string $font) {
         ->toBe($font);
 })->with(['noto-naskh-arabic', 'amiri', 'noto-sans-arabic', 'noto-kufi-arabic']);
 
-test('customers can save print copies and orientation', function () {
+test('customers can save print copies, side by side layout, and orientation', function () {
     $customer = paperDefaultsCustomer();
     $payload = paperDefaultsPayload();
     $payload['settings'] += [
         'printCopies' => 3,
+        'sideBySideCopiesEnabled' => true,
         'orientation' => 'landscape',
     ];
 
@@ -81,6 +82,7 @@ test('customers can save print copies and orientation', function () {
 
     $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
     expect($settings['printCopies'])->toBe(3);
+    expect($settings['sideBySideCopiesEnabled'])->toBeTrue();
     expect($settings['orientation'])->toBe('landscape');
 });
 
@@ -136,6 +138,7 @@ test('invalid paper defaults and structural assignment overrides are rejected', 
     ['settings.objectiveLayout', 'federal-row', 'settings'],
     ['settings.watermarkLogoUrl', 'javascript:alert(1)', 'settings.watermarkLogoUrl'],
     ['settings.printCopies', 5, 'settings.printCopies'],
+    ['settings.sideBySideCopiesEnabled', 'invalid', 'settings.sideBySideCopiesEnabled'],
     ['settings.multiplePerSheetEnabled', true, 'settings'],
     ['settings.papersPerSheet', 2, 'settings'],
     ['header.marks', 900, 'header'],

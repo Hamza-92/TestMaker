@@ -297,6 +297,13 @@ interface ExportOptions {
     papers: HTMLElement[];
     settings: PaperSettings;
     name: string;
+    /** Number of pairs to print, with two full-size-text papers in each pair. */
+    sideBySidePairs?: number;
+    /** Receives each paired page before its capture canvas is released. */
+    onSideBySidePage?: (
+        canvas: HTMLCanvasElement,
+        copies: number,
+    ) => Promise<void> | void;
     onProgress?: (message: string) => void;
     onMissingImages?: (count: number) => void;
     /** Used by browser regression checks without triggering a download. */
@@ -308,6 +315,8 @@ export async function downloadPaperPdf({
     papers,
     settings,
     name,
+    sideBySidePairs = 0,
+    onSideBySidePage,
     onProgress,
     onMissingImages,
     save = true,
@@ -320,9 +329,16 @@ export async function downloadPaperPdf({
         settings.paperSize,
         settings.orientation,
     );
-    const width =
-        (dimensions.width - settings.marginLeft - settings.marginRight) *
-        PX_PER_MM;
+    const printableWidthMm =
+        dimensions.width - settings.marginLeft - settings.marginRight;
+    const gapMm = 3;
+    const columnInsetMm = 1;
+    const pairCount = Math.min(Math.max(Math.round(sideBySidePairs), 0), 4);
+    const paired = pairCount > 0;
+    const columnWidthMm = paired
+        ? (printableWidthMm - gapMm - columnInsetMm * 2) / 2
+        : printableWidthMm;
+    const width = columnWidthMm * PX_PER_MM;
     const height =
         (dimensions.height - settings.marginTop - settings.marginBottom) *
         PX_PER_MM;
@@ -400,8 +416,15 @@ export async function downloadPaperPdf({
             .querySelector('[data-paper-watermark]')
             ?.cloneNode(true) as HTMLElement | undefined;
 
-        for (let setIndex = 0; setIndex < clones.length; setIndex++) {
-            const clone = clones[setIndex];
+        const renderRuns = clones.flatMap((clone, setIndex) =>
+            Array.from({ length: paired ? pairCount : 1 }, () => ({
+                clone,
+                setIndex,
+                copies: paired ? 2 : 1,
+            })),
+        );
+
+        for (const { clone, setIndex, copies } of renderRuns) {
             // Reuse the actual watermark on every exported page, including
             // secondary sets and copies.
             const watermark = (
@@ -637,7 +660,9 @@ export async function downloadPaperPdf({
                 }
 
                 holder.append(page);
-                onProgress?.(`Creating PDF page ${pageCount + 1}…`);
+                onProgress?.(
+                    `${onSideBySidePage ? 'Preparing print' : 'Creating PDF'} page ${pageCount + 1}…`,
+                );
 
                 try {
                     const canvas = await timeout(
@@ -667,13 +692,33 @@ export async function downloadPaperPdf({
                     pdf.addImage(
                         canvas,
                         'PNG',
-                        settings.marginLeft,
+                        settings.marginLeft + (paired ? columnInsetMm : 0),
                         settings.marginTop,
-                        width / PX_PER_MM,
+                        columnWidthMm,
                         height / PX_PER_MM,
                         undefined,
                         'FAST',
                     );
+
+                    if (paired && copies === 2) {
+                        pdf.addImage(
+                            canvas,
+                            'PNG',
+                            settings.marginLeft +
+                                columnInsetMm +
+                                columnWidthMm +
+                                gapMm,
+                            settings.marginTop,
+                            columnWidthMm,
+                            height / PX_PER_MM,
+                            undefined,
+                            'FAST',
+                        );
+                    }
+
+                    if (paired) {
+                        await onSideBySidePage?.(canvas, copies);
+                    }
 
                     canvas.width = 0;
                     canvas.height = 0;

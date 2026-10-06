@@ -872,7 +872,25 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: var(--paper-urdu-question-line-height) !important;
 }
 
+[data-side-by-side-print-root] {
+    display: none;
+}
+
 @media print {
+    body[data-side-by-side-print] #app {
+        display: none !important;
+    }
+
+    body[data-side-by-side-print] [data-side-by-side-print-root] {
+        display: block !important;
+    }
+
+    body[data-side-by-side-print]
+        [data-side-by-side-print-page]:not(:last-child) {
+        break-after: page;
+        page-break-after: always;
+    }
+
     /* The @page size/margin rule is injected per-paper by the React component
        so it can react to the user's paper-size + margin settings. */
 

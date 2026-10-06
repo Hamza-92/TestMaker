@@ -3402,6 +3402,7 @@ export default function GeneratePaper({
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
     const pdfDownloadStarted = useRef(false);
     const pdfDownloadBusy = useRef(false);
+    const sideBySidePrintBusy = useRef(false);
     const [savedPaperId, setSavedPaperId] = useState<number | null>(null);
     const [savedPaperName, setSavedPaperName] = useState('');
     const [savedPaperIsDraft, setSavedPaperIsDraft] = useState(false);
@@ -6186,6 +6187,14 @@ export default function GeneratePaper({
             return;
         }
 
+        const settings = normalizePaperSettings(generatedPaper.settings);
+
+        if (settings.sideBySideCopiesEnabled) {
+            void printSideBySideCopies(settings);
+
+            return;
+        }
+
         flushSync(() => setPrintAllSets(true));
         const cleanup = () => {
             window.removeEventListener('afterprint', cleanup);
@@ -6204,8 +6213,122 @@ export default function GeneratePaper({
         }
     }
 
+    async function printSideBySideCopies(settings: PaperSettings) {
+        if (
+            !generatedPaper ||
+            sideBySidePrintBusy.current ||
+            pdfDownloadBusy.current
+        ) {
+            return;
+        }
+
+        sideBySidePrintBusy.current = true;
+        flushSync(() => setPrintAllSets(true));
+        const dimensions = getPageDimensions(
+            settings.paperSize,
+            settings.orientation,
+        );
+        const contentWidth =
+            dimensions.width - settings.marginLeft - settings.marginRight;
+        const contentHeight =
+            dimensions.height - settings.marginTop - settings.marginBottom;
+        const columnWidth = (contentWidth - 3 - 2) / 2;
+        const root = document.createElement('div');
+        root.setAttribute('data-side-by-side-print-root', '');
+        const imageUrls: string[] = [];
+        const progress = toast.loading('Preparing side by side print…');
+        const cleanup = () => {
+            window.removeEventListener('afterprint', cleanup);
+            root.remove();
+            document.body.removeAttribute('data-side-by-side-print');
+            imageUrls.forEach((url) => URL.revokeObjectURL(url));
+            setPrintAllSets(false);
+            sideBySidePrintBusy.current = false;
+        };
+
+        try {
+            const { downloadPaperPdf } = await import(
+                './paper-layouts/download-paper-pdf'
+            );
+            const papers = printablePapers().filter(
+                (paper) => paper.dataset.paperCopyIndex === '0',
+            );
+
+            await downloadPaperPdf({
+                papers,
+                settings,
+                name: savedPaperName || defaultPaperName() || 'Paper',
+                save: false,
+                sideBySidePairs: settings.printCopies,
+                onProgress: (message) =>
+                    toast.loading(message, { id: progress }),
+                onSideBySidePage: async (canvas, copies) => {
+                    const blob = await new Promise<Blob>((resolve, reject) => {
+                        canvas.toBlob((value) =>
+                            value
+                                ? resolve(value)
+                                : reject(
+                                      new Error('Could not prepare a print page.'),
+                                  ),
+                        );
+                    });
+                    const url = URL.createObjectURL(blob);
+                    imageUrls.push(url);
+                    const page = document.createElement('div');
+                    page.setAttribute('data-side-by-side-print-page', '');
+                    Object.assign(page.style, {
+                        position: 'relative',
+                        width: `${contentWidth}mm`,
+                        height: `${contentHeight}mm`,
+                        overflow: 'hidden',
+                        background: '#ffffff',
+                    });
+
+                    for (let index = 0; index < copies; index++) {
+                        const image = document.createElement('img');
+                        image.src = url;
+                        image.alt = '';
+                        Object.assign(image.style, {
+                            position: 'absolute',
+                            top: '0',
+                            left: `${1 + index * (columnWidth + 3)}mm`,
+                            width: `${columnWidth}mm`,
+                            height: `${contentHeight}mm`,
+                        });
+                        page.append(image);
+                    }
+
+                    root.append(page);
+                },
+            });
+
+            document.body.append(root);
+            document.body.setAttribute('data-side-by-side-print', '');
+            await Promise.all(
+                Array.from(root.querySelectorAll('img'), (image) =>
+                    image.decode(),
+                ),
+            );
+            toast.dismiss(progress);
+            window.addEventListener('afterprint', cleanup);
+            window.print();
+        } catch (error) {
+            cleanup();
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not prepare the paper for printing.',
+                { id: progress },
+            );
+        }
+    }
+
     async function downloadGeneratedPaperPdf() {
-        if (!generatedPaper || pdfDownloadBusy.current) {
+        if (
+            !generatedPaper ||
+            pdfDownloadBusy.current ||
+            sideBySidePrintBusy.current
+        ) {
             return;
         }
 
@@ -6221,12 +6344,16 @@ export default function GeneratePaper({
             // Mount the existing print variants; use their DOM, never a second
             // implementation of question selection or paper layout.
             flushSync(() => setPrintAllSets(true));
-            const papers = printablePapers();
             const settings = normalizePaperSettings(generatedPaper.settings);
+            const sideBySide = settings.sideBySideCopiesEnabled;
+            const papers = printablePapers().filter(
+                (paper) => !sideBySide || paper.dataset.paperCopyIndex === '0',
+            );
             await downloadPaperPdf({
                 papers,
                 settings,
                 name,
+                sideBySidePairs: sideBySide ? settings.printCopies : 0,
                 onProgress: (message) =>
                     toast.loading(message, { id: progress }),
                 onMissingImages: (count) => {
@@ -14690,6 +14817,38 @@ export function GeneratedPaperView({
                                 ))}
                             </SelectContent>
                         </Select>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={settings.sideBySideCopiesEnabled}
+                            onClick={() =>
+                                onSettingsChange({
+                                    sideBySideCopiesEnabled:
+                                        !settings.sideBySideCopiesEnabled,
+                                })
+                            }
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            <span>Side by side</span>
+                            <span
+                                aria-hidden="true"
+                                className={cn(
+                                    'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                    settings.sideBySideCopiesEnabled
+                                        ? 'bg-brand-600'
+                                        : 'bg-slate-200 dark:bg-slate-700',
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                        settings.sideBySideCopiesEnabled
+                                            ? 'translate-x-3.5'
+                                            : 'translate-x-0',
+                                    )}
+                                />
+                            </span>
+                        </button>
                         <Select
                             value={settings.orientation}
                             onValueChange={(value) =>

@@ -348,6 +348,8 @@ export interface PaperSettings {
     orientation: PaperOrientation;
     /** Identical copies to print for each set. */
     printCopies: number;
+    /** Print identical copies in two parallel columns on every page. */
+    sideBySideCopiesEnabled: boolean;
     /** Page margins in millimetres (4 sides). 0 = no margin (content runs to the edge). */
     marginTop: number;
     marginRight: number;
@@ -437,6 +439,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     paperSize: 'A4',
     orientation: 'portrait',
     printCopies: 1,
+    sideBySideCopiesEnabled: false,
     marginTop: 10,
     marginRight: 10,
     marginBottom: 10,
@@ -747,6 +750,10 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             Number.isFinite(source.printCopies)
                 ? Math.min(Math.max(Math.round(source.printCopies), 1), 4)
                 : DEFAULT_PAPER_SETTINGS.printCopies,
+        sideBySideCopiesEnabled:
+            typeof source.sideBySideCopiesEnabled === 'boolean'
+                ? source.sideBySideCopiesEnabled
+                : DEFAULT_PAPER_SETTINGS.sideBySideCopiesEnabled,
         marginTop:
             typeof source.marginTop === 'number'
                 ? source.marginTop
