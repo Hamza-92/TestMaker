@@ -119,7 +119,7 @@ export function BoxedObjectiveSection({
             <div
                 data-paper-question-group="stacked"
                 dir={questionsRtl ? 'rtl' : undefined}
-                className={columns > 1 ? 'grid gap-x-6' : undefined}
+                className={columns > 1 ? 'grid gap-x-6 pt-1.5' : 'pt-1.5'}
                 style={
                     columns > 1
                         ? {
@@ -229,12 +229,16 @@ function ObjectiveQuestionRow({
                                 section.questionTextRtl ? true : undefined
                             }
                             className={
-                                section.questionTextRtl ? 'text-right' : undefined
+                                section.questionTextRtl
+                                    ? 'text-right'
+                                    : undefined
                             }
                         >
                             <QuestionContent value={question.text} />
                             {question.sameStatement && (
-                                <QuestionContent value={question.sameStatement} />
+                                <QuestionContent
+                                    value={question.sameStatement}
+                                />
                             )}
                         </div>
                     ) : (
