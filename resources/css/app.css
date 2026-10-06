@@ -686,6 +686,46 @@ input[type='date']::-webkit-calendar-picker-indicator {
     border-color: currentColor;
     box-sizing: border-box;
 }
+
+/* Only compact the header in a side-by-side column. The classic template's
+   fixed column widths otherwise overflow the narrower paper. */
+[data-print-paper][data-side-by-side-column] [data-paper-header-frame] {
+    max-width: 100%;
+    min-width: 0;
+}
+
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] {
+    min-width: 0;
+    max-width: 100%;
+}
+
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(1) {
+    width: 22% !important;
+}
+
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(2),
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(4) {
+    width: 18% !important;
+}
+
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(3),
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(5) {
+    width: 21% !important;
+}
+
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] th,
+[data-print-paper][data-side-by-side-column] [data-paper-header-table] td {
+    overflow-wrap: anywhere;
+}
+
+[data-print-paper][data-side-by-side-column]
+    [data-paper-header-table] [data-paper-header-cell] > div > * {
+    max-width: 100%;
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+}
+
 [data-print-paper] [data-paper-heading] {
     font-size: var(--paper-heading-size, 0.875rem);
     line-height: var(--paper-heading-line-height, 1.5);

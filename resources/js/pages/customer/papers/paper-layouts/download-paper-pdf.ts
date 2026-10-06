@@ -375,6 +375,35 @@ export async function downloadPaperPdf({
         const clones = papers.map((source) => {
             const clone = cleanClone(source);
             clone.style.width = `${width}px`;
+
+            if (paired) {
+                clone.setAttribute('data-side-by-side-column', '');
+                clone.style.setProperty(
+                    '--paper-header-size',
+                    `${Math.min(settings.headerSize, 11)}px`,
+                );
+                clone.style.setProperty(
+                    '--paper-header-padding-x',
+                    `${Math.min(settings.headerPaddingX, 3)}px`,
+                );
+                clone.style.setProperty(
+                    '--paper-header-padding-y',
+                    `${Math.min(settings.headerPaddingY, 3)}px`,
+                );
+                clone
+                    .querySelectorAll<HTMLInputElement>('[data-paper-header] input')
+                    .forEach((input) => {
+                        const value = document.createElement('span');
+                        value.textContent = input.value;
+                        value.className = input.className;
+                        value.style.display = 'block';
+                        value.style.width = '100%';
+                        value.style.whiteSpace = 'normal';
+                        value.style.overflowWrap = 'anywhere';
+                        input.replaceWith(value);
+                    });
+            }
+
             holder.append(clone);
 
             return clone;
