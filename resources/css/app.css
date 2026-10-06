@@ -36,6 +36,14 @@
 }
 
 @font-face {
+    font-family: 'Amiri Quran';
+    src: url('/fonts/AmiriQuran.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
     font-family: 'Noto Sans Arabic';
     src: url('/fonts/NotoSansArabic-Variable.ttf') format('truetype');
     font-style: normal;
@@ -61,6 +69,13 @@
 [data-paper-workflow] [data-paper-urdu-content],
 [data-paper-workflow] [data-paper-urdu-content] * {
     font-family: 'Jameel Noori Nastaleeq', serif !important;
+}
+
+[data-paper-workflow] .paper-rich-text [data-paper-arabic-content],
+[data-paper-workflow] .paper-rich-text [data-paper-arabic-content] *,
+[data-paper-workflow] .paper-rich-text [lang='ar'],
+[data-paper-workflow] .paper-rich-text [lang='ar'] * {
+    font-family: 'Amiri Quran', 'Amiri', serif !important;
 }
 
 :root {
@@ -910,6 +925,14 @@ input[type='date']::-webkit-calendar-picker-indicator {
 [data-print-paper] [data-paper-question] [dir='rtl'] {
     font-size: var(--paper-urdu-question-size) !important;
     line-height: var(--paper-urdu-question-line-height) !important;
+}
+
+[data-print-paper] [data-paper-question] [data-paper-arabic-content],
+[data-print-paper] [data-paper-question] [data-paper-arabic-content] *,
+[data-print-paper] [data-paper-question] [lang='ar'],
+[data-print-paper] [data-paper-question] [lang='ar'] * {
+    font-family: 'Amiri Quran', 'Amiri', serif !important;
+    transform: none !important;
 }
 
 [data-side-by-side-print-root] {

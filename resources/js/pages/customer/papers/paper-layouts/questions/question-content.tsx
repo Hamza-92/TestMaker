@@ -1,5 +1,6 @@
 import 'katex/dist/katex.min.css';
 import { cn } from '@/lib/utils';
+import { markArabicQuestionHtml } from './arabic-question-font';
 import { questionTextToHtml } from './question-html';
 
 interface QuestionContentProps {
@@ -18,7 +19,9 @@ export function QuestionContent({
     return (
         <Component
             className={cn('paper-rich-text', inline && 'inline', className)}
-            dangerouslySetInnerHTML={{ __html: questionTextToHtml(value) }}
+            dangerouslySetInnerHTML={{
+                __html: markArabicQuestionHtml(questionTextToHtml(value)),
+            }}
         />
     );
 }
