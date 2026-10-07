@@ -18,12 +18,20 @@ class PaperDefaultsController extends Controller
         return Inertia::render('customer/paper-defaults', [
             'paperDefaults' => CustomerPaperDefaults::forUser($request->user()),
             'canViewSubjectiveAnswers' => SubjectiveAnswerAccess::allows($request->user()),
+            'canEditWatermark' => CustomerPaperDefaults::canEditWatermark($request),
         ]);
     }
 
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate(CustomerPaperDefaults::rules($request->user()));
+        $existing = PaperDefault::where('user_id', $request->user()->id)->first();
+        if (! CustomerPaperDefaults::canEditWatermark($request)) {
+            $data['settings'] = CustomerPaperDefaults::preserveWatermarkSettings(
+                $data['settings'],
+                $existing?->settings ?? [],
+            );
+        }
         PaperDefault::updateOrCreate(['user_id' => $request->user()->id], [
             'settings' => $data['settings'],
             'header' => array_map(fn ($value) => $value ?? '', $data['header']),
@@ -36,7 +44,22 @@ class PaperDefaultsController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
-        PaperDefault::where('user_id', $request->user()->id)->delete();
+        $defaults = PaperDefault::where('user_id', $request->user()->id)->first();
+        if ($defaults && ! CustomerPaperDefaults::canEditWatermark($request)) {
+            $watermark = CustomerPaperDefaults::watermarkSettings($defaults->settings ?? []);
+            if ($watermark !== []) {
+                $defaults->update([
+                    'settings' => $watermark,
+                    'header' => [],
+                    'view_mode' => 'paper',
+                    'num_sets' => 1,
+                ]);
+            } else {
+                $defaults->delete();
+            }
+        } else {
+            $defaults?->delete();
+        }
 
         return back()->with('toast', ['type' => 'success', 'message' => 'System paper defaults restored.']);
     }

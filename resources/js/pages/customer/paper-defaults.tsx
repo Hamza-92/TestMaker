@@ -33,6 +33,7 @@ import type {
 interface Props {
     paperDefaults: PaperPreferences | null;
     canViewSubjectiveAnswers: boolean;
+    canEditWatermark: boolean;
 }
 
 const noop = () => {};
@@ -40,6 +41,7 @@ const noop = () => {};
 export default function PaperDefaults({
     paperDefaults,
     canViewSubjectiveAnswers,
+    canEditWatermark,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
     const initial = {
@@ -116,13 +118,25 @@ export default function PaperDefaults({
     }
 
     function updateSettings(patch: Partial<PaperSettings>) {
-        form.setData(
-            'settings',
-            normalizePaperSettings({
-                ...form.data.settings,
-                ...patch,
-            }),
-        );
+        const next = normalizePaperSettings({
+            ...form.data.settings,
+            ...patch,
+        });
+        form.setData('settings', preserveLockedWatermark(next));
+    }
+
+    function preserveLockedWatermark(next: PaperSettings): PaperSettings {
+        if (canEditWatermark) {
+            return next;
+        }
+
+        return {
+            ...next,
+            watermarkType: form.data.settings.watermarkType,
+            watermarkText: form.data.settings.watermarkText,
+            watermarkLogoUrl: form.data.settings.watermarkLogoUrl,
+            watermarkOpacity: form.data.settings.watermarkOpacity,
+        };
     }
 
     function resetDefaults() {
@@ -131,7 +145,9 @@ export default function PaperDefaults({
             preserveScroll: true,
             onSuccess: () => {
                 const system = {
-                    settings: { ...DEFAULT_PAPER_SETTINGS },
+                    settings: preserveLockedWatermark({
+                        ...DEFAULT_PAPER_SETTINGS,
+                    }),
                     header: {
                         exam: '',
                         section: '',
@@ -253,6 +269,7 @@ export default function PaperDefaults({
                     inline
                     settings={settings}
                     defaultWatermarkLogoUrl={logoUrl}
+                    canEditWatermark={canEditWatermark}
                     onChange={updateSettings}
                 />
                 <GeneratedPaperView
@@ -333,19 +350,6 @@ export default function PaperDefaults({
                     onPickerClose={noop}
                     previewOnly
                     showSettingsDrawer={false}
-                    footerActions={
-                        <div className="flex flex-wrap justify-end gap-2">
-                            {form.isDirty && (
-                                <span className="self-center text-xs font-medium text-amber-600">
-                                    Unsaved changes
-                                </span>
-                            )}
-                            <Button asChild>
-                                <Link href="/dashboard">Back</Link>
-                            </Button>
-                            {controls}
-                        </div>
-                    }
                     toolbarExtras={
                         <Select
                             value={medium}
@@ -372,6 +376,17 @@ export default function PaperDefaults({
                         </Select>
                     }
                 />
+                <div className="sticky bottom-0 z-30 flex flex-wrap justify-end gap-2 rounded-xl border border-slate-200 bg-white/95 px-4 py-2.5 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 print:hidden">
+                    {form.isDirty && (
+                        <span className="self-center text-xs font-medium text-amber-600">
+                            Unsaved changes
+                        </span>
+                    )}
+                    <Button asChild>
+                        <Link href="/dashboard">Back</Link>
+                    </Button>
+                    {controls}
+                </div>
             </div>
             {confirmReset && (
                 <ConfirmDialog

@@ -51,6 +51,7 @@ interface PaperSettingsDrawerProps {
     settings: PaperSettings;
     sectioningAvailable?: boolean;
     defaultWatermarkLogoUrl?: string;
+    canEditWatermark?: boolean;
     onChange: (patch: Partial<PaperSettings>) => void;
     onClose: () => void;
 }
@@ -261,6 +262,7 @@ export function PaperSettingsDrawer({
     settings,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
+    canEditWatermark = true,
     onChange,
     onClose,
 }: PaperSettingsDrawerProps) {
@@ -434,6 +436,7 @@ export function PaperSettingsDrawer({
                     settings={settings}
                     sectioningAvailable={sectioningAvailable}
                     defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
+                    canEditWatermark={canEditWatermark}
                     onChange={onChange}
                 />
             </aside>
@@ -445,6 +448,7 @@ export function PaperSettingsPanel({
     settings,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
+    canEditWatermark = true,
     onChange,
     inline = false,
 }: Omit<PaperSettingsDrawerProps, 'open' | 'onClose'> & { inline?: boolean }) {
@@ -678,6 +682,7 @@ export function PaperSettingsPanel({
             >
                 <WatermarkTypeSelector
                     value={settings.watermarkType}
+                    disabled={!canEditWatermark}
                     onChange={(value) => onChange({ watermarkType: value })}
                 />
                 <div className={inline ? 'xl:col-span-2' : 'mt-4'}>
@@ -686,6 +691,7 @@ export function PaperSettingsPanel({
                             label="Text"
                             value={settings.watermarkText}
                             placeholder="Optional"
+                            disabled={!canEditWatermark}
                             onChange={(value) =>
                                 onChange({ watermarkText: value })
                             }
@@ -694,6 +700,7 @@ export function PaperSettingsPanel({
                         <LogoInput
                             value={settings.watermarkLogoUrl}
                             defaultValue={defaultWatermarkLogoUrl}
+                            disabled={!canEditWatermark}
                             onChange={(value) =>
                                 onChange({
                                     watermarkLogoUrl: value,
@@ -708,6 +715,7 @@ export function PaperSettingsPanel({
                         value={settings.watermarkOpacity}
                         min={WATERMARK_OPACITY_BOUNDS.min}
                         max={WATERMARK_OPACITY_BOUNDS.max}
+                        disabled={!canEditWatermark}
                         onChange={(v) => onChange({ watermarkOpacity: v })}
                     />
                 </div>
@@ -1001,7 +1009,7 @@ function CollapsibleSection({
     contentClassName?: string;
     children: React.ReactNode;
 }) {
-    const [open, setOpen] = useState(inline || defaultOpen);
+    const [open, setOpen] = useState(!inline && defaultOpen);
 
     return (
         <section
@@ -1149,6 +1157,7 @@ function LabeledStepper({
     min,
     max,
     step = 1,
+    disabled = false,
     onChange,
 }: {
     label: string;
@@ -1156,6 +1165,7 @@ function LabeledStepper({
     min: number;
     max: number;
     step?: number;
+    disabled?: boolean;
     onChange: (next: number) => void;
 }) {
     const precision =
@@ -1179,13 +1189,13 @@ function LabeledStepper({
     const inputMode = step % 1 === 0 ? 'numeric' : 'decimal';
 
     return (
-        <div>
+        <div className={disabled ? 'opacity-60' : undefined}>
             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 {label}
             </p>
             <div className="flex h-9 items-stretch overflow-hidden rounded-lg border border-slate-200 transition-colors focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 dark:border-slate-800 dark:focus-within:border-brand-400 dark:focus-within:ring-brand-400/20">
                 <StepperButton
-                    disabled={!canDecrement}
+                    disabled={disabled || !canDecrement}
                     onClick={() => onChange(clamp(value - step))}
                     aria-label={`Decrease ${label.toLowerCase()}`}
                 >
@@ -1195,6 +1205,7 @@ function LabeledStepper({
                 <input
                     autoComplete="off"
                     type="number"
+                    disabled={disabled}
                     inputMode={inputMode}
                     value={value}
                     min={min}
@@ -1211,7 +1222,7 @@ function LabeledStepper({
                 />
 
                 <StepperButton
-                    disabled={!canIncrement}
+                    disabled={disabled || !canIncrement}
                     onClick={() => onChange(clamp(value + step))}
                     aria-label={`Increase ${label.toLowerCase()}`}
                 >
@@ -1224,13 +1235,15 @@ function LabeledStepper({
 
 function WatermarkTypeSelector({
     value,
+    disabled = false,
     onChange,
 }: {
     value: PaperWatermarkType;
+    disabled?: boolean;
     onChange: (next: PaperWatermarkType) => void;
 }) {
     return (
-        <div>
+        <div className={disabled ? 'opacity-60' : undefined}>
             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 Type
             </p>
@@ -1238,6 +1251,7 @@ function WatermarkTypeSelector({
                 <WatermarkTypeButton
                     active={value === 'text'}
                     label="Text"
+                    disabled={disabled}
                     onClick={() => onChange('text')}
                 >
                     <TypeIcon className="size-4" />
@@ -1245,6 +1259,7 @@ function WatermarkTypeSelector({
                 <WatermarkTypeButton
                     active={value === 'logo'}
                     label="Logo"
+                    disabled={disabled}
                     onClick={() => onChange('logo')}
                 >
                     <ImageIcon className="size-4" />
@@ -1257,11 +1272,13 @@ function WatermarkTypeSelector({
 function WatermarkTypeButton({
     active,
     label,
+    disabled = false,
     onClick,
     children,
 }: {
     active: boolean;
     label: string;
+    disabled?: boolean;
     onClick: () => void;
     children: React.ReactNode;
 }) {
@@ -1269,6 +1286,7 @@ function WatermarkTypeButton({
         <button
             type="button"
             aria-pressed={active}
+            disabled={disabled}
             onClick={onClick}
             className={cn(
                 'flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-[13px] font-semibold transition-colors',
@@ -1286,10 +1304,12 @@ function WatermarkTypeButton({
 function LogoInput({
     value,
     defaultValue,
+    disabled = false,
     onChange,
 }: {
     value: string;
     defaultValue: string;
+    disabled?: boolean;
     onChange: (next: string) => void;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -1299,7 +1319,7 @@ function LogoInput({
     const isUsingDefault = customLogoUrl === '' && defaultLogoUrl !== '';
 
     return (
-        <div>
+        <div className={disabled ? 'opacity-60' : undefined}>
             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 Logo
             </p>
@@ -1328,6 +1348,7 @@ function LogoInput({
                         {customLogoUrl !== '' && (
                             <button
                                 type="button"
+                                disabled={disabled}
                                 onClick={() => onChange('')}
                                 className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-800 dark:text-slate-300 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-300"
                             >
@@ -1345,6 +1366,7 @@ function LogoInput({
                     autoComplete="off"
                     ref={inputRef}
                     type="file"
+                    disabled={disabled}
                     accept="image/*"
                     className="hidden"
                     onChange={(event) => {
@@ -1368,6 +1390,7 @@ function LogoInput({
                 />
                 <button
                     type="button"
+                    disabled={disabled}
                     onClick={() => inputRef.current?.click()}
                     className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
@@ -1383,21 +1406,24 @@ function TextInput({
     label,
     value,
     placeholder,
+    disabled = false,
     onChange,
 }: {
     label: string;
     value: string;
     placeholder?: string;
+    disabled?: boolean;
     onChange: (next: string) => void;
 }) {
     return (
-        <div>
+        <div className={disabled ? 'opacity-60' : undefined}>
             <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 {label}
             </p>
             <input
                 autoComplete="off"
                 type="text"
+                disabled={disabled}
                 value={value}
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}

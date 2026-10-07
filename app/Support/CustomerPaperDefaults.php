@@ -2,12 +2,47 @@
 
 namespace App\Support;
 
+use App\Enums\UserType;
 use App\Models\PaperDefault;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class CustomerPaperDefaults
 {
+    public const WATERMARK_SETTING_KEYS = [
+        'watermarkType',
+        'watermarkText',
+        'watermarkLogoUrl',
+        'watermarkOpacity',
+    ];
+
+    public static function canEditWatermark(Request $request): bool
+    {
+        $impersonatorId = $request->session()->get('impersonator_id');
+
+        return $request->user()?->isCustomer() === true
+            && is_numeric($impersonatorId)
+            && User::query()
+                ->whereKey($impersonatorId)
+                ->where('user_type', UserType::SuperAdmin->value)
+                ->exists();
+    }
+
+    public static function watermarkSettings(array $settings): array
+    {
+        return array_intersect_key($settings, array_flip(self::WATERMARK_SETTING_KEYS));
+    }
+
+    public static function preserveWatermarkSettings(array $submitted, array $existing): array
+    {
+        foreach (self::WATERMARK_SETTING_KEYS as $key) {
+            unset($submitted[$key]);
+        }
+
+        return array_replace($submitted, self::watermarkSettings($existing));
+    }
+
     public static function forUser(User $user): ?array
     {
         $owner = $user->schoolOwner();
