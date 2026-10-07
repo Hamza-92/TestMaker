@@ -130,6 +130,7 @@ class GeneratePaperController extends Controller
 
         return [
             'paperDefaults' => CustomerPaperDefaults::forUser(auth()->user()),
+            'canEditWatermark' => CustomerPaperDefaults::canEditWatermark(request()),
             'patterns' => $patterns,
             'patternClasses' => $patternClasses,
             'classSubjects' => $classSubjects,

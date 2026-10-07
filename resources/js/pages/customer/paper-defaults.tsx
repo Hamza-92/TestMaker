@@ -290,6 +290,7 @@ export default function PaperDefaults({
                     schoolAddress={String(auth.user.address || '')}
                     showSchoolAddress={Boolean(auth.user.is_show_address)}
                     canViewSubjectiveAnswers={canViewSubjectiveAnswers}
+                    canEditWatermark={canEditWatermark}
                     pickerTarget={null}
                     pickerQuestions={[]}
                     pickerSearch=""

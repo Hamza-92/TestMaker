@@ -262,7 +262,7 @@ export function PaperSettingsDrawer({
     settings,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
-    canEditWatermark = true,
+    canEditWatermark = false,
     onChange,
     onClose,
 }: PaperSettingsDrawerProps) {
@@ -448,7 +448,7 @@ export function PaperSettingsPanel({
     settings,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
-    canEditWatermark = true,
+    canEditWatermark = false,
     onChange,
     inline = false,
 }: Omit<PaperSettingsDrawerProps, 'open' | 'onClose'> & { inline?: boolean }) {

@@ -382,6 +382,7 @@ interface Props {
     appliedTemplate?: AppliedTemplate;
     initialPatternId?: number | null;
     canViewSubjectiveAnswers: boolean;
+    canEditWatermark: boolean;
     paperDefaults?: PaperPreferences | null;
 }
 
@@ -3257,6 +3258,7 @@ export default function GeneratePaper({
     appliedTemplate,
     initialPatternId,
     canViewSubjectiveAnswers,
+    canEditWatermark,
     paperDefaults,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
@@ -8516,6 +8518,7 @@ export default function GeneratePaper({
                         schoolAddress={schoolAddress}
                         showSchoolAddress={showSchoolAddress}
                         canViewSubjectiveAnswers={canViewSubjectiveAnswers}
+                        canEditWatermark={canEditWatermark}
                         pickerTarget={activePaperPickerContext}
                         pickerQuestions={filteredPaperPickerQuestions}
                         pickerSearch={paperQuestionSearch}
@@ -13492,6 +13495,7 @@ export function GeneratedPaperView({
     schoolAddress,
     showSchoolAddress,
     canViewSubjectiveAnswers,
+    canEditWatermark,
     pickerTarget,
     pickerQuestions,
     pickerSearch,
@@ -13551,6 +13555,7 @@ export function GeneratedPaperView({
     schoolAddress: string;
     showSchoolAddress: boolean;
     canViewSubjectiveAnswers: boolean;
+    canEditWatermark: boolean;
     pickerTarget: {
         section: GeneratedPaperSection;
         question: GeneratedPaperQuestion;
@@ -15386,6 +15391,7 @@ export function GeneratedPaperView({
                             Boolean(rawPaper.sectioning?.active)
                         }
                         defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
+                        canEditWatermark={canEditWatermark}
                         onChange={onSettingsChange}
                         onClose={() => setIsSettingsDrawerOpen(false)}
                     />

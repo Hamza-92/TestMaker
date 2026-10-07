@@ -78,7 +78,7 @@ export function MultipartSection({
                     <div
                         className={
                             isUrduHeading
-                                ? 'min-w-0 text-right'
+                                ? 'min-w-0 w-full text-right'
                                 : 'min-w-0 text-left'
                         }
                         dir={isUrduHeading ? 'rtl' : 'ltr'}
@@ -160,7 +160,7 @@ export function MultipartSection({
             )}{' '}
             <div
                 data-paper-question-group="multipart"
-                className="space-y-0.5 px-2 py-1"
+                className="space-y-0.5 px-2 pt-2 pb-1"
             >
                 {multipart.rows.map((row, rowIndex) => (
                     <div

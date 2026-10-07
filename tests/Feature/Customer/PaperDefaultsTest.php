@@ -157,6 +157,10 @@ test('a superadmin impersonating a school can change its watermark', function ()
         ->get(route('customer.settings'))->assertOk()->viewData('page');
     expect($page['props']['canEditWatermark'])->toBeTrue();
 
+    $generatePage = $this->actingAs($customer)
+        ->get(route('customer.papers.generate'))->assertOk()->viewData('page');
+    expect($generatePage['props']['canEditWatermark'])->toBeTrue();
+
     $this->actingAs($customer)->put(route('customer.settings.update'), $payload)
         ->assertRedirect()
         ->assertSessionHasNoErrors();
@@ -172,6 +176,10 @@ test('staff impersonation does not unlock school watermark settings', function (
         ->withSession(['impersonator_id' => $staff->id])
         ->get(route('customer.settings'))->assertOk()->viewData('page');
     expect($page['props']['canEditWatermark'])->toBeFalse();
+
+    $generatePage = $this->actingAs($customer)
+        ->get(route('customer.papers.generate'))->assertOk()->viewData('page');
+    expect($generatePage['props']['canEditWatermark'])->toBeFalse();
 
     $payload = paperDefaultsPayload();
     $payload['settings']['watermarkText'] = 'Not allowed';
@@ -194,6 +202,7 @@ test('generation receives school defaults for the customer and their teachers', 
         $props = $this->actingAs($user)->get(route('customer.papers.generate'))->assertOk()->viewData('page')['props'];
         expect($props['paperDefaults']['settings']['marginTop'])->toBe(12);
         expect($props['paperDefaults']['viewMode'])->toBe('answers_on_paper');
+        expect($props['canEditWatermark'])->toBeFalse();
     }
 });
 

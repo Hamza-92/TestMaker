@@ -452,7 +452,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     marginLeft: 10,
     sectionSpacing: 1,
     textColor: '#000000',
-    watermarkType: 'text',
+    watermarkType: 'logo',
     watermarkText: '',
     watermarkLogoUrl: '',
     watermarkOpacity: 8,
