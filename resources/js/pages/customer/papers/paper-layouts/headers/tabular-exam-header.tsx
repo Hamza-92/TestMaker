@@ -53,6 +53,8 @@ export function TabularExamHeader({
                     autoComplete="off"
                     value={header.schoolName}
                     onChange={(e) => onChange('schoolName', e.target.value)}
+                    readOnly
+                    tabIndex={-1}
                     className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
                     placeholder="School Name"
                 />
@@ -152,6 +154,7 @@ function InlineField({
     divider?: boolean;
     emptyZero?: boolean;
 }) {
+    const readOnly = field !== 'date' && field !== 'duration';
     const raw = header[field];
     const displayValue =
         emptyZero && (raw === 0 || raw === '0') ? '' : String(raw ?? '');
@@ -167,6 +170,7 @@ function InlineField({
                     value={displayValue}
                     onChange={(value) => onChange(field, value)}
                     ariaLabel={label}
+                    readOnly={readOnly}
                     className="min-w-0 flex-1 border-b border-current font-normal"
                 />
             ) : (
@@ -174,6 +178,8 @@ function InlineField({
                     autoComplete="off"
                     value={displayValue}
                     onChange={(e) => onChange(field, e.target.value)}
+                    readOnly={readOnly}
+                    tabIndex={readOnly ? -1 : undefined}
                     className="min-w-0 flex-1 border-b border-current bg-transparent font-normal outline-none"
                 />
             )}

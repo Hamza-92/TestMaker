@@ -41,6 +41,8 @@ export function BannerExamHeader({
                         autoComplete="off"
                         value={header.schoolName}
                         onChange={(e) => onChange('schoolName', e.target.value)}
+                        readOnly
+                        tabIndex={-1}
                         className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
                         placeholder="School Name"
                     />
@@ -48,6 +50,8 @@ export function BannerExamHeader({
                         autoComplete="off"
                         value={header.exam}
                         onChange={(e) => onChange('exam', e.target.value)}
+                        readOnly
+                        tabIndex={-1}
                         className="w-full bg-transparent text-center text-sm font-normal text-slate-500 outline-none"
                         placeholder="Exam / Year"
                     />
@@ -70,6 +74,7 @@ export function BannerExamHeader({
                     <RichTextField
                         value={header.subject}
                         onChange={(value) => onChange('subject', value)}
+                        readOnly
                         className="w-full text-center font-normal"
                         placeholder="Subject"
                     />
@@ -146,6 +151,8 @@ function InlineField({
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     divider?: boolean;
 }) {
+    const readOnly = field !== 'date' && field !== 'duration';
+
     return (
         <div
             data-paper-header-divider={divider ? 'r' : undefined}
@@ -157,6 +164,7 @@ function InlineField({
                     value={String(header[field] ?? '')}
                     onChange={(value) => onChange(field, value)}
                     ariaLabel={label}
+                    readOnly={readOnly}
                     className="min-w-0 flex-1 border-b border-current font-normal"
                 />
             ) : (
@@ -164,6 +172,8 @@ function InlineField({
                     autoComplete="off"
                     value={String(header[field] ?? '')}
                     onChange={(e) => onChange(field, e.target.value)}
+                    readOnly={readOnly}
+                    tabIndex={readOnly ? -1 : undefined}
                     className="min-w-0 flex-1 border-b border-current bg-transparent font-normal outline-none"
                 />
             )}

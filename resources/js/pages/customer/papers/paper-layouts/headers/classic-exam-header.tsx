@@ -122,6 +122,8 @@ function HeaderValueCell({
     header: GeneratedPaperHeader;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
 }) {
+    const readOnly = field !== 'date' && field !== 'duration';
+
     return (
         <td className="p-0 align-middle">
             {field === 'className' || field === 'subject' ? (
@@ -129,6 +131,7 @@ function HeaderValueCell({
                     value={String(header[field] ?? '')}
                     onChange={(value) => onChange(field, value)}
                     ariaLabel={label}
+                    readOnly={readOnly}
                     className="h-full min-w-0 px-2 py-1 text-sm font-normal"
                 />
             ) : (
@@ -136,6 +139,8 @@ function HeaderValueCell({
                     autoComplete="off"
                     value={String(header[field] ?? '')}
                     onChange={(event) => onChange(field, event.target.value)}
+                    readOnly={readOnly}
+                    tabIndex={readOnly ? -1 : undefined}
                     className="h-full w-full min-w-0 bg-transparent px-2 py-1 text-sm font-normal outline-none"
                 />
             )}

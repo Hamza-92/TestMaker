@@ -48,6 +48,8 @@ export function FormalExamHeader({
                         autoComplete="off"
                         value={header.schoolName}
                         onChange={(e) => onChange('schoolName', e.target.value)}
+                        readOnly
+                        tabIndex={-1}
                         className="w-full bg-transparent text-center text-2xl font-extrabold uppercase outline-none"
                         placeholder="School Name"
                     />
@@ -55,6 +57,7 @@ export function FormalExamHeader({
                         <RichTextField
                             value={header.subject}
                             onChange={(value) => onChange('subject', value)}
+                            readOnly
                             className="text-center font-normal"
                             placeholder="Subject"
                         />
@@ -63,6 +66,8 @@ export function FormalExamHeader({
                             autoComplete="off"
                             value={header.exam}
                             onChange={(e) => onChange('exam', e.target.value)}
+                            readOnly
+                            tabIndex={-1}
                             className="bg-transparent text-center font-normal outline-none"
                             placeholder="Exam / Year"
                         />
@@ -81,6 +86,8 @@ export function FormalExamHeader({
                         autoComplete="off"
                         value={String(header.marks ?? '')}
                         onChange={(e) => onChange('marks', e.target.value)}
+                        readOnly
+                        tabIndex={-1}
                         className="w-full bg-transparent text-center text-xl font-normal outline-none"
                     />
                 </div>
@@ -157,6 +164,8 @@ function LabeledCell({
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     divider?: boolean;
 }) {
+    const readOnly = field !== 'date' && field !== 'duration';
+
     return (
         <div
             data-paper-header-divider={divider ? 'r' : undefined}
@@ -173,6 +182,7 @@ function LabeledCell({
                     value={String(header[field] ?? '')}
                     onChange={(value) => onChange(field, value)}
                     ariaLabel={label}
+                    readOnly={readOnly}
                     className="h-full min-w-0 px-2 py-1 font-normal"
                 />
             ) : (
@@ -180,6 +190,8 @@ function LabeledCell({
                     autoComplete="off"
                     value={String(header[field] ?? '')}
                     onChange={(e) => onChange(field, e.target.value)}
+                    readOnly={readOnly}
+                    tabIndex={readOnly ? -1 : undefined}
                     className="h-full min-w-0 bg-transparent px-2 py-1 font-normal outline-none"
                 />
             )}

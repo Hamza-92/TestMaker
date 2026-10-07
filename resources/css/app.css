@@ -669,6 +669,9 @@ input[type='date']::-webkit-calendar-picker-indicator {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
 }
+[data-print-paper] [data-paper-header] input[readonly] {
+    pointer-events: none;
+}
 [data-print-paper] [data-paper-header] [class*='p-'],
 [data-print-paper] [data-paper-header] [class*='px-'],
 [data-print-paper] [data-paper-header] [class*='py-'] {

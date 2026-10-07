@@ -3185,6 +3185,15 @@ function PaperHeader({
     paddingY: number;
     onChange: Parameters<typeof ClassicExamHeader>[0]['onChange'];
 }) {
+    const onEditableChange = (
+        field: keyof GeneratedPaperHeader,
+        value: string,
+    ) => {
+        if (field === 'date' || field === 'duration') {
+            onChange(field, value);
+        }
+    };
+
     if (template === 'banner') {
         return (
             <BannerExamHeader
@@ -3192,7 +3201,7 @@ function PaperHeader({
                 logoUrl={logoUrl || undefined}
                 paddingX={paddingX}
                 paddingY={paddingY}
-                onChange={onChange}
+                onChange={onEditableChange}
             />
         );
     }
@@ -3204,7 +3213,7 @@ function PaperHeader({
                 logoUrl={logoUrl || undefined}
                 paddingX={paddingX}
                 paddingY={paddingY}
-                onChange={onChange}
+                onChange={onEditableChange}
             />
         );
     }
@@ -3218,7 +3227,7 @@ function PaperHeader({
                 showAddress={showAddress}
                 paddingX={paddingX}
                 paddingY={paddingY}
-                onChange={onChange}
+                onChange={onEditableChange}
             />
         );
     }
@@ -3232,7 +3241,7 @@ function PaperHeader({
                 showAddress={showAddress}
                 paddingX={paddingX}
                 paddingY={paddingY}
-                onChange={onChange}
+                onChange={onEditableChange}
             />
         );
     }
@@ -3243,7 +3252,7 @@ function PaperHeader({
             logoUrl={logoUrl || undefined}
             paddingX={paddingX}
             paddingY={paddingY}
-            onChange={onChange}
+            onChange={onEditableChange}
         />
     );
 }

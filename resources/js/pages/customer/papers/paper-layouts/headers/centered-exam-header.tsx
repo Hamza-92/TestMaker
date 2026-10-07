@@ -40,6 +40,8 @@ export function CenteredExamHeader({
                     autoComplete="off"
                     value={header.schoolName}
                     onChange={(e) => onChange('schoolName', e.target.value)}
+                    readOnly
+                    tabIndex={-1}
                     className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
                     placeholder="School Name"
                 />
@@ -63,6 +65,7 @@ export function CenteredExamHeader({
                         <RichTextField
                             value={header.subject}
                             onChange={(value) => onChange('subject', value)}
+                            readOnly
                             className="min-w-0 flex-1 font-normal text-white"
                             placeholder="Subject"
                         />
@@ -75,6 +78,7 @@ export function CenteredExamHeader({
                         <RichTextField
                             value={header.className}
                             onChange={(value) => onChange('className', value)}
+                            readOnly
                             className="min-w-0 flex-1 font-normal text-white"
                             placeholder="Class"
                         />
@@ -85,6 +89,8 @@ export function CenteredExamHeader({
                             autoComplete="off"
                             value={String(header.marks ?? '')}
                             onChange={(e) => onChange('marks', e.target.value)}
+                            readOnly
+                            tabIndex={-1}
                             className="w-10 min-w-0 bg-transparent text-center font-normal text-white outline-none"
                         />
                     </div>
@@ -160,6 +166,8 @@ function UnderlineField({
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     className?: string;
 }) {
+    const readOnly = field !== 'date' && field !== 'duration';
+
     return (
         <div className={`flex items-center gap-1 ${className}`}>
             <span className="shrink-0 font-bold">{label}:</span>
@@ -167,6 +175,8 @@ function UnderlineField({
                 autoComplete="off"
                 value={String(header[field] ?? '')}
                 onChange={(e) => onChange(field, e.target.value)}
+                readOnly={readOnly}
+                tabIndex={readOnly ? -1 : undefined}
                 className="min-w-0 flex-1 border-b border-current bg-transparent font-normal outline-none"
             />
         </div>

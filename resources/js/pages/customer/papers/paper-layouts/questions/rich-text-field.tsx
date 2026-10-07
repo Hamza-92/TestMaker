@@ -8,6 +8,7 @@ interface RichTextFieldProps {
     className?: string;
     placeholder?: string;
     ariaLabel?: string;
+    readOnly?: boolean;
 }
 
 function richTextToPlainText(value: string): string {
@@ -38,7 +39,7 @@ function richTextToPlainText(value: string): string {
 
 /**
  * Shows sanitized stored rich text in paper previews/prints while retaining
- * the existing click-to-edit behaviour of header inputs.
+ * click-to-edit behaviour for fields that are not read-only.
  */
 export function RichTextField({
     value,
@@ -46,6 +47,7 @@ export function RichTextField({
     className,
     placeholder,
     ariaLabel,
+    readOnly = false,
 }: RichTextFieldProps) {
     const editableValue = useMemo(() => richTextToPlainText(value), [value]);
     const renderedValue = value.trim() || placeholder || '';
@@ -57,20 +59,23 @@ export function RichTextField({
                 className,
             )}
         >
-            <input
-                autoComplete="off"
-                value={editableValue}
-                onChange={(event) => onChange(event.target.value)}
-                aria-label={ariaLabel ?? placeholder}
-                placeholder={placeholder}
-                className="peer absolute inset-0 z-10 h-full w-full bg-inherit [color:inherit] opacity-0 outline-none [font:inherit] focus:opacity-100 print:hidden"
-            />
+            {!readOnly && (
+                <input
+                    autoComplete="off"
+                    value={editableValue}
+                    onChange={(event) => onChange(event.target.value)}
+                    aria-label={ariaLabel ?? placeholder}
+                    placeholder={placeholder}
+                    className="peer absolute inset-0 z-10 h-full w-full bg-inherit [color:inherit] opacity-0 outline-none [font:inherit] focus:opacity-100 print:hidden"
+                />
+            )}
             <QuestionContent
                 as="span"
                 inline
                 value={renderedValue}
                 className={cn(
-                    'pointer-events-none block min-h-[1.25em] min-w-0 overflow-hidden peer-focus:invisible print:visible',
+                    'pointer-events-none block min-h-[1.25em] min-w-0 overflow-hidden print:visible',
+                    !readOnly && 'peer-focus:invisible',
                     !value.trim() && 'opacity-50',
                 )}
             />
