@@ -15079,7 +15079,7 @@ export function GeneratedPaperView({
                         <SchoolIdentity
                             schoolName={paper.header.schoolName}
                             address={effectiveSchoolAddress}
-                            editable={!previewOnly}
+                            editable={false}
                             onSchoolNameChange={(value) =>
                                 onHeaderChange('schoolName', value)
                             }

@@ -11,7 +11,7 @@ import {
     UsersIcon,
     XIcon,
 } from 'lucide-react';
-import { CONTACT_EMAIL, CONTACT_PHONES } from '@/lib/contact';
+import { CONTACT_EMAIL, PUBLIC_CONTACT_PHONES } from '@/lib/contact';
 import { useCustomerSidebar } from './customer-layout';
 
 interface NavItem {
@@ -325,7 +325,7 @@ function SidebarContent({
                             Call / WhatsApp
                         </p>
                         <div className="space-y-1">
-                            {CONTACT_PHONES.map((phone) => (
+                            {PUBLIC_CONTACT_PHONES.map((phone) => (
                                 <a
                                     key={phone.display}
                                     href={`tel:${phone.tel}`}

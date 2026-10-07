@@ -69,17 +69,22 @@ export function MultipartSection({
             {showHeading && (
                 <div
                     data-paper-heading
+                    dir="ltr"
                     className={
                         isBilingualHeading
                             ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 border border-black px-2 py-1 text-sm font-bold'
-                            : 'flex items-start justify-between gap-3 border border-black px-2 py-1 text-sm font-bold'
+                            : isUrduHeading
+                              ? 'flex flex-row-reverse items-start justify-between gap-3 border border-black px-2 py-1 text-sm font-bold'
+                              : 'flex items-start justify-between gap-3 border border-black px-2 py-1 text-sm font-bold'
                     }
                 >
                     <div
                         className={
                             isUrduHeading
-                                ? 'min-w-0 w-full text-right'
-                                : 'min-w-0 text-left'
+                                ? 'min-w-0 flex-1 text-right'
+                                : isBilingualHeading
+                                  ? 'min-w-0 text-left'
+                                  : 'min-w-0 flex-1 text-left'
                         }
                         dir={isUrduHeading ? 'rtl' : 'ltr'}
                         data-paper-urdu-content={
@@ -106,35 +111,18 @@ export function MultipartSection({
                         />
                         {showChoice && (
                             <span className="ml-1 align-baseline whitespace-nowrap">
-                                {isUrduHeading ? (
-                                    <>
-                                        {choiceLabelUrdu}
-                                        {choiceMarksLabel !== '' && (
-                                            <span
-                                                dir="ltr"
-                                                className="inline-block"
-                                                style={{
-                                                    direction: 'ltr',
-                                                    unicodeBidi: 'isolate',
-                                                }}
-                                            >
-                                                {choiceMarksLabel}
-                                            </span>
-                                        )}
-                                    </>
-                                ) : (
-                                    <>
-                                        {choiceLabelEnglish}
-                                        {!isBilingualHeading &&
-                                            choiceMarksLabel}
-                                    </>
-                                )}
+                                {isUrduHeading
+                                    ? choiceLabelUrdu
+                                    : choiceLabelEnglish}
                             </span>
                         )}
                     </div>
-                    {isBilingualHeading && (
-                        <div className="shrink-0 text-center whitespace-nowrap">
-                            {choiceMarksLabel}
+                    {(isBilingualHeading || choiceMarksLabel !== '') && (
+                        <div
+                            dir="ltr"
+                            className="shrink-0 text-center whitespace-nowrap"
+                        >
+                            {choiceMarksLabel.trim()}
                         </div>
                     )}
                     {isBilingualHeading && (
