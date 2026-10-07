@@ -40,6 +40,7 @@ import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions
 import { BulkQuestionTypeChangeDialog } from './questions/change-type-dialog';
 import type { ChapterOption, QuestionTypeOption } from './questions/form';
 import type { TopicOption } from './questions/form';
+import { SourceBadge } from './questions/source-badge';
 import {
     fetchQuestionJson,
     useQuestionJson,
@@ -1024,6 +1025,9 @@ export default function Questions({
                                             <th className="px-3 py-3 text-left font-medium text-muted-foreground">
                                                 Type
                                             </th>
+                                            <th className="px-3 py-3 text-left font-medium text-muted-foreground">
+                                                Source
+                                            </th>
                                             {isTopicWise && !topicId && (
                                                 <th className="px-3 py-3 text-left font-medium text-muted-foreground">
                                                     Topic
@@ -1041,11 +1045,12 @@ export default function Questions({
                                                 <td
                                                     colSpan={
                                                         (isTopicWise && !topicId
-                                                            ? 6
-                                                            : 5) +
-                                                        (canEditQuestions
-                                                            ? 1
-                                                            : 0)
+                                                            ? 7
+                                                            : 6) +
+                                                        Number(
+                                                            canEditQuestions &&
+                                                                !sortingEnabled,
+                                                        )
                                                     }
                                                     className="py-16 text-center text-muted-foreground"
                                                 >
@@ -1134,6 +1139,12 @@ export default function Questions({
                                                                 }
                                                             </span>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <SourceBadge
+                                                            source={q.source}
+                                                            label={q.source_label}
+                                                        />
                                                     </td>
                                                     {isTopicWise &&
                                                         !topicId && (

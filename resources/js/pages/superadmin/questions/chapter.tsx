@@ -38,6 +38,7 @@ import { usePermission } from '@/hooks/use-permission';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { BulkQuestionTypeChangeDialog } from './change-type-dialog';
 import type { QuestionTypeOption, SourceOption } from './form';
+import { SourceBadge } from './source-badge';
 
 interface TopicContext {
     id: number;
@@ -830,10 +831,11 @@ export default function ChapterQuestions({
                                                         '-'}
                                                 </td>
                                             ) : null}
-                                            <td className="px-3 py-2.5 text-muted-foreground">
-                                                {question.source_label ||
-                                                    question.source ||
-                                                    '-'}
+                                            <td className="px-3 py-2.5">
+                                                <SourceBadge
+                                                    source={question.source}
+                                                    label={question.source_label}
+                                                />
                                             </td>
                                             <td className="px-3 py-2.5">
                                                 {statusBadge(question.status)}
