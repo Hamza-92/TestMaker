@@ -10,6 +10,7 @@ use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
@@ -59,6 +60,13 @@ function makeQuestionContextForManagement(User $creator): array
     ]);
 
     return compact('pattern', 'class', 'subject', 'chapter');
+}
+
+function managementQuestionListUrl(array $context): string
+{
+    return route('superadmin.questions.browse.chapter', [
+        $context['pattern'], $context['class'], $context['subject'], $context['chapter'],
+    ]);
 }
 
 function makeObjectiveQuestionTypeForManagement(User $creator, array $overrides = []): QuestionType
@@ -115,7 +123,7 @@ it('creates an objective question with options', function () {
 
     $question = Question::query()->with('options')->sole();
 
-    $response->assertRedirect(route('superadmin.questions.chapter', $context['chapter']));
+    $response->assertRedirect(managementQuestionListUrl($context));
 
     expect($question->question_type_id)->toBe($questionType->id)
         ->and($question->statement_en)->toBe('Choose the correct option')
@@ -235,7 +243,7 @@ it('updates an objective question and replaces its options', function () {
             ],
         ]);
 
-    $response->assertRedirect(route('superadmin.questions.chapter', $context['chapter']));
+    $response->assertRedirect(managementQuestionListUrl($context));
 
     $question->refresh()->load('options');
 
@@ -293,7 +301,7 @@ it('creates a passage based MCQ with nested sub-questions and options', function
     $content = $question->content;
 
     $response->assertRedirect(
-        route('superadmin.questions.chapter', $context['chapter']),
+        managementQuestionListUrl($context),
     );
 
     expect($question->statement_en)
@@ -308,4 +316,73 @@ it('creates a passage based MCQ with nested sub-questions and options', function
             'It evaporates',
         )
         ->and($content['items'][1]['options'][0]['is_correct'])->toBeTrue();
+});
+
+it('uploads question images only for users who may create or edit questions', function () {
+    $admin = makeQuestionAdmin();
+    $response = $this->actingAs($admin)->postJson(route('superadmin.questions.images'), [
+        'file' => UploadedFile::fake()->image('diagram.png'),
+    ])->assertOk();
+
+    expect($response->json('location'))->toStartWith('/question-images/');
+    $image = $this->get($response->json('location'))->assertOk();
+    expect($image->headers->get('Content-Type'))->toBe('image/png');
+
+    $restricted = User::factory()->create([
+        'user_type' => UserType::SuperAdmin->value,
+        'created_by' => $admin->id,
+    ]);
+    $this->actingAs($restricted)->postJson(route('superadmin.questions.images'), [
+        'file' => UploadedFile::fake()->image('diagram.png'),
+    ])->assertForbidden();
+});
+
+it('keeps equations and uploaded images in question statements and options', function () {
+    $admin = makeQuestionAdmin();
+    $type = makeObjectiveQuestionTypeForManagement($admin);
+    $context = makeQuestionContextForManagement($admin);
+    $imageUrl = $this->actingAs($admin)->postJson(route('superadmin.questions.images'), [
+        'file' => UploadedFile::fake()->image('formula.png'),
+    ])->assertOk()->json('location');
+    $equation = '<span class="tm-equation" data-latex="x^2" data-display="inline">x^2</span>';
+    $option = '<p><img src="'.$imageUrl.'" alt="Formula"></p>';
+
+    $this->post(route('superadmin.questions.store'), [
+        'question_type_id' => $type->id,
+        'chapter_id' => $context['chapter']->id,
+        'status' => true,
+        'content' => [
+            'prompt_en' => '<p>Solve '.$equation.'</p>',
+            'options' => [
+                ['text_en' => $option, 'is_correct' => true],
+                ['text_en' => 'None', 'is_correct' => false],
+            ],
+        ],
+    ])->assertRedirect(managementQuestionListUrl($context));
+
+    $question = Question::query()->with('options')->sole();
+    expect($question->statement_en)->toContain('data-latex="x^2"')
+        ->and($question->options->first()->text_en)->toContain($imageUrl);
+    $this->get($imageUrl)->assertOk();
+});
+
+it('treats visually empty rich text as an empty required statement', function () {
+    $admin = makeQuestionAdmin();
+    $type = makeObjectiveQuestionTypeForManagement($admin);
+    $context = makeQuestionContextForManagement($admin);
+
+    $this->actingAs($admin)->post(route('superadmin.questions.store'), [
+        'question_type_id' => $type->id,
+        'chapter_id' => $context['chapter']->id,
+        'status' => true,
+        'content' => [
+            'prompt_en' => '<p><br></p>',
+            'options' => [
+                ['text_en' => 'One', 'is_correct' => true],
+                ['text_en' => 'Two', 'is_correct' => false],
+            ],
+        ],
+    ])->assertSessionHasErrors('content.prompt_en');
+
+    expect(Question::query()->count())->toBe(0);
 });

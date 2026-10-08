@@ -4,9 +4,10 @@ import {
     ArrowLeftIcon,
     CheckCircle2Icon,
     CirclePlusIcon,
+    PencilIcon,
     Trash2Icon,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,16 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
+import { fetchQuestionJson } from './use-question-options';
+
+const QuestionEditModal = lazy(() =>
+    import('@/pages/customer/papers/paper-layouts/questions/question-edit-modal').then(
+        (module) => ({
+            default: module.QuestionEditModal,
+        }),
+    ),
+);
 
 export interface QuestionSchemaOption {
     key: string;
@@ -157,6 +168,7 @@ interface QuestionFormProps {
     form: InertiaFormProps<QuestionFormData>;
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
+    chapterOptionsUrl?: string;
     sourceOptions: SourceOption[];
     mediumOptions: MediumOption[];
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -199,6 +211,75 @@ function AutoTextarea({
             dir={dir}
             className={textareaClassName}
         />
+    );
+}
+
+function RichContentControl({
+    value,
+    onChange,
+    dir,
+    multiline = false,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    dir?: string;
+    multiline?: boolean;
+}) {
+    const [editing, setEditing] = useState(false);
+    const hasMarkup = /<\/?[a-z][^>]*>/i.test(value);
+
+    return (
+        <div className="space-y-1.5">
+            {hasMarkup ? (
+                <QuestionContent
+                    value={value}
+                    className="min-h-9 rounded-xl border border-input px-3 py-2 text-sm"
+                />
+            ) : multiline ? (
+                <AutoTextarea
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    dir={dir}
+                />
+            ) : (
+                <Input
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    dir={dir}
+                />
+            )}
+            <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+                <PencilIcon className="size-3" /> Rich text, equation or image
+            </button>
+            {editing && (
+                <Suspense
+                    fallback={
+                        <div
+                            role="status"
+                            className="text-sm text-muted-foreground"
+                        >
+                            Loading editor…
+                        </div>
+                    }
+                >
+                    <QuestionEditModal
+                        question={{ text: value }}
+                        title="Edit question content"
+                        saveLabel="Use content"
+                        imageUploadUrl="/superadmin/questions/images"
+                        onClose={() => setEditing(false)}
+                        onSave={(html) => {
+                            onChange(html);
+                            setEditing(false);
+                        }}
+                    />
+                </Suspense>
+            )}
+        </div>
     );
 }
 
@@ -301,6 +382,7 @@ export function QuestionForm({
     form,
     questionTypes,
     chapters,
+    chapterOptionsUrl,
     sourceOptions,
     mediumOptions,
     onSubmit,
@@ -308,14 +390,41 @@ export function QuestionForm({
     lockedChapterId,
     lockedTopicId,
 }: QuestionFormProps) {
+    const [chapterOptions, setChapterOptions] = useState(chapters);
+    const [allChaptersLoaded, setAllChaptersLoaded] = useState(false);
+    const [loadingChapters, setLoadingChapters] = useState(false);
+    const [chapterLoadError, setChapterLoadError] = useState('');
+    const loadChapters = async () => {
+        if (!chapterOptionsUrl || allChaptersLoaded || loadingChapters) {
+            return;
+        }
+
+        setLoadingChapters(true);
+        setChapterLoadError('');
+
+        try {
+            const result = await fetchQuestionJson<{
+                chapters: ChapterOption[];
+            }>(chapterOptionsUrl);
+            setChapterOptions(result.chapters);
+            setAllChaptersLoaded(true);
+        } catch {
+            setChapterLoadError(
+                'Could not load chapters. Open the list to retry.',
+            );
+        } finally {
+            setLoadingChapters(false);
+        }
+    };
     const isChapterLocked =
         lockedChapterId !== null && lockedChapterId !== undefined;
     const isTopicLocked = lockedTopicId !== null && lockedTopicId !== undefined;
     const selectedChapter = useMemo(
         () =>
-            chapters.find((item) => String(item.id) === form.data.chapter_id) ??
-            null,
-        [chapters, form.data.chapter_id],
+            chapterOptions.find(
+                (item) => String(item.id) === form.data.chapter_id,
+            ) ?? null,
+        [chapterOptions, form.data.chapter_id],
     );
 
     const selectedType = useMemo(() => {
@@ -574,41 +683,20 @@ export function QuestionForm({
                 required={required}
                 error={errorFor(`content.${String(englishKey)}`)}
             >
-                {control === 'input' ? (
-                    <Input
-                        value={String(form.data.content[englishKey] ?? '')}
-                        onChange={(event) =>
-                            setContentValue(englishKey, event.target.value)
-                        }
-                    />
-                ) : (
-                    <AutoTextarea
-                        value={String(form.data.content[englishKey] ?? '')}
-                        onChange={(event) =>
-                            setContentValue(englishKey, event.target.value)
-                        }
-                    />
-                )}
+                <RichContentControl
+                    value={String(form.data.content[englishKey] ?? '')}
+                    onChange={(value) => setContentValue(englishKey, value)}
+                    multiline={control !== 'input'}
+                />
             </Field>
 
             <Field label="Urdu" error={errorFor(`content.${String(urduKey)}`)}>
-                {control === 'input' ? (
-                    <Input
-                        dir="rtl"
-                        value={String(form.data.content[urduKey] ?? '')}
-                        onChange={(event) =>
-                            setContentValue(urduKey, event.target.value)
-                        }
-                    />
-                ) : (
-                    <AutoTextarea
-                        dir="rtl"
-                        value={String(form.data.content[urduKey] ?? '')}
-                        onChange={(event) =>
-                            setContentValue(urduKey, event.target.value)
-                        }
-                    />
-                )}
+                <RichContentControl
+                    dir="rtl"
+                    value={String(form.data.content[urduKey] ?? '')}
+                    onChange={(value) => setContentValue(urduKey, value)}
+                    multiline={control !== 'input'}
+                />
             </Field>
         </div>
     );
@@ -664,14 +752,10 @@ export function QuestionForm({
                         </span>
 
                         <div className="min-w-0">
-                            <Input
+                            <RichContentControl
                                 value={option.text_en}
-                                onChange={(event) =>
-                                    onOptionValue(
-                                        index,
-                                        'text_en',
-                                        event.target.value,
-                                    )
+                                onChange={(value) =>
+                                    onOptionValue(index, 'text_en', value)
                                 }
                             />
                             {errorFor(`${prefix}.${index}.text_en`) && (
@@ -682,15 +766,11 @@ export function QuestionForm({
                         </div>
 
                         <div className="min-w-0">
-                            <Input
+                            <RichContentControl
                                 dir="rtl"
                                 value={option.text_ur}
-                                onChange={(event) =>
-                                    onOptionValue(
-                                        index,
-                                        'text_ur',
-                                        event.target.value,
-                                    )
+                                onChange={(value) =>
+                                    onOptionValue(index, 'text_ur', value)
                                 }
                             />
                             {errorFor(`${prefix}.${index}.text_ur`) && (
@@ -768,11 +848,12 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_en`,
                                 )}
                             >
-                                <AutoTextarea
+                                <RichContentControl
+                                    multiline
                                     value={item.prompt_en}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updateItem(itemIndex, {
-                                            prompt_en: event.target.value,
+                                            prompt_en: value,
                                         })
                                     }
                                 />
@@ -783,12 +864,13 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_ur`,
                                 )}
                             >
-                                <AutoTextarea
+                                <RichContentControl
+                                    multiline
                                     dir="rtl"
                                     value={item.prompt_ur}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updateItem(itemIndex, {
-                                            prompt_ur: event.target.value,
+                                            prompt_ur: value,
                                         })
                                     }
                                 />
@@ -863,11 +945,12 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_en`,
                                 )}
                             >
-                                <AutoTextarea
+                                <RichContentControl
+                                    multiline
                                     value={item.prompt_en}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updateItem(itemIndex, {
-                                            prompt_en: event.target.value,
+                                            prompt_en: value,
                                         })
                                     }
                                 />
@@ -878,12 +961,13 @@ export function QuestionForm({
                                     `content.items.${itemIndex}.prompt_ur`,
                                 )}
                             >
-                                <AutoTextarea
+                                <RichContentControl
+                                    multiline
                                     dir="rtl"
                                     value={item.prompt_ur}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updateItem(itemIndex, {
-                                            prompt_ur: event.target.value,
+                                            prompt_ur: value,
                                         })
                                     }
                                 />
@@ -898,11 +982,11 @@ export function QuestionForm({
                                         `content.items.${itemIndex}.answer_en`,
                                     )}
                                 >
-                                    <Input
+                                    <RichContentControl
                                         value={item.answer_en}
-                                        onChange={(event) =>
+                                        onChange={(value) =>
                                             updateItem(itemIndex, {
-                                                answer_en: event.target.value,
+                                                answer_en: value,
                                             })
                                         }
                                     />
@@ -913,12 +997,12 @@ export function QuestionForm({
                                         `content.items.${itemIndex}.answer_ur`,
                                     )}
                                 >
-                                    <Input
+                                    <RichContentControl
                                         dir="rtl"
                                         value={item.answer_ur}
-                                        onChange={(event) =>
+                                        onChange={(value) =>
                                             updateItem(itemIndex, {
-                                                answer_ur: event.target.value,
+                                                answer_ur: value,
                                             })
                                         }
                                     />
@@ -976,11 +1060,11 @@ export function QuestionForm({
                                     `content.pairs.${pairIndex}.left_en`,
                                 )}
                             >
-                                <Input
+                                <RichContentControl
                                     value={pair.left_en}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updatePair(pairIndex, {
-                                            left_en: event.target.value,
+                                            left_en: value,
                                         })
                                     }
                                 />
@@ -991,12 +1075,12 @@ export function QuestionForm({
                                     `content.pairs.${pairIndex}.left_ur`,
                                 )}
                             >
-                                <Input
+                                <RichContentControl
                                     dir="rtl"
                                     value={pair.left_ur}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updatePair(pairIndex, {
-                                            left_ur: event.target.value,
+                                            left_ur: value,
                                         })
                                     }
                                 />
@@ -1007,11 +1091,11 @@ export function QuestionForm({
                                     `content.pairs.${pairIndex}.right_en`,
                                 )}
                             >
-                                <Input
+                                <RichContentControl
                                     value={pair.right_en}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updatePair(pairIndex, {
-                                            right_en: event.target.value,
+                                            right_en: value,
                                         })
                                     }
                                 />
@@ -1022,12 +1106,12 @@ export function QuestionForm({
                                     `content.pairs.${pairIndex}.right_ur`,
                                 )}
                             >
-                                <Input
+                                <RichContentControl
                                     dir="rtl"
                                     value={pair.right_ur}
-                                    onChange={(event) =>
+                                    onChange={(value) =>
                                         updatePair(pairIndex, {
-                                            right_ur: event.target.value,
+                                            right_ur: value,
                                         })
                                     }
                                 />
@@ -1246,7 +1330,12 @@ export function QuestionForm({
                             >
                                 <Select
                                     value={form.data.chapter_id || 'none'}
-                                    disabled={chapters.length === 0}
+                                    disabled={chapterOptions.length === 0}
+                                    onOpenChange={(open) => {
+                                        if (open) {
+                                            void loadChapters();
+                                        }
+                                    }}
                                     onValueChange={(value) => {
                                         form.setData(
                                             'chapter_id',
@@ -1258,7 +1347,7 @@ export function QuestionForm({
                                     <SelectTrigger className="w-full">
                                         <SelectValue
                                             placeholder={
-                                                chapters.length === 0
+                                                chapterOptions.length === 0
                                                     ? 'No chapters'
                                                     : 'Select chapter'
                                             }
@@ -1268,7 +1357,15 @@ export function QuestionForm({
                                         <SelectItem value="none">
                                             Select chapter
                                         </SelectItem>
-                                        {chapters.map((chapter) => (
+                                        {loadingChapters && (
+                                            <SelectItem
+                                                value="loading"
+                                                disabled
+                                            >
+                                                Loading chapters…
+                                            </SelectItem>
+                                        )}
+                                        {chapterOptions.map((chapter) => (
                                             <SelectItem
                                                 key={chapter.id}
                                                 value={String(chapter.id)}
@@ -1280,6 +1377,14 @@ export function QuestionForm({
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {chapterLoadError && (
+                                    <p
+                                        role="alert"
+                                        className="text-xs text-destructive"
+                                    >
+                                        {chapterLoadError}
+                                    </p>
+                                )}
                             </Field>
                         )}
 

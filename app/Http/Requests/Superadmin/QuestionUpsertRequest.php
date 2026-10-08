@@ -112,6 +112,15 @@ class QuestionUpsertRequest extends FormRequest
     {
         $normalized = trim((string) $value);
 
+        if (preg_match('/<\s*\/?\s*[a-z][^>]*>/i', $normalized)
+            && ! preg_match('/<\s*(img|math)\b|data-latex\s*=/i', $normalized)) {
+            $plain = html_entity_decode(strip_tags($normalized), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $plain = preg_replace('/[\s\x{00A0}]+/u', '', $plain) ?? $plain;
+            if ($plain === '') {
+                return null;
+            }
+        }
+
         return $normalized === '' ? null : $normalized;
     }
 

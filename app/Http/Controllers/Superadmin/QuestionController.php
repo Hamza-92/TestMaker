@@ -41,6 +41,30 @@ class QuestionController extends Controller
         return $this->renderQuestionsIndex(null, null);
     }
 
+    public function uploadImage(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('questions.create') || $request->user()?->can('questions.edit'), 403);
+        $validated = $request->validate([
+            'file' => ['required', 'image', 'mimes:jpeg,png,webp,gif', 'max:2048'],
+        ]);
+        $id = (string) Str::uuid();
+        DB::table('question_images')->insert([
+            'id' => $id,
+            'mime_type' => $validated['file']->getMimeType(),
+            'data' => base64_encode($validated['file']->get()),
+            'created_at' => now(),
+        ]);
+
+        return response()->json(['location' => route('question-images.show', $id, false)]);
+    }
+
+    public function formChapters(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('questions.create') || $request->user()?->can('questions.edit'), 403);
+
+        return response()->json(['chapters' => $this->chapterFormOptions(includeInactive: true)]);
+    }
+
     public function bulkUpdateType(Request $request, QuestionTypeChanger $changer): RedirectResponse
     {
         $validated = $request->validate([
@@ -122,14 +146,14 @@ class QuestionController extends Controller
 
     public function chapterFilter(Chapter $chapter)
     {
-        return $this->renderQuestionsIndex($chapter->id, null);
+        return redirect($this->browseHrefForChapter($chapter, null));
     }
 
     public function topicFilter(Chapter $chapter, Topic $topic)
     {
         abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
 
-        return $this->renderQuestionsIndex($chapter->id, $topic->id);
+        return redirect($this->browseHrefForChapter($chapter, $topic->id));
     }
 
     private function renderQuestionsIndex(?int $chapterId, ?int $topicId)
@@ -293,32 +317,7 @@ class QuestionController extends Controller
     {
         $this->ensureChapterBelongsToSubject($subject, $chapter);
 
-        $questions = Question::query()
-            ->where('chapter_id', $chapter->id)
-            ->with([
-                'questionType.objectiveType:id,name',
-                'chapter.subject:id,name_eng,name_ur,subject_type',
-                'chapter.schoolClass:id,name',
-                'chapter.pattern:id,name,short_name',
-                'topic:id,name,name_ur,chapter_id',
-                'options',
-            ])
-            ->orderBy('question_type_id')
-            ->orderBy('topic_id')
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
-        $subjectType = $this->subjectTypesForChapters(collect([$chapter]))
-            ->get((string) $chapter->id);
-
-        return Inertia::render('superadmin/questions/chapter', [
-            'chapter' => $this->chapterContext($chapter),
-            'questions' => $questions
-                ->map(fn (Question $question) => $this->transformQuestionListItem($question, $subjectType))
-                ->values(),
-            'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
-            'sourceOptions' => $this->sourceOptions(),
-        ]);
+        return redirect($this->browseHrefForChapter($chapter, null));
     }
 
     public function create()
@@ -340,13 +339,13 @@ class QuestionController extends Controller
 
     private function renderCreateForm(?int $chapterId, ?int $topicId)
     {
-        $backHref = $topicId
-            ? "/superadmin/questions/chapters/{$chapterId}/topics/{$topicId}"
-            : ($chapterId ? "/superadmin/questions/chapters/{$chapterId}" : '/superadmin/questions');
+        $backHref = $chapterId
+            ? $this->browseHrefForChapter(Chapter::query()->findOrFail($chapterId), $topicId)
+            : '/superadmin/questions';
 
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true, onlyChapterId: $chapterId),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapterId,
             'mediumOptions' => $this->mediumOptions(),
@@ -363,13 +362,13 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true, onlyChapterId: $chapter->id),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
             'mediumOptions' => $this->mediumOptions(),
             'defaultTopicId' => $request->integer('topic_id') ?: null,
             'lockedChapterId' => $chapter->id,
-            'backHref' => route('superadmin.subjects.chapters.questions', [$subject, $chapter], false),
+            'backHref' => $this->browseHrefForChapter($chapter, null),
         ]);
     }
 
@@ -403,37 +402,7 @@ class QuestionController extends Controller
         $this->ensureChapterBelongsToSubject($subject, $chapter);
         abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
 
-        $questions = Question::query()
-            ->where('chapter_id', $chapter->id)
-            ->where('topic_id', $topic->id)
-            ->with([
-                'questionType.objectiveType:id,name',
-                'chapter.subject:id,name_eng,name_ur,subject_type',
-                'chapter.schoolClass:id,name',
-                'chapter.pattern:id,name,short_name',
-                'topic:id,name,name_ur,chapter_id',
-                'options',
-            ])
-            ->orderBy('question_type_id')
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
-        $subjectType = $this->subjectTypesForChapters(collect([$chapter]))
-            ->get((string) $chapter->id);
-
-        return Inertia::render('superadmin/questions/chapter', [
-            'chapter' => $this->chapterContext($chapter),
-            'scopedTopic' => [
-                'id' => $topic->id,
-                'name' => $topic->name,
-                'name_ur' => $topic->name_ur,
-            ],
-            'questions' => $questions
-                ->map(fn (Question $question) => $this->transformQuestionListItem($question, $subjectType))
-                ->values(),
-            'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
-            'sourceOptions' => $this->sourceOptions(),
-        ]);
+        return redirect($this->browseHrefForChapter($chapter, $topic->id));
     }
 
     public function createForTopic(Request $request, Subject $subject, Chapter $chapter, Topic $topic)
@@ -443,14 +412,14 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions/add', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true, onlyChapterId: $chapter->id),
             'sourceOptions' => $this->sourceOptions(),
             'defaultChapterId' => $chapter->id,
             'mediumOptions' => $this->mediumOptions(),
             'defaultTopicId' => $topic->id,
             'lockedChapterId' => $chapter->id,
             'lockedTopicId' => $topic->id,
-            'backHref' => route('superadmin.subjects.chapters.topics.questions', [$subject, $chapter, $topic], false),
+            'backHref' => $this->browseHrefForChapter($chapter, $topic->id),
         ]);
     }
 
@@ -462,7 +431,7 @@ class QuestionController extends Controller
 
         return Inertia::render('superadmin/questions/import', [
             'questionTypes' => $this->questionTypeFormOptions(),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true, onlyChapterId: $chapter->id),
             'sourceOptions' => $this->sourceOptions(),
             'mediumOptions' => $this->mediumOptions(),
             'defaults' => [
@@ -474,7 +443,7 @@ class QuestionController extends Controller
                 'medium_id' => (string) $request->query('medium_id', ''),
             ],
             'lockedChapterId' => $chapter->id,
-            'backHref' => route('superadmin.subjects.chapters.questions', [$subject, $chapter], false),
+            'backHref' => $this->browseHrefForChapter($chapter, $request->integer('topic_id') ?: null),
             'preview' => $request->session()->get('question_import_preview'),
             'previewToken' => $request->session()->get('question_import_preview_token'),
             'report' => $request->session()->get('question_import_report'),
@@ -652,15 +621,13 @@ class QuestionController extends Controller
 
         if ($saveAndAddNew) {
             $addUrl = $topicId
-                ? "/superadmin/questions/chapters/{$chapter->id}/topics/{$topicId}/add"
-                : "/superadmin/questions/chapters/{$chapter->id}/add";
+                ? route('superadmin.questions.chapters.topics.add', [$chapter, $topicId], false)
+                : route('superadmin.questions.chapters.add', $chapter, false);
 
             return redirect($addUrl)->with('success', 'Question created successfully.');
         }
 
-        $listUrl = $question->topic_id
-            ? "/superadmin/questions/chapters/{$question->chapter_id}/topics/{$question->topic_id}"
-            : "/superadmin/questions/chapters/{$question->chapter_id}";
+        $listUrl = $this->browseHrefForChapter($chapter, $question->topic_id);
 
         return redirect($listUrl)->with('success', 'Question created successfully.');
     }
@@ -691,9 +658,7 @@ class QuestionController extends Controller
             'options',
         ]);
 
-        $backHref = $question->topic_id
-            ? "/superadmin/questions/chapters/{$question->chapter_id}/topics/{$question->topic_id}"
-            : "/superadmin/questions/chapters/{$question->chapter_id}";
+        $backHref = $this->browseHrefForChapter($question->chapter, $question->topic_id);
 
         return Inertia::render('superadmin/questions/edit', [
             'question' => [
@@ -723,7 +688,8 @@ class QuestionController extends Controller
                 ),
             ],
             'questionTypes' => $this->questionTypeFormOptions(includeInactive: true),
-            'chapters' => $this->chapterFormOptions(includeInactive: true),
+            'chapters' => $this->chapterFormOptions(includeInactive: true, onlyChapterId: $question->chapter_id),
+            'chapterOptionsUrl' => route('superadmin.questions.form-chapters', absolute: false),
             'sourceOptions' => $this->sourceOptions(),
             'mediumOptions' => $this->mediumOptions(),
             'backHref' => $backHref,
@@ -782,9 +748,7 @@ class QuestionController extends Controller
         });
 
         $topicId = $validated['topic_id'] ?? null;
-        $listUrl = $topicId
-            ? "/superadmin/questions/chapters/{$validated['chapter_id']}/topics/{$topicId}"
-            : "/superadmin/questions/chapters/{$validated['chapter_id']}";
+        $listUrl = $this->browseHrefForChapter($chapter, $topicId);
 
         return redirect($listUrl)->with('success', 'Question updated successfully.');
     }
@@ -1075,6 +1039,21 @@ class QuestionController extends Controller
         abort_if((int) $chapter->subject_id !== (int) $subject->id, 404);
     }
 
+    private function browseHrefForChapter(Chapter $chapter, ?int $topicId): string
+    {
+        $parents = [$chapter->pattern_id, $chapter->class_id, $chapter->subject_id, $chapter->id];
+        if ($topicId && $chapter->effectiveSubjectType() === 'topic-wise') {
+            return route('superadmin.questions.browse.topic', [...$parents, $topicId], false);
+        }
+
+        if ($chapter->effectiveSubjectType() === 'topic-wise'
+            && Topic::query()->where('chapter_id', $chapter->id)->exists()) {
+            return route('superadmin.questions.browse.unassigned', $parents, false);
+        }
+
+        return route('superadmin.questions.browse.chapter', $parents, false);
+    }
+
     private function chapterContext(Chapter $chapter): array
     {
         $chapter->load([
@@ -1128,7 +1107,7 @@ class QuestionController extends Controller
         ];
     }
 
-    private function chapterFormOptions(bool $includeInactive = false): Collection
+    private function chapterFormOptions(bool $includeInactive = false, ?int $onlyChapterId = null): Collection
     {
         $chapters = Chapter::query()
             ->with([
@@ -1142,6 +1121,7 @@ class QuestionController extends Controller
                     ->select('id', 'chapter_id', 'name', 'name_ur', 'status'),
             ])
             ->when(! $includeInactive, fn ($query) => $query->where('status', 1))
+            ->when($onlyChapterId, fn ($query) => $query->whereKey($onlyChapterId))
             ->orderBy('group_name')
             ->orderBy('group_heading')
             ->orderBy('chapter_number')

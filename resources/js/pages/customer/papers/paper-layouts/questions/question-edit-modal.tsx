@@ -41,6 +41,7 @@ interface QuestionEditModalProps {
     saveLabel?: string;
     onClose: () => void;
     onSave: (value: string) => void;
+    imageUploadUrl?: string;
 }
 
 interface EquationDialogState {
@@ -91,6 +92,7 @@ export function QuestionEditModal({
     saveLabel = 'Update',
     onClose,
     onSave,
+    imageUploadUrl,
 }: QuestionEditModalProps) {
     const editorRef = useRef<TinyMCEEditor | null>(null);
     const editingEquationRef = useRef<HTMLElement | null>(null);
@@ -99,6 +101,8 @@ export function QuestionEditModal({
     );
     const [equationDialog, setEquationDialog] =
         useState<EquationDialogState | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
 
     useEffect(() => {
         function closeOnEscape(event: KeyboardEvent) {
@@ -144,10 +148,33 @@ export function QuestionEditModal({
         setEquationDialog(null);
     }
 
-    function handleSave() {
-        const editorContent = editorRef.current?.getContent() ?? initialValue;
+    async function handleSave() {
+        const editor = editorRef.current;
+        setSaveError('');
+        setSaving(true);
 
-        onSave(sanitizeQuestionHtml(editorContent));
+        try {
+            if (imageUploadUrl && editor) {
+                await editor.uploadImages();
+            }
+
+            const html = sanitizeQuestionHtml(
+                editor?.getContent() ?? initialValue,
+            );
+
+            if (
+                imageUploadUrl &&
+                /<img\b[^>]*\bsrc=["']data:image\//i.test(html)
+            ) {
+                throw new Error('An image is still waiting to upload.');
+            }
+
+            onSave(html);
+        } catch {
+            setSaveError('An image could not be uploaded. Please retry.');
+        } finally {
+            setSaving(false);
+        }
     }
 
     return (
@@ -203,6 +230,51 @@ export function QuestionEditModal({
                                 '8pt 9pt 10pt 11pt 12pt 14pt 16pt 18pt 20pt 24pt 28pt 32pt 36pt',
                             height: 460,
                             image_advtab: true,
+                            images_upload_handler: imageUploadUrl
+                                ? async (blobInfo) => {
+                                      const form = new FormData();
+                                      form.append(
+                                          'file',
+                                          blobInfo.blob(),
+                                          blobInfo.filename(),
+                                      );
+                                      const token =
+                                          document.querySelector<HTMLMetaElement>(
+                                              'meta[name="csrf-token"]',
+                                          )?.content ?? '';
+                                      const response = await fetch(
+                                          imageUploadUrl,
+                                          {
+                                              method: 'POST',
+                                              credentials: 'same-origin',
+                                              headers: {
+                                                  Accept: 'application/json',
+                                                  'X-CSRF-TOKEN': token,
+                                              },
+                                              body: form,
+                                          },
+                                      );
+
+                                      if (!response.ok) {
+                                          throw new Error(
+                                              'Image upload failed',
+                                          );
+                                      }
+
+                                      const result =
+                                          (await response.json()) as {
+                                              location?: string;
+                                          };
+
+                                      if (!result.location) {
+                                          throw new Error(
+                                              'Image upload returned no URL',
+                                          );
+                                      }
+
+                                      return result.location;
+                                  }
+                                : undefined,
                             menubar: 'edit insert format table tools view help',
                             paste_data_images: true,
                             plugins: editorPlugins,
@@ -244,6 +316,14 @@ export function QuestionEditModal({
                 </div>
 
                 <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-800">
+                    {saveError && (
+                        <p
+                            role="alert"
+                            className="mr-auto self-center text-sm text-rose-600"
+                        >
+                            {saveError}
+                        </p>
+                    )}
                     <button
                         type="button"
                         onClick={onClose}
@@ -254,9 +334,10 @@ export function QuestionEditModal({
                     <button
                         type="button"
                         onClick={handleSave}
+                        disabled={saving}
                         className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                     >
-                        {saveLabel}
+                        {saving ? 'Saving…' : saveLabel}
                     </button>
                 </div>
             </section>

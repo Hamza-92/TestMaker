@@ -25,6 +25,7 @@ export default function EditQuestion({
     question,
     questionTypes,
     chapters,
+    chapterOptionsUrl,
     sourceOptions,
     mediumOptions,
     backHref,
@@ -32,6 +33,7 @@ export default function EditQuestion({
     question: QuestionPayload;
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
+    chapterOptionsUrl?: string;
     sourceOptions: SourceOption[];
     mediumOptions: MediumOption[];
     backHref: string;
@@ -76,6 +78,7 @@ export default function EditQuestion({
                 form={form}
                 questionTypes={effectiveQuestionTypes}
                 chapters={chapters}
+                chapterOptionsUrl={chapterOptionsUrl}
                 sourceOptions={sourceOptions}
                 mediumOptions={mediumOptions}
                 onSubmit={handleSubmit}

@@ -58,7 +58,7 @@ it('loads only patterns in the initial question page catalog', function () {
 
     $this->actingAs($context['admin'])->get(route('superadmin.questions'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('superadmin/questions')->has('patterns', 1)->where('initialChapter', null)
+        ->component('superadmin/questions/browse')->where('level', 'patterns')->has('rows', 1)
         ->missing('chapters')->missing('questions')->missing('questionTypes'));
 
     expect(collect($queries)->filter(fn ($sql) => preg_match('/from ["`](chapters|topics|questions|question_options|class_subjects|question_types)["`]/i', $sql)))->toBeEmpty();
@@ -95,10 +95,9 @@ it('keeps existing chapter deep links without eagerly loading the question bank'
     $context = questionLoadingContext();
     loadingQuestion($context);
     $this->actingAs($context['admin'])->get(route('superadmin.questions.topic', [$context['chapter'], $context['topic']]))
-        ->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('superadmin/questions')->where('initialChapter.id', $context['chapter']->id)
-        ->where('filters.chapter_id', $context['chapter']->id)->where('filters.topic_id', $context['topic']->id)
-        ->missing('questions')->missing('questionTypes'));
+        ->assertRedirect(route('superadmin.questions.browse.topic', [
+            $context['pattern'], $context['class'], $context['subject'], $context['chapter'], $context['topic'],
+        ]));
 });
 
 it('returns compact JSON with rich summaries and the same legacy and structured metrics', function () {
@@ -177,4 +176,100 @@ it('enforces view and edit permissions on the JSON endpoints', function () {
     $this->actingAs($restricted)->getJson(route('superadmin.questions.filter-options', ['level' => 'classes', 'pattern_id' => $context['pattern']->id]))->assertForbidden();
     $this->getJson(route('superadmin.questions.list-data', ['chapter_id' => $context['chapter']->id]))->assertForbidden();
     $this->getJson(route('superadmin.questions.list-types'))->assertForbidden();
+});
+
+it('navigates scoped tables and paginates only the selected topic questions', function () {
+    $context = questionLoadingContext();
+    $this->actingAs($context['admin']);
+    $parents = [$context['pattern'], $context['class'], $context['subject']];
+
+    $this->get(route('superadmin.questions.browse.classes', $context['pattern']))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('superadmin/questions/browse')
+        ->where('level', 'classes')->has('rows', 1));
+    $this->get(route('superadmin.questions.browse.subjects', [$context['pattern'], $context['class']]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('superadmin/questions/browse')
+        ->where('level', 'subjects')->has('rows', 1));
+    $this->get(route('superadmin.questions.browse.chapters', $parents))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('superadmin/questions/browse')
+        ->where('level', 'chapters')->has('rows', 1));
+    $this->get(route('superadmin.questions.browse.chapter', [...$parents, $context['chapter']]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('superadmin/questions/browse')
+        ->where('level', 'topics')->has('rows', 1));
+
+    for ($index = 0; $index < 31; $index++) {
+        loadingQuestion($context, ['statement_en' => 'Question '.$index]);
+    }
+    $url = route('superadmin.questions.browse.topic', [...$parents, $context['chapter'], $context['topic']]);
+    $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/list')->where('items.total', 31)
+        ->where('items.per_page', 200)->has('items.data', 31)->missing('items.data.0.content'));
+    $this->get($url.'?per_page=25')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/list')->where('items.per_page', 25)
+        ->has('items.data', 25)->missing('items.data.0.content'));
+    $this->get($url.'?per_page=25&page=2')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/list')->where('items.per_page', 25)->has('items.data', 6));
+    $this->getJson($url.'?per_page=201')->assertUnprocessable()->assertJsonValidationErrors('per_page');
+});
+
+it('lists chapter-wise questions directly and keeps unassigned topic-wise questions visible', function () {
+    $context = questionLoadingContext();
+    $this->actingAs($context['admin']);
+    loadingQuestion($context, ['topic_id' => null]);
+    $parents = [$context['pattern'], $context['class'], $context['subject'], $context['chapter']];
+
+    $this->get(route('superadmin.questions.browse.chapter', $parents))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('superadmin/questions/browse')
+        ->where('level', 'topics')->has('rows', 2));
+    $this->get(route('superadmin.questions.browse.unassigned', $parents))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('superadmin/questions/list')
+        ->where('items.total', 1));
+
+    ClassSubject::query()->where('pattern_id', $context['pattern']->id)
+        ->where('class_id', $context['class']->id)->where('subject_id', $context['subject']->id)
+        ->update(['subject_type' => 'chapter-wise']);
+    $this->get(route('superadmin.questions.browse.chapter', $parents))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->component('superadmin/questions/list')
+        ->where('items.total', 1));
+    $this->get(route('superadmin.questions.browse.topic', [...$parents, $context['topic']]))->assertNotFound();
+});
+
+it('rejects mismatched parent routes and returns lightweight selection and sort data', function () {
+    $context = questionLoadingContext();
+    $other = questionLoadingContext();
+    $question = loadingQuestion($context);
+    $this->actingAs($context['admin']);
+
+    $this->get(route('superadmin.questions.browse.chapter', [
+        $context['pattern'], $context['class'], $context['subject'], $other['chapter'],
+    ]))->assertNotFound();
+    $this->getJson(route('superadmin.questions.selection-ids', [
+        'chapter_id' => $context['chapter']->id, 'topic_id' => $context['topic']->id,
+    ]))->assertOk()->assertJsonCount(1, 'rows')->assertJsonPath('rows.0.id', $question->id);
+    $this->getJson(route('superadmin.questions.sort-rows', [
+        'chapter_id' => $context['chapter']->id, 'topic_id' => $context['topic']->id,
+        'question_type_id' => $context['type']->id,
+    ]))->assertOk()->assertJsonCount(1, 'rows')->assertJsonPath('rows.0.id', $question->id);
+    $this->getJson(route('superadmin.questions.selection-ids', [
+        'chapter_id' => $context['chapter']->id, 'topic_id' => $other['topic']->id,
+    ]))->assertNotFound();
+});
+
+it('loads only the current chapter on edit until the chapter picker is opened', function () {
+    $context = questionLoadingContext();
+    $other = questionLoadingContext();
+    $question = loadingQuestion($context);
+    $this->actingAs($context['admin'])->get(route('superadmin.questions.edit', $question))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/edit')->has('chapters', 1)
+        ->where('chapters.0.id', $context['chapter']->id)
+        ->where('chapterOptionsUrl', route('superadmin.questions.form-chapters', absolute: false)));
+    $this->getJson(route('superadmin.questions.form-chapters'))
+        ->assertOk()->assertJsonCount(2, 'chapters');
+
+    $restricted = User::factory()->create([
+        'user_type' => UserType::SuperAdmin->value,
+        'created_by' => $context['admin']->id,
+    ]);
+    $this->actingAs($restricted)->getJson(route('superadmin.questions.form-chapters'))
+        ->assertForbidden();
 });
