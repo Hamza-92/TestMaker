@@ -1,4 +1,5 @@
 import { PassageQuestionContent } from '../questions/passage-question-content';
+import { QuestionContent } from '../questions/question-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
 import type { SectionTemplateProps } from '../templates/template-props';
 import type { GeneratedPaperQuestion } from '../types';
@@ -131,12 +132,14 @@ function FederalQuestionCell({
                 forceRtl={section.questionTextRtl}
             />
             {question.sameStatement && (
-                <div className="mt-0.5">
-                    <BilingualTableContent
-                        value={question.sameStatement}
-                        urduOnly={urduOnly}
-                        forceRtl={section.questionTextRtl}
-                    />
+                <div
+                    dir="auto"
+                    data-paper-urdu-content={
+                        urduOnly || section.questionTextRtl ? true : undefined
+                    }
+                    className="mt-0.5 text-center"
+                >
+                    <QuestionContent value={question.sameStatement} inline />
                 </div>
             )}
             {question.imageUrl && (

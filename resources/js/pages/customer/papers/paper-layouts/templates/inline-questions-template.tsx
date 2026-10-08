@@ -134,14 +134,19 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                 className="align-baseline"
                             />
                             {question.sameStatement && (
-                                <>
-                                    {' - '}
+                                <span
+                                    dir="auto"
+                                    data-paper-urdu-content={
+                                        isRtl ? true : undefined
+                                    }
+                                    className="block text-center"
+                                >
                                     <QuestionContent
                                         value={question.sameStatement}
                                         inline
                                         className="align-baseline"
                                     />
-                                </>
+                                </span>
                             )}
                             {options.length > 0 && (
                                 <span className="ml-1 align-baseline">

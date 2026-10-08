@@ -134,6 +134,49 @@ export function BilingualQuestionRow({
         );
     }
 
+    if (!parts && sameStatement) {
+        const isRtl = urduOnly || forceRtl;
+        const question = (
+            <div
+                dir={isRtl ? 'rtl' : 'ltr'}
+                data-paper-urdu-content={isRtl ? true : undefined}
+                className={`flex min-w-0 items-baseline ${isRtl ? 'text-right' : 'text-left'}`}
+                style={
+                    isRtl ? { fontFamily: 'var(--paper-urdu-font)' } : undefined
+                }
+            >
+                <span className={indexClassName}>
+                    {label(
+                        isRtl ? urduIndexLabel : indexLabel,
+                        isRtl ? urduIndexPrefix : indexPrefix,
+                    )}
+                </span>{' '}
+                <QuestionContent
+                    value={value}
+                    inline
+                    className={`min-w-0 flex-1 align-baseline ${isRtl ? 'text-right' : ''}`}
+                />
+            </div>
+        );
+
+        return (
+            <div className="min-w-0">
+                {question}
+                <div
+                    dir="auto"
+                    data-paper-urdu-content={isRtl ? true : undefined}
+                    className="mt-0.5 text-center"
+                >
+                    <QuestionContent
+                        value={sameStatement}
+                        inline
+                        className="align-baseline"
+                    />
+                </div>
+            </div>
+        );
+    }
+
     if (!parts) {
         if (urduOnly || forceRtl) {
             return (
@@ -151,16 +194,6 @@ export function BilingualQuestionRow({
                         inline
                         className="min-w-0 flex-1 text-right align-baseline"
                     />
-                    {sameStatement && (
-                        <>
-                            {' - '}
-                            <QuestionContent
-                                value={sameStatement}
-                                inline
-                                className="text-right align-baseline"
-                            />
-                        </>
-                    )}
                 </div>
             );
         }
@@ -175,16 +208,6 @@ export function BilingualQuestionRow({
                     inline
                     className="min-w-0 flex-1 align-baseline"
                 />
-                {sameStatement && (
-                    <>
-                        {' - '}
-                        <QuestionContent
-                            value={sameStatement}
-                            inline
-                            className="align-baseline"
-                        />
-                    </>
-                )}
             </div>
         );
     }
