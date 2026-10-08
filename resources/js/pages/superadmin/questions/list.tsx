@@ -123,6 +123,9 @@ export default function ListQuestions({
     const [sortDirty, setSortDirty] = useState(false);
     const [sortSaving, setSortSaving] = useState(false);
     const [sortLoading, setSortLoading] = useState(false);
+    const [sortTypeId, setSortTypeId] = useState<string | null>(null);
+    const [sortPickerOpen, setSortPickerOpen] = useState(false);
+    const [pendingSortType, setPendingSortType] = useState('');
 
     const visit = (next: Partial<Filters>, page = 1) => {
         const current = { ...filters, ...next };
@@ -263,16 +266,12 @@ export default function ListQuestions({
         }
     };
 
-    const startSorting = async () => {
-        if (!filters.type) {
-            return;
-        }
-
+    const startSorting = async (typeId: string) => {
         setActionError('');
         setSortLoading(true);
         const query = new URLSearchParams({
             chapter_id: String(scope.chapter_id),
-            question_type_id: filters.type,
+            question_type_id: typeId,
         });
 
         if (scope.topic_id) {
@@ -284,6 +283,7 @@ export default function ListQuestions({
                 `/superadmin/questions/sort-rows?${query}`,
             );
             setSorting(data.rows);
+            setSortTypeId(typeId);
             setSortDirty(false);
             setSelected(new Map());
             setSelectionMode(false);
@@ -291,6 +291,27 @@ export default function ListQuestions({
             setActionError('Could not load the order. Please retry.');
         } finally {
             setSortLoading(false);
+        }
+    };
+
+    const openSort = () => {
+        setActionError('');
+
+        if (questionTypes.length === 0) {
+            setActionError('There are no questions to sort.');
+
+            return;
+        }
+
+        const typeId =
+            filters.type ||
+            (questionTypes.length === 1 ? String(questionTypes[0].id) : '');
+
+        if (typeId) {
+            void startSorting(typeId);
+        } else {
+            setPendingSortType('');
+            setSortPickerOpen(true);
         }
     };
 
@@ -322,7 +343,7 @@ export default function ListQuestions({
     };
 
     const saveSorting = () => {
-        if (!sorting || !filters.type) {
+        if (!sorting || !sortTypeId) {
             return;
         }
 
@@ -332,13 +353,14 @@ export default function ListQuestions({
             {
                 chapter_id: scope.chapter_id,
                 topic_id: scope.topic_id,
-                question_type_id: Number(filters.type),
+                question_type_id: Number(sortTypeId),
                 order: sorting.map((row) => row.id),
             },
             {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSorting(null);
+                    setSortTypeId(null);
                     setSortDirty(false);
                 },
                 onError: (errors) =>
@@ -384,6 +406,7 @@ export default function ListQuestions({
                                 <Button
                                     onClick={() => {
                                         setSorting(null);
+                                        setSortTypeId(null);
                                         setSortDirty(false);
                                     }}
                                     disabled={sortSaving}
@@ -400,6 +423,23 @@ export default function ListQuestions({
                             </>
                         ) : (
                             <>
+                                {can('questions.edit') && (
+                                    <Button
+                                        onClick={openSort}
+                                        disabled={sortLoading}
+                                    >
+                                        <ArrowUpDownIcon />
+                                        {sortLoading ? 'Loading…' : 'Sort'}
+                                    </Button>
+                                )}
+                                {can('questions.edit') && (
+                                    <Button
+                                        onClick={() => setSelectionMode(true)}
+                                    >
+                                        <ArrowRightLeftIcon />
+                                        Select
+                                    </Button>
+                                )}
                                 {can('questions.import') && (
                                     <Button asChild>
                                         <Link href={importHref}>
@@ -542,7 +582,7 @@ export default function ListQuestions({
                                 }
                             >
                                 <SelectTrigger
-                                    className="h-9 w-36"
+                                    className="h-9 w-24"
                                     aria-label="Questions per page"
                                 >
                                     <SelectValue />
@@ -553,31 +593,11 @@ export default function ListQuestions({
                                             key={count}
                                             value={String(count)}
                                         >
-                                            {count} per page
+                                            {count}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {can('questions.edit') && (
-                                <Button
-                                    size="sm"
-                                    onClick={startSorting}
-                                    disabled={!filters.type || sortLoading}
-                                    title="Select a question type to sort"
-                                >
-                                    <ArrowUpDownIcon />
-                                    {sortLoading ? 'Loading…' : 'Sort'}
-                                </Button>
-                            )}
-                            {can('questions.edit') && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setSelectionMode(true)}
-                                >
-                                    <ArrowRightLeftIcon />
-                                    Select
-                                </Button>
-                            )}
                         </div>
 
                         {selectionMode && (
@@ -791,6 +811,48 @@ export default function ListQuestions({
                     </>
                 )}
             </div>
+
+            <Dialog open={sortPickerOpen} onOpenChange={setSortPickerOpen}>
+                <DialogContent>
+                    <DialogTitle>Sort questions</DialogTitle>
+                    <DialogDescription>
+                        Choose the question type whose order you want to change.
+                    </DialogDescription>
+                    <Select
+                        value={pendingSortType}
+                        onValueChange={setPendingSortType}
+                    >
+                        <SelectTrigger aria-label="Question type to sort">
+                            <SelectValue placeholder="Select question type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {questionTypes.map((type) => (
+                                <SelectItem
+                                    key={type.id}
+                                    value={String(type.id)}
+                                >
+                                    {type.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <DialogFooter>
+                        <Button onClick={() => setSortPickerOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="primary"
+                            disabled={!pendingSortType}
+                            onClick={() => {
+                                setSortPickerOpen(false);
+                                void startSorting(pendingSortType);
+                            }}
+                        >
+                            Continue
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog
                 open={deleteTarget !== null}
