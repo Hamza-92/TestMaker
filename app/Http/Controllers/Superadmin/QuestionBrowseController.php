@@ -203,18 +203,24 @@ class QuestionBrowseController extends Controller
         $items = $this->applyListFilters($query, $filters)
             ->with(['questionType', 'options'])
             ->orderBy('question_type_id')->orderBy('topic_id')->orderBy('sort_order')->orderBy('id')
-            ->paginate((int) ($filters['per_page'] ?? 200), ['id', 'chapter_id', 'topic_id', 'question_type_id', 'schema_key', 'statement_en', 'statement_ur', 'content', 'source', 'status', 'sort_order'])
+            ->paginate((int) ($filters['per_page'] ?? 200), ['id', 'chapter_id', 'topic_id', 'question_type_id', 'schema_key', 'statement_en', 'statement_ur', 'description_en', 'description_ur', 'content', 'source', 'status', 'sort_order'])
             ->withQueryString();
 
         $rows = $items->getCollection()->map(function (Question $question): array {
             $type = QuestionTypeSchemaRegistry::typeForQuestion($question, $question->questionType);
-            $content = QuestionTypeSchemaRegistry::contentFromQuestion($question, $type);
-            $summary = QuestionTypeSchemaRegistry::summarize($type, $content);
-            $summary = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($summary), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+            $hasStatement = filled($question->statement_en) || filled($question->statement_ur);
+            $fallback = $hasStatement ? '' : QuestionTypeSchemaRegistry::summarize(
+                $type,
+                QuestionTypeSchemaRegistry::contentFromQuestion($question, $type),
+            );
 
             return [
                 'id' => $question->id,
-                'summary_text' => Str::limit($summary ?: 'Question #'.$question->id, 180),
+                'summary_text' => $fallback ?: ($hasStatement ? '' : 'Question #'.$question->id),
+                'statement_en' => $question->statement_en,
+                'statement_ur' => $question->statement_ur,
+                'description_en' => $question->description_en ?: ($question->content['shared_en'] ?? $question->content['guidance_en'] ?? null),
+                'description_ur' => $question->description_ur ?: ($question->content['shared_ur'] ?? $question->content['guidance_ur'] ?? null),
                 'question_type' => [
                     'id' => $question->question_type_id,
                     'name' => $question->questionType->name,
@@ -302,6 +308,8 @@ class QuestionBrowseController extends Controller
             ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('statement_en', 'like', "%{$search}%")
                     ->orWhere('statement_ur', 'like', "%{$search}%")
+                    ->orWhere('description_en', 'like', "%{$search}%")
+                    ->orWhere('description_ur', 'like', "%{$search}%")
                     ->orWhere('content', 'like', "%{$search}%")
                     ->orWhere('source', 'like', "%{$search}%")
                     ->orWhereHas('questionType', fn ($typeQuery) => $typeQuery->where('name', 'like', "%{$search}%"));

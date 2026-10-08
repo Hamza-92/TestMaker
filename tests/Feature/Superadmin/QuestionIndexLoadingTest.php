@@ -211,6 +211,31 @@ it('navigates scoped tables and paginates only the selected topic questions', fu
     $this->getJson($url.'?per_page=201')->assertUnprocessable()->assertJsonValidationErrors('per_page');
 });
 
+it('shows complete question statements and descriptions in the scoped list', function () {
+    $context = questionLoadingContext();
+    $statement = str_repeat('A long question sentence. ', 12);
+    $description = '<p>Use the diagram to explain your answer.</p>';
+    loadingQuestion($context, [
+        'statement_en' => $statement,
+        'statement_ur' => 'اردو سوال',
+        'description_en' => $description,
+        'description_ur' => 'اردو وضاحت',
+    ]);
+    $url = route('superadmin.questions.browse.topic', [
+        $context['pattern'], $context['class'], $context['subject'], $context['chapter'], $context['topic'],
+    ]);
+
+    $this->actingAs($context['admin'])->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/list')
+        ->where('items.data.0.statement_en', $statement)
+        ->where('items.data.0.statement_ur', 'اردو سوال')
+        ->where('items.data.0.description_en', $description)
+        ->where('items.data.0.description_ur', 'اردو وضاحت')
+        ->missing('items.data.0.content'));
+    $this->get($url.'?q=diagram')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/list')->where('items.total', 1));
+});
+
 it('lists chapter-wise questions directly and keeps unassigned topic-wise questions visible', function () {
     $context = questionLoadingContext();
     $this->actingAs($context['admin']);

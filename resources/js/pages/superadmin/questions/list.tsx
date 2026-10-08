@@ -36,6 +36,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { usePermission } from '@/hooks/use-permission';
+import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { BulkQuestionTypeChangeDialog } from './change-type-dialog';
 import type { QuestionTypeOption } from './form';
 import { QuestionPathBreadcrumbs } from './path-breadcrumbs';
@@ -46,6 +47,10 @@ import { fetchQuestionJson } from './use-question-options';
 interface QuestionRow {
     id: number;
     summary_text: string;
+    statement_en: string | null;
+    statement_ur: string | null;
+    description_en: string | null;
+    description_ur: string | null;
     question_type: {
         id: number;
         name: string;
@@ -82,6 +87,64 @@ interface Scope {
     topic_id: number | null;
     unassigned: boolean;
     subject_type: 'chapter-wise' | 'topic-wise';
+}
+
+function QuestionPreview({ row }: { row: QuestionRow }) {
+    const hasStatement = Boolean(row.statement_en || row.statement_ur);
+    const hasDescription = Boolean(row.description_en || row.description_ur);
+    const contentClass =
+        'break-words [&_img]:inline-block [&_img]:max-h-40 [&_img]:max-w-full [&_img]:object-contain [&_p]:my-0';
+
+    return (
+        <div className="max-w-[42rem] space-y-2">
+            <Link
+                href={`/superadmin/questions/${row.id}`}
+                className="block space-y-1 font-medium text-slate-900 hover:text-brand-600 dark:text-slate-100"
+            >
+                {row.statement_en && (
+                    <QuestionContent
+                        value={row.statement_en}
+                        className={contentClass}
+                    />
+                )}
+                {row.statement_ur && (
+                    <div dir="rtl">
+                        <QuestionContent
+                            value={row.statement_ur}
+                            className={contentClass}
+                        />
+                    </div>
+                )}
+                {!hasStatement && (
+                    <QuestionContent
+                        value={row.summary_text}
+                        className={contentClass}
+                    />
+                )}
+            </Link>
+            {hasDescription && (
+                <div className="space-y-1 border-l-2 border-slate-200 pl-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Description
+                    </span>
+                    {row.description_en && (
+                        <QuestionContent
+                            value={row.description_en}
+                            className={contentClass}
+                        />
+                    )}
+                    {row.description_ur && (
+                        <div dir="rtl">
+                            <QuestionContent
+                                value={row.description_ur}
+                                className={contentClass}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function ListQuestions({
@@ -726,14 +789,10 @@ export default function ListQuestions({
                                                         />
                                                     </td>
                                                 )}
-                                                <td className="max-w-xl px-5 py-3 font-medium text-slate-900 dark:text-slate-100">
-                                                    <Link
-                                                        href={`/superadmin/questions/${row.id}`}
-                                                        className="block truncate hover:text-brand-600"
-                                                        title={row.summary_text}
-                                                    >
-                                                        {row.summary_text}
-                                                    </Link>
+                                                <td className="min-w-80 px-5 py-3 align-top">
+                                                    <QuestionPreview
+                                                        row={row}
+                                                    />
                                                 </td>
                                                 <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
                                                     {row.question_type.name}
