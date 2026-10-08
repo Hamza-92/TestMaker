@@ -7,6 +7,7 @@ import {
     HelpCircleIcon,
     LayoutGrid,
     LayoutPanelTopIcon,
+    LanguagesIcon,
     SchoolIcon,
     Settings2Icon,
     ShapesIcon,
@@ -79,6 +80,11 @@ export function AppSidebar() {
                       title: 'Subjects',
                       href: '/superadmin/subjects',
                       icon: BookOpenIcon,
+                  },
+                  {
+                      title: 'Arabic Subjects',
+                      href: '/superadmin/arabic-subjects',
+                      icon: LanguagesIcon,
                   },
               ]
             : []),

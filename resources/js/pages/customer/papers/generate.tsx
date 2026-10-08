@@ -90,7 +90,10 @@ import {
     setLabelFor,
     variantForSet,
 } from './paper-layouts/paper-variant';
-import { QuestionContent } from './paper-layouts/questions/question-content';
+import {
+    ArabicQuestionFontProvider,
+    QuestionContent,
+} from './paper-layouts/questions/question-content';
 import { SaveAsTemplateModal } from './paper-layouts/save-as-template-modal';
 import type { SaveAsTemplateValues } from './paper-layouts/save-as-template-modal';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
@@ -173,6 +176,7 @@ interface ClassSubject {
     medium?: ContentMedium | null;
     objective_layout?: 'standard' | 'federal-row' | null;
     objective_bubbles?: boolean | number | null;
+    is_arabic: boolean;
 }
 
 interface Topic {
@@ -3514,6 +3518,14 @@ export default function GeneratePaper({
                 ),
             }));
     }, [pattern, klass, classSubjects]);
+
+    const subjectUsesArabicFont = classSubjects.some(
+        (item) =>
+            item.pattern_id === pattern?.id &&
+            item.class_id === klass?.id &&
+            item.subject_id === subject?.id &&
+            item.is_arabic,
+    );
 
     const selectedChapterIds = useMemo(
         () =>
@@ -8763,6 +8775,7 @@ export default function GeneratePaper({
                         showSchoolAddress={showSchoolAddress}
                         canViewSubjectiveAnswers={canViewSubjectiveAnswers}
                         canEditWatermark={canEditWatermark}
+                        enableArabicFont={subjectUsesArabicFont}
                         pickerTarget={activePaperPickerContext}
                         pickerQuestions={filteredPaperPickerQuestions}
                         pickerSearch={paperQuestionSearch}
@@ -13740,6 +13753,7 @@ export function GeneratedPaperView({
     showSchoolAddress,
     canViewSubjectiveAnswers,
     canEditWatermark,
+    enableArabicFont = false,
     pickerTarget,
     pickerQuestions,
     pickerSearch,
@@ -13800,6 +13814,7 @@ export function GeneratedPaperView({
     showSchoolAddress: boolean;
     canViewSubjectiveAnswers: boolean;
     canEditWatermark: boolean;
+    enableArabicFont?: boolean;
     pickerTarget: {
         section: GeneratedPaperSection;
         question: GeneratedPaperQuestion;
@@ -14544,7 +14559,7 @@ export function GeneratedPaperView({
     }
 
     return (
-        <>
+        <ArabicQuestionFontProvider enabled={enableArabicFont}>
             <div
                 data-paper-shell
                 data-paper-preview-only={previewOnly ? '' : undefined}
@@ -15641,7 +15656,7 @@ export function GeneratedPaperView({
                     />
                 </>
             )}
-        </>
+        </ArabicQuestionFontProvider>
     );
 }
 

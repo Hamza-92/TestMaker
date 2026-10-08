@@ -96,6 +96,7 @@ class GeneratePaperController extends Controller
                 'subjects.name_eng as name',
                 'subjects.name_ur',
                 'subjects.color',
+                'subjects.is_arabic',
                 'mediums.name as medium',
                 'objective_layout_assignments.objective_layout',
                 'objective_layout_assignments.show_bubbles as objective_bubbles',
@@ -133,7 +134,10 @@ class GeneratePaperController extends Controller
             'canEditWatermark' => CustomerPaperDefaults::canEditWatermark(request()),
             'patterns' => $patterns,
             'patternClasses' => $patternClasses,
-            'classSubjects' => $classSubjects,
+            'classSubjects' => $classSubjects->map(fn (ClassSubject $row) => [
+                ...$row->toArray(),
+                'is_arabic' => (bool) $row->is_arabic,
+            ]),
             'sourceOptions' => collect(Question::sourceOptions())
                 ->map(fn (string $label, string $value) => [
                     'value' => $value,

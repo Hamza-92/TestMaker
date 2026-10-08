@@ -14,9 +14,15 @@ class Subject extends Model
         'name_ur',
         'color',
         'subject_type',
+        'is_arabic',
         'status',
         'created_by',
     ];
+
+    protected function casts(): array
+    {
+        return ['is_arabic' => 'boolean'];
+    }
 
     // ── Relationships ─────────────────────────────────────────────────────────
 

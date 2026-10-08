@@ -15,6 +15,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
 use App\Http\Controllers\QuestionImageController;
 use App\Http\Controllers\Superadmin\AnnouncementController;
+use App\Http\Controllers\Superadmin\ArabicSubjectController;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
@@ -219,6 +220,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // â”€â”€â”€ Subjects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/subjects', [SubjectController::class, 'index'])->name('superadmin.subjects')->middleware('permission:subjects.view');
+        Route::get('superadmin/arabic-subjects', [ArabicSubjectController::class, 'index'])->name('superadmin.arabic-subjects')->middleware('permission:subjects.view');
+        Route::put('superadmin/arabic-subjects', [ArabicSubjectController::class, 'update'])->name('superadmin.arabic-subjects.update')->middleware('permission:subjects.edit');
         Route::get('superadmin/subjects/add', [SubjectController::class, 'create'])->name('superadmin.subjects.add')->middleware('permission:subjects.create');
         Route::post('superadmin/subjects', [SubjectController::class, 'store'])->name('superadmin.subjects.store')->middleware('permission:subjects.create');
         Route::get('superadmin/subjects/{subject}/edit', [SubjectController::class, 'edit'])->name('superadmin.subjects.edit')->middleware('permission:subjects.edit');

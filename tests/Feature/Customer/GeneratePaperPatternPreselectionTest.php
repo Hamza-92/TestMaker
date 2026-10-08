@@ -43,6 +43,7 @@ test('a subject assignment medium becomes the generator default without restrict
         'color' => '#0284c7',
         'name_ur' => 'کمپیوٹر سائنس',
         'subject_type' => 'chapter-wise',
+        'is_arabic' => true,
         'status' => 1,
     ]);
     $urdu = Medium::query()->firstOrCreate(['name' => 'Urdu']);
@@ -96,7 +97,8 @@ test('a subject assignment medium becomes the generator default without restrict
             ->where('patterns.0.icon', 'atom')
             ->where('patterns.0.color', '#4f46e5')
             ->where('patternClasses.0.color', '#059669')
-            ->where('classSubjects.0.color', '#0284c7'));
+            ->where('classSubjects.0.color', '#0284c7')
+            ->where('classSubjects.0.is_arabic', true));
 
     $this->actingAs($customer)
         ->getJson(route('customer.papers.generate.chapters', [
