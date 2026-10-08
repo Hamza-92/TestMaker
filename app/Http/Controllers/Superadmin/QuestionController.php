@@ -327,20 +327,45 @@ class QuestionController extends Controller
 
     public function createForChapterClean(Chapter $chapter)
     {
-        return $this->renderCreateForm($chapter->id, null);
+        return redirect(route('superadmin.questions.browse.chapter.add', [
+            $chapter->pattern_id, $chapter->class_id, $chapter->subject_id, $chapter->id,
+        ], false));
     }
 
     public function createForTopicClean(Chapter $chapter, Topic $topic)
     {
         abort_if((int) $topic->chapter_id !== (int) $chapter->id, 404);
 
+        return redirect(route('superadmin.questions.browse.topic.add', [
+            $chapter->pattern_id, $chapter->class_id, $chapter->subject_id, $chapter->id, $topic->id,
+        ], false));
+    }
+
+    public function createForChapterPath(Pattern $pattern, SchoolClass $schoolClass, Subject $subject, Chapter $chapter)
+    {
+        $this->ensureChapterMatchesPath($pattern, $schoolClass, $subject, $chapter);
+
+        return $this->renderCreateForm($chapter->id, null);
+    }
+
+    public function createForTopicPath(Pattern $pattern, SchoolClass $schoolClass, Subject $subject, Chapter $chapter, Topic $topic)
+    {
+        $this->ensureChapterMatchesPath($pattern, $schoolClass, $subject, $chapter);
+        abort_unless((int) $topic->chapter_id === (int) $chapter->id, 404);
+
         return $this->renderCreateForm($chapter->id, $topic->id);
     }
 
     private function renderCreateForm(?int $chapterId, ?int $topicId)
     {
-        $backHref = $chapterId
-            ? $this->browseHrefForChapter(Chapter::query()->findOrFail($chapterId), $topicId)
+        $chapter = $chapterId
+            ? Chapter::query()->with(['pattern:id,name', 'schoolClass:id,name', 'subject:id,name_eng,subject_type'])->findOrFail($chapterId)
+            : null;
+        $topic = $topicId
+            ? Topic::query()->where('chapter_id', $chapter?->id)->findOrFail($topicId)
+            : null;
+        $backHref = $chapter
+            ? $this->browseHrefForChapter($chapter, $topic?->id)
             : '/superadmin/questions';
 
         return Inertia::render('superadmin/questions/add', [
@@ -353,6 +378,7 @@ class QuestionController extends Controller
             'lockedChapterId' => $chapterId,
             'lockedTopicId' => $topicId,
             'backHref' => $backHref,
+            'breadcrumbs' => $this->addQuestionBreadcrumbs($chapter, $topic),
         ]);
     }
 
@@ -369,6 +395,7 @@ class QuestionController extends Controller
             'defaultTopicId' => $request->integer('topic_id') ?: null,
             'lockedChapterId' => $chapter->id,
             'backHref' => $this->browseHrefForChapter($chapter, null),
+            'breadcrumbs' => $this->addQuestionBreadcrumbs($chapter, null),
         ]);
     }
 
@@ -420,6 +447,7 @@ class QuestionController extends Controller
             'lockedChapterId' => $chapter->id,
             'lockedTopicId' => $topic->id,
             'backHref' => $this->browseHrefForChapter($chapter, $topic->id),
+            'breadcrumbs' => $this->addQuestionBreadcrumbs($chapter, $topic),
         ]);
     }
 
@@ -620,9 +648,10 @@ class QuestionController extends Controller
         $topicId = $validated['topic_id'] ?? null;
 
         if ($saveAndAddNew) {
-            $addUrl = $topicId
-                ? route('superadmin.questions.chapters.topics.add', [$chapter, $topicId], false)
-                : route('superadmin.questions.chapters.add', $chapter, false);
+            $parents = [$chapter->pattern_id, $chapter->class_id, $chapter->subject_id, $chapter->id];
+            $addUrl = $topicId && $chapter->effectiveSubjectType() === 'topic-wise'
+                ? route('superadmin.questions.browse.topic.add', [...$parents, $topicId], false)
+                : route('superadmin.questions.browse.chapter.add', $parents, false);
 
             return redirect($addUrl)->with('success', 'Question created successfully.');
         }
@@ -1037,6 +1066,40 @@ class QuestionController extends Controller
     private function ensureChapterBelongsToSubject(Subject $subject, Chapter $chapter): void
     {
         abort_if((int) $chapter->subject_id !== (int) $subject->id, 404);
+    }
+
+    private function ensureChapterMatchesPath(Pattern $pattern, SchoolClass $schoolClass, Subject $subject, Chapter $chapter): void
+    {
+        abort_unless((int) $chapter->pattern_id === (int) $pattern->id
+            && (int) $chapter->class_id === (int) $schoolClass->id
+            && (int) $chapter->subject_id === (int) $subject->id, 404);
+    }
+
+    private function addQuestionBreadcrumbs(?Chapter $chapter, ?Topic $topic): array
+    {
+        $breadcrumbs = [
+            ['label' => 'Questions', 'href' => route('superadmin.questions', absolute: false)],
+        ];
+
+        if ($chapter) {
+            $chapter->loadMissing(['pattern:id,name', 'schoolClass:id,name', 'subject:id,name_eng,subject_type']);
+            $parents = [$chapter->pattern_id, $chapter->class_id, $chapter->subject_id, $chapter->id];
+            $breadcrumbs[] = ['label' => $chapter->pattern->name, 'href' => route('superadmin.questions.browse.classes', $chapter->pattern_id, false)];
+            $breadcrumbs[] = ['label' => $chapter->schoolClass->name, 'href' => route('superadmin.questions.browse.subjects', array_slice($parents, 0, 2), false)];
+            $breadcrumbs[] = ['label' => $chapter->subject->name_eng, 'href' => route('superadmin.questions.browse.chapters', array_slice($parents, 0, 3), false)];
+            $breadcrumbs[] = ['label' => $chapter->name, 'href' => route('superadmin.questions.browse.chapter', $parents, false)];
+
+            if ($topic) {
+                $breadcrumbs[] = ['label' => $topic->name, 'href' => route('superadmin.questions.browse.topic', [...$parents, $topic->id], false)];
+            } elseif ($chapter->effectiveSubjectType() === 'topic-wise'
+                && Topic::query()->where('chapter_id', $chapter->id)->exists()) {
+                $breadcrumbs[] = ['label' => 'Unassigned questions', 'href' => route('superadmin.questions.browse.unassigned', $parents, false)];
+            }
+        }
+
+        $breadcrumbs[] = ['label' => 'Add Question', 'href' => request()->url()];
+
+        return $breadcrumbs;
     }
 
     private function browseHrefForChapter(Chapter $chapter, ?int $topicId): string

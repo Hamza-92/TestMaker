@@ -273,3 +273,39 @@ it('loads only the current chapter on edit until the chapter picker is opened', 
     $this->actingAs($restricted)->getJson(route('superadmin.questions.form-chapters'))
         ->assertForbidden();
 });
+
+it('opens add question from the full topic path and shows that path on the form', function () {
+    $context = questionLoadingContext();
+    $parents = [$context['pattern'], $context['class'], $context['subject'], $context['chapter']];
+    $url = route('superadmin.questions.browse.topic.add', [...$parents, $context['topic']]);
+    $listUrl = route('superadmin.questions.browse.topic', [...$parents, $context['topic']]);
+    $this->actingAs($context['admin']);
+
+    $this->get($listUrl)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/list')->where('addHref', parse_url($url, PHP_URL_PATH)));
+    $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/add')
+        ->where('backHref', parse_url($listUrl, PHP_URL_PATH))
+        ->where('breadcrumbs.0.label', 'Questions')
+        ->where('breadcrumbs.1.label', $context['pattern']->name)
+        ->where('breadcrumbs.2.label', $context['class']->name)
+        ->where('breadcrumbs.3.label', $context['subject']->name_eng)
+        ->where('breadcrumbs.4.label', $context['chapter']->name)
+        ->where('breadcrumbs.5.label', $context['topic']->name)
+        ->where('breadcrumbs.6.label', 'Add Question'));
+    $this->get(route('superadmin.questions.chapters.topics.add', [$context['chapter'], $context['topic']]))
+        ->assertRedirect($url);
+
+    $chapterAddUrl = route('superadmin.questions.browse.chapter.add', $parents);
+    $this->get($chapterAddUrl)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/add')
+        ->where('breadcrumbs.5.label', 'Unassigned questions')
+        ->where('breadcrumbs.6.label', 'Add Question'));
+    $this->get(route('superadmin.questions.chapters.add', $context['chapter']))
+        ->assertRedirect($chapterAddUrl);
+
+    $other = questionLoadingContext();
+    $this->get(route('superadmin.questions.browse.topic.add', [
+        $other['pattern'], $context['class'], $context['subject'], $context['chapter'], $context['topic'],
+    ]))->assertNotFound();
+});

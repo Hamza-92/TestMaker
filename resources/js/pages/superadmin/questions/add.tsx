@@ -7,6 +7,7 @@ import type {
     SourceOption,
     MediumOption,
 } from './form';
+import type { QuestionBreadcrumb } from './path-breadcrumbs';
 
 const STICKY_KEY = 'question_add_sticky';
 
@@ -48,6 +49,7 @@ function loadSticky(
             const chapter = chapters.find(
                 (c) => c.id.toString() === raw.chapter_id,
             );
+
             if (
                 chapter &&
                 raw.topic_id &&
@@ -61,13 +63,15 @@ function loadSticky(
             valid.source = raw.source;
         }
 
-
         if (
             raw.medium_id &&
-            mediumOptions.some((medium) => medium.id.toString() === raw.medium_id)
+            mediumOptions.some(
+                (medium) => medium.id.toString() === raw.medium_id,
+            )
         ) {
             valid.medium_id = raw.medium_id;
         }
+
         if (raw.status === '0' || raw.status === '1') {
             valid.status = raw.status;
         }
@@ -96,6 +100,7 @@ export default function AddQuestion({
     lockedChapterId,
     lockedTopicId,
     backHref = '/superadmin/questions',
+    breadcrumbs,
 }: {
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
@@ -106,6 +111,7 @@ export default function AddQuestion({
     lockedChapterId?: number | null;
     lockedTopicId?: number | null;
     backHref?: string;
+    breadcrumbs?: QuestionBreadcrumb[];
 }) {
     const sticky = loadSticky(
         questionTypes,
@@ -120,7 +126,8 @@ export default function AddQuestion({
         : (sticky.chapter_id ?? '');
     const initialTopicId = lockedTopicId
         ? lockedTopicId.toString()
-        : (defaultTopicId?.toString() ?? (scopedChapterId ? '' : (sticky.topic_id ?? '')));
+        : (defaultTopicId?.toString() ??
+          (scopedChapterId ? '' : (sticky.topic_id ?? '')));
 
     const form = useForm<QuestionFormData>({
         question_type_id: sticky.question_type_id ?? '',
@@ -128,7 +135,13 @@ export default function AddQuestion({
         topic_id: initialTopicId,
         source: sticky.source ?? '',
         status: sticky.status ?? '1',
-        medium_id: sticky.medium_id ?? String(mediumOptions.find((medium) => medium.name === 'Both')?.id ?? mediumOptions[0]?.id ?? ''),
+        medium_id:
+            sticky.medium_id ??
+            String(
+                mediumOptions.find((medium) => medium.name === 'Both')?.id ??
+                    mediumOptions[0]?.id ??
+                    '',
+            ),
         content: createEmptyQuestionContent(),
     });
 
@@ -139,10 +152,23 @@ export default function AddQuestion({
             .submitter as HTMLButtonElement | null;
         const saveAndAddNew = submitter?.value === 'save-and-add-new';
 
-        const { question_type_id, chapter_id, topic_id, source, status, medium_id } =
-            form.data;
+        const {
+            question_type_id,
+            chapter_id,
+            topic_id,
+            source,
+            status,
+            medium_id,
+        } = form.data;
 
-        saveSticky({ question_type_id, chapter_id, topic_id, source, status, medium_id });
+        saveSticky({
+            question_type_id,
+            chapter_id,
+            topic_id,
+            source,
+            status,
+            medium_id,
+        });
 
         const query = new URLSearchParams();
 
@@ -161,7 +187,9 @@ export default function AddQuestion({
         form.post(action, {
             preserveScroll: saveAndAddNew,
             onSuccess: () => {
-                if (!saveAndAddNew) return;
+                if (!saveAndAddNew) {
+                    return;
+                }
 
                 form.clearErrors();
                 form.setData({
@@ -184,6 +212,7 @@ export default function AddQuestion({
                 title="Add Question"
                 submitLabel="Save Question"
                 backHref={backHref}
+                breadcrumbs={breadcrumbs}
                 form={form}
                 questionTypes={questionTypes}
                 chapters={chapters}
@@ -202,6 +231,6 @@ AddQuestion.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: '/dashboard' },
         { title: 'Questions', href: '/superadmin/questions' },
-        { title: 'Add Question', href: '/superadmin/questions/add' },
+        { title: 'Add Question' },
     ],
 };

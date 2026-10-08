@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
+import { QuestionPathBreadcrumbs } from './path-breadcrumbs';
+import type { QuestionBreadcrumb } from './path-breadcrumbs';
 import { fetchQuestionJson } from './use-question-options';
 
 const QuestionEditModal = lazy(() =>
@@ -175,6 +177,7 @@ interface QuestionFormProps {
     secondarySubmitLabel?: string;
     lockedChapterId?: number | null;
     lockedTopicId?: number | null;
+    breadcrumbs?: QuestionBreadcrumb[];
 }
 
 const textareaClassName =
@@ -209,7 +212,7 @@ function AutoTextarea({
             value={value}
             onChange={onChange}
             dir={dir}
-            className={textareaClassName}
+            className={`${textareaClassName} pr-11`}
         />
     );
 }
@@ -229,11 +232,11 @@ function RichContentControl({
     const hasMarkup = /<\/?[a-z][^>]*>/i.test(value);
 
     return (
-        <div className="space-y-1.5">
+        <div className="relative">
             {hasMarkup ? (
                 <QuestionContent
                     value={value}
-                    className="min-h-9 rounded-xl border border-input px-3 py-2 text-sm"
+                    className="min-h-9 rounded-xl border border-input px-3 py-2 pr-11 text-sm"
                 />
             ) : multiline ? (
                 <AutoTextarea
@@ -246,14 +249,17 @@ function RichContentControl({
                     value={value}
                     onChange={(event) => onChange(event.target.value)}
                     dir={dir}
+                    className="pr-11"
                 />
             )}
             <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                aria-label="Open content editor"
+                title="Open content editor"
+                className="absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-md bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
-                <PencilIcon className="size-3" /> Rich text, equation or image
+                <PencilIcon className="size-4" />
             </button>
             {editing && (
                 <Suspense
@@ -389,6 +395,7 @@ export function QuestionForm({
     secondarySubmitLabel,
     lockedChapterId,
     lockedTopicId,
+    breadcrumbs,
 }: QuestionFormProps) {
     const [chapterOptions, setChapterOptions] = useState(chapters);
     const [allChaptersLoaded, setAllChaptersLoaded] = useState(false);
@@ -1276,6 +1283,7 @@ export function QuestionForm({
 
     return (
         <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
+            {breadcrumbs && <QuestionPathBreadcrumbs items={breadcrumbs} />}
             <div className="flex min-w-0 items-center gap-4">
                 <Link
                     href={backHref}

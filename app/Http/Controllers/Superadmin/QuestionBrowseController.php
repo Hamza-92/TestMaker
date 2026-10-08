@@ -257,8 +257,8 @@ class QuestionBrowseController extends Controller
                 'subject_type' => $this->subjectType($pattern, $schoolClass, $subject),
             ],
             'addHref' => $topic
-                ? route('superadmin.questions.chapters.topics.add', [$chapter, $topic], false)
-                : route('superadmin.questions.chapters.add', $chapter, false),
+                ? route('superadmin.questions.browse.topic.add', [$pattern, $schoolClass, $subject, $chapter, $topic], false)
+                : route('superadmin.questions.browse.chapter.add', [$pattern, $schoolClass, $subject, $chapter], false),
             'importHref' => route('superadmin.subjects.chapters.questions.import', [$subject, $chapter], false)
                 .($topic ? '?topic_id='.$topic->id : ''),
         ]);
