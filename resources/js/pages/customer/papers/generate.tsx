@@ -741,6 +741,32 @@ function draftKey(paperId: number | null): string {
 }
 
 const GENERATED_PAPER_SESSION_KEY = 'paper_generated_view';
+const PAPER_SETUP_SESSION_VERSION = 1;
+const PAPER_SETUP_SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
+
+function paperSetupSessionKey(userId: number | string): string {
+    return `paper_setup:${userId}`;
+}
+
+function clearPaperSetupSession(userId: number | string): void {
+    try {
+        sessionStorage.removeItem(paperSetupSessionKey(userId));
+    } catch {
+        // sessionStorage unavailable
+    }
+}
+
+interface PaperSetupSessionPayload {
+    version: number;
+    savedAt: number;
+    templateId: number | null;
+    initialPatternId: number | null;
+    step: FormStep;
+    patternId: number | null;
+    classId: number | null;
+    subjectId: number | null;
+    chapterSelection: Record<number, number[]>;
+}
 
 interface DraftPayload {
     savedAt: number;
@@ -3294,8 +3320,9 @@ export default function GeneratePaper({
         () =>
             router.on('before', () => {
                 clearGeneratedPaperSession();
+                clearPaperSetupSession(auth.user.id);
             }),
-        [],
+        [auth.user.id],
     );
 
     const sourceFilters = useMemo(
@@ -3323,6 +3350,8 @@ export default function GeneratePaper({
     );
     const [chapterRequestVersion, setChapterRequestVersion] = useState(0);
     const [selected, setSelected] = useState<Record<number, Set<number>>>({});
+    const [setupReady, setSetupReady] = useState(false);
+    const pendingSetupQuestionsStepRef = useRef(false);
     const [isFooterSticky, setIsFooterSticky] = useState(false);
     const footerSentinelRef = useRef<HTMLDivElement>(null);
     const questionRowSequence = useRef(0);
@@ -4240,6 +4269,35 @@ export default function GeneratePaper({
     ]);
 
     useEffect(() => {
+        if (!setupReady || !pendingSetupQuestionsStepRef.current) {
+            return;
+        }
+
+        if (step === 'questions') {
+            pendingSetupQuestionsStepRef.current = false;
+
+            return;
+        }
+
+        if (loadingChapters || chapters === null) {
+            return;
+        }
+
+        if (!chapterLoadError && selectedChapterIds.length > 0) {
+            setStep('questions');
+        } else {
+            pendingSetupQuestionsStepRef.current = false;
+        }
+    }, [
+        setupReady,
+        step,
+        loadingChapters,
+        chapters,
+        chapterLoadError,
+        selectedChapterIds.length,
+    ]);
+
+    useEffect(() => {
         if (
             !pendingTemplate ||
             templateStructureAppliedRef.current ||
@@ -4499,11 +4557,135 @@ export default function GeneratePaper({
                             : (session.viewMode ?? 'paper'),
                     );
                     setRecoveryDraft(null);
+                    setSetupReady(true);
 
                     return;
                 }
             }
 
+            if (!savedPaper) {
+                const setupRaw = sessionStorage.getItem(
+                    paperSetupSessionKey(auth.user.id),
+                );
+
+                if (setupRaw) {
+                    const setup = JSON.parse(
+                        setupRaw,
+                    ) as PaperSetupSessionPayload;
+                    const validSnapshot =
+                        setup !== null &&
+                        typeof setup === 'object' &&
+                        setup.version === PAPER_SETUP_SESSION_VERSION &&
+                        Number.isFinite(setup.savedAt) &&
+                        setup.savedAt <= Date.now() &&
+                        Date.now() - setup.savedAt <
+                            PAPER_SETUP_SESSION_MAX_AGE &&
+                        setup.templateId === (appliedTemplate?.id ?? null) &&
+                        setup.initialPatternId === (initialPatternId ?? null);
+
+                    if (validSnapshot) {
+                        const restoredPattern = patterns.find(
+                            (item) => item.id === setup.patternId,
+                        );
+                        const restoredClass = restoredPattern
+                            ? patternClasses.find(
+                                  (item) =>
+                                      item.pattern_id === restoredPattern.id &&
+                                      item.id === setup.classId,
+                              )
+                            : null;
+                        const restoredSubject = restoredClass
+                            ? classSubjects.find(
+                                  (item) =>
+                                      item.pattern_id === restoredPattern?.id &&
+                                      item.class_id === restoredClass.id &&
+                                      item.subject_id === setup.subjectId,
+                              )
+                            : null;
+
+                        setPattern(
+                            restoredPattern
+                                ? {
+                                      id: restoredPattern.id,
+                                      label: restoredPattern.name,
+                                  }
+                                : null,
+                        );
+                        setKlass(
+                            restoredClass
+                                ? {
+                                      id: restoredClass.id,
+                                      label: restoredClass.name,
+                                  }
+                                : null,
+                        );
+                        setSubject(
+                            restoredSubject
+                                ? {
+                                      id: restoredSubject.subject_id,
+                                      label: restoredSubject.name,
+                                  }
+                                : null,
+                        );
+
+                        if (restoredSubject) {
+                            const chapterSelection: Record<
+                                number,
+                                Set<number>
+                            > = {};
+
+                            if (
+                                setup.chapterSelection &&
+                                typeof setup.chapterSelection === 'object' &&
+                                !Array.isArray(setup.chapterSelection)
+                            ) {
+                                for (const [chapterId, topicIds] of Object.entries(
+                                    setup.chapterSelection,
+                                )) {
+                                    const id = Number(chapterId);
+
+                                    if (
+                                        Number.isInteger(id) &&
+                                        id > 0 &&
+                                        Array.isArray(topicIds)
+                                    ) {
+                                        const validTopicIds = topicIds.filter(
+                                            (topicId) =>
+                                                Number.isInteger(topicId) &&
+                                                (topicId > 0 ||
+                                                    topicId ===
+                                                        CHAPTER_ONLY_SELECTION),
+                                        );
+
+                                        if (validTopicIds.length > 0) {
+                                            chapterSelection[id] = new Set(
+                                                validTopicIds,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+
+                            setSelected(chapterSelection);
+                            pendingSetupQuestionsStepRef.current =
+                                setup.step === 'questions' &&
+                                Object.keys(chapterSelection).length > 0;
+                            templateStructureAppliedRef.current =
+                                appliedTemplate !== undefined &&
+                                setup.step === 'questions';
+                        }
+                    } else {
+                        clearPaperSetupSession(auth.user.id);
+                    }
+                }
+            }
+
+        } catch {
+            clearGeneratedPaperSession();
+            clearPaperSetupSession(auth.user.id);
+        }
+
+        try {
             // Look up the draft for the paper we're editing (or the "new" bucket
             // if this is a fresh paper). savedPaper.id is read directly from the
             // prop because the savedPaperId state hook hasn't been set yet on
@@ -4514,9 +4696,10 @@ export default function GeneratePaper({
                 setRecoveryDraft(JSON.parse(raw) as DraftPayload);
             }
         } catch {
-            // Ignore corrupted recovery data and remove the unusable snapshot.
-            clearGeneratedPaperSession();
+            // Ignore unavailable or corrupted local draft recovery data.
         }
+
+        setSetupReady(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -4561,6 +4744,7 @@ export default function GeneratePaper({
                     viewMode,
                 } satisfies GeneratedPaperSessionPayload),
             );
+            clearPaperSetupSession(auth.user.id);
         } catch {
             clearGeneratedPaperSession();
         }
@@ -4582,6 +4766,52 @@ export default function GeneratePaper({
         activeSetIndex,
         numSets,
         viewMode,
+        auth.user.id,
+    ]);
+
+    useEffect(() => {
+        if (!setupReady || generatedPaper || savedPaper) {
+            return;
+        }
+
+        if (!pattern && !klass && !subject) {
+            clearPaperSetupSession(auth.user.id);
+
+            return;
+        }
+
+        try {
+            sessionStorage.setItem(
+                paperSetupSessionKey(auth.user.id),
+                JSON.stringify({
+                    version: PAPER_SETUP_SESSION_VERSION,
+                    savedAt: Date.now(),
+                    templateId: appliedTemplate?.id ?? null,
+                    initialPatternId: initialPatternId ?? null,
+                    step: pendingSetupQuestionsStepRef.current
+                        ? 'questions'
+                        : step,
+                    patternId: pattern ? Number(pattern.id) : null,
+                    classId: klass ? Number(klass.id) : null,
+                    subjectId: subject ? Number(subject.id) : null,
+                    chapterSelection: serializeChapterSelection(selected),
+                } satisfies PaperSetupSessionPayload),
+            );
+        } catch {
+            // sessionStorage unavailable
+        }
+    }, [
+        setupReady,
+        generatedPaper,
+        savedPaper,
+        appliedTemplate?.id,
+        initialPatternId,
+        auth.user.id,
+        step,
+        pattern,
+        klass,
+        subject,
+        selected,
     ]);
 
     useEffect(() => {
@@ -4752,6 +4982,7 @@ export default function GeneratePaper({
     }
 
     function handlePatternChange(value: ComboboxOptionItem | null) {
+        pendingSetupQuestionsStepRef.current = false;
         setPattern(value);
         setKlass(null);
         setSubject(null);
@@ -4763,6 +4994,7 @@ export default function GeneratePaper({
     }
 
     function handleClassChange(value: ComboboxOptionItem | null) {
+        pendingSetupQuestionsStepRef.current = false;
         setKlass(value);
         setSubject(null);
         setChapters(null);
@@ -4773,6 +5005,7 @@ export default function GeneratePaper({
     }
 
     function handleSubjectChange(value: ComboboxOptionItem | null) {
+        pendingSetupQuestionsStepRef.current = false;
         setSubject(value);
         const assignedMedium = classSubjects.find(
             (item) =>
@@ -4975,6 +5208,8 @@ export default function GeneratePaper({
     }
 
     function reset() {
+        pendingSetupQuestionsStepRef.current = false;
+        clearPaperSetupSession(auth.user.id);
         setStep('chapters');
         setPattern(null);
         setKlass(null);
