@@ -132,22 +132,22 @@ export default function ArabicSubjects({
                                 key={subject.id}
                                 className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-5"
                             >
-                                <div className="min-w-0">
-                                    <p className="font-medium text-slate-900 dark:text-slate-100">
+                                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                                    <span className="font-medium text-slate-900 dark:text-slate-100">
                                         {subject.name_eng}
-                                        {Number(subject.status) !== 1 && (
-                                            <span className="ml-2 text-xs font-normal text-slate-400">
-                                                Inactive
-                                            </span>
-                                        )}
-                                    </p>
+                                    </span>
                                     {subject.name_ur && (
-                                        <p
-                                            className="mt-0.5 text-sm text-slate-500 dark:text-slate-400"
+                                        <span
+                                            className="text-sm text-slate-600 dark:text-slate-300"
                                             dir="rtl"
                                         >
                                             {subject.name_ur}
-                                        </p>
+                                        </span>
+                                    )}
+                                    {Number(subject.status) !== 1 && (
+                                        <span className="text-xs font-normal text-slate-400">
+                                            Inactive
+                                        </span>
                                     )}
                                 </div>
                                 <Switch
