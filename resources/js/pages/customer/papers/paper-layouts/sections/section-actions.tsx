@@ -50,7 +50,11 @@ export function QuestionHoverActions({
 
     return (
         <>
-            <div data-paper-edit-actions className="pointer-events-none absolute top-1/2 right-2 z-10 flex -translate-y-1/2 items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 opacity-0 shadow-lg shadow-slate-900/10 backdrop-blur transition-opacity group-hover/question:pointer-events-auto group-hover/question:opacity-100 dark:border-slate-700 dark:bg-slate-900/95 print:hidden">
+            <div
+                data-paper-edit-actions
+                dir="ltr"
+                className="pointer-events-none absolute right-2 top-1 z-30 flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 font-sans opacity-0 shadow-lg shadow-slate-900/10 transition-opacity group-hover/question:pointer-events-auto group-hover/question:opacity-100 dark:border-slate-700 dark:bg-slate-900 print:hidden"
+            >
                 {canSwap && (
                     <>
                         <ActionButton
@@ -86,14 +90,16 @@ export function QuestionHoverActions({
                         <button
                             type="button"
                             onClick={() =>
-                                onAnswerLinesChange(Math.max(0, answerLines - 1))
+                                onAnswerLinesChange(
+                                    Math.max(0, answerLines - 1),
+                                )
                             }
                             className="flex size-6 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                             disabled={answerLines <= 0}
                         >
                             <MinusIcon className="size-3.5" />
                         </button>
-                        <span className="min-w-6 text-center text-xs font-bold text-slate-700 tabular-nums dark:text-slate-200">
+                        <span className="min-w-6 text-center text-xs font-bold tabular-nums text-slate-700 dark:text-slate-200">
                             {answerLines}
                         </span>
                         <button
@@ -118,16 +124,19 @@ export function QuestionHoverActions({
                                     onAnswerLineSpacingChange(
                                         Math.max(
                                             SPACING_MIN,
-                                            (answerLineSpacing ?? 20) - SPACING_STEP,
+                                            (answerLineSpacing ?? 20) -
+                                                SPACING_STEP,
                                         ),
                                     )
                                 }
                                 className="flex size-6 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                                disabled={(answerLineSpacing ?? 20) <= SPACING_MIN}
+                                disabled={
+                                    (answerLineSpacing ?? 20) <= SPACING_MIN
+                                }
                             >
                                 <MinusIcon className="size-3.5" />
                             </button>
-                            <span className="min-w-10 select-none text-center text-xs font-bold text-slate-700 tabular-nums dark:text-slate-200">
+                            <span className="min-w-10 select-none text-center text-xs font-bold tabular-nums text-slate-700 dark:text-slate-200">
                                 {answerLineSpacing ?? 20}
                                 <span className="ml-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
                                     px
@@ -139,12 +148,15 @@ export function QuestionHoverActions({
                                     onAnswerLineSpacingChange(
                                         Math.min(
                                             SPACING_MAX,
-                                            (answerLineSpacing ?? 20) + SPACING_STEP,
+                                            (answerLineSpacing ?? 20) +
+                                                SPACING_STEP,
                                         ),
                                     )
                                 }
                                 className="flex size-6 cursor-pointer items-center justify-center rounded-md text-brand-700 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/10"
-                                disabled={(answerLineSpacing ?? 20) >= SPACING_MAX}
+                                disabled={
+                                    (answerLineSpacing ?? 20) >= SPACING_MAX
+                                }
                             >
                                 <PlusIcon className="size-3.5" />
                             </button>
@@ -218,8 +230,11 @@ export function SectionControls({
 
     return (
         <>
-            <div data-paper-edit-actions className="mt-3 flex justify-center print:hidden">
-                <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-sm ring-1 shadow-slate-900/4 ring-white/60 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:ring-slate-700/40">
+            <div
+                data-paper-edit-actions
+                className="mt-3 flex justify-center print:hidden"
+            >
+                <div className="shadow-slate-900/4 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-sm ring-1 ring-white/60 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:ring-slate-700/40">
                     <SectionButton
                         label="Move section up"
                         disabled={!canMoveUp}
@@ -364,7 +379,7 @@ function AddQuestionPopover({
             ref={panelRef}
             className="absolute bottom-full left-1/2 z-30 mb-2.5 w-52 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-2 text-left shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40 print:hidden"
         >
-            <span className="absolute -bottom-[5px] left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-r border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" />
+            <span className="absolute -bottom-[5px] left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-b border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" />
             <div className="relative flex flex-col gap-1">
                 <button
                     type="button"
@@ -434,7 +449,7 @@ function BlockSettingsPopover({
             ref={panelRef}
             className="absolute bottom-full left-1/2 z-30 mb-2.5 w-60 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40 print:hidden"
         >
-            <span className="absolute -bottom-[5px] left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-r border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" />
+            <span className="absolute -bottom-[5px] left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-b border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900" />
 
             <div className="relative mb-2.5 flex items-center gap-2">
                 <div className="flex size-6 items-center justify-center rounded-md bg-brand-600 text-white">

@@ -747,17 +747,27 @@ input[type='date']::-webkit-calendar-picker-indicator {
     max-width: 100%;
 }
 
-[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(1) {
+[data-print-paper][data-side-by-side-column]
+    [data-paper-header-table]
+    col:nth-child(1) {
     width: 22% !important;
 }
 
-[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(2),
-[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(4) {
+[data-print-paper][data-side-by-side-column]
+    [data-paper-header-table]
+    col:nth-child(2),
+[data-print-paper][data-side-by-side-column]
+    [data-paper-header-table]
+    col:nth-child(4) {
     width: 18% !important;
 }
 
-[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(3),
-[data-print-paper][data-side-by-side-column] [data-paper-header-table] col:nth-child(5) {
+[data-print-paper][data-side-by-side-column]
+    [data-paper-header-table]
+    col:nth-child(3),
+[data-print-paper][data-side-by-side-column]
+    [data-paper-header-table]
+    col:nth-child(5) {
     width: 21% !important;
 }
 
@@ -767,7 +777,10 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 [data-print-paper][data-side-by-side-column]
-    [data-paper-header-table] [data-paper-header-cell] > div > * {
+    [data-paper-header-table]
+    [data-paper-header-cell]
+    > div
+    > * {
     max-width: 100%;
     width: 60px;
     height: 60px;
@@ -820,9 +833,21 @@ input[type='date']::-webkit-calendar-picker-indicator {
     font-size: var(--paper-question-size, 0.875rem);
     line-height: var(--paper-question-line-height, 1.5);
 }
-[data-print-paper] [data-paper-question] * {
+[data-print-paper]
+    [data-paper-question]
+    :not([data-paper-edit-actions], [data-paper-edit-actions] *) {
     font-size: inherit;
     line-height: inherit;
+}
+
+[data-print-paper] .group\/question:hover,
+[data-print-paper] .group\/question:focus-within {
+    z-index: 20;
+}
+
+[data-print-paper] :dir(rtl) > [data-paper-edit-actions] {
+    right: auto;
+    left: 0.5rem;
 }
 
 [data-print-paper] [data-paper-correct-option] {
@@ -929,9 +954,13 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 [data-print-paper] [data-paper-urdu-content],
-[data-print-paper] [data-paper-urdu-content] *,
+[data-print-paper]
+    [data-paper-urdu-content]
+    :not([data-paper-edit-actions], [data-paper-edit-actions] *),
 [data-print-paper] [dir='rtl'],
-[data-print-paper] [dir='rtl'] * {
+[data-print-paper]
+    [dir='rtl']
+    :not([data-paper-edit-actions], [data-paper-edit-actions] *) {
     font-family: var(--paper-urdu-font) !important;
     transform: translateY(var(--paper-urdu-vertical-offset, -0.16em));
 }
