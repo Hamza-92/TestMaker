@@ -18,7 +18,16 @@ class CheckPermission
         }
 
         foreach ($permissions as $permission) {
-            abort_unless(Gate::allows($permission), 403);
+            $allowed = false;
+
+            foreach (explode('|', $permission) as $ability) {
+                if (Gate::allows($ability)) {
+                    $allowed = true;
+                    break;
+                }
+            }
+
+            abort_unless($allowed, 403);
         }
 
         return $next($request);

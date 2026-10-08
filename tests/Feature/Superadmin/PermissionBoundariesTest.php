@@ -6,6 +6,7 @@ use App\Models\Permission;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
@@ -167,6 +168,24 @@ it('keeps deployment helpers master only and blocks inactive admins', function (
     $this->actingAs($admin)->get('/superadmin/announcements')->assertForbidden();
 });
 
+it('allows question form resources to admins with create or edit permission', function () {
+    $creator = delegatedAdmin($this->master, ['questions.create']);
+    $editor = delegatedAdmin($this->master, ['questions.edit']);
+    $viewer = delegatedAdmin($this->master, ['questions.view']);
+
+    foreach ([$creator, $editor] as $admin) {
+        $this->actingAs($admin)->getJson(route('superadmin.questions.form-chapters'))->assertOk();
+        $this->postJson(route('superadmin.questions.images'), [
+            'file' => UploadedFile::fake()->image('diagram.png'),
+        ])->assertOk();
+    }
+
+    $this->actingAs($viewer)->getJson(route('superadmin.questions.form-chapters'))->assertForbidden();
+    $this->postJson(route('superadmin.questions.images'), [
+        'file' => UploadedFile::fake()->image('diagram.png'),
+    ])->assertForbidden();
+});
+
 it('keeps every Superadmin route tied to a seeded Gate', function () {
     foreach (Route::getRoutes() as $route) {
         if (! str_starts_with($route->uri(), 'superadmin/')) {
@@ -181,9 +200,11 @@ it('keeps every Superadmin route tied to a seeded Gate', function () {
         expect($permissions)->not->toBeEmpty();
 
         foreach ($permissions as $middleware) {
-            foreach (explode(',', substr($middleware, strlen('permission:'))) as $ability) {
-                expect(Permission::where('name', $ability)->exists())->toBeTrue();
-                expect(Gate::has($ability))->toBeTrue();
+            foreach (explode(',', substr($middleware, strlen('permission:'))) as $requirement) {
+                foreach (explode('|', $requirement) as $ability) {
+                    expect(Permission::where('name', $ability)->exists())->toBeTrue();
+                    expect(Gate::has($ability))->toBeTrue();
+                }
             }
         }
     }
