@@ -377,6 +377,12 @@ interface AppliedTemplate {
 }
 
 interface Props {
+    schoolDetails: {
+        name: string;
+        address: string;
+        showAddress: boolean;
+        logo: string | null;
+    };
     patterns: Pattern[];
     patternClasses: PatternClass[];
     classSubjects: ClassSubject[];
@@ -3288,6 +3294,7 @@ function PaperHeader({
 }
 
 export default function GeneratePaper({
+    schoolDetails,
     patterns,
     patternClasses,
     classSubjects,
@@ -3301,18 +3308,13 @@ export default function GeneratePaper({
     paperDefaults,
 }: Props) {
     const { auth } = usePage().props as { auth: Auth };
-    const defaultWatermarkLogoUrl = storageAssetUrl(auth.user.logo);
-    const configuredSchoolName = (
-        (auth.user.school_name as string) ||
-        auth.user.name ||
-        ''
-    ).trim();
+    const defaultWatermarkLogoUrl = storageAssetUrl(schoolDetails.logo);
+    const configuredSchoolName = schoolDetails.name.trim();
     const defaultSchoolName = configuredSchoolName || 'School Name';
     const defaultSettings = preferredPaperSettings(paperDefaults);
     const defaultPaperTopMargin = defaultSettings.marginTop;
-    const schoolAddress =
-        typeof auth.user.address === 'string' ? auth.user.address : '';
-    const showSchoolAddress = Boolean(auth.user.is_show_address);
+    const schoolAddress = schoolDetails.address;
+    const showSchoolAddress = schoolDetails.showAddress;
 
     useEffect(() => {
         document.body.setAttribute('data-paper-workflow', '');

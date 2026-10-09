@@ -30,7 +30,9 @@ class GeneratePaperController extends Controller
 {
     public static function pageData(): array
     {
-        $access = AppUserAccess::resolve(auth()->user());
+        $user = auth()->user();
+        $school = $user->schoolOwner() ?? $user;
+        $access = AppUserAccess::resolve($user);
         $patternIds = $access['ids']['pattern_access'];
         $classIds = $access['ids']['class_access'];
         $subjectIds = $access['ids']['subject_access'];
@@ -130,7 +132,13 @@ class GeneratePaperController extends Controller
             ->values();
 
         return [
-            'paperDefaults' => CustomerPaperDefaults::forUser(auth()->user()),
+            'schoolDetails' => [
+                'name' => $school->school_name ?: $school->name,
+                'address' => $school->address ?? '',
+                'showAddress' => (bool) $school->is_show_address,
+                'logo' => $school->logo,
+            ],
+            'paperDefaults' => CustomerPaperDefaults::forUser($user),
             'canEditWatermark' => CustomerPaperDefaults::canEditWatermark(request()),
             'patterns' => $patterns,
             'patternClasses' => $patternClasses,

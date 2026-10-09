@@ -192,10 +192,17 @@ test('staff impersonation does not unlock school watermark settings', function (
 
 test('generation receives school defaults for the customer and their teachers', function () {
     $customer = paperDefaultsCustomer();
+    $customer->update([
+        'school_name' => 'Owner School',
+        'address' => 'Owner School Address',
+        'is_show_address' => true,
+        'logo' => 'school-logo.png',
+    ]);
     $this->actingAs($customer)->put(route('customer.settings.update'), paperDefaultsPayload())->assertRedirect();
     $teacher = User::factory()->create([
         'user_type' => UserType::Teacher->value, 'status' => UserStatus::Active->value,
         'school_id' => $customer->id, 'teacher_permissions' => ['generate_papers'],
+        'name' => 'Teacher Name', 'address' => 'Teacher Address',
     ]);
 
     foreach ([$customer, $teacher] as $user) {
@@ -203,6 +210,12 @@ test('generation receives school defaults for the customer and their teachers', 
         expect($props['paperDefaults']['settings']['marginTop'])->toBe(12);
         expect($props['paperDefaults']['viewMode'])->toBe('answers_on_paper');
         expect($props['canEditWatermark'])->toBeFalse();
+        expect($props['schoolDetails'])->toBe([
+            'name' => 'Owner School',
+            'address' => 'Owner School Address',
+            'showAddress' => true,
+            'logo' => 'school-logo.png',
+        ]);
     }
 });
 
