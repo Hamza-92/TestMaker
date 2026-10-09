@@ -17,6 +17,7 @@ use App\Http\Controllers\QuestionImageController;
 use App\Http\Controllers\Superadmin\AnnouncementController;
 use App\Http\Controllers\Superadmin\ArabicSubjectController;
 use App\Http\Controllers\Superadmin\ChapterController;
+use App\Http\Controllers\Superadmin\CircularLabelController;
 use App\Http\Controllers\Superadmin\ClassController;
 use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
@@ -210,6 +211,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('superadmin/paper-layouts/assignments', [PaperLayoutController::class, 'updateAssignments'])->name('superadmin.paper-layouts.assignments')->middleware('permission:patterns.edit');
         Route::get('superadmin/objective-layouts', [ObjectiveLayoutController::class, 'index'])->name('superadmin.objective-layouts')->middleware('permission:patterns.view');
         Route::put('superadmin/objective-layouts', [ObjectiveLayoutController::class, 'update'])->name('superadmin.objective-layouts.update')->middleware('permission:patterns.edit');
+        Route::get('superadmin/circular-labels', [CircularLabelController::class, 'index'])->name('superadmin.circular-labels')->middleware('permission:patterns.view');
+        Route::put('superadmin/circular-labels', [CircularLabelController::class, 'update'])->name('superadmin.circular-labels.update')->middleware('permission:patterns.edit');
 
         // â”€â”€â”€ Classes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/classes', [ClassController::class, 'index'])->name('superadmin.classes')->middleware('permission:classes.view');

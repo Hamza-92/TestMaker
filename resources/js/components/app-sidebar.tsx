@@ -63,6 +63,11 @@ export function AppSidebar() {
                       href: '/superadmin/objective-layouts',
                       icon: CircleDotIcon,
                   },
+                  {
+                      title: 'Circular Labels',
+                      href: '/superadmin/circular-labels',
+                      icon: CircleDotIcon,
+                  },
               ]
             : []),
         ...(can('classes.view')

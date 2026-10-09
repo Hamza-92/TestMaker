@@ -97,8 +97,19 @@ test('a subject assignment medium becomes the generator default without restrict
             ->where('patterns.0.icon', 'atom')
             ->where('patterns.0.color', '#4f46e5')
             ->where('patternClasses.0.color', '#059669')
+            ->where('patternClasses.0.circular_labels_default', false)
             ->where('classSubjects.0.color', '#0284c7')
             ->where('classSubjects.0.is_arabic', true));
+
+    DB::table('pattern_classes')
+        ->where('pattern_id', $pattern->id)
+        ->where('class_id', $class->id)
+        ->update(['circular_labels_default' => true]);
+
+    $this->actingAs($customer)->get(route('customer.papers.generate'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('customer/papers/generate')
+            ->where('patternClasses.0.circular_labels_default', true));
 
     $this->actingAs($customer)
         ->getJson(route('customer.papers.generate.chapters', [

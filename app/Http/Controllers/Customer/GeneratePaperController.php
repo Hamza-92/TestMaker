@@ -61,8 +61,13 @@ class GeneratePaperController extends Controller
             ->when($classIds !== null, fn ($q) => $q->whereIn('pattern_classes.class_id', $classIds))
             ->orderBy('classes.sort_order')
             ->orderBy('classes.id')
-            ->select('pattern_classes.pattern_id', 'classes.id', 'classes.name', 'classes.color')
+            ->select('pattern_classes.pattern_id', 'pattern_classes.circular_labels_default', 'classes.id', 'classes.name', 'classes.color')
             ->get()
+            ->map(function (object $row) {
+                $row->circular_labels_default = (bool) $row->circular_labels_default;
+
+                return $row;
+            })
             ->filter(fn ($row) => AppUserAccess::allowsClass($access, (int) $row->pattern_id, (int) $row->id))
             ->values();
 

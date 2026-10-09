@@ -164,6 +164,7 @@ interface PatternClass {
     id: number;
     name: string;
     color?: string | null;
+    circular_labels_default: boolean;
 }
 
 interface ClassSubject {
@@ -5952,6 +5953,12 @@ export default function GeneratePaper({
                     item.class_id === klass?.id &&
                     item.subject_id === subject?.id,
             );
+            const circularLabelsDefault = patternClasses.some(
+                (item) =>
+                    item.pattern_id === pattern?.id &&
+                    item.id === klass?.id &&
+                    item.circular_labels_default,
+            );
 
             if (assignedPaperLayout === 'federal-board' && !usesCustomLayout) {
                 const federalized = federalizeGeneratedSections(
@@ -6007,6 +6014,9 @@ export default function GeneratePaper({
                 },
                 settings: {
                     ...defaultSettings,
+                    objectiveOptionBubblesEnabled:
+                        defaultSettings.objectiveOptionBubblesEnabled ||
+                        circularLabelsDefault,
                     marginTop: defaultPaperTopMargin,
                     paperLayout: effectivePaperLayout,
                     objectiveLayout:
