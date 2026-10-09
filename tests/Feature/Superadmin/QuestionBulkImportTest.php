@@ -224,6 +224,39 @@ it('imports a previewed file without re-uploading it', function () {
     expect(Question::query()->count())->toBe(2);
 });
 
+it('imports a subjective question without an optional answer', function () {
+    $admin = makeImportSuperAdmin();
+    $questionType = makeImportQuestionType($admin, [
+        'name' => 'Short Questions',
+        'heading_en' => 'Short Questions',
+    ]);
+    $context = makeImportContext($admin);
+    $csv = "statement_en,answer_en\n\"What is heat?\",\n";
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.questions.import.preview'), [
+            'question_type_id' => $questionType->id,
+            'chapter_id' => $context['chapter']->id,
+            'source' => '',
+            'status' => true,
+            'file' => UploadedFile::fake()->createWithContent('optional-answer.csv', $csv),
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('question_import_preview.ready_rows', 1);
+
+    $this->post(route('superadmin.questions.import.store'), [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $context['chapter']->id,
+        'source' => '',
+        'status' => true,
+        'preview_token' => session('question_import_preview_token'),
+        'selected_row_numbers' => [2],
+    ])->assertRedirect()
+        ->assertSessionHas('question_import_report.imported_rows', 1);
+
+    expect(Question::query()->sole()->answer_en)->toBeNull();
+});
+
 it('imports objective questions with options', function () {
     $admin = makeImportSuperAdmin();
     $questionType = makeImportQuestionType($admin, [

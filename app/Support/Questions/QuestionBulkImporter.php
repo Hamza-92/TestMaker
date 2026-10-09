@@ -440,10 +440,6 @@ class QuestionBulkImporter
             $errors[] = "Row {$rowNumber}: Description is required.";
         }
 
-        if (! $questionType->is_objective && $questionType->have_answer && $answerEn === null && $answerUr === null) {
-            $errors[] = "Row {$rowNumber}: Answer is required.";
-        }
-
         $options = [];
 
         if (in_array($schema['key'], [

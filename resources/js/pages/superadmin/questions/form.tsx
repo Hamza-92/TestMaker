@@ -11,6 +11,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -471,6 +472,14 @@ export function QuestionForm({
             : baseType;
     }, [form.data.question_type_id, questionTypes, selectedChapter]);
     const selectedSchema = selectedType?.schema ?? null;
+    const questionTypeOptions = useMemo(
+        () =>
+            questionTypes.map((item) => ({
+                id: item.id,
+                label: item.name,
+            })),
+        [questionTypes],
+    );
 
     const [lastSchemaKey, setLastSchemaKey] = useState(
         selectedType?.schema_key ?? '',
@@ -681,12 +690,13 @@ export function QuestionForm({
     const renderLocalizedEditor = (
         englishKey: keyof QuestionContentFormData,
         urduKey: keyof QuestionContentFormData,
+        fieldLabel: string,
         required = false,
         control: 'textarea' | 'input' = 'textarea',
     ) => (
         <div className="grid gap-3 sm:grid-cols-2">
             <Field
-                label="English"
+                label={`${fieldLabel} (English)`}
                 required={required}
                 error={errorFor(`content.${String(englishKey)}`)}
             >
@@ -697,7 +707,10 @@ export function QuestionForm({
                 />
             </Field>
 
-            <Field label="Urdu" error={errorFor(`content.${String(urduKey)}`)}>
+            <Field
+                label={`${fieldLabel} (Urdu)`}
+                error={errorFor(`content.${String(urduKey)}`)}
+            >
                 <RichContentControl
                     dir="rtl"
                     value={String(form.data.content[urduKey] ?? '')}
@@ -946,7 +959,7 @@ export function QuestionForm({
 
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field
-                                label="Prompt (English)"
+                                label="Question (English)"
                                 required
                                 error={errorFor(
                                     `content.items.${itemIndex}.prompt_en`,
@@ -963,7 +976,7 @@ export function QuestionForm({
                                 />
                             </Field>
                             <Field
-                                label="Prompt (Urdu)"
+                                label="Question (Urdu)"
                                 error={errorFor(
                                     `content.items.${itemIndex}.prompt_ur`,
                                 )}
@@ -1062,7 +1075,7 @@ export function QuestionForm({
 
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field
-                                label="Left (English)"
+                                label="Left column entry (English)"
                                 error={errorFor(
                                     `content.pairs.${pairIndex}.left_en`,
                                 )}
@@ -1077,7 +1090,7 @@ export function QuestionForm({
                                 />
                             </Field>
                             <Field
-                                label="Left (Urdu)"
+                                label="Left column entry (Urdu)"
                                 error={errorFor(
                                     `content.pairs.${pairIndex}.left_ur`,
                                 )}
@@ -1093,7 +1106,7 @@ export function QuestionForm({
                                 />
                             </Field>
                             <Field
-                                label="Right (English)"
+                                label="Matching entry (English)"
                                 error={errorFor(
                                     `content.pairs.${pairIndex}.right_en`,
                                 )}
@@ -1108,7 +1121,7 @@ export function QuestionForm({
                                 />
                             </Field>
                             <Field
-                                label="Right (Urdu)"
+                                label="Matching entry (Urdu)"
                                 error={errorFor(
                                     `content.pairs.${pairIndex}.right_ur`,
                                 )}
@@ -1150,6 +1163,10 @@ export function QuestionForm({
                             : renderLocalizedEditor(
                                   'prompt_en',
                                   'prompt_ur',
+                                  selectedSchema.key ===
+                                      'objective_blank_choice'
+                                      ? 'Sentence with blank'
+                                      : 'Multiple-choice question',
                                   true,
                               )}
                         {renderOptionsEditor(
@@ -1164,7 +1181,12 @@ export function QuestionForm({
             case 'objective_true_false':
                 return (
                     <div className="space-y-4">
-                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        {renderLocalizedEditor(
+                            'prompt_en',
+                            'prompt_ur',
+                            'True or false statement',
+                            true,
+                        )}
                         <Field
                             label="Correct Answer"
                             required
@@ -1198,10 +1220,16 @@ export function QuestionForm({
             case 'objective_blank_open':
                 return (
                     <div className="space-y-4">
-                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        {renderLocalizedEditor(
+                            'prompt_en',
+                            'prompt_ur',
+                            'Sentence with blank',
+                            true,
+                        )}
                         {renderLocalizedEditor(
                             'answer_en',
                             'answer_ur',
+                            'Correct answer',
                             true,
                             'input',
                         )}
@@ -1213,6 +1241,7 @@ export function QuestionForm({
                         {renderLocalizedEditor(
                             'passage_en',
                             'passage_ur',
+                            'Reading passage',
                             true,
                         )}
                         {renderPassageItems()}
@@ -1221,31 +1250,24 @@ export function QuestionForm({
             case 'subjective_same_statement':
                 return (
                     <div className="space-y-4">
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium">
-                                Question statement
-                            </p>
-                            {renderLocalizedEditor(
-                                'prompt_en',
-                                'prompt_ur',
-                                true,
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium">
-                                Shared statement / expression
-                            </p>
-                            {renderLocalizedEditor(
-                                'shared_en',
-                                'shared_ur',
-                                true,
-                            )}
-                        </div>
+                        {renderLocalizedEditor(
+                            'prompt_en',
+                            'prompt_ur',
+                            'Question statement',
+                            true,
+                        )}
+                        {renderLocalizedEditor(
+                            'shared_en',
+                            'shared_ur',
+                            'Shared statement or expression',
+                            true,
+                        )}
                         {selectedType?.have_answer
                             ? renderLocalizedEditor(
                                   'answer_en',
                                   'answer_ur',
-                                  true,
+                                  'Answer',
+                                  false,
                                   'input',
                               )
                             : null}
@@ -1254,26 +1276,39 @@ export function QuestionForm({
             case 'subjective_grouped':
                 return (
                     <div className="space-y-4">
-                        {renderLocalizedEditor('intro_en', 'intro_ur')}
+                        {renderLocalizedEditor(
+                            'intro_en',
+                            'intro_ur',
+                            'Instructions for this group',
+                        )}
                         {renderGroupedItems()}
                     </div>
                 );
             case 'subjective_pairs':
                 return (
                     <div className="space-y-4">
-                        {renderLocalizedEditor('prompt_en', 'prompt_ur')}
+                        {renderLocalizedEditor(
+                            'prompt_en',
+                            'prompt_ur',
+                            'Instructions for matching',
+                        )}
                         {renderPairs()}
                     </div>
                 );
             default:
                 return (
                     <div className="space-y-4">
-                        {renderLocalizedEditor('prompt_en', 'prompt_ur', true)}
+                        {renderLocalizedEditor(
+                            'prompt_en',
+                            'prompt_ur',
+                            'Question statement',
+                            true,
+                        )}
                         {selectedType?.have_answer
                             ? renderLocalizedEditor(
                                   'answer_en',
                                   'answer_ur',
-                                  true,
+                                  'Answer',
                               )
                             : null}
                     </div>
@@ -1302,32 +1337,27 @@ export function QuestionForm({
                             required
                             error={form.errors.question_type_id}
                         >
-                            <Select
-                                value={form.data.question_type_id || 'none'}
-                                onValueChange={(value) =>
+                            <FloatingCombobox
+                                label="Question Type"
+                                hideLabel
+                                compact
+                                maxVisibleOptions={50}
+                                placeholder="Select type"
+                                options={questionTypeOptions}
+                                value={
+                                    questionTypeOptions.find(
+                                        (option) =>
+                                            String(option.id) ===
+                                            form.data.question_type_id,
+                                    ) ?? null
+                                }
+                                onChange={(option) =>
                                     form.setData(
                                         'question_type_id',
-                                        value === 'none' ? '' : value,
+                                        option ? String(option.id) : '',
                                     )
                                 }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-80">
-                                    <SelectItem value="none">
-                                        Select type
-                                    </SelectItem>
-                                    {questionTypes.map((item) => (
-                                        <SelectItem
-                                            key={item.id}
-                                            value={String(item.id)}
-                                        >
-                                            {item.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            />
                         </Field>
 
                         {!isChapterLocked && (

@@ -142,6 +142,62 @@ it('creates an objective question with options', function () {
         ->assertJsonPath('questions.0.options_count', 4);
 });
 
+it('allows enabled subjective answers to be omitted on create and edit', function (string $schemaKey, array $content) {
+    $admin = makeQuestionAdmin();
+    $questionType = makeObjectiveQuestionTypeForManagement($admin, [
+        'is_objective' => false,
+        'is_single' => false,
+        'schema_key' => $schemaKey,
+        'have_answer' => true,
+    ]);
+    $context = makeQuestionContextForManagement($admin);
+    $payload = [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $context['chapter']->id,
+        'topic_id' => null,
+        'source' => 'exercise',
+        'status' => true,
+        'content' => $content,
+    ];
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.questions.store'), $payload)
+        ->assertRedirect(managementQuestionListUrl($context));
+
+    $question = Question::query()->sole();
+    expect($question->answer_en)->toBeNull()
+        ->and($question->answer_ur)->toBeNull();
+
+    $answeredContent = $content;
+    if ($schemaKey === 'subjective_grouped') {
+        $answeredContent['items'][0]['answer_en'] = 'Sample answer';
+    } else {
+        $answeredContent['answer_en'] = 'Sample answer';
+    }
+
+    $this->put(route('superadmin.questions.update', $question), [
+        ...$payload,
+        'content' => $answeredContent,
+    ])->assertRedirect(managementQuestionListUrl($context));
+
+    $answeredQuestion = $question->fresh();
+    expect($schemaKey === 'subjective_grouped'
+        ? $answeredQuestion->content['items'][0]['answer_en']
+        : $answeredQuestion->answer_en)->toBe('Sample answer');
+
+    $this->put(route('superadmin.questions.update', $question), $payload)
+        ->assertRedirect(managementQuestionListUrl($context));
+
+    $clearedQuestion = $question->fresh();
+    expect($schemaKey === 'subjective_grouped'
+        ? $clearedQuestion->content['items'][0]['answer_en']
+        : $clearedQuestion->answer_en)->toBeNull();
+})->with([
+    'standard subjective' => ['subjective_standard', ['prompt_en' => 'Explain evaporation.']],
+    'same statement' => ['subjective_same_statement', ['prompt_en' => 'Calculate the value.', 'shared_en' => 'x + 2 = 5']],
+    'grouped subjective' => ['subjective_grouped', ['intro_en' => 'Answer the following.', 'items' => [['prompt_en' => 'What is evaporation?']]]],
+]);
+
 it('sorts questions within one chapter topic and question type scope', function () {
     $admin = makeQuestionAdmin();
     $questionType = makeObjectiveQuestionTypeForManagement($admin);

@@ -37,6 +37,8 @@ interface FloatingComboboxProps {
     /** Use the compact field height for dense card layouts. */
     compact?: boolean;
     className?: string;
+    /** Limit mounted options for large lists while still searching every option. */
+    maxVisibleOptions?: number;
 }
 
 /**
@@ -58,6 +60,7 @@ export function FloatingCombobox({
     placeholder,
     compact = false,
     className,
+    maxVisibleOptions,
 }: FloatingComboboxProps) {
     const [query, setQuery] = useState('');
 
@@ -75,6 +78,17 @@ export function FloatingCombobox({
                       .toLowerCase()
                       .includes(query.trim().toLowerCase()),
               );
+    const limited =
+        maxVisibleOptions && maxVisibleOptions > 0
+            ? filtered.slice(0, maxVisibleOptions)
+            : filtered;
+    const visibleOptions =
+        query === '' &&
+        value &&
+        limited.length < filtered.length &&
+        !limited.some((option) => String(option.id) === String(value.id))
+            ? [value, ...limited.slice(0, -1)]
+            : limited;
 
     const isFilled = value !== null;
 
@@ -237,7 +251,7 @@ export function FloatingCombobox({
                         </div>
                     )}
 
-                    {filtered.map((option) => (
+                    {visibleOptions.map((option) => (
                         <ComboboxOption
                             key={option.id}
                             value={option}
@@ -274,6 +288,11 @@ export function FloatingCombobox({
                             )}
                         </ComboboxOption>
                     ))}
+                    {visibleOptions.length < filtered.length && (
+                        <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+                            Search to find more options
+                        </p>
+                    )}
                 </ComboboxOptions>
             </Combobox>
 

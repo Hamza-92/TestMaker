@@ -609,7 +609,6 @@ class QuestionTypeSchemaRegistry
             self::SUBJECTIVE_GROUPED => self::validateGroupedSubjectiveQuestion(
                 $content,
                 $validator,
-                $questionType->have_answer,
             ),
             self::SUBJECTIVE_PAIRS => self::validatePairsQuestion(
                 $content,
@@ -618,12 +617,10 @@ class QuestionTypeSchemaRegistry
             self::SUBJECTIVE_SAME_STATEMENT => self::validateSameStatementQuestion(
                 $content,
                 $validator,
-                $questionType->have_answer,
             ),
             default => self::validateStandardSubjectiveQuestion(
                 $content,
                 $validator,
-                $questionType->have_answer,
             ),
         };
     }
@@ -759,7 +756,6 @@ class QuestionTypeSchemaRegistry
     private static function validateSameStatementQuestion(
         array $content,
         Validator $validator,
-        bool $haveAnswer,
     ): void {
         if (! self::hasLocalizedValue($content, 'prompt')) {
             $validator->errors()->add('content.prompt_en', 'Question statement is required.');
@@ -767,10 +763,6 @@ class QuestionTypeSchemaRegistry
 
         if (! self::firstFilled($content['shared_en'] ?? null, $content['shared_ur'] ?? null)) {
             $validator->errors()->add('content.shared_en', 'Shared statement is required.');
-        }
-
-        if ($haveAnswer && ! self::hasLocalizedValue($content, 'answer')) {
-            $validator->errors()->add('content.answer_en', 'Answer is required for this question type.');
         }
     }
 
@@ -921,21 +913,15 @@ class QuestionTypeSchemaRegistry
     private static function validateStandardSubjectiveQuestion(
         array $content,
         Validator $validator,
-        bool $collectAnswers,
     ): void {
         if (! self::hasLocalizedValue($content, 'prompt')) {
             $validator->errors()->add('content.prompt_en', 'Question is required.');
-        }
-
-        if ($collectAnswers && ! self::hasLocalizedValue($content, 'answer')) {
-            $validator->errors()->add('content.answer_en', 'Answer is required for this question type.');
         }
     }
 
     private static function validateGroupedSubjectiveQuestion(
         array $content,
         Validator $validator,
-        bool $collectAnswers,
     ): void {
         $items = self::normalizeSubjectiveItems($content['items'] ?? []);
 
@@ -947,11 +933,7 @@ class QuestionTypeSchemaRegistry
 
         foreach ($items as $index => $item) {
             if (! self::firstFilled($item['prompt_en'] ?? null, $item['prompt_ur'] ?? null)) {
-                $validator->errors()->add("content.items.{$index}.prompt_en", 'Each grouped item needs a prompt.');
-            }
-
-            if ($collectAnswers && ! self::firstFilled($item['answer_en'] ?? null, $item['answer_ur'] ?? null)) {
-                $validator->errors()->add("content.items.{$index}.answer_en", 'Each grouped item needs an answer.');
+                $validator->errors()->add("content.items.{$index}.prompt_en", 'Each grouped item needs a question.');
             }
         }
     }
