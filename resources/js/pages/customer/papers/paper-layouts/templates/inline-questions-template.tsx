@@ -97,12 +97,32 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                         fallbackFormat,
                     );
                     const options = question.options.slice(0, 4);
+                    const questionText = (
+                        <>
+                            {!isObjective && (
+                                <>
+                                    <span className="font-bold">
+                                        {label})
+                                    </span>{' '}
+                                </>
+                            )}
+                            <QuestionContent
+                                value={question.text}
+                                inline
+                                className="align-baseline"
+                            />
+                        </>
+                    );
 
                     return (
                         <span
                             key={question.id}
                             data-paper-question
-                            className="mr-4 inline align-baseline"
+                            className={
+                                question.sameStatement
+                                    ? 'mr-4 inline-block w-full align-top'
+                                    : 'mr-4 inline align-baseline'
+                            }
                             dir={isRtl ? 'rtl' : undefined}
                             data-paper-urdu-content={isRtl ? true : undefined}
                             style={{
@@ -114,39 +134,41 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                                     : {}),
                             }}
                         >
-                            {!isObjective &&
-                                (isUrduOnly ? (
-                                    <>
-                                        <span className="font-bold">
-                                            {label})
-                                        </span>{' '}
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="font-bold">
-                                            {label})
-                                        </span>{' '}
-                                    </>
-                                ))}
-                            <QuestionContent
-                                value={question.text}
-                                inline
-                                className="align-baseline"
-                            />
-                            {question.sameStatement && (
+                            {question.sameStatement ? (
                                 <span
-                                    dir="auto"
-                                    data-paper-urdu-content={
-                                        isRtl ? true : undefined
-                                    }
-                                    className="block text-center"
+                                    dir="ltr"
+                                    className="grid min-w-0 grid-cols-3 items-start gap-x-3"
                                 >
-                                    <QuestionContent
-                                        value={question.sameStatement}
-                                        inline
-                                        className="align-baseline"
-                                    />
+                                    {isRtl ? (
+                                        <span />
+                                    ) : (
+                                        <span dir="ltr" className="min-w-0">
+                                            {questionText}
+                                        </span>
+                                    )}
+                                    <span
+                                        dir="auto"
+                                        data-paper-urdu-content={
+                                            isRtl ? true : undefined
+                                        }
+                                        className="min-w-0 text-center"
+                                    >
+                                        <QuestionContent
+                                            value={question.sameStatement}
+                                            inline
+                                            className="align-baseline"
+                                        />
+                                    </span>
+                                    {isRtl ? (
+                                        <span dir="rtl" className="min-w-0">
+                                            {questionText}
+                                        </span>
+                                    ) : (
+                                        <span />
+                                    )}
                                 </span>
+                            ) : (
+                                questionText
                             )}
                             {options.length > 0 && (
                                 <span className="ml-1 align-baseline">

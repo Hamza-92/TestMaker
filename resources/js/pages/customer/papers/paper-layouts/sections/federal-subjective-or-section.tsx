@@ -1,3 +1,4 @@
+import { splitBilingualParts } from '../questions/bilingual-question-row';
 import { PassageQuestionContent } from '../questions/passage-question-content';
 import { QuestionContent } from '../questions/question-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
@@ -123,20 +124,42 @@ function FederalQuestionCell({
 }) {
     const section = props.section;
     const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
+    const isRtl = urduOnly || section.questionTextRtl === true;
+    const sameStatement = question.sameStatement ?? '';
+    const singleMediumStatement =
+        sameStatement !== '' && splitBilingualParts(question.text) === null;
+    const questionContent = (
+        <BilingualTableContent
+            value={question.text}
+            urduOnly={urduOnly}
+            forceRtl={section.questionTextRtl}
+        />
+    );
 
     return (
         <td className="group/question relative px-2 py-1 align-top font-normal">
-            <BilingualTableContent
-                value={question.text}
-                urduOnly={urduOnly}
-                forceRtl={section.questionTextRtl}
-            />
-            {question.sameStatement && (
+            {singleMediumStatement ? (
+                <div
+                    dir="ltr"
+                    className="grid min-w-0 grid-cols-3 items-start gap-x-2"
+                >
+                    {isRtl ? <span /> : questionContent}
+                    <div
+                        dir="auto"
+                        data-paper-urdu-content={isRtl ? true : undefined}
+                        className="min-w-0 text-center"
+                    >
+                        <QuestionContent value={sameStatement} inline />
+                    </div>
+                    {isRtl ? questionContent : <span />}
+                </div>
+            ) : (
+                questionContent
+            )}
+            {question.sameStatement && !singleMediumStatement && (
                 <div
                     dir="auto"
-                    data-paper-urdu-content={
-                        urduOnly || section.questionTextRtl ? true : undefined
-                    }
+                    data-paper-urdu-content={isRtl ? true : undefined}
                     className="mt-0.5 text-center"
                 >
                     <QuestionContent value={question.sameStatement} inline />

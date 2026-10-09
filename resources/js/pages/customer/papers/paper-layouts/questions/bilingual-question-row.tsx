@@ -160,12 +160,15 @@ export function BilingualQuestionRow({
         );
 
         return (
-            <div className="min-w-0">
-                {question}
+            <div
+                dir="ltr"
+                className="grid min-w-0 grid-cols-3 items-start gap-x-3"
+            >
+                {isRtl ? <div /> : question}
                 <div
                     dir="auto"
                     data-paper-urdu-content={isRtl ? true : undefined}
-                    className="mt-0.5 text-center"
+                    className="min-w-0 text-center"
                 >
                     <QuestionContent
                         value={sameStatement}
@@ -173,6 +176,7 @@ export function BilingualQuestionRow({
                         className="align-baseline"
                     />
                 </div>
+                {isRtl ? question : <div />}
             </div>
         );
     }
