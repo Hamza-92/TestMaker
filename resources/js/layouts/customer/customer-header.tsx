@@ -196,11 +196,13 @@ export function CustomerHeader() {
         auth: {
             user: Record<string, unknown>;
             is_impersonating?: boolean;
+            is_teacher_impersonating?: boolean;
         };
         legacyWebsiteUrl: string;
     }>();
     const user = page.props.auth.user;
     const isImpersonating = Boolean(page.props.auth.is_impersonating);
+    const isTeacherImpersonating = Boolean(page.props.auth.is_teacher_impersonating);
     const schoolName =
         (user.school_name as string | null) ?? (user.name as string);
 
@@ -255,6 +257,15 @@ export function CustomerHeader() {
                         className="mr-1 rounded-md px-2 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
                     >
                         Return to Superadmin
+                    </button>
+                )}
+                {isTeacherImpersonating && (
+                    <button
+                        type="button"
+                        onClick={() => router.post('/teacher-impersonation/stop')}
+                        className="mr-1 rounded-md px-2 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
+                    >
+                        Return to School
                     </button>
                 )}
                 <NotificationBell />

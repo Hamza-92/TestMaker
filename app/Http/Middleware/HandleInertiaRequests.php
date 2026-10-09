@@ -50,6 +50,9 @@ class HandleInertiaRequests extends Middleware
                 'teacher_permissions' => $user?->isTeacher() ? (array) ($user->teacher_permissions ?? []) : [],
                 'school_context' => $this->schoolContext($user),
                 'is_impersonating' => $request->session()->has('impersonator_id') && $user?->isCustomer(),
+                'is_teacher_impersonating' => $request->session()->has('teacher_impersonator_id')
+                    && $user?->isTeacher()
+                    && (int) $request->session()->get('teacher_impersonator_id') === (int) $user->school_id,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
 

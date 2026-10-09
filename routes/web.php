@@ -61,6 +61,8 @@ Route::get('question-images/{image}', [QuestionImageController::class, 'show'])
 Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('impersonation/stop', [CustomerController::class, 'stopImpersonation'])->name('impersonation.stop');
+    Route::post('teacher-impersonation/stop', [TeacherController::class, 'stopTeacherImpersonation'])
+        ->name('customer.teachers.impersonation.stop');
 
     // â”€â”€â”€ Shared smart dashboard (renders based on user type) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -156,6 +158,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('teachers/{teacher}', [TeacherController::class, 'destroy'])->name('customer.teachers.destroy');
             Route::get('teachers/{teacher}/permissions', [TeacherController::class, 'permissions'])->name('customer.teachers.permissions');
             Route::put('teachers/{teacher}/permissions', [TeacherController::class, 'updatePermissions'])->name('customer.teachers.permissions.update');
+            Route::post('teachers/{teacher}/login', [TeacherController::class, 'loginAsTeacher'])->name('customer.teachers.login');
         });
     });
 

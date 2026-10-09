@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Support\SubscriptionAccess;
 use App\Support\TeacherAccess;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -269,6 +270,47 @@ class TeacherController extends Controller
 
         return redirect()->route('customer.teachers.index')
             ->with('success', 'Teacher access updated.');
+    }
+
+    public function loginAsTeacher(Request $request, User $teacher)
+    {
+        $this->authorizeTeacher($teacher);
+        abort_unless($request->user()->isActive(), 403);
+        abort_unless($request->user()->activeSchoolSubscription()?->allow_teachers, 403);
+        abort_unless($teacher->isActive(), 403);
+
+        $request->session()->put('teacher_impersonator_id', $request->user()->id);
+        Auth::login($teacher);
+        $request->session()->regenerate();
+
+        return redirect()->route('dashboard');
+    }
+
+    public function stopTeacherImpersonation(Request $request)
+    {
+        $ownerId = $request->session()->get('teacher_impersonator_id');
+        abort_unless(
+            $request->user()?->isTeacher()
+                && is_numeric($ownerId)
+                && (int) $request->user()->school_id === (int) $ownerId,
+            403,
+        );
+
+        $owner = User::query()->whereKey($ownerId)->first();
+        $request->session()->forget('teacher_impersonator_id');
+
+        if (! $owner?->isSchoolOwner() || ! $owner->isActive()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login');
+        }
+
+        Auth::login($owner);
+        $request->session()->regenerate();
+
+        return redirect()->route('customer.teachers.index');
     }
 
     private function ensureCanAddTeacher(): void

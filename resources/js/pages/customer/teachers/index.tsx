@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
     KeyRoundIcon,
+    LogInIcon,
     MailIcon,
     PencilIcon,
     PlusIcon,
@@ -64,6 +65,7 @@ export default function TeachersIndex({ teachers, quota }: Props) {
     const [search, setSearch] = useState('');
     const [deleting, setDeleting] = useState<Teacher | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [loggingInId, setLoggingInId] = useState<number | null>(null);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -214,6 +216,28 @@ export default function TeachersIndex({ teachers, quota }: Props) {
                                     </div>
 
                                     <div className="flex shrink-0 items-center gap-1.5">
+                                        {teacher.status === 'active' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setLoggingInId(teacher.id);
+                                                    router.post(
+                                                        `/teachers/${teacher.id}/login`,
+                                                        {},
+                                                        {
+                                                            onFinish: () =>
+                                                                setLoggingInId(null),
+                                                        },
+                                                    );
+                                                }}
+                                                disabled={loggingInId !== null}
+                                                className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-600 disabled:cursor-wait disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-400"
+                                                aria-label={`Log in as ${teacher.name}`}
+                                                title={`Log in as ${teacher.name}`}
+                                            >
+                                                <LogInIcon className="size-4" />
+                                            </button>
+                                        )}
                                         <Link
                                             href={`/teachers/${teacher.id}/permissions`}
                                             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-400"
