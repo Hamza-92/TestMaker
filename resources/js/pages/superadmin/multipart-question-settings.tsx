@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { Layers3Icon, SaveIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
@@ -64,9 +65,13 @@ export default function MultipartQuestionSettings({
         selectedScope?.subject_id ?? null,
     );
     const [active, setActive] = useState(setting?.is_active ?? false);
-    const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>(
-        setting?.part_type_ids ?? [],
-    );
+    const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>(() => {
+        const availableIds = new Set(questionTypes.map((type) => type.id));
+
+        return (setting?.part_type_ids ?? []).filter((id) =>
+            availableIds.has(id),
+        );
+    });
     const [headingEn, setHeadingEn] = useState(setting?.heading_en ?? '');
     const [headingUr, setHeadingUr] = useState(setting?.heading_ur ?? '');
     const [saving, setSaving] = useState(false);
@@ -157,6 +162,13 @@ export default function MultipartQuestionSettings({
         };
         const options = {
             preserveScroll: true,
+            preserveState: 'errors' as const,
+            onSuccess: () => toast.success('Multipart settings saved.'),
+            onError: (errors: Record<string, string>) =>
+                toast.error(
+                    Object.values(errors)[0] ??
+                        'Unable to save multipart settings. Please try again.',
+                ),
             onFinish: () => setSaving(false),
         };
 
