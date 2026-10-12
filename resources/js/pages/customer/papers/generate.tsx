@@ -120,6 +120,7 @@ import {
     PAPER_URDU_FONT_METRICS,
     normalizePaperSettings,
     objectiveSectionQuestionCount,
+    paperChapterNumbers,
     paperPartLabel,
     resolveOrGroupLabel,
 } from './paper-layouts/types';
@@ -200,6 +201,27 @@ interface Chapter {
     question_count?: number;
     locked?: boolean;
     topics: Topic[];
+}
+
+function chapterNumbersForSelection(
+    chapters: Chapter[] | null,
+    selectedChapterIds: number[],
+): number[] {
+    const selectedIds = new Set(selectedChapterIds);
+
+    return [
+        ...new Set(
+            (chapters ?? [])
+                .filter((chapter) => selectedIds.has(chapter.id))
+                .map((chapter) => chapter.chapter_number)
+                .filter(
+                    (number): number is number =>
+                        number !== null &&
+                        Number.isInteger(number) &&
+                        number > 0,
+                ),
+        ),
+    ].sort((left, right) => left - right);
 }
 
 function selectableTopicIds(chapter: Chapter): number[] {
@@ -3332,6 +3354,7 @@ function SchoolIdentity({
 function PaperHeader({
     template,
     header,
+    chapterNumbers,
     logoUrl,
     address,
     showAddress,
@@ -3341,6 +3364,7 @@ function PaperHeader({
 }: {
     template: PaperHeaderTemplate;
     header: Parameters<typeof ClassicExamHeader>[0]['header'];
+    chapterNumbers: string;
     logoUrl: string;
     address: string;
     showAddress: boolean;
@@ -3412,6 +3436,7 @@ function PaperHeader({
     return (
         <ClassicExamHeader
             header={header}
+            chapterNumbers={chapterNumbers}
             logoUrl={logoUrl || undefined}
             paddingX={paddingX}
             paddingY={paddingY}
@@ -3662,6 +3687,10 @@ export default function GeneratePaper({
                 .filter(([, topicIds]) => topicIds.size > 0)
                 .map(([chapterId]) => Number(chapterId)),
         [selected],
+    );
+    const selectedChapterNumbers = useMemo(
+        () => chapterNumbersForSelection(chapters, selectedChapterIds),
+        [chapters, selectedChapterIds],
     );
 
     const selectedTopicIds = useMemo(
@@ -6127,6 +6156,7 @@ export default function GeneratePaper({
             setQuestionPoolsByType(pools);
             setGeneratedPaper({
                 id: `paper_${Date.now()}`,
+                selectedChapterNumbers,
                 header: {
                     schoolName: defaultSchoolName,
                     schoolAddress: showSchoolAddress ? schoolAddress : '',
@@ -8909,6 +8939,7 @@ export default function GeneratePaper({
                     <GeneratedPaperView
                         paper={variantForSet(generatedPaper, activeSetIndex)}
                         rawPaper={generatedPaper}
+                        fallbackChapterNumbers={selectedChapterNumbers.join(', ')}
                         activeSetIndex={activeSetIndex}
                         numSets={numSets}
                         viewMode={viewMode}
@@ -13887,6 +13918,7 @@ function PaperSectionHeading({
 export function GeneratedPaperView({
     paper,
     rawPaper,
+    fallbackChapterNumbers = '',
     activeSetIndex,
     numSets,
     viewMode,
@@ -13948,6 +13980,7 @@ export function GeneratedPaperView({
 }: {
     paper: GeneratedPaper;
     rawPaper: GeneratedPaper;
+    fallbackChapterNumbers?: string;
     activeSetIndex: number;
     numSets: number;
     viewMode: PaperViewMode;
@@ -15498,6 +15531,11 @@ export function GeneratedPaperView({
                         />
                         <PaperHeader
                             template={settings.headerTemplate}
+                            chapterNumbers={
+                                paper.selectedChapterNumbers === undefined
+                                    ? fallbackChapterNumbers
+                                    : paperChapterNumbers(paper)
+                            }
                             header={{
                                 ...paper.header,
                                 marks: totalMarks,
@@ -15628,6 +15666,14 @@ export function GeneratedPaperView({
                                         />
                                         <PaperHeader
                                             template={settings.headerTemplate}
+                                            chapterNumbers={
+                                                variantPaper.selectedChapterNumbers ===
+                                                undefined
+                                                    ? fallbackChapterNumbers
+                                                    : paperChapterNumbers(
+                                                          variantPaper,
+                                                      )
+                                            }
                                             header={{
                                                 ...variantPaper.header,
                                                 marks: totalMarks,

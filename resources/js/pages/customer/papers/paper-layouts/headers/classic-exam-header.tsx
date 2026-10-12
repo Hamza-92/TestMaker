@@ -4,6 +4,7 @@ import { HeaderLogo } from './header-logo';
 
 interface ClassicExamHeaderProps {
     header: GeneratedPaperHeader;
+    chapterNumbers: string;
     logoUrl?: string;
     paddingX: number;
     paddingY: number;
@@ -28,6 +29,7 @@ const rightFields: Array<[keyof GeneratedPaperHeader, string]> = [
 
 export function ClassicExamHeader({
     header,
+    chapterNumbers,
     logoUrl,
     paddingX,
     paddingY,
@@ -57,7 +59,10 @@ export function ClassicExamHeader({
                             <tr key={leftField}>
                                 {index === 0 && (
                                     <td
-                                        rowSpan={leftFields.length}
+                                        rowSpan={
+                                            leftFields.length +
+                                            (chapterNumbers ? 1 : 0)
+                                        }
                                         data-paper-header-cell
                                         className="p-3 align-middle"
                                     >
@@ -105,6 +110,23 @@ export function ClassicExamHeader({
                             </tr>
                         );
                     })}
+                    {chapterNumbers && (
+                        <tr>
+                            <th
+                                scope="row"
+                                data-paper-header-label-cell
+                                className="bg-slate-100 px-2 py-1 text-left text-sm font-bold uppercase"
+                            >
+                                Chapters
+                            </th>
+                            <td
+                                colSpan={3}
+                                className="break-words px-2 py-1 text-sm font-normal"
+                            >
+                                {chapterNumbers}
+                            </td>
+                        </tr>
+                    )}
                 </tbody>
             </table>
         </div>

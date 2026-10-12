@@ -906,6 +906,15 @@ export interface GeneratedPaper {
     settings?: PaperSettings;
     /** Snapshot of the active superadmin grouping used when this paper was generated. */
     sectioning?: GeneratedPaperSectioning;
+    /** Chapter numbers selected during paper setup, including chapters with no printed questions. */
+    selectedChapterNumbers?: number[];
+}
+
+export function paperChapterNumbers(paper: GeneratedPaper): string {
+    return [...new Set(paper.selectedChapterNumbers ?? [])]
+        .filter((number) => Number.isInteger(number) && number > 0)
+        .sort((left, right) => left - right)
+        .join(', ');
 }
 
 const ROMAN_NUMERALS = [
