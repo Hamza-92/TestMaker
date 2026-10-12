@@ -948,6 +948,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
     line-height: var(--paper-question-line-height, 1.5);
     font-weight: 700;
 }
+/* Fractions and symbols in legacy math questions are inline images. Tailwind's
+   block image reset otherwise puts every symbol on its own line in this table. */
+[data-print-paper] [data-paper-federal-or-table] .paper-rich-text img {
+    display: inline-block;
+    break-inside: avoid;
+}
 [data-print-paper] [data-paper-federal-section-heading] {
     text-decoration: underline;
     text-underline-offset: 2px;
