@@ -13,11 +13,11 @@ import { dashboard, login, register } from '@/routes';
 import type { Auth } from '@/types/auth';
 
 const primaryNavigation = [
-    { label: 'Features', href: '#features' },
+    { label: 'Features', href: '/#features' },
     { label: 'Pricing', href: '/pricing' },
-    { label: 'How it Works', href: '#how-it-works' },
-    { label: 'Resources', href: '#resources', hasMenu: true },
-    { label: 'About Us', href: '#about' },
+    { label: 'How it Works', href: '/#how-it-works' },
+    { label: 'Resources', href: '/#resources', hasMenu: true },
+    { label: 'About Us', href: '/#about' },
 ];
 
 export default function SiteHeader({ auth }: { auth: Auth }) {

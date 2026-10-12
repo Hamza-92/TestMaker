@@ -70,6 +70,9 @@ class PermissionSeeder extends Seeder
             ['name' => 'announcements.edit',   'display_name' => 'Edit Announcements',   'group' => 'Announcements'],
             ['name' => 'announcements.delete', 'display_name' => 'Delete Announcements', 'group' => 'Announcements'],
 
+            ['name' => 'site_pages.view', 'display_name' => 'View Public Website', 'group' => 'Public Website'],
+            ['name' => 'site_pages.edit', 'display_name' => 'Edit Public Website', 'group' => 'Public Website'],
+
             ['name' => 'data_transfer.manage', 'display_name' => 'Transfer Legacy Data', 'group' => 'Data Transfer'],
             ['name' => 'user_transfer.manage', 'display_name' => 'Transfer Legacy Users and Subscriptions', 'group' => 'User Transfer'],
         ];

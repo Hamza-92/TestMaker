@@ -13,6 +13,7 @@ use App\Http\Controllers\Customer\ProfileController;
 use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
+use App\Http\Controllers\PublicPricingController;
 use App\Http\Controllers\QuestionImageController;
 use App\Http\Controllers\Superadmin\AnnouncementController;
 use App\Http\Controllers\Superadmin\ArabicSubjectController;
@@ -32,12 +33,14 @@ use App\Http\Controllers\Superadmin\QuestionBrowseController;
 use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\QuestionTypePairingController;
+use App\Http\Controllers\Superadmin\SitePricingController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\SuperadminUserController;
 use App\Http\Controllers\Superadmin\TopicController;
 use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
 use App\Http\Controllers\Superadmin\UserTransferController;
+use App\Support\PricingPageContent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -51,10 +54,11 @@ Route::get('/', function (Request $request) {
 
     return Inertia::render('welcome', [
         'canRegister' => Features::enabled(Features::registration()),
+        'pricingContent' => PricingPageContent::published(),
     ]);
 })->name('home');
 
-Route::inertia('/pricing', 'pricing')->name('pricing');
+Route::get('/pricing', [PublicPricingController::class, 'index'])->name('pricing');
 
 Route::get('question-images/{image}', [QuestionImageController::class, 'show'])
     ->whereUuid('image')->name('question-images.show');
@@ -165,6 +169,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // â”€â”€â”€ Superadmin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::middleware('superadmin')->group(function () {
+
+        Route::get('superadmin/site/pricing', [SitePricingController::class, 'edit'])->name('superadmin.site.pricing')->middleware('permission:site_pages.view');
+        Route::get('superadmin/site/pricing/preview', [SitePricingController::class, 'preview'])->name('superadmin.site.pricing.preview')->middleware('permission:site_pages.view');
+        Route::put('superadmin/site/pricing', [SitePricingController::class, 'update'])->name('superadmin.site.pricing.update')->middleware('permission:site_pages.edit');
+        Route::post('superadmin/site/pricing/revisions/{revision}/restore', [SitePricingController::class, 'restore'])->name('superadmin.site.pricing.restore')->middleware('permission:site_pages.edit');
 
         // â”€â”€â”€ Customers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Route::get('superadmin/customers', [CustomerController::class, 'index'])->name('superadmin.customers')->middleware('permission:customers.view');

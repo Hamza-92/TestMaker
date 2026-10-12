@@ -3,6 +3,7 @@ import {
     BookOpenIcon,
     CircleDotIcon,
     MegaphoneIcon,
+    Globe2Icon,
     DatabaseIcon,
     HelpCircleIcon,
     LayoutGrid,
@@ -186,6 +187,15 @@ export function AppSidebar() {
                       title: 'News & Updates',
                       href: '/superadmin/announcements',
                       icon: MegaphoneIcon,
+                  },
+              ]
+            : []),
+        ...(can('site_pages.view')
+            ? [
+                  {
+                      title: 'Public Website',
+                      href: '/superadmin/site/pricing',
+                      icon: Globe2Icon,
                   },
               ]
             : []),
