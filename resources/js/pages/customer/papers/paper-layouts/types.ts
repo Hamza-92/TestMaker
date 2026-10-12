@@ -25,6 +25,10 @@ export interface GeneratedPaperQuestion {
     sourceQuestionId: number | null;
     optionsOnly?: boolean;
     text: string;
+    /** Additional subjective content shown beneath the statement in Federal OR tables. */
+    description?: string | null;
+    /** Grouped question prompt displayed before its intro in Federal OR tables. */
+    federalStatement?: string | null;
     /** One shared statement rendered between the English and Urdu question statements. */
     sameStatement?: string | null;
     source: string | null;

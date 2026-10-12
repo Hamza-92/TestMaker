@@ -1528,6 +1528,71 @@ function paperQuestionFromManual(
 ): GeneratedPaperQuestion {
     const passageQuestions = passageQuestionsFromManual(question, id);
     const passageText = passageTextFromManual(question);
+    const groupedItems = question.content.items;
+    const groupedItem =
+        question.schemaKey === 'subjective_grouped' &&
+        Array.isArray(groupedItems) &&
+        groupedItems.length === 1 &&
+        groupedItems[0] &&
+        typeof groupedItems[0] === 'object'
+            ? (groupedItems[0] as Record<string, unknown>)
+            : null;
+    const federalStatement = groupedItem
+        ? localizedPaperHtml(
+              groupedItem.prompt_en,
+              groupedItem.prompt_ur,
+              question.medium,
+          )
+        : '';
+    const descriptionFor = (locale: 'en' | 'ur'): string => {
+        if (
+            question.isObjective ||
+            question.schemaKey === 'subjective_same_statement'
+        ) {
+            return '';
+        }
+
+        const contentDescription = question.content[
+            (groupedItem ? 'intro_' : 'guidance_') + locale
+        ];
+        const description =
+            (
+                typeof contentDescription === 'string' &&
+                contentDescription.trim() !== ''
+                    ? contentDescription
+                    : groupedItem
+                      ? null
+                      : locale === 'en'
+                        ? question.descriptionTextEn
+                        : question.descriptionTextUr
+            )?.trim() ?? '';
+        const summary = groupedItem
+            ? groupedItem['prompt_' + locale]
+            : locale === 'en'
+              ? question.summaryTextEn
+              : question.summaryTextUr;
+        const summaryHtml = typeof summary === 'string' ? summary.trim() : '';
+        const descriptionText = plainQuestionText(description);
+        const hasEmbeddedContent = /<(?:img|math|svg)\b/i.test(description);
+
+        if (
+            description === '' ||
+            (descriptionText === '' && !hasEmbeddedContent) ||
+            description === summaryHtml ||
+            (descriptionText !== '' &&
+                descriptionText === plainQuestionText(summaryHtml) &&
+                !hasEmbeddedContent)
+        ) {
+            return '';
+        }
+
+        return description;
+    };
+    const description = localizedPaperHtml(
+        descriptionFor('en'),
+        descriptionFor('ur'),
+        question.medium,
+    );
 
     return {
         id,
@@ -1544,6 +1609,8 @@ function paperQuestionFromManual(
                     question.summaryText,
                     question.schemaKey === 'subjective_same_statement',
                 ),
+        description: description || null,
+        federalStatement: federalStatement || null,
         sameStatement: sameStatementFromManual(question),
         source: question.source,
         sourceLabel: question.sourceLabel,
@@ -1556,6 +1623,65 @@ function paperQuestionFromManual(
         answerLines: question.isObjective ? 0 : 0,
         answerText: answerTextFromManual(question),
     };
+}
+
+function backfillFederalGroupedQuestions(
+    paper: GeneratedPaper,
+    pools: Record<number, ManualQuestion[]>,
+): GeneratedPaper {
+    const questionsById = new Map(
+        Object.values(pools)
+            .flat()
+            .map((question) => [question.id, question] as const),
+    );
+    let changed = false;
+    const sections = paper.sections.map((section) => {
+        if (!section.orGroupId || !section.orRole) {
+            return section;
+        }
+
+        let sectionChanged = false;
+        const questions = section.questions.map((question) => {
+            if (
+                question.sourceQuestionId === null ||
+                (question.federalStatement && question.description)
+            ) {
+                return question;
+            }
+
+            const source = questionsById.get(question.sourceQuestionId);
+
+            if (!source || source.schemaKey !== 'subjective_grouped') {
+                return question;
+            }
+
+            const updated = paperQuestionFromManual(source, question.id);
+
+            if (!updated.federalStatement) {
+                return question;
+            }
+
+            const federalStatement =
+                question.federalStatement || updated.federalStatement;
+            const description = question.description ?? updated.description;
+
+            if (
+                federalStatement === question.federalStatement &&
+                description === question.description
+            ) {
+                return question;
+            }
+
+            changed = true;
+            sectionChanged = true;
+
+            return { ...question, federalStatement, description };
+        });
+
+        return sectionChanged ? { ...section, questions } : section;
+    });
+
+    return changed ? { ...paper, sections } : paper;
 }
 
 function federalizeGeneratedSections(
@@ -5556,6 +5682,18 @@ export default function GeneratePaper({
         activeSourceValues,
         chapterMedium,
     ]);
+
+    useEffect(() => {
+        if (Object.keys(questionPoolsByType).length === 0) {
+            return;
+        }
+
+        setGeneratedPaper((current) =>
+            current
+                ? backfillFederalGroupedQuestions(current, questionPoolsByType)
+                : current,
+        );
+    }, [questionPoolsByType]);
 
     async function searchPaperQuestionPool(
         questionTypeId: number,

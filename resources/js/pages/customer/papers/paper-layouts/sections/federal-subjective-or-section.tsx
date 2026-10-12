@@ -126,11 +126,12 @@ function FederalQuestionCell({
     const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
     const isRtl = urduOnly || section.questionTextRtl === true;
     const sameStatement = question.sameStatement ?? '';
+    const displayText = question.federalStatement || question.text;
     const singleMediumStatement =
-        sameStatement !== '' && splitBilingualParts(question.text) === null;
+        sameStatement !== '' && splitBilingualParts(displayText) === null;
     const questionContent = (
         <BilingualTableContent
-            value={question.text}
+            value={displayText}
             urduOnly={urduOnly}
             forceRtl={section.questionTextRtl}
         />
@@ -163,6 +164,15 @@ function FederalQuestionCell({
                     className="mt-0.5 text-center"
                 >
                     <QuestionContent value={question.sameStatement} inline />
+                </div>
+            )}
+            {question.description && (
+                <div className="mt-1">
+                    <BilingualTableContent
+                        value={question.description}
+                        urduOnly={urduOnly}
+                        forceRtl={section.questionTextRtl}
+                    />
                 </div>
             )}
             {question.imageUrl && (
