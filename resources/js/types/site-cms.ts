@@ -33,10 +33,11 @@ export interface SiteMediaItem {
 
 export interface SiteContentSection {
     id: string;
-    type: 'text' | 'gallery' | 'cta';
+    type: 'text' | 'gallery' | 'cta' | 'columns';
     title: string;
     body: string;
     image_ids: number[];
+    columns?: Array<{ id: string; body: string }>;
     button_label: string;
     button_url: string;
     visible: boolean;

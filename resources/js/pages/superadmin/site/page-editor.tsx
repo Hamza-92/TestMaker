@@ -40,6 +40,7 @@ const sectionLabels: Record<SectionType, string> = {
     text: 'Text',
     gallery: 'Gallery',
     cta: 'Call to action',
+    columns: 'Columns',
 };
 
 function Field({
@@ -108,6 +109,7 @@ function SitePageEditorInner({
     const [selectedId, setSelectedId] = useState<string | null>(
         initialContent.sections[0]?.id ?? null,
     );
+    const [columnIndex, setColumnIndex] = useState(0);
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const dirty =
@@ -133,6 +135,24 @@ function SitePageEditorInner({
         }));
     }
 
+    function patchColumn(sectionId: string, columnId: string, body: string) {
+        setContent((current) => ({
+            ...current,
+            sections: current.sections.map((section) =>
+                section.id === sectionId
+                    ? {
+                          ...section,
+                          columns: (section.columns ?? []).map((column) =>
+                              column.id === columnId
+                                  ? { ...column, body }
+                                  : column,
+                          ),
+                      }
+                    : section,
+            ),
+        }));
+    }
+
     function addSection(type: SectionType) {
         const id = crypto.randomUUID();
         setContent((current) => ({
@@ -145,6 +165,13 @@ function SitePageEditorInner({
                     title: sectionLabels[type],
                     body: '',
                     image_ids: [],
+                    columns:
+                        type === 'columns'
+                            ? [
+                                  { id: crypto.randomUUID(), body: '' },
+                                  { id: crypto.randomUUID(), body: '' },
+                              ]
+                            : [],
                     button_label: '',
                     button_url: '',
                     visible: true,
@@ -152,6 +179,7 @@ function SitePageEditorInner({
             ],
         }));
         setSelectedId(id);
+        setColumnIndex(0);
         setPanel('content');
     }
 
@@ -329,7 +357,10 @@ function SitePageEditorInner({
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setSelectedId(null)}
+                                onClick={() => {
+                                    setSelectedId(null);
+                                    setColumnIndex(0);
+                                }}
                                 className={`w-full rounded-lg border px-3 py-2 text-left text-sm font-medium ${selectedId === null ? 'border-brand-400 bg-brand-50 text-brand-800' : 'border-slate-200 hover:bg-slate-50'}`}
                             >
                                 Page heading
@@ -343,9 +374,10 @@ function SitePageEditorInner({
                                         <button
                                             type="button"
                                             className="min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm"
-                                            onClick={() =>
-                                                setSelectedId(section.id)
-                                            }
+                                            onClick={() => {
+                                                setSelectedId(section.id);
+                                                setColumnIndex(0);
+                                            }}
                                         >
                                             {section.title ||
                                                 sectionLabels[section.type]}
@@ -391,6 +423,7 @@ function SitePageEditorInner({
                                     {(
                                         [
                                             'text',
+                                            'columns',
                                             'gallery',
                                             'cta',
                                         ] as SectionType[]
@@ -456,30 +489,189 @@ function SitePageEditorInner({
                                         }
                                         disabled={!canEdit}
                                     />
-                                    {selected.type !== 'gallery' && (
-                                        <div className="space-y-2">
-                                            <Label>Section text</Label>
-                                            <Suspense
-                                                fallback={
-                                                    <p className="text-sm text-slate-500">
-                                                        Loading editor…
-                                                    </p>
-                                                }
-                                            >
-                                                <SiteRichEditor
-                                                    key={selected.id}
-                                                    value={selected.body}
-                                                    onChange={(body) =>
-                                                        patchSection(
-                                                            selected.id,
-                                                            { body },
-                                                        )
+                                    {selected.type !== 'gallery' &&
+                                        selected.type !== 'columns' && (
+                                            <div className="space-y-2">
+                                                <Label>Section text</Label>
+                                                <Suspense
+                                                    fallback={
+                                                        <p className="text-sm text-slate-500">
+                                                            Loading editor…
+                                                        </p>
                                                     }
-                                                    disabled={!canEdit}
-                                                />
-                                            </Suspense>
-                                        </div>
-                                    )}
+                                                >
+                                                    <SiteRichEditor
+                                                        key={selected.id}
+                                                        value={selected.body}
+                                                        media={media}
+                                                        onChange={(body) =>
+                                                            patchSection(
+                                                                selected.id,
+                                                                { body },
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                </Suspense>
+                                            </div>
+                                        )}
+                                    {selected.type === 'columns' &&
+                                        (() => {
+                                            const columns =
+                                                selected.columns ?? [];
+                                            const activeColumn =
+                                                columns[columnIndex] ??
+                                                columns[0];
+
+                                            return (
+                                                <div className="space-y-4">
+                                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-slate-700">
+                                                                Responsive
+                                                                columns
+                                                            </p>
+                                                            <p className="text-xs text-slate-500">
+                                                                Columns sit side
+                                                                by side on wide
+                                                                screens and
+                                                                stack on phones.
+                                                                Add text or
+                                                                images to each
+                                                                column.
+                                                            </p>
+                                                        </div>
+                                                        {canEdit &&
+                                                            (columns.length ===
+                                                            2 ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        patchSection(
+                                                                            selected.id,
+                                                                            {
+                                                                                columns:
+                                                                                    [
+                                                                                        ...columns,
+                                                                                        {
+                                                                                            id: crypto.randomUUID(),
+                                                                                            body: '',
+                                                                                        },
+                                                                                    ],
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Plus />{' '}
+                                                                    Third column
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="secondary"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        if (
+                                                                            columns[2]
+                                                                                ?.body &&
+                                                                            !window.confirm(
+                                                                                'Remove the third column and its content?',
+                                                                            )
+                                                                        ) {
+                                                                            return;
+                                                                        }
+
+                                                                        patchSection(
+                                                                            selected.id,
+                                                                            {
+                                                                                columns:
+                                                                                    columns.slice(
+                                                                                        0,
+                                                                                        2,
+                                                                                    ),
+                                                                            },
+                                                                        );
+                                                                        setColumnIndex(
+                                                                            0,
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Two columns
+                                                                </Button>
+                                                            ))}
+                                                    </div>
+                                                    <Tabs
+                                                        items={columns.map(
+                                                            (
+                                                                column,
+                                                                index,
+                                                            ) => ({
+                                                                value: String(
+                                                                    index,
+                                                                ),
+                                                                label: `Column ${index + 1}`,
+                                                            }),
+                                                        )}
+                                                        value={String(
+                                                            Math.min(
+                                                                columnIndex,
+                                                                columns.length -
+                                                                    1,
+                                                            ),
+                                                        )}
+                                                        onChange={(value) =>
+                                                            setColumnIndex(
+                                                                Number(value),
+                                                            )
+                                                        }
+                                                    />
+                                                    {activeColumn && (
+                                                        <div className="space-y-2">
+                                                            <Label>
+                                                                Column{' '}
+                                                                {columnIndex +
+                                                                    1}{' '}
+                                                                content
+                                                            </Label>
+                                                            <Suspense
+                                                                fallback={
+                                                                    <p className="text-sm text-slate-500">
+                                                                        Loading
+                                                                        editor…
+                                                                    </p>
+                                                                }
+                                                            >
+                                                                <SiteRichEditor
+                                                                    key={
+                                                                        activeColumn.id
+                                                                    }
+                                                                    value={
+                                                                        activeColumn.body
+                                                                    }
+                                                                    media={
+                                                                        media
+                                                                    }
+                                                                    onChange={(
+                                                                        body,
+                                                                    ) =>
+                                                                        patchColumn(
+                                                                            selected.id,
+                                                                            activeColumn.id,
+                                                                            body,
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                />
+                                                            </Suspense>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     {selected.type === 'gallery' && (
                                         <div className="space-y-3">
                                             <p className="text-sm text-slate-600">

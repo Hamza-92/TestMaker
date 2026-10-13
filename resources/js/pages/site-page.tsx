@@ -14,6 +14,24 @@ interface Props {
     preview?: boolean;
 }
 
+const richContentClass =
+    'overflow-x-auto text-base leading-8 [&_a]:font-medium [&_a]:text-brand-700 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-brand-200 [&_blockquote]:pl-5 [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-4 [&_table]:my-5 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-50 [&_th]:p-2 [&_ul]:list-disc';
+
+function RichContent({
+    html,
+    className = '',
+}: {
+    html: string;
+    className?: string;
+}) {
+    return (
+        <div
+            className={`${richContentClass} ${className}`}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
+        />
+    );
+}
+
 export default function SitePage() {
     const { auth, content, media, preview = false } = usePage<Props>().props;
     const mediaById = new Map(media.map((item) => [item.id, item]));
@@ -111,13 +129,9 @@ export default function SitePage() {
                                                     {section.title}
                                                 </h2>
                                                 {section.body && (
-                                                    <div
-                                                        className="mt-3 leading-7 text-blue-100 [&_a]:underline [&_p]:mb-3"
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: DOMPurify.sanitize(
-                                                                section.body,
-                                                            ),
-                                                        }}
+                                                    <RichContent
+                                                        html={section.body}
+                                                        className="mt-3 text-blue-100 [&_a]:text-white"
                                                     />
                                                 )}
                                             </div>
@@ -135,6 +149,34 @@ export default function SitePage() {
                                 );
                             }
 
+                            if (section.type === 'columns') {
+                                const columns = section.columns ?? [];
+
+                                return (
+                                    <section
+                                        key={section.id}
+                                        className={`px-4 py-16 sm:px-6 lg:px-8 ${index % 2 ? 'bg-slate-50' : 'bg-white'}`}
+                                    >
+                                        <div className="mx-auto max-w-[1200px]">
+                                            <h2 className="font-display text-3xl font-bold tracking-tight">
+                                                {section.title}
+                                            </h2>
+                                            <div
+                                                className={`mt-8 grid gap-8 lg:gap-12 ${columns.length === 3 ? 'lg:grid-cols-3' : 'md:grid-cols-2'}`}
+                                            >
+                                                {columns.map((column) => (
+                                                    <RichContent
+                                                        key={column.id}
+                                                        html={column.body}
+                                                        className="min-w-0 text-slate-700"
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </section>
+                                );
+                            }
+
                             return (
                                 <section
                                     key={section.id}
@@ -144,13 +186,9 @@ export default function SitePage() {
                                         <h2 className="font-display text-3xl font-bold tracking-tight">
                                             {section.title}
                                         </h2>
-                                        <div
-                                            className="mt-6 text-base leading-8 text-slate-700 [&_a]:font-medium [&_a]:text-brand-700 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-brand-200 [&_blockquote]:pl-5 [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-6 [&_ol]:list-decimal [&_p]:mb-4 [&_ul]:list-disc"
-                                            dangerouslySetInnerHTML={{
-                                                __html: DOMPurify.sanitize(
-                                                    section.body,
-                                                ),
-                                            }}
+                                        <RichContent
+                                            html={section.body}
+                                            className="mt-6 text-slate-700"
                                         />
                                     </div>
                                 </section>

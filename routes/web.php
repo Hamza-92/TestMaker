@@ -35,10 +35,10 @@ use App\Http\Controllers\Superadmin\QuestionBrowseController;
 use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\QuestionTypePairingController;
-use App\Http\Controllers\Superadmin\SitePricingController;
 use App\Http\Controllers\Superadmin\SiteMediaController;
 use App\Http\Controllers\Superadmin\SiteNavigationController;
 use App\Http\Controllers\Superadmin\SitePageController;
+use App\Http\Controllers\Superadmin\SitePricingController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\SuperadminUserController;
 use App\Http\Controllers\Superadmin\TopicController;
@@ -191,6 +191,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('superadmin/site/navigation/{key}', [SiteNavigationController::class, 'update'])->name('superadmin.site.navigation.update')->middleware('permission:site_pages.edit');
         Route::get('superadmin/site/media', [SiteMediaController::class, 'index'])->name('superadmin.site.media')->middleware('permission:site_pages.view');
         Route::post('superadmin/site/media', [SiteMediaController::class, 'store'])->name('superadmin.site.media.store')->middleware('permission:site_pages.edit');
+        Route::post('superadmin/site/media/editor', [SiteMediaController::class, 'storeForEditor'])->name('superadmin.site.media.editor')->middleware('permission:site_pages.edit');
         Route::put('superadmin/site/media/{media}', [SiteMediaController::class, 'update'])->name('superadmin.site.media.update')->middleware('permission:site_pages.edit');
         Route::delete('superadmin/site/media/{media}', [SiteMediaController::class, 'destroy'])->name('superadmin.site.media.destroy')->middleware('permission:site_pages.edit');
 

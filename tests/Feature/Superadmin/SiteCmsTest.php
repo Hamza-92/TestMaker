@@ -112,6 +112,34 @@ it('serves uploaded media and prevents deletion while a page uses it', function 
     $this->delete("/superadmin/site/media/{$media->id}")->assertStatus(409);
 });
 
+it('keeps rich formatting and local images in responsive columns', function () {
+    $upload = $this->actingAs($this->master)->postJson('/superadmin/site/media/editor', [
+        'image' => UploadedFile::fake()->image('classroom.png'),
+    ])->assertCreated()->assertJsonStructure(['location', 'alt_text']);
+    $url = $upload->json('location');
+    expect($url)->toMatch('~^/site-media/[0-9]+$~');
+    $media = SiteMedia::firstOrFail();
+
+    $content = SitePageContent::defaults('Learning');
+    $content['sections'] = [[
+        'id' => 'feature', 'type' => 'columns', 'title' => 'Learn together',
+        'body' => '', 'image_ids' => [], 'button_label' => '', 'button_url' => '', 'visible' => true,
+        'columns' => [
+            ['id' => 'copy', 'body' => '<p style="text-align: center; color: #123456">Centered copy</p><script>alert(1)</script>'],
+            ['id' => 'photo', 'body' => '<p><img src="'.$url.'" alt="Classroom" style="width: 75%"></p><img src="https://evil.example/image.png" onerror="alert(1)">'],
+        ],
+    ]];
+    $page = SitePage::create(['slug' => 'learning', 'template' => 'standard', 'draft_content' => SitePageContent::defaults('Learning')]);
+    $this->put("/superadmin/site/pages/{$page->id}", [
+        'slug' => 'learning', 'version' => 1, 'publish' => true, 'content' => $content,
+    ])->assertRedirect();
+
+    $columns = $this->get('/learning')->assertOk()->viewData('page')['props']['content']['sections'][0]['columns'];
+    expect($columns[0]['body'])->toContain('text-align: center')->toContain('color: #123456')->not->toContain('<script');
+    expect($columns[1]['body'])->toContain('src="'.$url.'"')->toContain('width: 75%')->not->toContain('evil.example')->not->toContain('onerror');
+    $this->delete("/superadmin/site/media/{$media->id}")->assertStatus(409);
+});
+
 it('enforces website permissions on CMS writes', function () {
     $viewer = User::factory()->create([
         'user_type' => UserType::SuperAdmin,
@@ -125,5 +153,8 @@ it('enforces website permissions on CMS writes', function () {
     ])->assertForbidden();
     $this->post('/superadmin/site/media', [
         'image' => UploadedFile::fake()->image('photo.png'), 'alt_text' => 'Photo',
+    ])->assertForbidden();
+    $this->postJson('/superadmin/site/media/editor', [
+        'image' => UploadedFile::fake()->image('photo.png'),
     ])->assertForbidden();
 });

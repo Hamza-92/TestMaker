@@ -12,6 +12,6 @@ class SiteMedia extends Model
 
     public function getUrlAttribute(): string
     {
-        return route('site.media.show', $this);
+        return route('site.media.show', $this, false);
     }
 }
