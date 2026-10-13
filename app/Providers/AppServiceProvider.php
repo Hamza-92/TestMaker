@@ -52,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
             'users.view', 'users.create', 'users.edit', 'users.delete', 'users.manage_permissions',
             'trial_settings.edit',
             'announcements.view', 'announcements.create', 'announcements.edit', 'announcements.delete',
+            'site_pages.view', 'site_pages.edit',
             'data_transfer.manage', 'user_transfer.manage',
         ];
 

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     ArrowUp,
     ArrowUpRight,
@@ -11,16 +11,11 @@ import { useEffect, useState } from 'react';
 import SiteContactBar from '@/components/site-contact-bar';
 import { dashboard, login, register } from '@/routes';
 import type { Auth } from '@/types/auth';
-
-const primaryNavigation = [
-    { label: 'Features', href: '#features' },
-    { label: 'Pricing', href: '/pricing' },
-    { label: 'How it Works', href: '#how-it-works' },
-    { label: 'Resources', href: '#resources', hasMenu: true },
-    { label: 'About Us', href: '#about' },
-];
+import type { SiteNavigation } from '@/types/site-cms';
 
 export default function SiteHeader({ auth }: { auth: Auth }) {
+    const primaryNavigation = usePage<{ siteNavigation: SiteNavigation }>()
+        .props.siteNavigation.header;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [showBackToTop, setShowBackToTop] = useState(false);
     const isAuthenticated = Boolean(auth?.user);
@@ -66,20 +61,37 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                                 aria-label="Primary navigation"
                             >
                                 {primaryNavigation.map((item) => (
-                                    <a
-                                        key={item.label}
-                                        href={item.href}
-                                        className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                                    <div
+                                        key={item.id}
+                                        className="group relative"
                                     >
-                                        {item.label}
-                                        {item.hasMenu && (
-                                            <ChevronDown
-                                                size={14}
-                                                strokeWidth={2}
-                                                aria-hidden="true"
-                                            />
+                                        <a
+                                            href={item.href}
+                                            className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                                        >
+                                            {item.label}
+                                            {item.children.length > 0 && (
+                                                <ChevronDown
+                                                    size={14}
+                                                    strokeWidth={2}
+                                                    aria-hidden="true"
+                                                />
+                                            )}
+                                        </a>
+                                        {item.children.length > 0 && (
+                                            <div className="invisible absolute left-0 top-full z-50 min-w-48 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-800 opacity-0 shadow-xl transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+                                                {item.children.map((child) => (
+                                                    <a
+                                                        key={child.id}
+                                                        href={child.href}
+                                                        className="block rounded-lg px-3 py-2 text-sm hover:bg-brand-50 hover:text-brand-700 focus:bg-brand-50 focus:outline-none"
+                                                    >
+                                                        {child.label}
+                                                    </a>
+                                                ))}
+                                            </div>
                                         )}
-                                    </a>
+                                    </div>
                                 ))}
                             </nav>
 
@@ -142,7 +154,7 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                             <aside
                                 id="mobile-navigation"
                                 aria-label="Mobile navigation"
-                                className="site-mobile-panel fixed top-0 right-0 z-[70] flex h-[100dvh] w-[min(88vw,360px)] flex-col border-l border-slate-200 bg-white px-5 pt-5 pb-7 shadow-[-12px_0_32px_rgba(15,23,42,0.1)] lg:hidden"
+                                className="site-mobile-panel fixed right-0 top-0 z-[70] flex h-[100dvh] w-[min(88vw,360px)] flex-col overflow-y-auto border-l border-slate-200 bg-white px-5 pb-7 pt-5 shadow-[-12px_0_32px_rgba(15,23,42,0.1)] lg:hidden"
                             >
                                 <div className="flex items-center justify-between border-b border-slate-200 pb-5">
                                     <Link
@@ -173,19 +185,30 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                                     aria-label="Mobile page links"
                                 >
                                     {primaryNavigation.map((item) => (
-                                        <a
-                                            key={item.label}
-                                            href={item.href}
-                                            onClick={closeMenu}
-                                            className="flex min-h-12 items-center justify-between rounded-[10px] px-3 text-base font-medium text-slate-800 transition hover:bg-brand-50 hover:text-brand-700"
-                                        >
-                                            {item.label}
-                                            {item.hasMenu ? (
-                                                <ChevronDown size={16} />
-                                            ) : (
-                                                <ArrowUpRight size={16} />
-                                            )}
-                                        </a>
+                                        <div key={item.id}>
+                                            <a
+                                                href={item.href}
+                                                onClick={closeMenu}
+                                                className="flex min-h-12 items-center justify-between rounded-[10px] px-3 text-base font-medium text-slate-800 transition hover:bg-brand-50 hover:text-brand-700"
+                                            >
+                                                {item.label}
+                                                {item.children.length > 0 ? (
+                                                    <ChevronDown size={16} />
+                                                ) : (
+                                                    <ArrowUpRight size={16} />
+                                                )}
+                                            </a>
+                                            {item.children.map((child) => (
+                                                <a
+                                                    key={child.id}
+                                                    href={child.href}
+                                                    onClick={closeMenu}
+                                                    className="ml-4 flex min-h-10 items-center rounded-lg px-3 text-sm text-slate-600 hover:bg-brand-50 hover:text-brand-700"
+                                                >
+                                                    {child.label}
+                                                </a>
+                                            ))}
+                                        </div>
                                     ))}
                                 </nav>
                                 <div className="mt-auto grid gap-3 border-t border-slate-200 pt-6">
@@ -225,7 +248,7 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                     onClick={scrollToTop}
                     aria-label="Back to top"
                     title="Back to top"
-                    className="fixed right-6 bottom-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-[0_12px_28px_rgba(37,99,235,0.35)] transition duration-200 hover:-translate-y-1 hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/30"
+                    className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-[0_12px_28px_rgba(37,99,235,0.35)] transition duration-200 hover:-translate-y-1 hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/30"
                 >
                     <ArrowUp size={20} strokeWidth={2.5} />
                 </button>

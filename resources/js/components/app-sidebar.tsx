@@ -3,6 +3,7 @@ import {
     BookOpenIcon,
     CircleDotIcon,
     MegaphoneIcon,
+    Globe2Icon,
     DatabaseIcon,
     HelpCircleIcon,
     LayoutGrid,
@@ -186,6 +187,30 @@ export function AppSidebar() {
                       title: 'News & Updates',
                       href: '/superadmin/announcements',
                       icon: MegaphoneIcon,
+                  },
+              ]
+            : []),
+        ...(can('site_pages.view')
+            ? [
+                  {
+                      title: 'Public Website',
+                      href: '/superadmin/site/pages',
+                      icon: Globe2Icon,
+                      items: [
+                          { title: 'Pages', href: '/superadmin/site/pages' },
+                          {
+                              title: 'Pricing',
+                              href: '/superadmin/site/pricing',
+                          },
+                          {
+                              title: 'Navigation',
+                              href: '/superadmin/site/navigation',
+                          },
+                          {
+                              title: 'Media Library',
+                              href: '/superadmin/site/media',
+                          },
+                      ],
                   },
               ]
             : []),
