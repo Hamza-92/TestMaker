@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowRight, Check, ClipboardCheck } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
+import PublicSiteFooter from '@/components/public-site-footer';
 import SiteHeader from '@/components/site-header';
-import { dashboard, register } from '@/routes';
 import type { Auth } from '@/types/auth';
 import type {
     PricingContent,
@@ -242,7 +242,6 @@ export default function Pricing() {
         content,
         preview = false,
     } = usePage<PricingPageProps>().props;
-    const isAuthenticated = Boolean(auth?.user);
 
     return (
         <>
@@ -290,35 +289,7 @@ export default function Pricing() {
                     </section>
                     <PricingSections content={content} />
                 </main>
-                <footer className="bg-[#0b2035] px-5 py-8 text-white sm:px-8">
-                    <div className="mx-auto flex max-w-[1200px] flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                        <Link
-                            href="/"
-                            className="inline-flex items-center gap-2.5 font-display text-xl font-bold"
-                        >
-                            <ClipboardCheck size={24} aria-hidden="true" />
-                            TestMaker
-                        </Link>
-                        <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-blue-200">
-                            <Link href="/" className="hover:text-white">
-                                Home
-                            </Link>
-                            <Link href="/pricing" className="text-white">
-                                Pricing
-                            </Link>
-                            <Link
-                                href={
-                                    isAuthenticated ? dashboard() : register()
-                                }
-                                className="hover:text-white"
-                            >
-                                {isAuthenticated
-                                    ? 'Dashboard'
-                                    : 'Create an account'}
-                            </Link>
-                        </div>
-                    </div>
-                </footer>
+                <PublicSiteFooter />
             </div>
         </>
     );

@@ -14,6 +14,8 @@ use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
 use App\Http\Controllers\PublicPricingController;
+use App\Http\Controllers\PublicSiteMediaController;
+use App\Http\Controllers\PublicSitePageController;
 use App\Http\Controllers\QuestionImageController;
 use App\Http\Controllers\Superadmin\AnnouncementController;
 use App\Http\Controllers\Superadmin\ArabicSubjectController;
@@ -34,6 +36,9 @@ use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\QuestionTypePairingController;
 use App\Http\Controllers\Superadmin\SitePricingController;
+use App\Http\Controllers\Superadmin\SiteMediaController;
+use App\Http\Controllers\Superadmin\SiteNavigationController;
+use App\Http\Controllers\Superadmin\SitePageController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\SuperadminUserController;
 use App\Http\Controllers\Superadmin\TopicController;
@@ -41,6 +46,7 @@ use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
 use App\Http\Controllers\Superadmin\UserTransferController;
 use App\Support\PricingPageContent;
+use App\Support\SiteNavigation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -55,10 +61,12 @@ Route::get('/', function (Request $request) {
     return Inertia::render('welcome', [
         'canRegister' => Features::enabled(Features::registration()),
         'pricingContent' => PricingPageContent::published(),
+        'siteNavigation' => SiteNavigation::published(),
     ]);
 })->name('home');
 
 Route::get('/pricing', [PublicPricingController::class, 'index'])->name('pricing');
+Route::get('/site-media/{media}', [PublicSiteMediaController::class, 'show'])->name('site.media.show');
 
 Route::get('question-images/{image}', [QuestionImageController::class, 'show'])
     ->whereUuid('image')->name('question-images.show');
@@ -169,6 +177,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // â”€â”€â”€ Superadmin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::middleware('superadmin')->group(function () {
+
+        Route::get('superadmin/site/pages', [SitePageController::class, 'index'])->name('superadmin.site.pages')->middleware('permission:site_pages.view');
+        Route::post('superadmin/site/pages', [SitePageController::class, 'store'])->name('superadmin.site.pages.store')->middleware('permission:site_pages.edit');
+        Route::get('superadmin/site/pages/{page}/edit', [SitePageController::class, 'edit'])->name('superadmin.site.pages.edit')->middleware('permission:site_pages.view');
+        Route::get('superadmin/site/pages/{page}/preview', [SitePageController::class, 'preview'])->name('superadmin.site.pages.preview')->middleware('permission:site_pages.view');
+        Route::put('superadmin/site/pages/{page}', [SitePageController::class, 'update'])->name('superadmin.site.pages.update')->middleware('permission:site_pages.edit');
+        Route::post('superadmin/site/pages/{page}/revisions/{revision}/restore', [SitePageController::class, 'restoreRevision'])->name('superadmin.site.pages.revisions.restore')->middleware('permission:site_pages.edit');
+        Route::post('superadmin/site/pages/{page}/unpublish', [SitePageController::class, 'unpublish'])->name('superadmin.site.pages.unpublish')->middleware('permission:site_pages.edit');
+        Route::delete('superadmin/site/pages/{page}', [SitePageController::class, 'archive'])->name('superadmin.site.pages.archive')->middleware('permission:site_pages.edit');
+        Route::post('superadmin/site/pages/{id}/restore', [SitePageController::class, 'restoreArchived'])->name('superadmin.site.pages.restore')->middleware('permission:site_pages.edit');
+        Route::get('superadmin/site/navigation', [SiteNavigationController::class, 'edit'])->name('superadmin.site.navigation')->middleware('permission:site_pages.view');
+        Route::put('superadmin/site/navigation/{key}', [SiteNavigationController::class, 'update'])->name('superadmin.site.navigation.update')->middleware('permission:site_pages.edit');
+        Route::get('superadmin/site/media', [SiteMediaController::class, 'index'])->name('superadmin.site.media')->middleware('permission:site_pages.view');
+        Route::post('superadmin/site/media', [SiteMediaController::class, 'store'])->name('superadmin.site.media.store')->middleware('permission:site_pages.edit');
+        Route::put('superadmin/site/media/{media}', [SiteMediaController::class, 'update'])->name('superadmin.site.media.update')->middleware('permission:site_pages.edit');
+        Route::delete('superadmin/site/media/{media}', [SiteMediaController::class, 'destroy'])->name('superadmin.site.media.destroy')->middleware('permission:site_pages.edit');
 
         Route::get('superadmin/site/pricing', [SitePricingController::class, 'edit'])->name('superadmin.site.pricing')->middleware('permission:site_pages.view');
         Route::get('superadmin/site/pricing/preview', [SitePricingController::class, 'preview'])->name('superadmin.site.pricing.preview')->middleware('permission:site_pages.view');
@@ -458,3 +482,7 @@ Route::post('take-test/attempt/{attemptToken}/submit', [PublicOnlineTestControll
 Route::get('take-test/attempt/{attemptToken}/complete', [PublicOnlineTestController::class, 'complete'])->name('online-tests.public.complete');
 
 require __DIR__.'/settings.php';
+
+Route::get('/{slug}', [PublicSitePageController::class, 'show'])
+    ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+    ->name('site.public.page');

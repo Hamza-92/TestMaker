@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SitePage extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'slug', 'template', 'draft_content', 'published_content', 'version', 'published_at',
     ];

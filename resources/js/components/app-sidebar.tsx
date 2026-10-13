@@ -194,8 +194,23 @@ export function AppSidebar() {
             ? [
                   {
                       title: 'Public Website',
-                      href: '/superadmin/site/pricing',
+                      href: '/superadmin/site/pages',
                       icon: Globe2Icon,
+                      items: [
+                          { title: 'Pages', href: '/superadmin/site/pages' },
+                          {
+                              title: 'Pricing',
+                              href: '/superadmin/site/pricing',
+                          },
+                          {
+                              title: 'Navigation',
+                              href: '/superadmin/site/navigation',
+                          },
+                          {
+                              title: 'Media Library',
+                              href: '/superadmin/site/media',
+                          },
+                      ],
                   },
               ]
             : []),

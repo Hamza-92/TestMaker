@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Superadmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\SitePage;
 use App\Models\SitePageRevision;
 use App\Support\PricingPageContent;
+use App\Support\SiteNavigation;
+use App\Support\SitePageWorkflow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,6 +32,7 @@ class SitePricingController extends Controller
         return Inertia::render('pricing', [
             'content' => PricingPageContent::page()->draft_content,
             'preview' => true,
+            'siteNavigation' => SiteNavigation::published(),
         ]);
     }
 
@@ -50,57 +50,17 @@ class SitePricingController extends Controller
         }
         unset($plan);
 
-        DB::transaction(function () use ($request, $data) {
-            $page = PricingPageContent::page();
-            $page = SitePage::query()->whereKey($page->id)->lockForUpdate()->firstOrFail();
-
-            if ($page->version !== $data['version']) {
-                throw ValidationException::withMessages([
-                    'version' => 'This page changed since you opened it. Reload before saving.',
-                ]);
-            }
-
-            $page->draft_content = $data['content'];
-            $page->version++;
-
-            if ($data['publish']) {
-                $page->published_content = $data['content'];
-                $page->published_at = now();
-            }
-
-            $page->save();
-
-            if ($data['publish']) {
-                $page->revisions()->create([
-                    'number' => (int) $page->revisions()->max('number') + 1,
-                    'content' => $data['content'],
-                    'published_by' => $request->user()->id,
-                    'created_at' => now(),
-                ]);
-            }
-        });
+        SitePageWorkflow::save(
+            PricingPageContent::page(), $data['content'], $data['version'], $data['publish'], $request->user()->id,
+        );
 
         return back()->with('success', $data['publish'] ? 'Pricing page published.' : 'Pricing draft saved.');
     }
 
     public function restore(Request $request, SitePageRevision $revision): RedirectResponse
     {
-        DB::transaction(function () use ($request, $revision) {
-            $page = PricingPageContent::page();
-            $page = SitePage::query()->whereKey($page->id)->lockForUpdate()->firstOrFail();
-            abort_unless($revision->site_page_id === $page->id, 404);
-
-            $data = $request->validate(['version' => ['required', 'integer', 'min:1']]);
-            if ($page->version !== $data['version']) {
-                throw ValidationException::withMessages([
-                    'version' => 'This page changed since you opened it. Reload before restoring.',
-                ]);
-            }
-
-            $page->draft_content = $revision->content;
-            $page->version++;
-            $page->save();
-        });
+        $data = $request->validate(['version' => ['required', 'integer', 'min:1']]);
+        SitePageWorkflow::restore(PricingPageContent::page(), $revision, $data['version']);
 
         return back()->with('success', 'Revision restored to the draft. Publish when ready.');
     }

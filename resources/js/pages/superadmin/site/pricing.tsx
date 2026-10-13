@@ -11,7 +11,8 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useId, useState } from 'react';
-import { Button, Card, PageHeader } from '@/components/tm';
+import SiteSectionNav from '@/components/site-section-nav';
+import { Button, Card, PageHeader, Tabs } from '@/components/tm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -42,6 +43,15 @@ const sectionNames: Record<PricingSection, string> = {
     faq: 'Questions & answers',
     cta: 'Final call to action',
 };
+
+type PricingPanel =
+    | 'layout'
+    | 'plans'
+    | 'benefits'
+    | 'faq'
+    | 'cta'
+    | 'seo'
+    | 'history';
 
 function TextField({
     label,
@@ -130,6 +140,7 @@ export default function SitePricingEditor({
     const [content, setContent] = useState<PricingContent>(initialContent);
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [panel, setPanel] = useState<PricingPanel>('layout');
     const dirty = JSON.stringify(content) !== JSON.stringify(initialContent);
 
     function patchGroup<
@@ -241,6 +252,7 @@ export default function SitePricingEditor({
         <>
             <Head title="Pricing · Public Website" />
             <div className="space-y-6 p-4 pb-28 md:p-6">
+                <SiteSectionNav />
                 <PageHeader
                     title="Pricing page"
                     meta={
@@ -296,8 +308,25 @@ export default function SitePricingEditor({
                     </div>
                 )}
 
+                <div className="overflow-x-auto">
+                    <Tabs
+                        items={[
+                            { value: 'layout', label: 'Layout' },
+                            { value: 'plans', label: 'Plans' },
+                            { value: 'benefits', label: 'Benefits' },
+                            { value: 'faq', label: 'Questions' },
+                            { value: 'cta', label: 'Final CTA' },
+                            { value: 'seo', label: 'Search' },
+                            { value: 'history', label: 'History' },
+                        ]}
+                        value={panel}
+                        onChange={setPanel}
+                    />
+                </div>
                 <fieldset disabled={locked} className="space-y-6">
-                    <Card className="space-y-4">
+                    <Card
+                        className={panel === 'layout' ? 'space-y-4' : 'hidden'}
+                    >
                         <h2 className="text-lg font-semibold">Page heading</h2>
                         <div className="grid gap-4 md:grid-cols-2">
                             <TextField
@@ -388,7 +417,9 @@ export default function SitePricingEditor({
                         </div>
                     </Card>
 
-                    <Card className="space-y-4">
+                    <Card
+                        className={panel === 'layout' ? 'space-y-4' : 'hidden'}
+                    >
                         <h2 className="text-lg font-semibold">
                             Section order and visibility
                         </h2>
@@ -444,7 +475,9 @@ export default function SitePricingEditor({
                         </div>
                     </Card>
 
-                    <Card className="space-y-4">
+                    <Card
+                        className={panel === 'plans' ? 'space-y-4' : 'hidden'}
+                    >
                         <h2 className="text-lg font-semibold">Plans section</h2>
                         <div className="grid gap-4 md:grid-cols-2">
                             <TextField
@@ -487,7 +520,9 @@ export default function SitePricingEditor({
                         />
                     </Card>
 
-                    <Card className="space-y-5">
+                    <Card
+                        className={panel === 'plans' ? 'space-y-5' : 'hidden'}
+                    >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h2 className="text-lg font-semibold">
@@ -798,7 +833,11 @@ export default function SitePricingEditor({
                         </div>
                     </Card>
 
-                    <Card className="space-y-4">
+                    <Card
+                        className={
+                            panel === 'benefits' ? 'space-y-4' : 'hidden'
+                        }
+                    >
                         <h2 className="text-lg font-semibold">Benefits</h2>
                         <TextField
                             label="Section title"
@@ -886,7 +925,7 @@ export default function SitePricingEditor({
                         </Button>
                     </Card>
 
-                    <Card className="space-y-4">
+                    <Card className={panel === 'faq' ? 'space-y-4' : 'hidden'}>
                         <h2 className="text-lg font-semibold">
                             Questions & answers
                         </h2>
@@ -979,7 +1018,7 @@ export default function SitePricingEditor({
                         </Button>
                     </Card>
 
-                    <Card className="space-y-4">
+                    <Card className={panel === 'cta' ? 'space-y-4' : 'hidden'}>
                         <h2 className="text-lg font-semibold">
                             Final call to action
                         </h2>
@@ -1025,7 +1064,7 @@ export default function SitePricingEditor({
                         </div>
                     </Card>
 
-                    <Card className="space-y-4">
+                    <Card className={panel === 'seo' ? 'space-y-4' : 'hidden'}>
                         <h2 className="text-lg font-semibold">
                             Search listing
                         </h2>
@@ -1047,7 +1086,7 @@ export default function SitePricingEditor({
                     </Card>
                 </fieldset>
 
-                <Card className="space-y-3">
+                <Card className={panel === 'history' ? 'space-y-3' : 'hidden'}>
                     <h2 className="text-lg font-semibold">
                         Published versions
                     </h2>
