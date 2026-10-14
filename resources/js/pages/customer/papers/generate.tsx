@@ -709,6 +709,57 @@ interface PaperQuestionEditorTarget {
     questionId: string;
 }
 
+function findSectionQuestion(
+    section: GeneratedPaperSection | undefined,
+    questionId: string,
+): { question: GeneratedPaperQuestion; questionTypeId: number | null } | null {
+    if (!section) {
+        return null;
+    }
+
+    const question = section.questions.find((item) => item.id === questionId);
+
+    if (question) {
+        return { question, questionTypeId: section.questionTypeId };
+    }
+
+    for (const row of section.multipart?.rows ?? []) {
+        const part = row.parts.find((item) => item.question.id === questionId);
+
+        if (part) {
+            return { question: part.question, questionTypeId: part.typeId };
+        }
+    }
+
+    return null;
+}
+
+function updateSectionQuestion(
+    section: GeneratedPaperSection,
+    questionId: string,
+    update: (question: GeneratedPaperQuestion) => GeneratedPaperQuestion,
+): GeneratedPaperSection {
+    return {
+        ...section,
+        questions: section.questions.map((question) =>
+            question.id === questionId ? update(question) : question,
+        ),
+        multipart: section.multipart
+            ? {
+                  ...section.multipart,
+                  rows: section.multipart.rows.map((row) => ({
+                      ...row,
+                      parts: row.parts.map((part) =>
+                          part.question.id === questionId
+                              ? { ...part, question: update(part.question) }
+                              : part,
+                      ),
+                  })),
+              }
+            : section.multipart,
+    };
+}
+
 interface PaperQuestionPoolFilters {
     chapterIds: number[];
     topicIds: number[];
@@ -3998,15 +4049,16 @@ export default function GeneratePaper({
         const section = generatedPaper.sections.find(
             (item) => item.id === paperQuestionPickerTarget.sectionId,
         );
-        const question = section?.questions.find(
-            (item) => item.id === paperQuestionPickerTarget.questionId,
+        const match = findSectionQuestion(
+            section,
+            paperQuestionPickerTarget.questionId,
         );
 
-        if (!section || !question || section.questionTypeId === null) {
+        if (!section || !match || match.questionTypeId === null) {
             return null;
         }
 
-        return { section, question };
+        return { section, ...match };
     }, [generatedPaper, paperQuestionPickerTarget]);
     const activePaperSectionEditorContext = useMemo(() => {
         if (!generatedPaper || !paperSectionEditorTarget) {
@@ -4027,26 +4079,25 @@ export default function GeneratePaper({
         const section = generatedPaper.sections.find(
             (item) => item.id === paperQuestionEditorTarget.sectionId,
         );
-        const question = section?.questions.find(
-            (item) => item.id === paperQuestionEditorTarget.questionId,
+        const match = findSectionQuestion(
+            section,
+            paperQuestionEditorTarget.questionId,
         );
 
-        if (!section || !question) {
+        if (!section || !match) {
             return null;
         }
 
-        return { section, question };
+        return { section, ...match };
     }, [generatedPaper, paperQuestionEditorTarget]);
     const filteredPaperPickerQuestions = useMemo(() => {
-        if (!activePaperPickerContext?.section.questionTypeId) {
+        if (!activePaperPickerContext?.questionTypeId) {
             return [];
         }
 
         const search = paperQuestionSearch.trim().toLowerCase();
         const pool =
-            questionPoolsByType[
-                activePaperPickerContext.section.questionTypeId
-            ] ?? [];
+            questionPoolsByType[activePaperPickerContext.questionTypeId] ?? [];
 
         return pool.filter((question) => {
             const matchesSearch =
@@ -4071,7 +4122,7 @@ export default function GeneratePaper({
             return matchesSearch;
         });
     }, [
-        activePaperPickerContext?.section.questionTypeId,
+        activePaperPickerContext?.questionTypeId,
         paperQuestionSearch,
         questionPoolsByType,
     ]);
@@ -7030,15 +7081,11 @@ export default function GeneratePaper({
                       ...current,
                       sections: current.sections.map((section) =>
                           section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? { ...question, text: value }
-                                                : question,
-                                    ),
-                                }
+                              ? updateSectionQuestion(
+                                    section,
+                                    questionId,
+                                    (question) => ({ ...question, text: value }),
+                                )
                               : section,
                       ),
                   }
@@ -7057,15 +7104,11 @@ export default function GeneratePaper({
                       ...current,
                       sections: current.sections.map((section) =>
                           section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? { ...question, imageSize }
-                                                : question,
-                                    ),
-                                }
+                              ? updateSectionQuestion(
+                                    section,
+                                    questionId,
+                                    (question) => ({ ...question, imageSize }),
+                                )
                               : section,
                       ),
                   }
@@ -7084,18 +7127,11 @@ export default function GeneratePaper({
                       ...current,
                       sections: current.sections.map((section) =>
                           section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? {
-                                                      ...question,
-                                                      answerLines,
-                                                  }
-                                                : question,
-                                    ),
-                                }
+                              ? updateSectionQuestion(
+                                    section,
+                                    questionId,
+                                    (question) => ({ ...question, answerLines }),
+                                )
                               : section,
                       ),
                   }
@@ -7114,18 +7150,14 @@ export default function GeneratePaper({
                       ...current,
                       sections: current.sections.map((section) =>
                           section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? {
-                                                      ...question,
-                                                      answerLineSpacing,
-                                                  }
-                                                : question,
-                                    ),
-                                }
+                              ? updateSectionQuestion(
+                                    section,
+                                    questionId,
+                                    (question) => ({
+                                        ...question,
+                                        answerLineSpacing,
+                                    }),
+                                )
                               : section,
                       ),
                   }
@@ -7165,24 +7197,20 @@ export default function GeneratePaper({
                       ...current,
                       sections: current.sections.map((section) =>
                           section.id === sectionId
-                              ? {
-                                    ...section,
-                                    questions: section.questions.map(
-                                        (question) =>
-                                            question.id === questionId
-                                                ? {
-                                                      ...paperQuestionFromManual(
-                                                          replacement,
-                                                          question.id,
-                                                      ),
-                                                      imageSize:
-                                                          question.imageSize,
-                                                      answerLines:
-                                                          question.answerLines,
-                                                  }
-                                                : question,
-                                    ),
-                                }
+                              ? updateSectionQuestion(
+                                    section,
+                                    questionId,
+                                    (question) => ({
+                                        ...paperQuestionFromManual(
+                                            replacement,
+                                            question.id,
+                                        ),
+                                        imageSize: question.imageSize,
+                                        answerLines: question.answerLines,
+                                        answerLineSpacing:
+                                            question.answerLineSpacing,
+                                    }),
+                                )
                               : section,
                       ),
                   }
@@ -7198,22 +7226,20 @@ export default function GeneratePaper({
         const section = generatedPaper.sections.find(
             (item) => item.id === sectionId,
         );
-        const currentQuestion = section?.questions.find(
-            (item) => item.id === questionId,
-        );
+        const match = findSectionQuestion(section, questionId);
 
-        if (!section || !currentQuestion || section.questionTypeId === null) {
+        if (!match || match.questionTypeId === null) {
             return;
         }
 
         const usedIds = new Set(generatedSourceQuestionIds);
 
-        if (currentQuestion.sourceQuestionId !== null) {
-            usedIds.delete(currentQuestion.sourceQuestionId);
+        if (match.question.sourceQuestionId !== null) {
+            usedIds.delete(match.question.sourceQuestionId);
         }
 
         const candidates = (
-            questionPoolsByType[section.questionTypeId] ?? []
+            questionPoolsByType[match.questionTypeId] ?? []
         ).filter((question) => !usedIds.has(question.id));
         const replacement = shuffledQuestions(candidates)[0];
 
@@ -14266,6 +14292,14 @@ export function GeneratedPaperView({
                         sectionIndex,
                     )}
                     showHeading={sectionIndex === firstMultipartIndex}
+                    interactive={interactive}
+                    onEditQuestion={onEditQuestion}
+                    onRandomQuestion={onRandomQuestion}
+                    onPickQuestion={onPickQuestion}
+                    onAnswerLinesChange={onQuestionAnswerLinesChange}
+                    onAnswerLineSpacingChange={
+                        onQuestionAnswerLineSpacingChange
+                    }
                 />
             );
         }

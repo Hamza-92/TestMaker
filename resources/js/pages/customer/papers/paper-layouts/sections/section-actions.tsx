@@ -23,7 +23,7 @@ interface QuestionHoverActionsProps {
     onRandom: () => void;
     onPick: () => void;
     onEdit: () => void;
-    onDelete: () => void;
+    onDelete?: () => void;
     onAnswerLinesChange: (value: number) => void;
     onAnswerLineSpacingChange?: (value: number) => void;
 }
@@ -68,13 +68,15 @@ export function QuestionHoverActions({
                         </ActionButton>
                     </>
                 )}
-                <ActionButton
-                    label="Delete question"
-                    variant="danger"
-                    onClick={() => setConfirmAction('delete')}
-                >
-                    <Trash2Icon className="size-4" />
-                </ActionButton>
+                {onDelete && (
+                    <ActionButton
+                        label="Delete question"
+                        variant="danger"
+                        onClick={() => setConfirmAction('delete')}
+                    >
+                        <Trash2Icon className="size-4" />
+                    </ActionButton>
+                )}
                 <ActionButton
                     label="Edit question"
                     variant="primary"
@@ -164,7 +166,7 @@ export function QuestionHoverActions({
                     )}
             </div>
 
-            {confirmAction === 'delete' && (
+            {confirmAction === 'delete' && onDelete && (
                 <ConfirmDialog
                     variant="danger"
                     title="Remove Question"

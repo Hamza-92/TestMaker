@@ -3,19 +3,33 @@ import {
     splitBilingualParts,
 } from '../questions/bilingual-question-row';
 import { QuestionContent } from '../questions/question-content';
+import type { SectionTemplateProps } from '../templates/template-props';
 import { paperPartLabel } from '../types';
 import type { GeneratedPaperSection } from '../types';
+import { QuestionHoverActions } from './section-actions';
 
 interface Props {
     section: GeneratedPaperSection;
     headingNumber: number | null;
     showHeading: boolean;
+    interactive: boolean;
+    onEditQuestion: SectionTemplateProps['onEditQuestion'];
+    onRandomQuestion: SectionTemplateProps['onRandomQuestion'];
+    onPickQuestion: SectionTemplateProps['onPickQuestion'];
+    onAnswerLinesChange: SectionTemplateProps['onAnswerLinesChange'];
+    onAnswerLineSpacingChange: SectionTemplateProps['onAnswerLineSpacingChange'];
 }
 
 export function MultipartSection({
     section,
     headingNumber,
     showHeading,
+    interactive,
+    onEditQuestion,
+    onRandomQuestion,
+    onPickQuestion,
+    onAnswerLinesChange,
+    onAnswerLineSpacingChange,
 }: Props) {
     const multipart = section.multipart;
 
@@ -110,7 +124,7 @@ export function MultipartSection({
                             }
                         />
                         {showChoice && (
-                            <span className="ml-1 align-baseline whitespace-nowrap">
+                            <span className="ml-1 whitespace-nowrap align-baseline">
                                 {isUrduHeading
                                     ? choiceLabelUrdu
                                     : choiceLabelEnglish}
@@ -120,7 +134,7 @@ export function MultipartSection({
                     {(isBilingualHeading || choiceMarksLabel !== '') && (
                         <div
                             dir="ltr"
-                            className="shrink-0 text-center whitespace-nowrap"
+                            className="shrink-0 whitespace-nowrap text-center"
                         >
                             {choiceMarksLabel.trim()}
                         </div>
@@ -138,7 +152,7 @@ export function MultipartSection({
                                 className="text-right align-baseline"
                             />
                             {showChoice && (
-                                <span className="mr-1 align-baseline whitespace-nowrap">
+                                <span className="mr-1 whitespace-nowrap align-baseline">
                                     {choiceLabelUrdu}
                                 </span>
                             )}
@@ -148,7 +162,7 @@ export function MultipartSection({
             )}{' '}
             <div
                 data-paper-question-group="multipart"
-                className="space-y-0.5 px-2 pt-2 pb-1"
+                className="space-y-0.5 px-2 pb-1 pt-2"
             >
                 {multipart.rows.map((row, rowIndex) => (
                     <div
@@ -210,7 +224,7 @@ export function MultipartSection({
                             return (
                                 <div
                                     key={`${rowIndex}-${part.key}`}
-                                    className="break-inside-avoid"
+                                    className="group/question relative break-inside-avoid"
                                 >
                                     {hasBilingualContent ? (
                                         questionRow
@@ -224,6 +238,69 @@ export function MultipartSection({
                                             </div>
                                             {partMarks}
                                         </div>
+                                    )}
+                                    {part.question.answerLines > 0 && (
+                                        <div className="mt-2 flex flex-col">
+                                            {Array.from({
+                                                length: part.question
+                                                    .answerLines,
+                                            }).map((_, lineIndex) => (
+                                                <div
+                                                    key={lineIndex}
+                                                    style={{
+                                                        height: `${part.question.answerLineSpacing ?? 20}px`,
+                                                    }}
+                                                    className="border-b border-dotted border-slate-400"
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                    {interactive && (
+                                        <QuestionHoverActions
+                                            canSwap={part.typeId !== null}
+                                            showAnswerLines
+                                            answerLines={
+                                                part.question.answerLines
+                                            }
+                                            answerLineSpacing={
+                                                part.question
+                                                    .answerLineSpacing ?? 20
+                                            }
+                                            onRandom={() =>
+                                                onRandomQuestion(
+                                                    section.id,
+                                                    part.question.id,
+                                                )
+                                            }
+                                            onPick={() =>
+                                                onPickQuestion(
+                                                    section.id,
+                                                    part.question.id,
+                                                )
+                                            }
+                                            onEdit={() =>
+                                                onEditQuestion(
+                                                    section.id,
+                                                    part.question.id,
+                                                )
+                                            }
+                                            onAnswerLinesChange={(value) =>
+                                                onAnswerLinesChange(
+                                                    section.id,
+                                                    part.question.id,
+                                                    value,
+                                                )
+                                            }
+                                            onAnswerLineSpacingChange={(
+                                                value,
+                                            ) =>
+                                                onAnswerLineSpacingChange(
+                                                    section.id,
+                                                    part.question.id,
+                                                    value,
+                                                )
+                                            }
+                                        />
                                     )}
                                 </div>
                             );
