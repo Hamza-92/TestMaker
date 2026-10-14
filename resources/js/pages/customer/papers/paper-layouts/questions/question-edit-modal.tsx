@@ -2,32 +2,6 @@ import { Editor } from '@tinymce/tinymce-react';
 import { XIcon } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { Editor as TinyMCEEditor } from 'tinymce';
-import 'tinymce/tinymce';
-import 'tinymce/icons/default';
-import 'tinymce/models/dom';
-import 'tinymce/themes/silver';
-import 'tinymce/plugins/advlist';
-import 'tinymce/plugins/anchor';
-import 'tinymce/plugins/autolink';
-import 'tinymce/plugins/autoresize';
-import 'tinymce/plugins/charmap';
-import 'tinymce/plugins/code';
-import 'tinymce/plugins/codesample';
-import 'tinymce/plugins/directionality';
-import 'tinymce/plugins/fullscreen';
-import 'tinymce/plugins/help';
-import 'tinymce/plugins/image';
-import 'tinymce/plugins/link';
-import 'tinymce/plugins/lists';
-import 'tinymce/plugins/nonbreaking';
-import 'tinymce/plugins/pagebreak';
-import 'tinymce/plugins/preview';
-import 'tinymce/plugins/quickbars';
-import 'tinymce/plugins/searchreplace';
-import 'tinymce/plugins/table';
-import 'tinymce/plugins/visualblocks';
-import 'tinymce/plugins/visualchars';
-import 'tinymce/plugins/wordcount';
 import type { GeneratedPaperQuestion } from '../types';
 import {
     createEquationHtml,
@@ -47,6 +21,48 @@ interface QuestionEditModalProps {
 interface EquationDialogState {
     latex: string;
     displayMode: boolean;
+}
+
+let editorLoadPromise: Promise<void> | null = null;
+
+function loadEditor() {
+    editorLoadPromise ??= import('tinymce/tinymce')
+        .then(async () => {
+            await Promise.all([
+                import('tinymce/icons/default'),
+                import('tinymce/models/dom'),
+                import('tinymce/themes/silver'),
+                import('tinymce/plugins/advlist'),
+                import('tinymce/plugins/anchor'),
+                import('tinymce/plugins/autolink'),
+                import('tinymce/plugins/autoresize'),
+                import('tinymce/plugins/charmap'),
+                import('tinymce/plugins/code'),
+                import('tinymce/plugins/codesample'),
+                import('tinymce/plugins/directionality'),
+                import('tinymce/plugins/fullscreen'),
+                import('tinymce/plugins/help'),
+                import('tinymce/plugins/image'),
+                import('tinymce/plugins/link'),
+                import('tinymce/plugins/lists'),
+                import('tinymce/plugins/nonbreaking'),
+                import('tinymce/plugins/pagebreak'),
+                import('tinymce/plugins/preview'),
+                import('tinymce/plugins/quickbars'),
+                import('tinymce/plugins/searchreplace'),
+                import('tinymce/plugins/table'),
+                import('tinymce/plugins/visualblocks'),
+                import('tinymce/plugins/visualchars'),
+                import('tinymce/plugins/wordcount'),
+            ]);
+        })
+        .catch((error: unknown) => {
+            editorLoadPromise = null;
+
+            throw error;
+        });
+
+    return editorLoadPromise;
 }
 
 const EquationDialog = lazy(() =>
@@ -101,8 +117,33 @@ export function QuestionEditModal({
     );
     const [equationDialog, setEquationDialog] =
         useState<EquationDialogState | null>(null);
+    const [editorStatus, setEditorStatus] = useState<
+        'loading' | 'ready' | 'error'
+    >('loading');
+    const [loadAttempt, setLoadAttempt] = useState(0);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+
+        void loadEditor().then(
+            () => {
+                if (!cancelled) {
+                    setEditorStatus('ready');
+                }
+            },
+            () => {
+                if (!cancelled) {
+                    setEditorStatus('error');
+                }
+            },
+        );
+
+        return () => {
+            cancelled = true;
+        };
+    }, [loadAttempt]);
 
     useEffect(() => {
         function closeOnEscape(event: KeyboardEvent) {
@@ -208,111 +249,140 @@ export function QuestionEditModal({
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-5">
-                    <Editor
-                        licenseKey="gpl"
-                        initialValue={initialValue}
-                        onInit={(_event, editor) => {
-                            editorRef.current = editor;
-                        }}
-                        init={{
-                            branding: false,
-                            browser_spellcheck: true,
-                            content_css:
-                                '/vendor/tinymce/skins/content/default/content.min.css',
-                            content_style: editorContentStyle,
-                            contextmenu:
-                                'link image table | inserttable cell row column deletetable | equation',
-                            extended_valid_elements:
-                                'span[class|style|data-latex|data-display|contenteditable|title|aria-hidden|role]',
-                            font_family_formats:
-                                'Arial=arial,helvetica,sans-serif;Montserrat=Montserrat,arial,sans-serif;Times New Roman=times new roman,times,serif;Georgia=georgia,palatino,serif;Courier New=courier new,courier,monospace;Noto Nastaliq Urdu=Noto Nastaliq Urdu,serif',
-                            font_size_formats:
-                                '8pt 9pt 10pt 11pt 12pt 14pt 16pt 18pt 20pt 24pt 28pt 32pt 36pt',
-                            height: 460,
-                            image_advtab: true,
-                            images_upload_handler: imageUploadUrl
-                                ? async (blobInfo) => {
-                                      const form = new FormData();
-                                      form.append(
-                                          'file',
-                                          blobInfo.blob(),
-                                          blobInfo.filename(),
-                                      );
-                                      const token =
-                                          document.querySelector<HTMLMetaElement>(
-                                              'meta[name="csrf-token"]',
-                                          )?.content ?? '';
-                                      const response = await fetch(
-                                          imageUploadUrl,
-                                          {
-                                              method: 'POST',
-                                              credentials: 'same-origin',
-                                              headers: {
-                                                  Accept: 'application/json',
-                                                  'X-CSRF-TOKEN': token,
+                    {editorStatus === 'loading' && (
+                        <div
+                            role="status"
+                            className="py-12 text-center text-sm text-slate-500"
+                        >
+                            Loading question editor…
+                        </div>
+                    )}
+                    {editorStatus === 'error' && (
+                        <div
+                            role="alert"
+                            className="py-12 text-center text-sm text-rose-600"
+                        >
+                            Question editor could not load.{' '}
+                            <button
+                                type="button"
+                                className="font-semibold underline"
+                                onClick={() => {
+                                    setEditorStatus('loading');
+                                    setLoadAttempt((attempt) => attempt + 1);
+                                }}
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
+                    {editorStatus === 'ready' && (
+                        <Editor
+                            licenseKey="gpl"
+                            initialValue={initialValue}
+                            onInit={(_event, editor) => {
+                                editorRef.current = editor;
+                            }}
+                            init={{
+                                branding: false,
+                                browser_spellcheck: true,
+                                content_css:
+                                    '/vendor/tinymce/skins/content/default/content.min.css',
+                                content_style: editorContentStyle,
+                                contextmenu:
+                                    'link image table | inserttable cell row column deletetable | equation',
+                                extended_valid_elements:
+                                    'span[class|style|data-latex|data-display|contenteditable|title|aria-hidden|role]',
+                                font_family_formats:
+                                    'Arial=arial,helvetica,sans-serif;Montserrat=Montserrat,arial,sans-serif;Times New Roman=times new roman,times,serif;Georgia=georgia,palatino,serif;Courier New=courier new,courier,monospace;Noto Nastaliq Urdu=Noto Nastaliq Urdu,serif',
+                                font_size_formats:
+                                    '8pt 9pt 10pt 11pt 12pt 14pt 16pt 18pt 20pt 24pt 28pt 32pt 36pt',
+                                height: 460,
+                                image_advtab: true,
+                                images_upload_handler: imageUploadUrl
+                                    ? async (blobInfo) => {
+                                          const form = new FormData();
+                                          form.append(
+                                              'file',
+                                              blobInfo.blob(),
+                                              blobInfo.filename(),
+                                          );
+                                          const token =
+                                              document.querySelector<HTMLMetaElement>(
+                                                  'meta[name="csrf-token"]',
+                                              )?.content ?? '';
+                                          const response = await fetch(
+                                              imageUploadUrl,
+                                              {
+                                                  method: 'POST',
+                                                  credentials: 'same-origin',
+                                                  headers: {
+                                                      Accept: 'application/json',
+                                                      'X-CSRF-TOKEN': token,
+                                                  },
+                                                  body: form,
                                               },
-                                              body: form,
-                                          },
-                                      );
-
-                                      if (!response.ok) {
-                                          throw new Error(
-                                              'Image upload failed',
                                           );
+
+                                          if (!response.ok) {
+                                              throw new Error(
+                                                  'Image upload failed',
+                                              );
+                                          }
+
+                                          const result =
+                                              (await response.json()) as {
+                                                  location?: string;
+                                              };
+
+                                          if (!result.location) {
+                                              throw new Error(
+                                                  'Image upload returned no URL',
+                                              );
+                                          }
+
+                                          return result.location;
                                       }
+                                    : undefined,
+                                menubar:
+                                    'edit insert format table tools view help',
+                                paste_data_images: true,
+                                plugins: editorPlugins,
+                                promotion: false,
+                                quickbars_insert_toolbar:
+                                    'quicktable image equation codesample',
+                                quickbars_selection_toolbar:
+                                    'bold italic underline | quicklink h2 h3 blockquote | equation',
+                                skin_url: '/vendor/tinymce/skins/ui/oxide',
+                                toolbar: editorToolbar,
+                                toolbar_mode: 'wrap',
+                                valid_children: '+span[span|sup|sub]',
+                                setup: (editor) => {
+                                    editor.ui.registry.addButton('equation', {
+                                        text: 'fx',
+                                        tooltip: 'Insert equation',
+                                        onAction: () => openEquationDialog(),
+                                    });
 
-                                      const result =
-                                          (await response.json()) as {
-                                              location?: string;
-                                          };
+                                    editor.ui.registry.addMenuItem('equation', {
+                                        text: 'Insert equation',
+                                        onAction: () => openEquationDialog(),
+                                    });
 
-                                      if (!result.location) {
-                                          throw new Error(
-                                              'Image upload returned no URL',
-                                          );
-                                      }
+                                    editor.on('DblClick', (event) => {
+                                        const target = event.target as Node;
+                                        const element = editor.dom.getParent(
+                                            target,
+                                            '.tm-equation',
+                                        ) as HTMLElement | null;
 
-                                      return result.location;
-                                  }
-                                : undefined,
-                            menubar: 'edit insert format table tools view help',
-                            paste_data_images: true,
-                            plugins: editorPlugins,
-                            promotion: false,
-                            quickbars_insert_toolbar:
-                                'quicktable image equation codesample',
-                            quickbars_selection_toolbar:
-                                'bold italic underline | quicklink h2 h3 blockquote | equation',
-                            skin_url: '/vendor/tinymce/skins/ui/oxide',
-                            toolbar: editorToolbar,
-                            toolbar_mode: 'wrap',
-                            valid_children: '+span[span|sup|sub]',
-                            setup: (editor) => {
-                                editor.ui.registry.addButton('equation', {
-                                    text: 'fx',
-                                    tooltip: 'Insert equation',
-                                    onAction: () => openEquationDialog(),
-                                });
-
-                                editor.ui.registry.addMenuItem('equation', {
-                                    text: 'Insert equation',
-                                    onAction: () => openEquationDialog(),
-                                });
-
-                                editor.on('DblClick', (event) => {
-                                    const target = event.target as Node;
-                                    const element = editor.dom.getParent(
-                                        target,
-                                        '.tm-equation',
-                                    ) as HTMLElement | null;
-
-                                    if (element) {
-                                        openEquationDialog(element);
-                                    }
-                                });
-                            },
-                        }}
-                    />
+                                        if (element) {
+                                            openEquationDialog(element);
+                                        }
+                                    });
+                                },
+                            }}
+                        />
+                    )}
                 </div>
 
                 <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-800">
@@ -334,7 +404,7 @@ export function QuestionEditModal({
                     <button
                         type="button"
                         onClick={handleSave}
-                        disabled={saving}
+                        disabled={saving || editorStatus !== 'ready'}
                         className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                     >
                         {saving ? 'Saving…' : saveLabel}
