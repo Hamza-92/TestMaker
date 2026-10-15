@@ -21,13 +21,14 @@ import {
     WalletIcon,
     XCircleIcon,
 } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { usePermission } from '@/hooks/use-permission';
+import { useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { usePermission } from '@/hooks/use-permission';
 import { cn } from '@/lib/utils';
 
 type CustomerStatus = 'active' | 'inactive' | 'suspended';
@@ -385,6 +386,7 @@ export default function ShowCustomer({
     const location = [customer.city, customer.province].filter(Boolean).join(', ');
     const address = customer.is_show_address ? customer.address : null;
     const activeSubscriptions = customer.subscriptions.filter((subscription) => subscription.status === 'active');
+    const totalFinalized = customer.subscriptions.reduce((sum, subscription) => sum + Number(subscription.amount), 0);
 
     const totalPaid = paymentLogs
         .filter((log) => log.status === 'approved')
@@ -559,13 +561,27 @@ export default function ShowCustomer({
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                                        <MetricCard
+                                            icon={<CreditCardIcon className="size-4 text-violet-700" />}
+                                            label="Finalized"
+                                            value={money(totalFinalized)}
+                                            meta="Total value of all plans"
+                                            toneClass="bg-violet-100 text-violet-700"
+                                        />
                                         <MetricCard
                                             icon={<TrendingUpIcon className="size-4 text-emerald-700" />}
                                             label="Received"
                                             value={money(totalPaid)}
                                             meta="Approved payments"
                                             toneClass="bg-emerald-100 text-emerald-700"
+                                        />
+                                        <MetricCard
+                                            icon={<WalletIcon className="size-4 text-rose-700" />}
+                                            label="Outstanding"
+                                            value={totalDues > 0 ? money(totalDues) : 'Settled'}
+                                            meta={totalDues > 0 ? 'Dues across all plans' : 'All payments clear'}
+                                            toneClass={totalDues > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}
                                         />
                                         <MetricCard
                                             icon={<ClockIcon className="size-4 text-amber-700" />}
@@ -580,13 +596,6 @@ export default function ShowCustomer({
                                             value={String(activeSubscriptions.length)}
                                             meta={`of ${customer.subscriptions.length} total · ${expiredCount} expired`}
                                             toneClass="bg-blue-100 text-blue-700"
-                                        />
-                                        <MetricCard
-                                            icon={<WalletIcon className="size-4 text-rose-700" />}
-                                            label="Outstanding"
-                                            value={totalDues > 0 ? money(totalDues) : 'Settled'}
-                                            meta={totalDues > 0 ? 'Dues across all plans' : 'All payments clear'}
-                                            toneClass={totalDues > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}
                                         />
                                     </div>
 
