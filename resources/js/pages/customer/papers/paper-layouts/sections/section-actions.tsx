@@ -53,7 +53,7 @@ export function QuestionHoverActions({
             <div
                 data-paper-edit-actions
                 dir="ltr"
-                className="pointer-events-none absolute right-2 top-1 z-30 flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 font-sans opacity-0 shadow-lg shadow-slate-900/10 transition-opacity group-hover/question:pointer-events-auto group-hover/question:opacity-100 dark:border-slate-700 dark:bg-slate-900 print:hidden"
+                className="pointer-events-none absolute left-1/2 top-1 z-30 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 font-sans opacity-0 shadow-lg shadow-slate-900/10 transition-opacity group-hover/question:pointer-events-auto group-hover/question:opacity-100 dark:border-slate-700 dark:bg-slate-900 print:hidden"
             >
                 {canSwap && (
                     <>

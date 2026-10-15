@@ -845,11 +845,6 @@ input[type='date']::-webkit-calendar-picker-indicator {
     z-index: 20;
 }
 
-[data-print-paper] :dir(rtl) > [data-paper-edit-actions] {
-    right: auto;
-    left: 0.5rem;
-}
-
 [data-print-paper] [data-paper-correct-option] {
     background-color: #dcfce7 !important;
     -webkit-box-decoration-break: clone;
