@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Superadmin;
 
-use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -28,6 +28,7 @@ class SuperadminUserController extends Controller
                 'created_at'   => $user->created_at?->toISOString(),
                 'created_by'   => $user->creator?->name,
                 'can_manage'   => auth()->user()->canManageSuperAdmin($user),
+                'can_login'    => auth()->user()->isMasterSuperAdmin() && $user->isActive(),
             ]);
 
         return Inertia::render('superadmin/users', ['users' => $users]);
@@ -105,5 +106,39 @@ class SuperadminUserController extends Controller
 
         return redirect()->route('superadmin.users')
             ->with('success', 'User deleted successfully.');
+    }
+
+    public function loginAsUser(Request $request, User $user)
+    {
+        abort_unless($request->user()->isMasterSuperAdmin(), 403);
+        abort_unless($user->isSuperAdmin() && ! $user->isMasterSuperAdmin(), 404);
+        abort_unless($user->isActive(), 403);
+
+        $request->session()->put('superadmin_impersonator_id', $request->user()->id);
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->route('dashboard');
+    }
+
+    public function stopImpersonation(Request $request)
+    {
+        $impersonatorId = $request->session()->get('superadmin_impersonator_id');
+        abort_unless($request->user()?->isSuperAdmin() && $impersonatorId, 403);
+
+        $admin = User::query()->find($impersonatorId);
+        if (! $admin?->isMasterSuperAdmin() || ! $admin->isActive()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login');
+        }
+
+        $request->session()->forget('superadmin_impersonator_id');
+        Auth::login($admin);
+        $request->session()->regenerate();
+
+        return redirect()->route('superadmin.users');
     }
 }

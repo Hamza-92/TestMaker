@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    LogInIcon,
     PencilIcon,
     PlusIcon,
     SearchIcon,
@@ -32,6 +33,7 @@ interface SuperadminUser {
     created_at: string;
     created_by: string | null;
     can_manage: boolean;
+    can_login: boolean;
 }
 
 const STATUS_CONFIG: Record<AccountStatus, { label: string; className: string }> = {
@@ -49,6 +51,7 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
     const [search, setSearch] = useState('');
     const [deleteTarget, setDeleteTarget] = useState<SuperadminUser | null>(null);
     const [deleting, setDeleting] = useState<number | null>(null);
+    const [loggingIn, setLoggingIn] = useState<number | null>(null);
 
     const filtered = users.filter((u) => {
         const q = search.trim().toLowerCase();
@@ -144,6 +147,23 @@ export default function Users({ users }: { users: SuperadminUser[] }) {
                                                 <td className="text-muted-foreground px-4 py-3">{fmt(user.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1">
+                                                        {user.can_login && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setLoggingIn(user.id);
+                                                                    router.post(`/superadmin/users/${user.id}/login`, {}, {
+                                                                        onFinish: () => setLoggingIn(null),
+                                                                    });
+                                                                }}
+                                                                disabled={loggingIn !== null}
+                                                                className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                                                aria-label={`Login as ${user.name}`}
+                                                                title={`Login as ${user.name}`}
+                                                            >
+                                                                <LogInIcon className="size-4" />
+                                                            </button>
+                                                        )}
                                                         {user.can_manage && can('users.manage_permissions') && (
                                                             <Link
                                                                 href={`/superadmin/users/${user.id}/permissions`}

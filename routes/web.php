@@ -74,6 +74,8 @@ Route::get('question-images/{image}', [QuestionImageController::class, 'show'])
 Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('impersonation/stop', [CustomerController::class, 'stopImpersonation'])->name('impersonation.stop');
+    Route::post('superadmin-impersonation/stop', [SuperadminUserController::class, 'stopImpersonation'])
+        ->name('superadmin.users.impersonation.stop');
     Route::post('teacher-impersonation/stop', [TeacherController::class, 'stopTeacherImpersonation'])
         ->name('customer.teachers.impersonation.stop');
 
@@ -377,6 +379,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/users', [SuperadminUserController::class, 'index'])->name('superadmin.users')->middleware('permission:users.view');
         Route::get('superadmin/users/add', [SuperadminUserController::class, 'create'])->name('superadmin.users.add')->middleware('permission:users.create');
         Route::post('superadmin/users', [SuperadminUserController::class, 'store'])->name('superadmin.users.store')->middleware('permission:users.create');
+        Route::post('superadmin/users/{user}/login', [SuperadminUserController::class, 'loginAsUser'])->name('superadmin.users.login')->middleware(['permission:users.view', 'master.superadmin']);
         Route::get('superadmin/users/{user}/permissions', [UserPermissionController::class, 'edit'])->name('superadmin.users.permissions')->middleware('permission:users.manage_permissions');
         Route::put('superadmin/users/{user}/permissions', [UserPermissionController::class, 'update'])->name('superadmin.users.permissions.update')->middleware('permission:users.manage_permissions');
         Route::get('superadmin/users/{user}/edit', [SuperadminUserController::class, 'edit'])->name('superadmin.users.edit')->middleware('permission:users.edit');

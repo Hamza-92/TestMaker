@@ -14,6 +14,7 @@ export type Auth = {
     user: User;
     permissions: string[];
     is_master: boolean;
+    is_admin_impersonating?: boolean;
 };
 
 export type TwoFactorSetupData = {
