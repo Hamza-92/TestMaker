@@ -90,6 +90,7 @@ import {
     setLabelFor,
     variantForSet,
 } from './paper-layouts/paper-variant';
+import { PaperWatermark } from './paper-layouts/paper-watermark';
 import {
     ArabicQuestionFontProvider,
     QuestionContent,
@@ -14273,11 +14274,6 @@ export function GeneratedPaperView({
         Math.max(0, Math.min(100, settings.watermarkOpacity)) / 100;
     const activeWatermarkLogoUrl =
         settings.watermarkLogoUrl.trim() || defaultWatermarkLogoUrl;
-    const shouldShowTextWatermark =
-        settings.watermarkType === 'text' &&
-        settings.watermarkText.trim() !== '';
-    const shouldShowLogoWatermark =
-        settings.watermarkType === 'logo' && activeWatermarkLogoUrl !== '';
 
     function renderPaperSection(
         targetPaper: GeneratedPaper,
@@ -15604,37 +15600,15 @@ export function GeneratedPaperView({
                     style={paperShellStyle}
                     className="relative mx-auto overflow-hidden bg-white shadow-sm shadow-slate-900/10 print:overflow-visible print:shadow-none"
                 >
-                    {/* Watermark — sits behind everything; hidden when inactive. */}
-                    {(shouldShowTextWatermark || shouldShowLogoWatermark) && (
-                        <div
-                            data-paper-watermark
-                            aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
-                            style={{
-                                opacity: watermarkOpacity,
-                            }}
-                        >
-                            {shouldShowTextWatermark ? (
-                                <span
-                                    className="text-center font-bold uppercase select-none"
-                                    style={{
-                                        fontSize: '5.5rem',
-                                        transform: 'rotate(-30deg)',
-                                        whiteSpace: 'nowrap',
-                                    }}
-                                >
-                                    {settings.watermarkText}
-                                </span>
-                            ) : (
-                                <img
-                                    src={activeWatermarkLogoUrl}
-                                    alt=""
-                                    draggable={false}
-                                    className="max-h-[45%] max-w-[45%] object-contain select-none"
-                                />
-                            )}
-                        </div>
-                    )}
+                    <PaperWatermark
+                        type={settings.watermarkType}
+                        schoolName={paper.header.schoolName}
+                        logoUrl={activeWatermarkLogoUrl}
+                        opacity={watermarkOpacity}
+                        pageHeightMm={pageDims.height}
+                        marginTopMm={settings.marginTop}
+                        marginBottomMm={settings.marginBottom}
+                    />
                     <div className="relative z-10">
                         <SchoolIdentity
                             schoolName={paper.header.schoolName}
@@ -15747,34 +15721,17 @@ export function GeneratedPaperView({
                                     style={paperShellStyle}
                                     className="relative mx-auto overflow-hidden bg-white print:overflow-visible print:shadow-none"
                                 >
-                                    {(shouldShowTextWatermark || shouldShowLogoWatermark) && (
-                                        <div
-                                            data-paper-watermark
-                                            aria-hidden="true"
-                                            className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
-                                            style={{ opacity: watermarkOpacity }}
-                                        >
-                                            {shouldShowTextWatermark ? (
-                                                <span
-                                                    className="text-center font-bold uppercase select-none"
-                                                    style={{
-                                                        fontSize: '5.5rem',
-                                                        transform: 'rotate(-30deg)',
-                                                        whiteSpace: 'nowrap',
-                                                    }}
-                                                >
-                                                    {settings.watermarkText}
-                                                </span>
-                                            ) : (
-                                                <img
-                                                    src={activeWatermarkLogoUrl}
-                                                    alt=""
-                                                    draggable={false}
-                                                    className="max-h-[45%] max-w-[45%] object-contain select-none"
-                                                />
-                                            )}
-                                        </div>
-                                    )}
+                                    <PaperWatermark
+                                        type={settings.watermarkType}
+                                        schoolName={
+                                            variantPaper.header.schoolName
+                                        }
+                                        logoUrl={activeWatermarkLogoUrl}
+                                        opacity={watermarkOpacity}
+                                        pageHeightMm={pageDims.height}
+                                        marginTopMm={settings.marginTop}
+                                        marginBottomMm={settings.marginBottom}
+                                    />
                                     <div className="relative z-10">
                                         <SchoolIdentity
                                             schoolName={
@@ -15965,6 +15922,7 @@ export function GeneratedPaperView({
                             Boolean(rawPaper.sectioning?.active)
                         }
                         defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
+                        watermarkSchoolName={paper.header.schoolName}
                         canEditWatermark={canEditWatermark}
                         onChange={onSettingsChange}
                         onClose={() => setIsSettingsDrawerOpen(false)}

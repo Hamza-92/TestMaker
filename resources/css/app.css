@@ -1089,6 +1089,7 @@ input[type='date']::-webkit-calendar-picker-indicator {
     }
 
     body:has([data-print-paper]) [data-print-paper] {
+        --paper-watermark-start: 0mm;
         width: 100% !important;
         max-width: none !important;
         height: auto !important;

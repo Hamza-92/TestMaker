@@ -37,10 +37,12 @@ class CustomerPaperDefaults
     public static function preserveWatermarkSettings(array $submitted, array $existing): array
     {
         foreach (self::WATERMARK_SETTING_KEYS as $key) {
-            unset($submitted[$key]);
+            if ($key !== 'watermarkType') {
+                unset($submitted[$key]);
+            }
         }
 
-        return array_replace($submitted, self::watermarkSettings($existing));
+        return array_replace(self::watermarkSettings($existing), $submitted);
     }
 
     public static function forUser(User $user): ?array

@@ -51,6 +51,7 @@ interface PaperSettingsDrawerProps {
     settings: PaperSettings;
     sectioningAvailable?: boolean;
     defaultWatermarkLogoUrl?: string;
+    watermarkSchoolName?: string;
     canEditWatermark?: boolean;
     onChange: (patch: Partial<PaperSettings>) => void;
     onClose: () => void;
@@ -262,6 +263,7 @@ export function PaperSettingsDrawer({
     settings,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
+    watermarkSchoolName = '',
     canEditWatermark = false,
     onChange,
     onClose,
@@ -436,6 +438,7 @@ export function PaperSettingsDrawer({
                     settings={settings}
                     sectioningAvailable={sectioningAvailable}
                     defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
+                    watermarkSchoolName={watermarkSchoolName}
                     canEditWatermark={canEditWatermark}
                     onChange={onChange}
                 />
@@ -448,6 +451,7 @@ export function PaperSettingsPanel({
     settings,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
+    watermarkSchoolName = '',
     canEditWatermark = false,
     onChange,
     inline = false,
@@ -682,19 +686,14 @@ export function PaperSettingsPanel({
             >
                 <WatermarkTypeSelector
                     value={settings.watermarkType}
-                    disabled={!canEditWatermark}
                     onChange={(value) => onChange({ watermarkType: value })}
                 />
                 <div className={inline ? 'xl:col-span-2' : 'mt-4'}>
                     {settings.watermarkType === 'text' ? (
                         <TextInput
                             label="Text"
-                            value={settings.watermarkText}
-                            placeholder="Optional"
-                            disabled={!canEditWatermark}
-                            onChange={(value) =>
-                                onChange({ watermarkText: value })
-                            }
+                            value={watermarkSchoolName}
+                            disabled
                         />
                     ) : (
                         <LogoInput
@@ -1407,13 +1406,11 @@ function TextInput({
     value,
     placeholder,
     disabled = false,
-    onChange,
 }: {
     label: string;
     value: string;
     placeholder?: string;
     disabled?: boolean;
-    onChange: (next: string) => void;
 }) {
     return (
         <div className={disabled ? 'opacity-60' : undefined}>
@@ -1426,7 +1423,6 @@ function TextInput({
                 disabled={disabled}
                 value={value}
                 placeholder={placeholder}
-                onChange={(event) => onChange(event.target.value)}
                 className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:ring-brand-400/20"
             />
         </div>

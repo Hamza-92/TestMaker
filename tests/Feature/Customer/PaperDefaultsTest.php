@@ -101,7 +101,7 @@ test('customers can save circled objective option labels', function () {
         ->toBeTrue();
 });
 
-test('school users cannot change or erase a saved watermark through paper defaults', function () {
+test('school users can select the watermark type but cannot change its logo or opacity', function () {
     $customer = paperDefaultsCustomer();
     PaperDefault::create([
         'user_id' => $customer->id,
@@ -132,14 +132,14 @@ test('school users cannot change or erase a saved watermark through paper defaul
 
     $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
     expect($settings['questionSize'])->toBe(14)
-        ->and($settings['watermarkType'])->toBe('logo')
+        ->and($settings['watermarkType'])->toBe('text')
         ->and($settings['watermarkLogoUrl'])->toBe('/storage/approved-watermark.png')
         ->and($settings['watermarkOpacity'])->toBe(25)
         ->and($settings)->not->toHaveKey('watermarkText');
 
     $this->actingAs($customer)->delete(route('customer.settings.reset'))->assertRedirect();
     $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
-    expect($settings['watermarkType'])->toBe('logo')
+    expect($settings['watermarkType'])->toBe('text')
         ->and($settings['watermarkLogoUrl'])->toBe('/storage/approved-watermark.png')
         ->and($settings)->not->toHaveKey('questionSize');
 });

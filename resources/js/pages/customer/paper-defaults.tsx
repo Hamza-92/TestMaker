@@ -132,7 +132,6 @@ export default function PaperDefaults({
 
         return {
             ...next,
-            watermarkType: form.data.settings.watermarkType,
             watermarkText: form.data.settings.watermarkText,
             watermarkLogoUrl: form.data.settings.watermarkLogoUrl,
             watermarkOpacity: form.data.settings.watermarkOpacity,
@@ -269,6 +268,7 @@ export default function PaperDefaults({
                     inline
                     settings={settings}
                     defaultWatermarkLogoUrl={logoUrl}
+                    watermarkSchoolName={header.schoolName}
                     canEditWatermark={canEditWatermark}
                     onChange={updateSettings}
                 />

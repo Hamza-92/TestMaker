@@ -65,6 +65,16 @@ function cleanClone(source: HTMLElement): HTMLElement {
     const clone = source.cloneNode(true) as HTMLElement;
     clone.setAttribute('data-paper-pdf-export', '');
 
+    // Preview repeats the watermark at page intervals. The exporter adds its
+    // own watermark to every captured page, so keep only its first template.
+    clone
+        .querySelectorAll('[data-paper-watermark]')
+        .forEach((element, index) => {
+            if (index > 0) {
+                element.remove();
+            }
+        });
+
     // Additional sets are mounted for printing with `hidden print:block`.
     // They must be displayed when measured and captured outside print media.
     clone.classList.remove('hidden');
@@ -465,7 +475,9 @@ export async function downloadPaperPdf({
             const watermark = (
                 clone.querySelector('[data-paper-watermark]') ?? sharedWatermark
             )?.cloneNode(true) as HTMLElement | undefined;
-            clone.querySelector('[data-paper-watermark]')?.remove();
+            clone
+                .querySelectorAll('[data-paper-watermark]')
+                .forEach((element) => element.remove());
 
             const geometry = measure(clone);
             const tableBorders = paperTableBorders(clone);
@@ -557,7 +569,15 @@ export async function downloadPaperPdf({
                 });
 
                 if (watermark) {
-                    page.append(watermark.cloneNode(true));
+                    const pageWatermark = watermark.cloneNode(true) as HTMLElement;
+                    Object.assign(pageWatermark.style, {
+                        top: '0',
+                        right: '0',
+                        bottom: '0',
+                        left: '0',
+                        height: 'auto',
+                    });
+                    page.append(pageWatermark);
                 }
 
                 const viewport = document.createElement('div');
