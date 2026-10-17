@@ -14111,6 +14111,20 @@ export function GeneratedPaperView({
     const effectiveSchoolAddress =
         rawPaper.header.schoolAddress ??
         (showSchoolAddress ? schoolAddress : '');
+    const logicalPaperSections = paper.sections.filter(
+        (section) => section.orRole !== 'alternative',
+    );
+    const separateCategoryPages =
+        settings.separateObjectiveSubjectivePages &&
+        showsPaper &&
+        !bubbleSheetOnly &&
+        logicalPaperSections.some(
+            (section, index) =>
+                index > 0 &&
+                (section.category === 'Objective Questions') !==
+                    (logicalPaperSections[index - 1].category ===
+                        'Objective Questions'),
+        );
     const printJobs = Array.from({ length: numSets }).flatMap((_, setIndex) =>
         Array.from({ length: settings.printCopies }, (_, copyIndex) => ({
             setIndex,
@@ -14449,6 +14463,33 @@ export function GeneratedPaperView({
         };
     }
 
+    function sectionPageBreak(
+        logicalSections: GeneratedPaperSection[],
+        logicalIndex: number,
+    ): ReactNode {
+        const previous = logicalSections[logicalIndex - 1];
+        const current = logicalSections[logicalIndex];
+
+        if (
+            !settings.separateObjectiveSubjectivePages ||
+            !previous ||
+            !current ||
+            (previous.category === 'Objective Questions') ===
+                (current.category === 'Objective Questions')
+        ) {
+            return null;
+        }
+
+        return (
+            <div
+                data-paper-section-page-break
+                aria-hidden="true"
+                className="h-0 shrink-0"
+                style={{ marginBottom: `-${settings.sectionSpacing}mm` }}
+            />
+        );
+    }
+
     function renderFederalPaperSections(
         targetPaper: GeneratedPaper,
         interactive: boolean,
@@ -14530,6 +14571,7 @@ export function GeneratedPaperView({
             ) : null;
             const canMoveUp = logicalIndex > 0;
             const canMoveDown = logicalIndex < logicalSections.length - 1;
+            const pageBreak = sectionPageBreak(logicalSections, logicalIndex);
 
             if (
                 section.category === 'Objective Questions' ||
@@ -14537,6 +14579,7 @@ export function GeneratedPaperView({
             ) {
                 return (
                     <div key={section.id} className="contents">
+                        {pageBreak}
                         {heading}
                         {renderPaperSection(
                             targetPaper,
@@ -14561,6 +14604,7 @@ export function GeneratedPaperView({
             if (!alternative) {
                 return (
                     <div key={section.id} className="contents">
+                        {pageBreak}
                         {heading}
                         {renderPaperSection(
                             targetPaper,
@@ -14576,6 +14620,7 @@ export function GeneratedPaperView({
 
             return (
                 <div key={section.orGroupId ?? section.id} className="contents">
+                    {pageBreak}
                     {heading}
                     <FederalSubjectiveOrSection
                         primary={createSectionTemplateProps(
@@ -14638,6 +14683,7 @@ export function GeneratedPaperView({
                 (candidate) => candidate.id === section.id,
             );
             const previousLogicalSection = logicalSections[logicalIndex - 1];
+            const pageBreak = sectionPageBreak(logicalSections, logicalIndex);
             const showPaperSectionHeading = Boolean(
                 targetPaper.sectioning?.active &&
                 settings.showSections &&
@@ -14679,6 +14725,7 @@ export function GeneratedPaperView({
             if (groupSections.length < 2) {
                 return (
                     <div key={section.id} className="contents">
+                        {pageBreak}
                         {paperSectionHeading}
                         {primary}
                     </div>
@@ -14732,6 +14779,7 @@ export function GeneratedPaperView({
 
             return (
                 <div key={section.orGroupId ?? section.id} className="contents">
+                    {pageBreak}
                     {paperSectionHeading}
                     <div
                         data-or-group
@@ -14947,6 +14995,41 @@ export function GeneratedPaperView({
                                             className={cn(
                                                 'size-3.5 rounded-full bg-white shadow-sm transition-transform',
                                                 settings.objectiveOptionBubblesEnabled
+                                                    ? 'translate-x-3.5'
+                                                    : 'translate-x-0',
+                                            )}
+                                        />
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    title="Print objective and subjective questions on separate pages"
+                                    aria-checked={
+                                        settings.separateObjectiveSubjectivePages
+                                    }
+                                    onClick={() =>
+                                        onSettingsChange({
+                                            separateObjectiveSubjectivePages:
+                                                !settings.separateObjectiveSubjectivePages,
+                                        })
+                                    }
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    <span>Separate pages</span>
+                                    <span
+                                        aria-hidden="true"
+                                        className={cn(
+                                            'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
+                                            settings.separateObjectiveSubjectivePages
+                                                ? 'bg-brand-600'
+                                                : 'bg-slate-200 dark:bg-slate-700',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                                                settings.separateObjectiveSubjectivePages
                                                     ? 'translate-x-3.5'
                                                     : 'translate-x-0',
                                             )}
@@ -15511,9 +15594,10 @@ export function GeneratedPaperView({
                     data-paper-set-index={activeSetIndex}
                     data-paper-copy-index={0}
                     data-paper-forced-page-break={
-                        bubbleSheetVisible &&
-                        !bubbleSheetOnly &&
-                        settings.bubbleSheetMode === 'separate-page'
+                        separateCategoryPages ||
+                        (bubbleSheetVisible &&
+                            !bubbleSheetOnly &&
+                            settings.bubbleSheetMode === 'separate-page')
                             ? 'true'
                             : undefined
                     }
@@ -15652,10 +15736,11 @@ export function GeneratedPaperView({
                                     data-paper-set-index={setIndex}
                                     data-paper-copy-index={copyIndex}
                                     data-paper-forced-page-break={
-                                        bubbleSheetVisible &&
-                                        !bubbleSheetOnly &&
-                                        settings.bubbleSheetMode ===
-                                            'separate-page'
+                                        separateCategoryPages ||
+                                        (bubbleSheetVisible &&
+                                            !bubbleSheetOnly &&
+                                            settings.bubbleSheetMode ===
+                                                'separate-page')
                                             ? 'true'
                                             : undefined
                                     }

@@ -1076,6 +1076,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
         page-break-inside: auto;
     }
 
+    [data-print-paper] [data-paper-section-page-break] {
+        height: 1px !important;
+        break-before: page;
+        page-break-before: always;
+    }
+
     [data-print-paper] [data-paper-correct-option] {
         background-color: transparent !important;
     }

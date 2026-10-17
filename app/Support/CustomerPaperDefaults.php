@@ -103,7 +103,7 @@ class CustomerPaperDefaults
         ] as $key => $values) {
             $settings[$key] = ['sometimes', Rule::in($values)];
         }
-        foreach (['showSections', 'sectionHeadingBrackets', 'bubbleSheetEnabled', 'bubbleSheetHeadingEnabled', 'pageNumbersEnabled', 'repeatTableHeaders', 'sideBySideCopiesEnabled', 'objectiveOptionBubblesEnabled'] as $key) {
+        foreach (['showSections', 'sectionHeadingBrackets', 'bubbleSheetEnabled', 'bubbleSheetHeadingEnabled', 'pageNumbersEnabled', 'repeatTableHeaders', 'sideBySideCopiesEnabled', 'separateObjectiveSubjectivePages', 'objectiveOptionBubblesEnabled'] as $key) {
             $settings[$key] = ['sometimes', 'boolean'];
         }
         $settings['bubbleSheetQuestionCount'] = ['sometimes', 'integer', 'min:1', 'max:200'];

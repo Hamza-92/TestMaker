@@ -358,6 +358,8 @@ export interface PaperSettings {
     printCopies: number;
     /** Print identical copies in two parallel columns on every page. */
     sideBySideCopiesEnabled: boolean;
+    /** Start a new page when paper sections change between objective and subjective. */
+    separateObjectiveSubjectivePages: boolean;
     /** Page margins in millimetres (4 sides). 0 = no margin (content runs to the edge). */
     marginTop: number;
     marginRight: number;
@@ -450,6 +452,7 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     orientation: 'portrait',
     printCopies: 1,
     sideBySideCopiesEnabled: false,
+    separateObjectiveSubjectivePages: false,
     marginTop: 10,
     marginRight: 10,
     marginBottom: 10,
@@ -765,6 +768,10 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             typeof source.sideBySideCopiesEnabled === 'boolean'
                 ? source.sideBySideCopiesEnabled
                 : DEFAULT_PAPER_SETTINGS.sideBySideCopiesEnabled,
+        separateObjectiveSubjectivePages:
+            typeof source.separateObjectiveSubjectivePages === 'boolean'
+                ? source.separateObjectiveSubjectivePages
+                : DEFAULT_PAPER_SETTINGS.separateObjectiveSubjectivePages,
         marginTop:
             typeof source.marginTop === 'number'
                 ? source.marginTop

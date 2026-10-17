@@ -67,12 +67,13 @@ test('customers can save an Arabic paper font', function (string $font) {
         ->toBe($font);
 })->with(['noto-naskh-arabic', 'amiri', 'noto-sans-arabic', 'noto-kufi-arabic']);
 
-test('customers can save print copies, side by side layout, and orientation', function () {
+test('customers can save print copies, page separation, side by side layout, and orientation', function () {
     $customer = paperDefaultsCustomer();
     $payload = paperDefaultsPayload();
     $payload['settings'] += [
         'printCopies' => 3,
         'sideBySideCopiesEnabled' => true,
+        'separateObjectiveSubjectivePages' => true,
         'orientation' => 'landscape',
     ];
 
@@ -83,6 +84,7 @@ test('customers can save print copies, side by side layout, and orientation', fu
     $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
     expect($settings['printCopies'])->toBe(3);
     expect($settings['sideBySideCopiesEnabled'])->toBeTrue();
+    expect($settings['separateObjectiveSubjectivePages'])->toBeTrue();
     expect($settings['orientation'])->toBe('landscape');
 });
 
@@ -259,6 +261,7 @@ test('invalid paper defaults and structural assignment overrides are rejected', 
     ['settings.watermarkLogoUrl', 'javascript:alert(1)', 'settings.watermarkLogoUrl'],
     ['settings.printCopies', 5, 'settings.printCopies'],
     ['settings.sideBySideCopiesEnabled', 'invalid', 'settings.sideBySideCopiesEnabled'],
+    ['settings.separateObjectiveSubjectivePages', 'invalid', 'settings.separateObjectiveSubjectivePages'],
     ['settings.objectiveOptionBubblesEnabled', 'invalid', 'settings.objectiveOptionBubblesEnabled'],
     ['settings.multiplePerSheetEnabled', true, 'settings'],
     ['settings.papersPerSheet', 2, 'settings'],

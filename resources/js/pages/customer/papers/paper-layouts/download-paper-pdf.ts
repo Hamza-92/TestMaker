@@ -285,11 +285,16 @@ function measure(root: HTMLElement) {
         }
     }
 
-    const forcedBreaks = Array.from(
-        root.querySelectorAll('[data-bubble-sheet-page="separate"]'),
-    )
-        .map((element) => interval(element).bottom)
-        .sort((a, b) => a - b);
+    const forcedBreaks = [
+        ...Array.from(
+            root.querySelectorAll('[data-bubble-sheet-page="separate"]'),
+            (element) => interval(element).bottom,
+        ),
+        ...Array.from(
+            root.querySelectorAll('[data-paper-section-page-break]'),
+            (element) => interval(element).top,
+        ),
+    ].sort((a, b) => a - b);
 
     return { blocks, lines, forcedBreaks };
 }
