@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    CalendarDaysIcon,
     KeyRoundIcon,
     LogInIcon,
     MailIcon,
@@ -24,6 +25,8 @@ interface Teacher {
     status: TeacherStatus;
     permission_count: number;
     created_at: string;
+    expires_on: string | null;
+    access_expired: boolean;
 }
 
 interface Quota {
@@ -51,6 +54,10 @@ function formatDate(iso: string) {
     });
 }
 
+function formatDateOnly(date: string) {
+    return formatDate(`${date}T12:00:00`);
+}
+
 function initials(name: string) {
     return name
         .split(' ')
@@ -69,7 +76,11 @@ export default function TeachersIndex({ teachers, quota }: Props) {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return teachers;
+
+        if (!q) {
+            return teachers;
+        }
+
         return teachers.filter(
             (t) => t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q),
         );
@@ -80,7 +91,10 @@ export default function TeachersIndex({ teachers, quota }: Props) {
     const canAdd = quota.allow && (quota.max === null || quota.used < quota.max);
 
     function handleDelete() {
-        if (!deleting || isDeleting) return;
+        if (!deleting || isDeleting) {
+            return;
+        }
+
         setIsDeleting(true);
         router.delete(`/teachers/${deleting.id}`, {
             onFinish: () => {
@@ -201,6 +215,11 @@ export default function TeachersIndex({ teachers, quota }: Props) {
                                             >
                                                 {teacher.status}
                                             </span>
+                                            {teacher.access_expired && (
+                                                <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+                                                    Access expired
+                                                </span>
+                                            )}
                                             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                                 <KeyRoundIcon className="size-3" />
                                                 {teacher.permission_count} permissions
@@ -212,11 +231,17 @@ export default function TeachersIndex({ teachers, quota }: Props) {
                                                 {teacher.email}
                                             </span>
                                             <span>Added {formatDate(teacher.created_at)}</span>
+                                            <span className="flex items-center gap-1">
+                                                <CalendarDaysIcon className="size-3.5" />
+                                                {teacher.expires_on
+                                                    ? `Expires ${formatDateOnly(teacher.expires_on)}`
+                                                    : 'No expiry'}
+                                            </span>
                                         </div>
                                     </div>
 
                                     <div className="flex shrink-0 items-center gap-1.5">
-                                        {teacher.status === 'active' && (
+                                        {teacher.status === 'active' && !teacher.access_expired && (
                                             <button
                                                 type="button"
                                                 onClick={() => {

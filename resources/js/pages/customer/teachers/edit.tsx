@@ -25,6 +25,7 @@ interface Teacher {
     name: string;
     email: string;
     status: string;
+    expires_on: string | null;
 }
 
 interface FormData {
@@ -33,6 +34,7 @@ interface FormData {
     password: string;
     password_confirmation: string;
     status: string;
+    expires_on: string;
     [key: string]: string;
 }
 
@@ -70,6 +72,7 @@ export default function EditTeacher({ teacher }: { teacher: Teacher }) {
         password: '',
         password_confirmation: '',
         status: teacher.status,
+        expires_on: teacher.expires_on ?? '',
     });
 
     function submit(e: React.FormEvent) {
@@ -133,24 +136,50 @@ export default function EditTeacher({ teacher }: { teacher: Teacher }) {
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <Label htmlFor="status">Status</Label>
-                            <Select
-                                value={data.status}
-                                onValueChange={(v) => setData('status', v)}
-                            >
-                                <SelectTrigger id="status" className="w-48">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="inactive">Inactive</SelectItem>
-                                    <SelectItem value="suspended">Suspended</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {errors.status && (
-                                <p className="text-xs text-rose-600">{errors.status}</p>
-                            )}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="status">Status</Label>
+                                <Select
+                                    value={data.status}
+                                    onValueChange={(v) => setData('status', v)}
+                                >
+                                    <SelectTrigger id="status" className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="active">Active</SelectItem>
+                                        <SelectItem value="inactive">Inactive</SelectItem>
+                                        <SelectItem value="suspended">Suspended</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {errors.status && (
+                                    <p className="text-xs text-rose-600">{errors.status}</p>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="expires_on">Expiry Date</Label>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        id="expires_on"
+                                        type="date"
+                                        value={data.expires_on}
+                                        onChange={(e) => setData('expires_on', e.target.value)}
+                                        className="min-w-0 flex-1"
+                                    />
+                                    {data.expires_on && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setData('expires_on', '')}
+                                            className="text-xs font-medium text-slate-600 hover:text-brand-600 dark:text-slate-300"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                {errors.expires_on && (
+                                    <p className="text-xs text-rose-600">{errors.expires_on}</p>
+                                )}
+                            </div>
                         </div>
                     </div>
 

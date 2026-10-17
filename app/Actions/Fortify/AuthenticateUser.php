@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthenticateUser
 {
@@ -37,6 +38,12 @@ class AuthenticateUser
 
         if (! $user) {
             return null;
+        }
+
+        if ($user->teacherAccessExpired()) {
+            throw ValidationException::withMessages([
+                'email' => 'Your teacher access has expired. Contact your school administrator.',
+            ]);
         }
 
         if (config('hashing.rehash_on_login', true) && Hash::needsRehash($user->password)) {

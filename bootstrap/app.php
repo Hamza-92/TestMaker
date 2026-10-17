@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureSchoolSubscriptionFeature;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureMasterSuperAdmin;
 use App\Http\Middleware\EnsureTeacherFeature;
+use App\Http\Middleware\EnsureTeacherNotExpired;
 use App\Http\Middleware\EnsureNonCustomer;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             HandleAppearance::class,
+            EnsureTeacherNotExpired::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::using(20),
         ]);

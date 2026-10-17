@@ -26,6 +26,7 @@ interface FormData {
     password: string;
     password_confirmation: string;
     status: string;
+    expires_on: string;
     [key: string]: string;
 }
 
@@ -56,6 +57,7 @@ export default function AddTeacher() {
         password: '',
         password_confirmation: '',
         status: 'active',
+        expires_on: '',
     });
 
     function submit(e: React.FormEvent) {
@@ -121,24 +123,38 @@ export default function AddTeacher() {
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <Label htmlFor="status">Status</Label>
-                            <Select
-                                value={data.status}
-                                onValueChange={(v) => setData('status', v)}
-                            >
-                                <SelectTrigger id="status" className="w-48">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="inactive">Inactive</SelectItem>
-                                    <SelectItem value="suspended">Suspended</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {errors.status && (
-                                <p className="text-xs text-rose-600">{errors.status}</p>
-                            )}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="status">Status</Label>
+                                <Select
+                                    value={data.status}
+                                    onValueChange={(v) => setData('status', v)}
+                                >
+                                    <SelectTrigger id="status" className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="active">Active</SelectItem>
+                                        <SelectItem value="inactive">Inactive</SelectItem>
+                                        <SelectItem value="suspended">Suspended</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {errors.status && (
+                                    <p className="text-xs text-rose-600">{errors.status}</p>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="expires_on">Expiry Date</Label>
+                                <Input
+                                    id="expires_on"
+                                    type="date"
+                                    value={data.expires_on}
+                                    onChange={(e) => setData('expires_on', e.target.value)}
+                                />
+                                {errors.expires_on && (
+                                    <p className="text-xs text-rose-600">{errors.expires_on}</p>
+                                )}
+                            </div>
                         </div>
                     </div>
 

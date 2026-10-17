@@ -34,13 +34,15 @@ class TeacherController extends Controller
 
         $teachers = $owner->teachers()
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'status', 'teacher_permissions', 'created_at'])
+            ->get(['id', 'name', 'email', 'status', 'teacher_permissions', 'teacher_expires_on', 'created_at'])
             ->map(fn (User $teacher) => [
                 'id' => $teacher->id,
                 'name' => $teacher->name,
                 'email' => $teacher->email,
                 'status' => $teacher->status?->value,
                 'permission_count' => count((array) ($teacher->teacher_permissions ?? [])),
+                'expires_on' => $teacher->teacher_expires_on?->toDateString(),
+                'access_expired' => $teacher->teacherAccessExpired(),
                 'created_at' => $teacher->created_at?->toISOString(),
             ]);
 
@@ -77,6 +79,7 @@ class TeacherController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
             'status' => ['required', Rule::in(['active', 'inactive', 'suspended'])],
+            'expires_on' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $owner = auth()->user();
@@ -91,6 +94,7 @@ class TeacherController extends Controller
             'created_by' => $owner->id,
             'teacher_permissions' => [],
             'access_scope' => [],
+            'teacher_expires_on' => $validated['expires_on'] ?? null,
         ]);
 
         AuditLog::record(
@@ -101,6 +105,7 @@ class TeacherController extends Controller
                 'email' => $teacher->email,
                 'user_type' => UserType::Teacher->value,
                 'school_id' => $owner->id,
+                'teacher_expires_on' => $teacher->teacher_expires_on?->toDateString(),
                 'activity' => 'added',
             ],
             notes: 'Teacher added.',
@@ -122,7 +127,10 @@ class TeacherController extends Controller
         }
 
         return Inertia::render('customer/teachers/edit', [
-            'teacher' => $teacher->only(['id', 'name', 'email', 'status']),
+            'teacher' => [
+                ...$teacher->only(['id', 'name', 'email', 'status']),
+                'expires_on' => $teacher->teacher_expires_on?->toDateString(),
+            ],
         ]);
     }
 
@@ -135,12 +143,19 @@ class TeacherController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($teacher->id)],
             'password' => ['nullable', 'string', 'min:6', 'confirmed'],
             'status' => ['required', Rule::in(['active', 'inactive', 'suspended'])],
+            'expires_on' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
-        $oldValues = $teacher->only(['name', 'email', 'status']);
+        $oldValues = [
+            ...$teacher->only(['name', 'email', 'status']),
+            'teacher_expires_on' => $teacher->teacher_expires_on?->toDateString(),
+        ];
         $teacher->name = $validated['name'];
         $teacher->email = $validated['email'];
         $teacher->status = $validated['status'];
+        if (array_key_exists('expires_on', $validated)) {
+            $teacher->teacher_expires_on = $validated['expires_on'] ?: null;
+        }
 
         if (! empty($validated['password'])) {
             $teacher->password = Hash::make($validated['password']);
@@ -153,6 +168,7 @@ class TeacherController extends Controller
             oldValues: $oldValues,
             newValues: [
                 ...$teacher->only(['name', 'email', 'status']),
+                'teacher_expires_on' => $teacher->teacher_expires_on?->toDateString(),
                 'user_type' => UserType::Teacher->value,
                 'school_id' => $teacher->school_id,
                 'activity' => 'updated',
@@ -277,7 +293,7 @@ class TeacherController extends Controller
         $this->authorizeTeacher($teacher);
         abort_unless($request->user()->isActive(), 403);
         abort_unless($request->user()->activeSchoolSubscription()?->allow_teachers, 403);
-        abort_unless($teacher->isActive(), 403);
+        abort_unless($teacher->isActive() && ! $teacher->teacherAccessExpired(), 403);
 
         $request->session()->put('teacher_impersonator_id', $request->user()->id);
         Auth::login($teacher);

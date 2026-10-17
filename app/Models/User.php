@@ -23,7 +23,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'address', 'city', 'province', 'is_show_address',
     'school_name', 'logo',
     'user_type', 'school_id', 'status', 'account_type', 'created_by',
-    'teacher_permissions', 'access_scope',
+    'teacher_permissions', 'access_scope', 'teacher_expires_on',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
@@ -43,6 +43,7 @@ class User extends Authenticatable
             'account_type' => AccountType::class,
             'teacher_permissions' => 'array',
             'access_scope' => 'array',
+            'teacher_expires_on' => 'date',
         ];
     }
 
@@ -61,6 +62,13 @@ class User extends Authenticatable
     public function isTeacher(): bool
     {
         return $this->user_type === UserType::Teacher;
+    }
+
+    public function teacherAccessExpired(): bool
+    {
+        return $this->isTeacher()
+            && $this->teacher_expires_on !== null
+            && $this->teacher_expires_on->toDateString() < now('Asia/Karachi')->toDateString();
     }
 
     public function isSchoolOwner(): bool
