@@ -650,6 +650,18 @@ input[type='date']::-webkit-calendar-picker-indicator {
         'Liberation Mono', 'Courier New', monospace;
 }
 
+@media screen {
+    [data-print-paper] {
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    [data-print-paper] :is(input:not([readonly]), textarea, [contenteditable='true']) {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+}
+
 /* ── Paper Settings: font sizing ───────────────────────────────────────── */
 /* CSS variables on [data-print-paper] are written by the React component.
    The `*` selector forces nested Tailwind text-utility classes to inherit
