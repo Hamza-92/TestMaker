@@ -1,6 +1,10 @@
 import { RichTextField } from '../questions/rich-text-field';
 import type { GeneratedPaperHeader } from '../types';
 import { HeaderLogo } from './header-logo';
+import {
+    formatPaperHeaderDate,
+    normalizePaperHeaderDateInput,
+} from './paper-header-date';
 
 interface FormalExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -188,8 +192,19 @@ function LabeledCell({
             ) : (
                 <input
                     autoComplete="off"
-                    value={String(header[field] ?? '')}
-                    onChange={(e) => onChange(field, e.target.value)}
+                    value={
+                        field === 'date'
+                            ? formatPaperHeaderDate(String(header[field] ?? ''))
+                            : String(header[field] ?? '')
+                    }
+                    onChange={(e) =>
+                        onChange(
+                            field,
+                            field === 'date'
+                                ? normalizePaperHeaderDateInput(e.target.value)
+                                : e.target.value,
+                        )
+                    }
                     readOnly={readOnly}
                     tabIndex={readOnly ? -1 : undefined}
                     className="h-full min-w-0 bg-transparent px-2 py-1 font-normal outline-none"

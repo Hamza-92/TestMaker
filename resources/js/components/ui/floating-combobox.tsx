@@ -7,7 +7,7 @@ import {
 } from '@headlessui/react';
 import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface ComboboxOptionItem {
@@ -39,6 +39,8 @@ interface FloatingComboboxProps {
     className?: string;
     /** Limit mounted options for large lists while still searching every option. */
     maxVisibleOptions?: number;
+    /** Show long option names on multiple lines instead of truncating them. */
+    wrapOptionLabels?: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export function FloatingCombobox({
     compact = false,
     className,
     maxVisibleOptions,
+    wrapOptionLabels = false,
 }: FloatingComboboxProps) {
     const [query, setQuery] = useState('');
 
@@ -229,12 +232,11 @@ export function FloatingCombobox({
                     portal
                     modal={false}
                     anchor={{ to: 'bottom start', gap: 6, padding: 8 }}
+                    style={{ '--anchor-max-height': '14rem' } as CSSProperties}
                     className={cn(
-                        // Render through Headless UI's anchored portal so dialogs,
-                        // drawers, and cards cannot clip the options panel or add
-                        // it to their scrollable height. --input-width keeps the
-                        // portal panel exactly aligned with its field.
-                        'pointer-events-auto z-[100] max-h-72 w-[var(--input-width)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/[0.08] outline-none',
+                        // Headless UI sets max-height inline for anchored panels,
+                        // so --anchor-max-height above caps this scrollable list.
+                        'pointer-events-auto z-[100] max-h-56 w-[var(--input-width)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/[0.08] outline-none',
                         'dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40',
                         'origin-top transition duration-100 ease-out',
                         'data-[closed]:scale-95 data-[closed]:opacity-0',
@@ -269,7 +271,13 @@ export function FloatingCombobox({
                             {({ selected }) => (
                                 <>
                                     <span className="flex min-w-0 flex-col">
-                                        <span className="truncate">
+                                        <span
+                                            className={
+                                                wrapOptionLabels
+                                                    ? 'whitespace-normal break-words'
+                                                    : 'truncate'
+                                            }
+                                        >
                                             {option.displayLabel ?? option.label}
                                         </span>
                                         {option.hint && (

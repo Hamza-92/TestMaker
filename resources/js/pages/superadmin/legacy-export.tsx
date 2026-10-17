@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { ArrowRightIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
@@ -16,13 +17,7 @@ type Mode =
 type Item = { id: number; name: string };
 type Chapter = Item & { chapter_number: number | null };
 type Topic = Item & { chapter_id: number };
-type Type = Item & { schema_key: string | null; is_objective: boolean };
-type OldType = {
-    id: number;
-    type_name: string;
-    is_objective: number;
-    objective_type_id: number;
-};
+type Type = Item & { schema_key: string | null };
 type Question = {
     id: number;
     chapter_id: number;
@@ -38,9 +33,7 @@ type Catalog = {
     subjects: (Item & { name_eng: string; name_ur: string | null })[];
     legacy_patterns: Item[];
     legacy_classes: Item[];
-    legacy_subjects: (Item & { afaq: number })[];
-    legacy_question_types: OldType[];
-    type_mappings: Record<string, number>;
+    legacy_subjects: Item[];
     chapters: Chapter[];
     topics: Topic[];
     question_types: Type[];
@@ -58,13 +51,6 @@ type Preview = {
     unsupported: Record<string, number>;
     target: { class: string; subject: string; pattern: number };
     replace_existing: boolean;
-    type_destinations: {
-        source_id: number;
-        source_name: string;
-        legacy_id: number | null;
-        legacy_name: string;
-        question_type_id: number | null;
-    }[];
 };
 type Report = {
     created: number;
@@ -112,35 +98,20 @@ function choice(
     return items.find((item) => Number(item.id) === id) ?? null;
 }
 
-function compatibleOldType(source: Type, target: OldType): boolean {
-    if (Boolean(source.is_objective) !== Boolean(target.is_objective)) {
-        return false;
-    }
+function matchingLegacyPattern(name: string): number | null {
+    const match = [
+        [/pecta|pef|smart|short syllabus/i, 3],
+        [/federal|fedral/i, 4],
+        [/ajk/i, 6],
+        [/kpk/i, 7],
+        [/sindh/i, 9],
+        [/afaq.*sun/i, 5],
+        [/afaq/i, 1],
+        [/oxford/i, 2],
+        [/punjab/i, 0],
+    ] as const;
 
-    if (!source.is_objective) {
-        return (
-            source.schema_key !== 'subjective_same_statement' ||
-            [336, 386].includes(target.id)
-        );
-    }
-
-    if (source.schema_key === 'objective_true_false') {
-        return target.objective_type_id === 2;
-    }
-
-    if (source.schema_key === 'objective_blank_choice') {
-        return target.objective_type_id === 3;
-    }
-
-    if (source.schema_key === 'objective_blank_open') {
-        return [4, 27].includes(target.objective_type_id);
-    }
-
-    if (source.schema_key === 'objective_passage_mcq') {
-        return target.objective_type_id === 5;
-    }
-
-    return ![2, 3, 4, 5, 27].includes(target.objective_type_id);
+    return match.find(([pattern]) => pattern.test(name))?.[1] ?? null;
 }
 
 function messageFrom(error: unknown): string {
@@ -176,12 +147,15 @@ async function jsonRequest<T>(
 }
 
 export default function LegacyExport({ history }: { history: Run[] }) {
+    const legacyChoices = useRef(
+        new Map<string, { classes: Item[]; subjects: Item[] }>(),
+    );
     const [mode, setMode] = useState<Mode>('subject');
     const [catalog, setCatalog] = useState<Catalog | null>(null);
     const [patternId, setPatternId] = useState<number | null>(null);
     const [classId, setClassId] = useState<number | null>(null);
     const [subjectId, setSubjectId] = useState<number | null>(null);
-    const [legacyAfaq, setLegacyAfaq] = useState<number | null>(null);
+    const [legacyAfaq, setLegacyAfaq] = useState<number | null>(3);
     const [legacyClassId, setLegacyClassId] = useState<number | null>(null);
     const [legacySubjectId, setLegacySubjectId] = useState<number | null>(null);
     const [ids, setIds] = useState<number[]>([]);
@@ -191,9 +165,6 @@ export default function LegacyExport({ history }: { history: Run[] }) {
     const [topicFilterId, setTopicFilterId] = useState<number | null>(null);
     const [typeFilterId, setTypeFilterId] = useState<number | null>(null);
     const [replaceExisting, setReplaceExisting] = useState(false);
-    const [legacyTypeIds, setLegacyTypeIds] = useState<Record<number, number>>(
-        {},
-    );
     const [search, setSearch] = useState('');
     const [preview, setPreview] = useState<Preview | null>(null);
     const [report, setReport] = useState<Report | null>(null);
@@ -203,8 +174,24 @@ export default function LegacyExport({ history }: { history: Run[] }) {
     const [runs, setRuns] = useState(history);
 
     useEffect(() => {
+        if (mode === 'history') {
+            return;
+        }
+
         let active = true;
         const params = new URLSearchParams();
+        const legacyKey = `${legacyAfaq ?? 'none'}:${legacyClassId ?? 'none'}`;
+        const cachedLegacy = legacyChoices.current.get(legacyKey);
+        params.set('mode', mode);
+        params.set('include_legacy', cachedLegacy ? '0' : '1');
+
+        if (legacyAfaq !== null) {
+            params.set('afaq', String(legacyAfaq));
+        }
+
+        if (legacyClassId !== null) {
+            params.set('legacy_class_id', String(legacyClassId));
+        }
 
         if (patternId) {
             params.set('pattern_id', String(patternId));
@@ -218,14 +205,10 @@ export default function LegacyExport({ history }: { history: Run[] }) {
             params.set('subject_id', String(subjectId));
         }
 
-        if (legacyAfaq !== null) {
-            params.set('afaq', String(legacyAfaq));
-        }
-
         params.set('page', String(page));
         params.set('per_page', String(perPage));
 
-        if (mode === 'questions' && chapterFilterId) {
+        if ((mode === 'questions' || mode === 'topics') && chapterFilterId) {
             params.set('chapter_id', String(chapterFilterId));
         }
 
@@ -244,7 +227,16 @@ export default function LegacyExport({ history }: { history: Run[] }) {
         )
             .then((data) => {
                 if (active) {
-                    setCatalog(data);
+                    const choices = cachedLegacy ?? {
+                        classes: data.legacy_classes,
+                        subjects: data.legacy_subjects,
+                    };
+                    legacyChoices.current.set(legacyKey, choices);
+                    setCatalog({
+                        ...data,
+                        legacy_classes: choices.classes,
+                        legacy_subjects: choices.subjects,
+                    });
                 }
             })
             .catch((cause) => {
@@ -266,6 +258,7 @@ export default function LegacyExport({ history }: { history: Run[] }) {
         classId,
         subjectId,
         legacyAfaq,
+        legacyClassId,
         page,
         perPage,
         mode,
@@ -336,9 +329,6 @@ export default function LegacyExport({ history }: { history: Run[] }) {
             .includes(search.toLowerCase()),
     );
     const selected = useMemo(() => new Set(ids), [ids]);
-    const mappingTypes = (catalog?.question_types ?? []).filter((type) =>
-        mode === 'question_types' ? selected.has(type.id) : true,
-    );
     const selection = {
         mode,
         pattern_id: patternId,
@@ -349,7 +339,6 @@ export default function LegacyExport({ history }: { history: Run[] }) {
         legacy_subject_id: legacySubjectId,
         ids,
         replace_existing: replaceExisting,
-        legacy_type_ids: legacyTypeIds,
     };
     const canPreview =
         mode !== 'history' &&
@@ -489,11 +478,11 @@ export default function LegacyExport({ history }: { history: Run[] }) {
                 </div>
             ) : (
                 <>
-                    <div className="grid items-start gap-4 lg:grid-cols-2">
+                    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)]">
                         <div className="min-w-0 space-y-4">
-                            <section className="grid gap-4 rounded-lg border p-4 sm:grid-cols-2 2xl:grid-cols-3">
-                                <h2 className="font-semibold sm:col-span-2 2xl:col-span-3">
-                                    New TestMaker
+                            <section className="space-y-4 rounded-lg border p-4">
+                                <h2 className="text-sm font-semibold">
+                                    Source · New TestMaker
                                 </h2>
                                 <FloatingCombobox
                                     label="Pattern"
@@ -508,6 +497,24 @@ export default function LegacyExport({ history }: { history: Run[] }) {
                                         );
                                         setClassId(null);
                                         setSubjectId(null);
+                                        setLegacyAfaq(
+                                            item
+                                                ? matchingLegacyPattern(
+                                                      item.label,
+                                                  )
+                                                : null,
+                                        );
+                                        setLegacyClassId(null);
+                                        setLegacySubjectId(null);
+                                        setCatalog((current) =>
+                                            current
+                                                ? {
+                                                      ...current,
+                                                      legacy_classes: [],
+                                                      legacy_subjects: [],
+                                                  }
+                                                : current,
+                                        );
                                         setIds([]);
                                         clearPreview();
                                     }}
@@ -556,7 +563,6 @@ export default function LegacyExport({ history }: { history: Run[] }) {
                                             item ? Number(item.id) : null,
                                         );
                                         setIds([]);
-                                        setLegacyTypeIds({});
                                         setPage(1);
                                         clearPreview();
                                     }}
@@ -827,10 +833,15 @@ export default function LegacyExport({ history }: { history: Run[] }) {
                                 </section>
                             )}
                         </div>
+                        <div className="flex items-center justify-center">
+                            <span className="flex size-10 items-center justify-center rounded-full border">
+                                <ArrowRightIcon className="size-5" />
+                            </span>
+                        </div>
                         <div className="min-w-0 space-y-4">
-                            <section className="grid gap-4 rounded-lg border p-4 sm:grid-cols-2 2xl:grid-cols-3">
-                                <h2 className="font-semibold sm:col-span-2 2xl:col-span-3">
-                                    Old TestMaker
+                            <section className="space-y-4 rounded-lg border p-4">
+                                <h2 className="text-sm font-semibold">
+                                    Target · Old TestMaker
                                 </h2>
                                 <FloatingCombobox
                                     label="Pattern"
@@ -845,42 +856,55 @@ export default function LegacyExport({ history }: { history: Run[] }) {
                                         setLegacyAfaq(
                                             item ? Number(item.id) : null,
                                         );
+                                        setLegacyClassId(null);
+                                        setLegacySubjectId(null);
+                                        setCatalog((current) =>
+                                            current
+                                                ? {
+                                                      ...current,
+                                                      legacy_classes: [],
+                                                      legacy_subjects: [],
+                                                  }
+                                                : current,
+                                        );
                                         clearPreview();
                                     }}
                                 />
                                 <FloatingCombobox
                                     label="Class"
+                                    disabled={legacyAfaq === null || loading}
                                     options={options(
                                         catalog?.legacy_classes ?? [],
-                                        (item) => `#${item.id} ${item.name}`,
                                     )}
                                     value={choice(
-                                        options(
-                                            catalog?.legacy_classes ?? [],
-                                            (item) =>
-                                                `#${item.id} ${item.name}`,
-                                        ),
+                                        options(catalog?.legacy_classes ?? []),
                                         legacyClassId,
                                     )}
                                     onChange={(item) => {
                                         setLegacyClassId(
                                             item ? Number(item.id) : null,
                                         );
+                                        setLegacySubjectId(null);
+                                        setCatalog((current) =>
+                                            current
+                                                ? {
+                                                      ...current,
+                                                      legacy_subjects: [],
+                                                  }
+                                                : current,
+                                        );
                                         clearPreview();
                                     }}
                                 />
                                 <FloatingCombobox
                                     label="Subject"
+                                    disabled={legacyClassId === null || loading}
+                                    wrapOptionLabels
                                     options={options(
                                         catalog?.legacy_subjects ?? [],
-                                        (item) => `#${item.id} ${item.name}`,
                                     )}
                                     value={choice(
-                                        options(
-                                            catalog?.legacy_subjects ?? [],
-                                            (item) =>
-                                                `#${item.id} ${item.name}`,
-                                        ),
+                                        options(catalog?.legacy_subjects ?? []),
                                         legacySubjectId,
                                     )}
                                     onChange={(item) => {
@@ -890,106 +914,6 @@ export default function LegacyExport({ history }: { history: Run[] }) {
                                         clearPreview();
                                     }}
                                 />
-                            </section>
-                            <section className="space-y-3 rounded-lg border p-4">
-                                <h2 className="font-semibold">
-                                    Question type destinations
-                                </h2>
-                                <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
-                                    {mappingTypes.map((sourceType) => {
-                                        const available = (
-                                            catalog?.legacy_question_types ?? []
-                                        ).filter((oldType) =>
-                                            compatibleOldType(
-                                                sourceType,
-                                                oldType,
-                                            ),
-                                        );
-                                        const targetOptions = available.map(
-                                            (oldType) => ({
-                                                id: oldType.id,
-                                                label: `#${oldType.id} ${oldType.type_name}`,
-                                            }),
-                                        );
-                                        const automaticId =
-                                            catalog?.type_mappings[
-                                                String(sourceType.id)
-                                            ];
-                                        const automatic =
-                                            available.find(
-                                                (oldType) =>
-                                                    oldType.id === automaticId,
-                                            ) ??
-                                            available.find(
-                                                (oldType) =>
-                                                    oldType.type_name ===
-                                                    sourceType.name,
-                                            );
-
-                                        return (
-                                            <div
-                                                key={sourceType.id}
-                                                className="grid gap-2 border-b pb-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] sm:items-center"
-                                            >
-                                                <span className="min-w-0 text-sm font-medium">
-                                                    {sourceType.name}
-                                                </span>
-                                                <div className="min-w-0">
-                                                    <FloatingCombobox
-                                                        label="Old type (optional)"
-                                                        options={targetOptions}
-                                                        value={choice(
-                                                            targetOptions,
-                                                            legacyTypeIds[
-                                                                sourceType.id
-                                                            ] ?? null,
-                                                        )}
-                                                        onChange={(item) => {
-                                                            setLegacyTypeIds(
-                                                                (current) => {
-                                                                    const next =
-                                                                        {
-                                                                            ...current,
-                                                                        };
-
-                                                                    if (item) {
-                                                                        next[
-                                                                            sourceType.id
-                                                                        ] =
-                                                                            Number(
-                                                                                item.id,
-                                                                            );
-                                                                    } else {
-                                                                        delete next[
-                                                                            sourceType
-                                                                                .id
-                                                                        ];
-                                                                    }
-
-                                                                    return next;
-                                                                },
-                                                            );
-                                                            clearPreview();
-                                                        }}
-                                                    />
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Auto:{' '}
-                                                        {automatic
-                                                            ? `#${automatic.id} ${automatic.type_name}`
-                                                            : automaticId
-                                                              ? `missing saved type #${automaticId}`
-                                                              : 'create new type'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    {mappingTypes.length === 0 && (
-                                        <p className="text-sm text-muted-foreground">
-                                            No question types in this selection.
-                                        </p>
-                                    )}
-                                </div>
                             </section>
                             <section className="flex items-center justify-between gap-3 rounded-lg border p-4">
                                 <span className="text-sm font-medium">
@@ -1047,33 +971,6 @@ export default function LegacyExport({ history }: { history: Run[] }) {
                                     ? 'replace matching records'
                                     : 'keep conflicting records'}
                             </p>
-                            {preview.type_destinations.length > 0 && (
-                                <div className="grid gap-x-5 gap-y-1 border-t pt-3 sm:grid-cols-2">
-                                    {preview.type_destinations.map(
-                                        (destination) => (
-                                            <div
-                                                key={destination.source_id}
-                                                className="flex min-w-0 items-baseline justify-between gap-3"
-                                            >
-                                                <span className="truncate">
-                                                    {destination.source_name}
-                                                </span>
-                                                <span className="shrink-0 text-muted-foreground">
-                                                    →{' '}
-                                                    {destination.legacy_id
-                                                        ? `#${destination.legacy_id} ${destination.legacy_name}`
-                                                        : destination.legacy_name}
-                                                    {destination.question_type_id &&
-                                                    destination.question_type_id !==
-                                                        destination.legacy_id
-                                                        ? ` · stores #${destination.question_type_id}`
-                                                        : ''}
-                                                </span>
-                                            </div>
-                                        ),
-                                    )}
-                                </div>
-                            )}
                             {Object.entries(preview.unsupported).map(
                                 ([reason, count]) => (
                                     <p key={reason} className="text-amber-700">

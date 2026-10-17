@@ -113,6 +113,11 @@ beforeEach(function (): void {
     });
     DB::connection('legacy_mysql')->table('pk_class')->insert(['id' => 5, 'name' => '9th', 'id_order' => 1]);
     DB::connection('legacy_mysql')->table('pk_subject')->insert(['id' => 7, 'name' => 'Mathematics', 'afaq' => 4]);
+    DB::connection('legacy_mysql')->table('pk_chapter')->insert([
+        'id' => 1, 'class_id' => 5, 'subject_id' => 7, 'afaq' => 4,
+        'name' => 'Existing chapter', 'u_name' => '', 'chapter_number' => 99,
+        'chapter_type' => '', 'sort_int' => 99, 'status' => 1, 'status_pef' => 1,
+    ]);
 });
 
 function legacyExportContext(): array
@@ -147,6 +152,21 @@ it('exports a selected subject and safely retries and updates its questions', fu
     expect($service->export($selection, $admin->id)['questions_updated'])->toBe(1);
     expect(DB::connection('legacy_mysql')->table('pk_question')->first()->statement_en)->toBe('Find y.');
     expect(DB::connection('legacy_mysql')->table('pk_question')->count())->toBe(1);
+});
+
+it('accepts an empty ids list when previewing and exporting a whole subject', function (): void {
+    [$admin, $pattern, $class, $subject] = legacyExportContext();
+    $this->seed(PermissionSeeder::class);
+    $selection = [
+        'mode' => 'subject', 'pattern_id' => $pattern->id, 'class_id' => $class->id,
+        'subject_id' => $subject->id, 'legacy_afaq' => 4, 'legacy_class_id' => 5,
+        'legacy_subject_id' => 7, 'ids' => [],
+    ];
+
+    $this->actingAs($admin)->postJson('/superadmin/legacy-export/preview', $selection)
+        ->assertOk()->assertJsonPath('ready', 1);
+    $this->postJson('/superadmin/legacy-export', $selection)
+        ->assertOk()->assertJsonPath('report.questions_created', 1);
 });
 
 it('reports a conflict when an old question has changed independently', function (): void {
@@ -266,6 +286,79 @@ it('filters question pages and permits 200 rows', function (): void {
     expect($catalog['questions']->items()[0]->id)->toBe($question->id);
 });
 
+it('loads only the catalog data needed by the active tab', function (): void {
+    [$admin, $pattern, $class, $subject, $chapter] = legacyExportContext();
+    Topic::create(['chapter_id' => $chapter->id, 'name' => 'Linear equations', 'sort_id' => 1, 'status' => 1]);
+    $filter = ['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id, 'afaq' => 4, 'legacy_class_id' => 5];
+    $service = app(LegacyExportService::class);
+
+    $subjectCatalog = $service->catalog($filter + ['mode' => 'subject']);
+    expect($subjectCatalog['legacy_classes'])->toHaveCount(1);
+    expect($subjectCatalog['chapters'])->toBe([]);
+    expect($subjectCatalog['questions'])->toBeNull();
+
+    $withoutLegacy = $service->catalog($filter + ['mode' => 'subject', 'include_legacy' => false]);
+    expect($withoutLegacy['legacy_classes'])->toBe([]);
+    expect($withoutLegacy['legacy_subjects'])->toBe([]);
+
+    $chapterCatalog = $service->catalog($filter + ['mode' => 'chapters']);
+    expect($chapterCatalog['chapters'])->toHaveCount(1);
+    expect($chapterCatalog['topics'])->toBe([]);
+    expect($chapterCatalog['question_types'])->toBe([]);
+    expect($chapterCatalog['questions'])->toBeNull();
+
+    $topicCatalog = $service->catalog($filter + ['mode' => 'topics', 'chapter_id' => $chapter->id]);
+    expect($topicCatalog['topics'])->toHaveCount(1);
+    expect($topicCatalog['question_types'])->toBe([]);
+    expect($topicCatalog['questions'])->toBeNull();
+
+    $questionCatalog = $service->catalog($filter + ['mode' => 'questions']);
+    expect($questionCatalog['questions']->total())->toBe(1);
+});
+
+it('limits old classes and subjects to the selected pattern and class', function (): void {
+    [$admin, $pattern, $class, $subject] = legacyExportContext();
+    $old = DB::connection('legacy_mysql');
+    $old->table('pk_class')->insert(['id' => 6, 'name' => '10th', 'id_order' => 2]);
+    $old->table('pk_subject')->insert(['id' => 8, 'name' => 'General Science', 'afaq' => 0]);
+    $old->table('pk_chapter')->insert([
+        ['id' => 2, 'class_id' => 6, 'subject_id' => 8, 'afaq' => 4, 'name' => 'Federal science', 'u_name' => '', 'chapter_number' => 1, 'chapter_type' => '', 'sort_int' => 1, 'status' => 1, 'status_pef' => 1],
+        ['id' => 3, 'class_id' => 5, 'subject_id' => 8, 'afaq' => 0, 'name' => 'Punjab science', 'u_name' => '', 'chapter_number' => 1, 'chapter_type' => '', 'sort_int' => 1, 'status' => 1, 'status_pef' => 1],
+    ]);
+    $service = app(LegacyExportService::class);
+
+    $federal = $service->catalog(['mode' => 'subject', 'afaq' => 4, 'legacy_class_id' => 5]);
+    expect($federal['legacy_classes']->pluck('id')->all())->toBe([5, 6]);
+    expect($federal['legacy_subjects']->pluck('id')->all())->toBe([7]);
+
+    $punjab = $service->catalog(['mode' => 'subject', 'afaq' => 0, 'legacy_class_id' => 5]);
+    expect($punjab['legacy_classes']->pluck('id')->all())->toBe([5]);
+    expect($punjab['legacy_subjects']->pluck('id')->all())->toBe([8]);
+
+    expect(fn () => $service->preview([
+        'mode' => 'subject', 'pattern_id' => $pattern->id, 'class_id' => $class->id,
+        'subject_id' => $subject->id, 'legacy_afaq' => 4, 'legacy_class_id' => 5,
+        'legacy_subject_id' => 8, 'ids' => [],
+    ]))->toThrow(RuntimeException::class, 'not linked');
+});
+
+it('shows the PECTA classes under the short syllabus legacy pattern', function (): void {
+    $old = DB::connection('legacy_mysql');
+    $old->table('pk_class')->insert(['id' => 6, 'name' => 'One', 'id_order' => 2]);
+    $old->table('pk_subject')->insert(['id' => 8, 'name' => 'English', 'afaq' => 3]);
+    $old->table('pk_chapter')->insert([
+        'id' => 2, 'class_id' => 6, 'subject_id' => 8, 'afaq' => 3,
+        'name' => 'Chapter 1', 'u_name' => '', 'chapter_number' => 1,
+        'chapter_type' => '', 'sort_int' => 1, 'status' => 1, 'status_pef' => 1,
+    ]);
+
+    $catalog = app(LegacyExportService::class)->catalog(['mode' => 'subject', 'afaq' => 3, 'legacy_class_id' => 6]);
+
+    expect(collect($catalog['legacy_patterns'])->firstWhere('id', 3)['name'])->toContain('PECTA');
+    expect($catalog['legacy_classes']->pluck('name')->all())->toBe(['One']);
+    expect($catalog['legacy_subjects']->pluck('name')->all())->toBe(['English']);
+});
+
 it('replaces a changed old question only when the replacement option is selected', function (): void {
     [$admin, $pattern, $class, $subject] = legacyExportContext();
     $selection = ['mode' => 'subject', 'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id, 'legacy_afaq' => 4, 'legacy_class_id' => 5, 'legacy_subject_id' => 7, 'ids' => []];
@@ -297,7 +390,7 @@ it('uses an explicitly selected compatible old question type', function (): void
     ];
     $service = app(LegacyExportService::class);
 
-    expect($service->preview($selection)['type_destinations'][0]['legacy_id'])->toBe(333);
+    expect($service->preview($selection)['ready'])->toBe(1);
     expect($service->export($selection, $admin->id)['questions_created'])->toBe(1);
     expect(DB::connection('legacy_mysql')->table('pk_question')->value('type_id'))->toBe('333');
 });

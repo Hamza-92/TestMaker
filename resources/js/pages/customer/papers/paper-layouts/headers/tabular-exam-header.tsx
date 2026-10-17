@@ -1,6 +1,10 @@
 import { RichTextField } from '../questions/rich-text-field';
 import type { GeneratedPaperHeader } from '../types';
 import { HeaderLogo } from './header-logo';
+import {
+    formatPaperHeaderDate,
+    normalizePaperHeaderDateInput,
+} from './paper-header-date';
 
 interface TabularExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -157,7 +161,11 @@ function InlineField({
     const readOnly = field !== 'date' && field !== 'duration';
     const raw = header[field];
     const displayValue =
-        emptyZero && (raw === 0 || raw === '0') ? '' : String(raw ?? '');
+        emptyZero && (raw === 0 || raw === '0')
+            ? ''
+            : field === 'date'
+              ? formatPaperHeaderDate(String(raw ?? ''))
+              : String(raw ?? '');
 
     return (
         <div
@@ -177,7 +185,14 @@ function InlineField({
                 <input
                     autoComplete="off"
                     value={displayValue}
-                    onChange={(e) => onChange(field, e.target.value)}
+                    onChange={(e) =>
+                        onChange(
+                            field,
+                            field === 'date'
+                                ? normalizePaperHeaderDateInput(e.target.value)
+                                : e.target.value,
+                        )
+                    }
                     readOnly={readOnly}
                     tabIndex={readOnly ? -1 : undefined}
                     className="min-w-0 flex-1 border-b border-current bg-transparent font-normal outline-none"

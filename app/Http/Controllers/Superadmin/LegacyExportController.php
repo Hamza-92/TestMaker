@@ -24,10 +24,13 @@ class LegacyExportController extends Controller
     public function catalog(Request $request, LegacyExportService $export): JsonResponse
     {
         $filter = $request->validate([
+            'mode' => ['nullable', Rule::in(['subject', 'chapters', 'topics', 'question_types', 'questions'])],
+            'include_legacy' => ['nullable', 'boolean'],
             'pattern_id' => ['nullable', 'integer', 'min:1'],
             'class_id' => ['nullable', 'integer', 'min:1'],
             'subject_id' => ['nullable', 'integer', 'min:1'],
             'afaq' => ['nullable', 'integer', 'between:0,9'],
+            'legacy_class_id' => ['nullable', 'integer', 'min:1'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', Rule::in([50, 100, 200])],
             'chapter_id' => ['nullable', 'integer', 'min:1'],
@@ -75,7 +78,7 @@ class LegacyExportController extends Controller
             'legacy_class_id' => ['required', 'integer', 'min:1'],
             'legacy_subject_id' => ['required', 'integer', 'min:1'],
             'mode' => ['required', Rule::in(['subject', 'chapters', 'topics', 'question_types', 'questions'])],
-            'ids' => ['required_unless:mode,subject', 'array', 'min:1', 'max:2000'],
+            'ids' => [Rule::excludeIf($request->input('mode') === 'subject'), 'required', 'array', 'min:1', 'max:2000'],
             'ids.*' => ['integer', 'min:1', 'distinct'],
             'replace_existing' => ['nullable', 'boolean'],
             'legacy_type_ids' => ['nullable', 'array'],

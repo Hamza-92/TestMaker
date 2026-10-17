@@ -1,5 +1,9 @@
 import { RichTextField } from '../questions/rich-text-field';
 import type { GeneratedPaperHeader } from '../types';
+import {
+    formatPaperHeaderDate,
+    normalizePaperHeaderDateInput,
+} from './paper-header-date';
 
 interface CompactExamHeaderProps {
     header: GeneratedPaperHeader;
@@ -122,8 +126,19 @@ function CompactField({
             ) : (
                 <input
                     autoComplete="off"
-                    value={String(header[field] ?? '')}
-                    onChange={(e) => onChange(field, e.target.value)}
+                    value={
+                        field === 'date'
+                            ? formatPaperHeaderDate(String(header[field] ?? ''))
+                            : String(header[field] ?? '')
+                    }
+                    onChange={(e) =>
+                        onChange(
+                            field,
+                            field === 'date'
+                                ? normalizePaperHeaderDateInput(e.target.value)
+                                : e.target.value,
+                        )
+                    }
                     className="w-full min-w-0 border-b border-current bg-transparent text-sm font-normal outline-none"
                 />
             )}

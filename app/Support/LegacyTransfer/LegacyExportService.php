@@ -43,10 +43,13 @@ class LegacyExportService
 
     public function catalog(array $filter): array
     {
+        $mode = $filter['mode'] ?? 'questions';
+        $includeLegacy = (bool) ($filter['include_legacy'] ?? true);
+        $legacyPattern = isset($filter['afaq']) ? (int) $filter['afaq'] : null;
+        $legacyClassId = (int) ($filter['legacy_class_id'] ?? 0);
         $patternId = (int) ($filter['pattern_id'] ?? 0);
         $classId = (int) ($filter['class_id'] ?? 0);
         $subjectId = (int) ($filter['subject_id'] ?? 0);
-        $afaq = (int) ($filter['afaq'] ?? 0);
         $chapterFilterId = (int) ($filter['chapter_id'] ?? 0);
         $topicFilterId = (int) ($filter['topic_id'] ?? 0);
         $typeFilterId = (int) ($filter['question_type_id'] ?? 0);
@@ -55,37 +58,56 @@ class LegacyExportService
             'patterns' => Pattern::query()->orderBy('sort_order')->get(['id', 'name']),
             'classes' => $patternId ? SchoolClass::query()->whereHas('patterns', fn ($q) => $q->whereKey($patternId))->ordered()->get(['classes.id', 'classes.name']) : [],
             'subjects' => $patternId && $classId ? Subject::query()->whereHas('classSubjects', fn ($q) => $q->where('pattern_id', $patternId)->where('class_id', $classId))->orderBy('name_eng')->get(['id', 'name_eng', 'name_ur']) : [],
-            'legacy_classes' => DB::connection(self::CONNECTION)->table('pk_class')->orderBy('id_order')->get(['id', 'name']),
-            'legacy_subjects' => DB::connection(self::CONNECTION)->table('pk_subject')->orderBy('name')->get(['id', 'name', 'afaq']),
-            'legacy_question_types' => DB::connection(self::CONNECTION)->table('pk_question_types')
-                ->orderBy('type_name')->get(['id', 'type_name', 'is_objective', 'objective_type_id']),
+            'legacy_classes' => $includeLegacy && $legacyPattern !== null
+                ? DB::connection(self::CONNECTION)->table('pk_class as old_class')
+                    ->whereExists(fn ($query) => $query->selectRaw('1')->from('pk_chapter as old_chapter')
+                        ->whereColumn('old_chapter.class_id', 'old_class.id')->where('old_chapter.afaq', $legacyPattern))
+                    ->orderBy('old_class.id_order')->get(['old_class.id', 'old_class.name'])
+                : [],
+            'legacy_subjects' => $includeLegacy && $legacyPattern !== null && $legacyClassId
+                ? DB::connection(self::CONNECTION)->table('pk_subject as old_subject')
+                    ->whereExists(fn ($query) => $query->selectRaw('1')->from('pk_chapter as old_chapter')
+                        ->whereColumn('old_chapter.subject_id', 'old_subject.id')
+                        ->where('old_chapter.class_id', $legacyClassId)->where('old_chapter.afaq', $legacyPattern))
+                    ->orderBy('old_subject.name')->get(['old_subject.id', 'old_subject.name'])
+                : [],
+            'chapters' => [],
+            'topics' => [],
+            'question_types' => [],
+            'questions' => null,
         ];
 
-        if ($patternId && $classId && $subjectId && $this->scopeExists($patternId, $classId, $subjectId)) {
+        if ($mode !== 'subject' && $patternId && $classId && $subjectId && $this->scopeExists($patternId, $classId, $subjectId)) {
             $chapters = Chapter::query()->where('pattern_id', $patternId)->where('class_id', $classId)->where('subject_id', $subjectId)->orderBy('sort_id')->orderBy('id')->get(['id', 'name', 'chapter_number']);
             $chapterIds = $chapters->pluck('id');
-            $result['chapters'] = $chapters;
-            $result['topics'] = Topic::query()->whereIn('chapter_id', $chapterIds)->orderBy('chapter_id')->orderBy('sort_id')->get(['id', 'chapter_id', 'name']);
-            $result['question_types'] = QuestionType::query()->whereIn('id', Question::query()->whereIn('chapter_id', $chapterIds)->select('question_type_id'))->orderBy('name')->get(['id', 'name', 'schema_key', 'is_objective']);
-            $result['type_mappings'] = DB::table('legacy_export_items')->where('entity_type', 'question_type')->whereIn('entity_id', $result['question_types']->pluck('id'))->pluck('legacy_id', 'entity_id');
-            $result['questions'] = Question::query()->whereIn('chapter_id', $chapterIds)
-                ->when($chapterFilterId, fn ($query) => $query->where('chapter_id', $chapterFilterId))
-                ->when($topicFilterId, fn ($query) => $query->where('topic_id', $topicFilterId))
-                ->when($typeFilterId, fn ($query) => $query->where('question_type_id', $typeFilterId))
-                ->selectRaw('id, chapter_id, topic_id, question_type_id, schema_key, substr(statement_en, 1, 300) as statement_en, substr(statement_ur, 1, 300) as statement_ur')
-                ->orderBy('id')->paginate((int) ($filter['per_page'] ?? 50), ['*'], 'page', max(1, (int) ($filter['page'] ?? 1)));
-        } else {
-            $result += ['chapters' => [], 'topics' => [], 'question_types' => [], 'type_mappings' => [], 'questions' => null];
+            if (in_array($mode, ['chapters', 'topics', 'questions'], true)) {
+                $result['chapters'] = $chapters;
+            }
+            if (in_array($mode, ['topics', 'questions'], true)) {
+                $result['topics'] = Topic::query()->whereIn('chapter_id', $chapterIds)
+                    ->when($chapterFilterId, fn ($query) => $query->where('chapter_id', $chapterFilterId))
+                    ->orderBy('chapter_id')->orderBy('sort_id')->get(['id', 'chapter_id', 'name']);
+            }
+            if (in_array($mode, ['question_types', 'questions'], true)) {
+                $result['question_types'] = QuestionType::query()->whereIn('id', Question::query()->whereIn('chapter_id', $chapterIds)->select('question_type_id'))->orderBy('name')->get(['id', 'name', 'schema_key']);
+            }
+            if ($mode === 'questions') {
+                $result['questions'] = Question::query()->whereIn('chapter_id', $chapterIds)
+                    ->when($chapterFilterId, fn ($query) => $query->where('chapter_id', $chapterFilterId))
+                    ->when($topicFilterId, fn ($query) => $query->where('topic_id', $topicFilterId))
+                    ->when($typeFilterId, fn ($query) => $query->where('question_type_id', $typeFilterId))
+                    ->selectRaw('id, chapter_id, topic_id, question_type_id, schema_key, substr(statement_en, 1, 300) as statement_en, substr(statement_ur, 1, 300) as statement_ur')
+                    ->orderBy('id')->paginate((int) ($filter['per_page'] ?? 50), ['*'], 'page', max(1, (int) ($filter['page'] ?? 1)));
+            }
         }
 
         $result['legacy_patterns'] = [
             ['id' => 0, 'name' => 'Punjab'], ['id' => 1, 'name' => 'AFAQ'],
-            ['id' => 2, 'name' => 'Oxford'], ['id' => 3, 'name' => 'Short Syllabus / PEF'],
+            ['id' => 2, 'name' => 'Oxford'], ['id' => 3, 'name' => 'PECTA / Short Syllabus / PEF'],
             ['id' => 4, 'name' => 'Federal'], ['id' => 5, 'name' => 'AFAQ Sons'],
             ['id' => 6, 'name' => 'AJK'], ['id' => 7, 'name' => 'KPK'],
             ['id' => 8, 'name' => 'SS'], ['id' => 9, 'name' => 'Sindh'],
         ];
-        $result['selected_legacy_pattern'] = $afaq;
 
         return $result;
     }
@@ -112,42 +134,7 @@ class LegacyExportService
             'chapters' => $this->chapters($selection)->count(),
             'target' => $this->targetLabels($selection),
             'replace_existing' => (bool) ($selection['replace_existing'] ?? false),
-            'type_destinations' => $this->typeDestinations($selection),
         ];
-    }
-
-    private function typeDestinations(array $selection): array
-    {
-        $types = QuestionType::query()->whereIn('id', $this->questions($selection)->select('question_type_id'))
-            ->get(['id', 'name', 'is_objective', 'schema_key']);
-        $legacy = DB::connection(self::CONNECTION);
-
-        return $types->map(function (QuestionType $type) use ($selection, $legacy): array {
-            $overrideId = (int) ($selection['legacy_type_ids'][$type->id] ?? 0);
-            $mappedId = DB::table('legacy_export_items')->where('entity_type', 'question_type')->where('entity_id', $type->id)->value('legacy_id');
-            $target = $overrideId
-                ? $legacy->table('pk_question_types')->where('id', $overrideId)->first(['id', 'type_name', 'is_objective', 'objective_type_id'])
-                : ($mappedId
-                    ? $legacy->table('pk_question_types')->where('id', $mappedId)->first(['id', 'type_name', 'is_objective', 'objective_type_id'])
-                    : $legacy->table('pk_question_types')->where('type_name', $type->name)->where('is_objective', (int) $type->is_objective)->first(['id', 'type_name', 'is_objective', 'objective_type_id']));
-            if ($overrideId && ! $target) {
-                throw new RuntimeException("Old question type {$overrideId} no longer exists.");
-            }
-            $incompatible = $target && ((bool) $target->is_objective !== (bool) $type->is_objective
-                || ($type->is_objective && ! $this->compatibleObjectiveParent($type->schema_key, (int) $target->objective_type_id))
-                || ($type->schema_key === SchemaKeys::SUBJECTIVE_SAME_STATEMENT && ! in_array((int) $target->id, [336, 386], true)));
-            if ($overrideId && $incompatible) {
-                throw new RuntimeException("Old question type {$target->id} is incompatible with {$type->name}.");
-            }
-
-            return [
-                'source_id' => $type->id,
-                'source_name' => $type->name,
-                'legacy_id' => $target->id ?? null,
-                'legacy_name' => $incompatible ? 'Incompatible old type' : ($target->type_name ?? ($mappedId ? 'Missing saved type' : 'New type')),
-                'question_type_id' => $target && ! $incompatible ? ($type->is_objective ? (int) $target->objective_type_id : (int) $target->id) : null,
-            ];
-        })->all();
     }
 
     public function export(array $selection, ?int $userId): array
@@ -259,6 +246,11 @@ class LegacyExportService
         if (! $legacy->table('pk_class')->where('id', $selection['legacy_class_id'])->exists()
             || ! $legacy->table('pk_subject')->where('id', $selection['legacy_subject_id'])->exists()) {
             throw new RuntimeException('The selected old class or subject no longer exists.');
+        }
+        if (! $legacy->table('pk_chapter')->where('afaq', $selection['legacy_afaq'])
+            ->where('class_id', $selection['legacy_class_id'])
+            ->where('subject_id', $selection['legacy_subject_id'])->exists()) {
+            throw new RuntimeException('The selected old pattern, class and subject are not linked.');
         }
     }
 
