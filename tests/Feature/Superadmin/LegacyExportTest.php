@@ -236,6 +236,50 @@ it('keeps passage questions in the old paragraph format', function (): void {
     expect($items[0]['options'][0]['is_true'])->toBe(1);
 });
 
+it('exports one grouped subjective prompt without losing its intro or answer', function (): void {
+    [$admin, $pattern, $class, $subject, $chapter] = legacyExportContext();
+    $type = QuestionType::create(['name' => 'Long Question', 'heading_en' => 'Long questions', 'is_objective' => false, 'schema_key' => 'subjective_grouped', 'status' => 1]);
+    $grouped = Question::create([
+        'chapter_id' => $chapter->id, 'question_type_id' => $type->id,
+        'schema_key' => 'subjective_grouped', 'statement_en' => 'Find the area.',
+        'content' => [
+            'intro_en' => 'Solve the following.', 'intro_ur' => 'حل کریں۔',
+            'items' => [[
+                'prompt_en' => 'Find the area.', 'prompt_ur' => 'رقبہ معلوم کریں۔',
+                'answer_en' => 'Area = 12', 'answer_ur' => 'رقبہ = ۱۲',
+            ]],
+        ],
+        'status' => 1,
+    ]);
+    $multiple = Question::create([
+        'chapter_id' => $chapter->id, 'question_type_id' => $type->id,
+        'schema_key' => 'subjective_grouped', 'statement_en' => 'Two prompts',
+        'content' => [
+            'intro_en' => 'Solve both.', 'items' => [
+                ['prompt_en' => 'First'], ['prompt_en' => 'Second'],
+            ],
+        ],
+        'status' => 1,
+    ]);
+    $selection = [
+        'mode' => 'questions', 'pattern_id' => $pattern->id, 'class_id' => $class->id,
+        'subject_id' => $subject->id, 'legacy_afaq' => 4, 'legacy_class_id' => 5,
+        'legacy_subject_id' => 7, 'ids' => [$grouped->id, $multiple->id],
+    ];
+    $service = app(LegacyExportService::class);
+
+    expect($service->preview($selection)['ready'])->toBe(1);
+    expect($service->preview($selection)['unsupported'])->toHaveKey('Grouped question needs exactly one prompt for the old format');
+    expect($service->export($selection, $admin->id)['questions_created'])->toBe(1);
+    $old = DB::connection('legacy_mysql')->table('pk_question')->where('statement_en', 'Find the area.')->first();
+    expect($old->statement_ur)->toBe('رقبہ معلوم کریں۔');
+    expect($old->description_en)->toBe('Solve the following.');
+    expect($old->description_ur)->toBe('حل کریں۔');
+    expect($old->answer_en)->toBe('Area = 12');
+    expect($old->answer_ur)->toBe('رقبہ = ۱۲');
+    expect($service->export($selection, $admin->id)['questions_created'])->toBe(0);
+});
+
 it('restricts the selection to the requested questions and chapter scope', function (): void {
     [$admin, $pattern, $class, $subject, $chapter, $question] = legacyExportContext();
     $other = Question::create([
@@ -340,6 +384,31 @@ it('limits old classes and subjects to the selected pattern and class', function
         'subject_id' => $subject->id, 'legacy_afaq' => 4, 'legacy_class_id' => 5,
         'legacy_subject_id' => 8, 'ids' => [],
     ]))->toThrow(RuntimeException::class, 'not linked');
+});
+
+it('matches chapters by name while preserving old names and numbers', function (): void {
+    [$admin, $pattern, $class, $subject, $chapter, $question] = legacyExportContext();
+    $chapter->update(['name' => 'Ch # 1: Algebra']);
+    $old = DB::connection('legacy_mysql');
+    $old->table('pk_chapter')->insert([
+        ['id' => 2, 'class_id' => 5, 'subject_id' => 7, 'afaq' => 4, 'name' => 'Different syllabus', 'u_name' => '', 'chapter_number' => 1, 'chapter_type' => '', 'sort_int' => 1, 'status' => 1, 'status_pef' => 1],
+        ['id' => 3, 'class_id' => 5, 'subject_id' => 7, 'afaq' => 4, 'name' => 'Chapter # 7: Algebra', 'u_name' => '', 'chapter_number' => 7, 'chapter_type' => '', 'sort_int' => 7, 'status' => 1, 'status_pef' => 1],
+    ]);
+    $newChapter = Chapter::create(['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id, 'name' => 'New curriculum', 'chapter_number' => 99, 'sort_id' => 99, 'status' => 1]);
+    Question::create(['chapter_id' => $newChapter->id, 'question_type_id' => $question->question_type_id, 'schema_key' => 'subjective_standard', 'statement_en' => 'New question', 'content' => ['prompt_en' => 'New question'], 'status' => 1]);
+    $selection = ['mode' => 'subject', 'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id, 'legacy_afaq' => 4, 'legacy_class_id' => 5, 'legacy_subject_id' => 7, 'ids' => []];
+    $service = app(LegacyExportService::class);
+
+    expect($service->export($selection, $admin->id)['questions_created'])->toBe(2);
+    expect($old->table('pk_question')->where('statement_en', 'Find x.')->value('chapter_id'))->toBe(3);
+    expect($old->table('pk_chapter')->where('id', 3)->first(['name', 'chapter_number']))
+        ->toMatchArray(['name' => 'Chapter # 7: Algebra', 'chapter_number' => 7]);
+    expect($old->table('pk_chapter')->where('id', 2)->first(['name', 'chapter_number']))
+        ->toMatchArray(['name' => 'Different syllabus', 'chapter_number' => 1]);
+    expect($old->table('pk_chapter')->where('id', 1)->first(['name', 'chapter_number']))
+        ->toMatchArray(['name' => 'Existing chapter', 'chapter_number' => 99]);
+    expect($old->table('pk_chapter')->where('name', 'New curriculum')->value('chapter_number'))->toBe(99);
+    expect($service->export($selection, $admin->id)['questions_created'])->toBe(0);
 });
 
 it('shows the PECTA classes under the short syllabus legacy pattern', function (): void {

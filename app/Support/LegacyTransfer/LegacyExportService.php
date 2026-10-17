@@ -35,6 +35,7 @@ class LegacyExportService
         SchemaKeys::OBJECTIVE_PASSAGE_MCQ,
         SchemaKeys::SUBJECTIVE_STANDARD,
         SchemaKeys::SUBJECTIVE_SAME_STATEMENT,
+        SchemaKeys::SUBJECTIVE_GROUPED,
     ];
 
     private ?array $sharedStatementTypeNames = null;
@@ -342,6 +343,9 @@ class LegacyExportService
         if ($schema === SchemaKeys::OBJECTIVE_TRUE_FALSE && ! in_array($content['correct_boolean'] ?? '', ['true', 'false'], true)) {
             return 'True/false answer is missing';
         }
+        if ($schema === SchemaKeys::SUBJECTIVE_GROUPED && count($content['items'] ?? []) !== 1) {
+            return 'Grouped question needs exactly one prompt for the old format';
+        }
         if ($schema === SchemaKeys::SUBJECTIVE_SAME_STATEMENT) {
             $destinationId = (int) ($selection['legacy_type_ids'][$question->question_type_id]
                 ?? DB::table('legacy_export_items')->where('entity_type', 'question_type')->where('entity_id', $question->question_type_id)->value('legacy_id'));
@@ -405,10 +409,20 @@ class LegacyExportService
         if ($mapped && ! $existing) {
             throw new RuntimeException('Saved old chapter mapping points outside the selected target.');
         }
+        $chapterName = $this->normalizedChapterName((string) $chapter->name);
+        if ($existing && $this->normalizedChapterName((string) $existing->name) !== $chapterName) {
+            throw new RuntimeException('Saved old chapter mapping points to a different chapter name.');
+        }
         if (! $existing) {
-            $existing = $chapter->chapter_number !== null
-                ? $query->clone()->where('chapter_number', $chapter->chapter_number)->first()
-                : $query->clone()->where('name', $chapter->name)->first();
+            $oldChapters = $query->clone()->get();
+            $matches = $oldChapters->filter(fn ($old) => trim((string) $old->name) === trim((string) $chapter->name));
+            if ($matches->isEmpty()) {
+                $matches = $oldChapters->filter(fn ($old) => $this->normalizedChapterName((string) $old->name) === $chapterName);
+            }
+            if ($matches->count() > 1) {
+                throw new RuntimeException('More than one old chapter has this name.');
+            }
+            $existing = $matches->first();
         }
         $payload = [
             'class_id' => $selection['legacy_class_id'], 'subject_id' => $selection['legacy_subject_id'],
@@ -418,9 +432,6 @@ class LegacyExportService
             'status_pef' => $chapter->status,
         ];
         if ($existing) {
-            if ((string) $existing->name !== (string) $chapter->name) {
-                throw new RuntimeException('An old chapter with this number has a different name.');
-            }
             $id = (int) $existing->id;
             $report['matched']++;
         } else {
@@ -430,6 +441,14 @@ class LegacyExportService
         $this->remember('chapter', $chapter->id, $id, $payload);
 
         return $id;
+    }
+
+    private function normalizedChapterName(string $name): string
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', $name) ?? $name);
+        $withoutNumber = trim(preg_replace('/^ch(?:apter)?\.?\s*(?:#|no\.?)?\s*\d+\s*[:.)-]?\s*/iu', '', $name) ?? $name);
+
+        return mb_strtolower($withoutNumber !== '' ? $withoutNumber : $name);
     }
 
     private function ensureTopic(Topic $topic, int $legacyChapterId, array $selection, array &$report): int
@@ -545,6 +564,15 @@ class LegacyExportService
         ];
         if ($schema === SchemaKeys::OBJECTIVE_TRUE_FALSE) {
             $payload['answer_en'] = ($content['correct_boolean'] ?? '') === 'true' ? 'True' : 'False';
+        }
+        if ($schema === SchemaKeys::SUBJECTIVE_GROUPED) {
+            $item = $content['items'][0];
+            $payload['statement_en'] = $item['prompt_en'] ?? '';
+            $payload['statement_ur'] = $item['prompt_ur'] ?? '';
+            $payload['description_en'] = $content['intro_en'] ?? '';
+            $payload['description_ur'] = $content['intro_ur'] ?? '';
+            $payload['answer_en'] = $item['answer_en'] ?? null;
+            $payload['answer_ur'] = $item['answer_ur'] ?? null;
         }
         if ($schema === SchemaKeys::OBJECTIVE_PASSAGE_MCQ) {
             $payload['statement_en'] = $content['passage_en'] ?? '';
