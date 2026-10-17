@@ -72,6 +72,8 @@ interface SelectionRow {
 interface SortRow {
     id: number;
     summary_text: string;
+    statement_en: string | null;
+    statement_ur: string | null;
 }
 
 interface Filters {
@@ -142,6 +144,39 @@ function QuestionPreview({ row }: { row: QuestionRow }) {
                         </div>
                     )}
                 </div>
+            )}
+        </div>
+    );
+}
+
+function SortQuestionText({ row }: { row: SortRow }) {
+    const hasStatement = Boolean(
+        row.statement_en?.trim() || row.statement_ur?.trim(),
+    );
+    const contentClass =
+        'break-words [&_img]:inline-block [&_img]:max-h-40 [&_img]:max-w-full [&_img]:object-contain [&_p]:my-0';
+
+    return (
+        <div className="min-w-0 flex-1 space-y-1 overflow-x-auto">
+            {row.statement_en?.trim() && (
+                <QuestionContent
+                    value={row.statement_en}
+                    className={contentClass}
+                />
+            )}
+            {row.statement_ur?.trim() && (
+                <div dir="rtl">
+                    <QuestionContent
+                        value={row.statement_ur}
+                        className={contentClass}
+                    />
+                </div>
+            )}
+            {!hasStatement && (
+                <QuestionContent
+                    value={row.summary_text}
+                    className={contentClass}
+                />
             )}
         </div>
     );
@@ -553,9 +588,7 @@ export default function ListQuestions({
                                     <span className="w-8 shrink-0 tabular-nums text-slate-500">
                                         {index + 1}
                                     </span>
-                                    <span className="min-w-0 flex-1 truncate">
-                                        {row.summary_text}
-                                    </span>
+                                    <SortQuestionText row={row} />
                                 </div>
                             ))}
                         </div>

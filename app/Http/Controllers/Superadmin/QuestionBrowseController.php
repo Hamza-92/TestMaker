@@ -15,7 +15,6 @@ use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -167,16 +166,19 @@ class QuestionBrowseController extends Controller
             ->when(isset($scope['topic_id']),
                 fn ($query) => $query->where('topic_id', $scope['topic_id']),
                 fn ($query) => $query->whereNull('topic_id'))
+            ->with(['questionType', 'options'])
             ->orderBy('sort_order')->orderBy('id')
-            ->get(['id', 'statement_en', 'statement_ur', 'content'])
+            ->get(['id', 'question_type_id', 'schema_key', 'statement_en', 'statement_ur', 'description_en', 'description_ur', 'answer_en', 'answer_ur', 'content'])
             ->map(function (Question $question): array {
-                $content = $question->content ?? [];
-                $text = $question->statement_en ?: $question->statement_ur
-                    ?: ($content['prompt_en'] ?? $content['prompt_ur'] ?? $content['intro_en'] ?? $content['intro_ur'] ?? '');
+                $type = QuestionTypeSchemaRegistry::typeForQuestion($question, $question->questionType);
+                $content = QuestionTypeSchemaRegistry::contentFromQuestion($question, $type);
+                $hasStatement = filled($question->statement_en) || filled($question->statement_ur);
 
                 return [
                     'id' => $question->id,
-                    'summary_text' => Str::limit(trim(strip_tags((string) $text)) ?: 'Question #'.$question->id, 180),
+                    'statement_en' => $question->statement_en,
+                    'statement_ur' => $question->statement_ur,
+                    'summary_text' => $hasStatement ? '' : QuestionTypeSchemaRegistry::summarize($type, $content),
                 ];
             })->values();
 

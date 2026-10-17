@@ -273,10 +273,38 @@ it('rejects mismatched parent routes and returns lightweight selection and sort 
     $this->getJson(route('superadmin.questions.sort-rows', [
         'chapter_id' => $context['chapter']->id, 'topic_id' => $context['topic']->id,
         'question_type_id' => $context['type']->id,
-    ]))->assertOk()->assertJsonCount(1, 'rows')->assertJsonPath('rows.0.id', $question->id);
+    ]))->assertOk()->assertJsonCount(1, 'rows')
+        ->assertJsonPath('rows.0.id', $question->id)
+        ->assertJsonPath('rows.0.statement_en', 'A question')
+        ->assertJsonPath('rows.0.summary_text', '');
     $this->getJson(route('superadmin.questions.selection-ids', [
         'chapter_id' => $context['chapter']->id, 'topic_id' => $other['topic']->id,
     ]))->assertNotFound();
+});
+
+it('shows rich and structured question text when sorting without an id fallback', function () {
+    $context = questionLoadingContext();
+    $image = loadingQuestion($context, [
+        'statement_en' => '<img alt="Equation" src="/equation.svg">',
+    ]);
+    $structured = loadingQuestion($context, [
+        'statement_en' => null,
+        'schema_key' => 'objective_passage_mcq',
+        'content' => ['passage_en' => 'Read this passage before answering.'],
+    ]);
+
+    $rows = $this->actingAs($context['admin'])->getJson(route('superadmin.questions.sort-rows', [
+        'chapter_id' => $context['chapter']->id,
+        'topic_id' => $context['topic']->id,
+        'question_type_id' => $context['type']->id,
+    ]))->assertOk()->assertJsonCount(2, 'rows')->json('rows');
+
+    $rows = collect($rows)->keyBy('id');
+    expect($rows[$image->id]['statement_en'])->toBe('<img alt="Equation" src="/equation.svg">')
+        ->and($rows[$image->id]['summary_text'])->toBe('')
+        ->and($rows[$structured->id]['statement_en'])->toBeNull()
+        ->and($rows[$structured->id]['summary_text'])->toBe('Read this passage before answering.')
+        ->and($rows[$structured->id])->not->toHaveKey('content');
 });
 
 it('loads only the current chapter on edit until the chapter picker is opened', function () {
