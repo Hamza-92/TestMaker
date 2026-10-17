@@ -101,6 +101,11 @@ export function AppSidebar() {
                       href: '/superadmin/data-transfer',
                       icon: DatabaseIcon,
                   },
+                  {
+                      title: 'Export to Old TestMaker',
+                      href: '/superadmin/legacy-export',
+                      icon: DatabaseIcon,
+                  },
               ]
             : []),
         ...(can('user_transfer.manage')

@@ -26,6 +26,7 @@ use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
 use App\Http\Controllers\Superadmin\CustomPaperLayoutController;
 use App\Http\Controllers\Superadmin\DataTransferController;
+use App\Http\Controllers\Superadmin\LegacyExportController;
 use App\Http\Controllers\Superadmin\MultipartQuestionSettingController;
 use App\Http\Controllers\Superadmin\ObjectiveLayoutController;
 use App\Http\Controllers\Superadmin\PaperLayoutController;
@@ -217,6 +218,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/data-transfer', [DataTransferController::class, 'index'])->name('superadmin.data-transfer')->middleware('permission:data_transfer.manage');
         Route::get('superadmin/data-transfer/catalog', [DataTransferController::class, 'catalog'])->name('superadmin.data-transfer.catalog')->middleware('permission:data_transfer.manage');
         Route::post('superadmin/data-transfer', [DataTransferController::class, 'store'])->name('superadmin.data-transfer.store')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/legacy-export', [LegacyExportController::class, 'index'])->name('superadmin.legacy-export')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/legacy-export/catalog', [LegacyExportController::class, 'catalog'])->name('superadmin.legacy-export.catalog')->middleware('permission:data_transfer.manage');
+        Route::post('superadmin/legacy-export/preview', [LegacyExportController::class, 'preview'])->name('superadmin.legacy-export.preview')->middleware('permission:data_transfer.manage');
+        Route::post('superadmin/legacy-export', [LegacyExportController::class, 'store'])->name('superadmin.legacy-export.store')->middleware('permission:data_transfer.manage');
         Route::get('superadmin/user-transfer', [UserTransferController::class, 'index'])->name('superadmin.user-transfer')->middleware('permission:user_transfer.manage');
         Route::get('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'show'])->name('superadmin.user-transfer.show')->middleware('permission:user_transfer.manage');
         Route::post('superadmin/user-transfer/{sourceUserId}', [UserTransferController::class, 'store'])->name('superadmin.user-transfer.store')->middleware('permission:user_transfer.manage');
