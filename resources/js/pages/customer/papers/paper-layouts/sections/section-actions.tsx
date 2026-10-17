@@ -10,7 +10,8 @@ import {
     Trash2Icon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '../confirm-dialog';
 import { MAX_SECTION_COLUMNS, MIN_SECTION_COLUMNS } from '../types';
@@ -31,6 +32,7 @@ interface QuestionHoverActionsProps {
 const SPACING_MIN = 0;
 const SPACING_MAX = 40;
 const SPACING_STEP = 2;
+const QUESTION_ACTION_OPEN_EVENT = 'paper-question-actions-open';
 
 export function QuestionHoverActions({
     canSwap,
@@ -47,23 +49,291 @@ export function QuestionHoverActions({
     const [confirmAction, setConfirmAction] = useState<
         'delete' | 'random' | null
     >(null);
+    const [isOpen, setIsOpen] = useState(false);
+    const [position, setPosition] = useState({ left: 0, top: 0 });
+    const markerRef = useRef<HTMLSpanElement>(null);
+    const targetRef = useRef<HTMLElement | null>(null);
+    const toolbarRef = useRef<HTMLDivElement>(null);
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const touchPinnedRef = useRef(false);
+
+    const cancelClose = useCallback(() => {
+        if (closeTimerRef.current !== null) {
+            clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+    }, []);
+
+    const closeToolbar = useCallback(() => {
+        cancelClose();
+        touchPinnedRef.current = false;
+        targetRef.current?.removeAttribute('data-paper-question-active');
+        setIsOpen(false);
+    }, [cancelClose]);
+
+    const scheduleClose = useCallback(() => {
+        if (touchPinnedRef.current) {
+            return;
+        }
+
+        cancelClose();
+        closeTimerRef.current = setTimeout(() => {
+            const focused = document.activeElement;
+
+            if (
+                !targetRef.current?.contains(focused) &&
+                !toolbarRef.current?.contains(focused)
+            ) {
+                closeToolbar();
+            }
+        }, 300);
+    }, [cancelClose, closeToolbar]);
+
+    useEffect(() => {
+        const questionCell = markerRef.current?.parentElement;
+        const questionRow = questionCell?.closest<HTMLElement>('tr[data-paper-question]');
+        const target = questionRow?.querySelectorAll('[data-paper-question-action-anchor]').length === 1
+            ? questionRow
+            : questionCell;
+
+        if (!target || target.closest('[data-paper-preview-only]')) {
+            return;
+        }
+
+        targetRef.current = target;
+        const previousTabIndex = target.getAttribute('tabindex');
+        target.tabIndex = 0;
+
+        function openToolbar() {
+            cancelClose();
+            window.dispatchEvent(
+                new CustomEvent(QUESTION_ACTION_OPEN_EVENT, {
+                    detail: markerRef.current,
+                }),
+            );
+            target!.setAttribute('data-paper-question-active', '');
+            setIsOpen(true);
+        }
+
+        function closeOtherToolbar(event: Event) {
+            if ((event as CustomEvent).detail !== markerRef.current) {
+                closeToolbar();
+            }
+        }
+
+        function openOnTouch(event: PointerEvent) {
+            if (event.pointerType === 'touch') {
+                touchPinnedRef.current = true;
+                openToolbar();
+            }
+        }
+
+        function focusActions(event: KeyboardEvent) {
+            if (event.target !== target) {
+                return;
+            }
+
+            if (event.key === 'Tab' && !event.shiftKey) {
+                const firstAction = toolbarRef.current?.querySelector<HTMLButtonElement>(
+                    'button:not(:disabled)',
+                );
+
+                if (firstAction) {
+                    event.preventDefault();
+                    firstAction.focus();
+                }
+            }
+
+            if (event.key === 'Escape') {
+                closeToolbar();
+            }
+        }
+
+        target.addEventListener('pointerenter', openToolbar);
+        target.addEventListener('pointerdown', openOnTouch);
+        target.addEventListener('focusin', openToolbar);
+        target.addEventListener('focusout', scheduleClose);
+        target.addEventListener('keydown', focusActions);
+        window.addEventListener(QUESTION_ACTION_OPEN_EVENT, closeOtherToolbar);
+
+        return () => {
+            target.removeEventListener('pointerenter', openToolbar);
+            target.removeEventListener('pointerdown', openOnTouch);
+            target.removeEventListener('focusin', openToolbar);
+            target.removeEventListener('focusout', scheduleClose);
+            target.removeEventListener('keydown', focusActions);
+            window.removeEventListener(QUESTION_ACTION_OPEN_EVENT, closeOtherToolbar);
+            cancelClose();
+            target.removeAttribute('data-paper-question-active');
+
+            if (previousTabIndex === null) {
+                target.removeAttribute('tabindex');
+            } else {
+                target.setAttribute('tabindex', previousTabIndex);
+            }
+        };
+    }, [cancelClose, closeToolbar, scheduleClose]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        function closeOnOutsidePointer(event: PointerEvent) {
+            const clicked = event.target;
+
+            if (
+                clicked instanceof Node &&
+                !targetRef.current?.contains(clicked) &&
+                !toolbarRef.current?.contains(clicked)
+            ) {
+                closeToolbar();
+            }
+        }
+
+        document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+
+        return () => document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+    }, [closeToolbar, isOpen]);
+
+    useLayoutEffect(() => {
+        if (!isOpen || !targetRef.current || !toolbarRef.current) {
+            return;
+        }
+
+        const target = targetRef.current;
+        const toolbar = toolbarRef.current;
+
+        function updatePosition() {
+            const question = target.getBoundingClientRect();
+            const actions = toolbar.getBoundingClientRect();
+
+            if (
+                question.bottom < 0 ||
+                question.top > window.innerHeight ||
+                question.right < 0 ||
+                question.left > window.innerWidth
+            ) {
+                closeToolbar();
+
+                return;
+            }
+
+            const left = Math.max(
+                8,
+                Math.min(question.right + 8, window.innerWidth - actions.width - 8),
+            );
+            const top = Math.max(
+                8,
+                Math.min(question.top, window.innerHeight - actions.height - 8),
+            );
+
+            setPosition((current) =>
+                current.left === left && current.top === top
+                    ? current
+                    : { left, top },
+            );
+        }
+
+        updatePosition();
+        const observer = new ResizeObserver(updatePosition);
+        observer.observe(target);
+        observer.observe(toolbar);
+        window.addEventListener('scroll', updatePosition, true);
+        window.addEventListener('resize', updatePosition);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('scroll', updatePosition, true);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [closeToolbar, isOpen]);
 
     return (
         <>
-            <div
-                data-paper-edit-actions
-                dir="ltr"
-                className="pointer-events-none absolute left-1/2 top-1 z-30 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 font-sans opacity-0 shadow-lg shadow-slate-900/10 transition-opacity group-hover/question:pointer-events-auto group-hover/question:opacity-100 dark:border-slate-700 dark:bg-slate-900 print:hidden"
-            >
+            <span ref={markerRef} data-paper-question-action-anchor className="hidden" aria-hidden="true" />
+            {isOpen && typeof document !== 'undefined' && createPortal(
+                <div
+                    ref={toolbarRef}
+                    data-paper-edit-actions
+                    dir="ltr"
+                    role="toolbar"
+                    aria-label="Question actions"
+                    aria-orientation="vertical"
+                    onPointerEnter={cancelClose}
+                    onPointerLeave={scheduleClose}
+                    onFocusCapture={cancelClose}
+                    onBlurCapture={scheduleClose}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                            targetRef.current?.focus();
+                            closeToolbar();
+                        } else if (event.key === 'Tab') {
+                            const buttons = Array.from(
+                                toolbarRef.current?.querySelectorAll<HTMLButtonElement>(
+                                    'button:not(:disabled)',
+                                ) ?? [],
+                            );
+
+                            if (event.shiftKey && document.activeElement === buttons[0]) {
+                                event.preventDefault();
+                                targetRef.current?.focus();
+                            } else if (!event.shiftKey && document.activeElement === buttons.at(-1)) {
+                                const markers = Array.from(
+                                    targetRef.current?.closest('[data-print-paper]')?.querySelectorAll<HTMLElement>(
+                                        '[data-paper-question-action-anchor]',
+                                    ) ?? [],
+                                );
+                                const next = markers.slice(markers.indexOf(markerRef.current!) + 1)
+                                    .map((marker) => marker.parentElement)
+                                    .find((element) => element?.getClientRects().length);
+
+                                if (next) {
+                                    event.preventDefault();
+                                    closeToolbar();
+                                    const row = next.closest<HTMLElement>('tr[data-paper-question]');
+                                    const nextTarget = row?.querySelectorAll('[data-paper-question-action-anchor]').length === 1
+                                        ? row
+                                        : next;
+                                    nextTarget.focus();
+                                }
+                            }
+                        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                            const buttons = Array.from(
+                                toolbarRef.current?.querySelectorAll<HTMLButtonElement>(
+                                    'button:not(:disabled)',
+                                ) ?? [],
+                            );
+                            const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+
+                            if (buttons.length > 0) {
+                                event.preventDefault();
+                                buttons[
+                                    (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
+                                ].focus();
+                            }
+                        }
+                    }}
+                    style={{ left: position.left, top: position.top }}
+                    className="fixed z-[100] w-14 rounded-xl border border-slate-200 bg-white font-sans shadow-lg shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 print:hidden"
+                >
+                    <span className="absolute -left-2 top-0 h-full w-2" aria-hidden="true" />
+                    <div className="flex max-h-[calc(100vh-16px)] w-full flex-col items-center gap-1 overflow-y-auto p-1">
                 {canSwap && (
                     <>
                         <ActionButton
                             label="Random change"
-                            onClick={() => setConfirmAction('random')}
+                            onClick={() => {
+                                closeToolbar();
+                                setConfirmAction('random');
+                            }}
                         >
                             <ShuffleIcon className="size-4" />
                         </ActionButton>
-                        <ActionButton label="Pick question" onClick={onPick}>
+                        <ActionButton label="Pick question" onClick={() => {
+                            closeToolbar();
+                            onPick();
+                        }}>
                             <ListChecksIcon className="size-4" />
                         </ActionButton>
                     </>
@@ -72,7 +342,10 @@ export function QuestionHoverActions({
                     <ActionButton
                         label="Delete question"
                         variant="danger"
-                        onClick={() => setConfirmAction('delete')}
+                        onClick={() => {
+                            closeToolbar();
+                            setConfirmAction('delete');
+                        }}
                     >
                         <Trash2Icon className="size-4" />
                     </ActionButton>
@@ -80,34 +353,40 @@ export function QuestionHoverActions({
                 <ActionButton
                     label="Edit question"
                     variant="primary"
-                    onClick={onEdit}
+                    onClick={() => {
+                        closeToolbar();
+                        onEdit();
+                    }}
                 >
                     <FilePenLineIcon className="size-4" />
                 </ActionButton>
                 {showAnswerLines && (
                     <div
-                        className="ml-1 flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-700 dark:bg-slate-950/60"
+                        className="flex w-full flex-col items-center rounded-lg border border-slate-200 bg-slate-50 py-1 dark:border-slate-700 dark:bg-slate-950/60"
                         title="Number of answer lines"
                     >
+                        <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400">Lines</span>
                         <button
                             type="button"
+                            aria-label="Remove an answer line"
                             onClick={() =>
                                 onAnswerLinesChange(
                                     Math.max(0, answerLines - 1),
                                 )
                             }
-                            className="flex size-6 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                            className="flex size-8 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                             disabled={answerLines <= 0}
                         >
                             <MinusIcon className="size-3.5" />
                         </button>
-                        <span className="min-w-6 text-center text-xs font-bold tabular-nums text-slate-700 dark:text-slate-200">
+                        <span className="text-center text-xs font-bold tabular-nums text-slate-700 dark:text-slate-200">
                             {answerLines}
                         </span>
                         <button
                             type="button"
+                            aria-label="Add an answer line"
                             onClick={() => onAnswerLinesChange(answerLines + 1)}
-                            className="flex size-6 cursor-pointer items-center justify-center rounded-md text-brand-700 transition-colors hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10"
+                            className="flex size-8 cursor-pointer items-center justify-center rounded-md text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 dark:text-brand-300 dark:hover:bg-brand-500/10"
                         >
                             <PlusIcon className="size-3.5" />
                         </button>
@@ -117,11 +396,13 @@ export function QuestionHoverActions({
                     answerLines > 0 &&
                     onAnswerLineSpacingChange && (
                         <div
-                            className="flex h-8 select-none items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 dark:border-slate-700 dark:bg-slate-950/60"
+                            className="flex w-full flex-col items-center rounded-lg border border-slate-200 bg-slate-50 py-1 dark:border-slate-700 dark:bg-slate-950/60"
                             title="Spacing between answer lines (px)"
                         >
+                            <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400">Gap</span>
                             <button
                                 type="button"
+                                aria-label="Decrease answer line spacing"
                                 onClick={() =>
                                     onAnswerLineSpacingChange(
                                         Math.max(
@@ -131,14 +412,14 @@ export function QuestionHoverActions({
                                         ),
                                     )
                                 }
-                                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                className="flex size-8 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                                 disabled={
                                     (answerLineSpacing ?? 20) <= SPACING_MIN
                                 }
                             >
                                 <MinusIcon className="size-3.5" />
                             </button>
-                            <span className="min-w-10 select-none text-center text-xs font-bold tabular-nums text-slate-700 dark:text-slate-200">
+                            <span className="select-none text-center text-xs font-bold tabular-nums text-slate-700 dark:text-slate-200">
                                 {answerLineSpacing ?? 20}
                                 <span className="ml-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
                                     px
@@ -146,6 +427,7 @@ export function QuestionHoverActions({
                             </span>
                             <button
                                 type="button"
+                                aria-label="Increase answer line spacing"
                                 onClick={() =>
                                     onAnswerLineSpacingChange(
                                         Math.min(
@@ -155,7 +437,7 @@ export function QuestionHoverActions({
                                         ),
                                     )
                                 }
-                                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-brand-700 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/10"
+                                className="flex size-8 cursor-pointer items-center justify-center rounded-md text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-brand-300 dark:hover:bg-brand-500/10"
                                 disabled={
                                     (answerLineSpacing ?? 20) >= SPACING_MAX
                                 }
@@ -164,7 +446,10 @@ export function QuestionHoverActions({
                             </button>
                         </div>
                     )}
-            </div>
+                    </div>
+                </div>,
+                document.body,
+            )}
 
             {confirmAction === 'delete' && onDelete && (
                 <ConfirmDialog
@@ -507,7 +792,7 @@ function ActionButton({
             aria-label={label}
             onClick={onClick}
             className={cn(
-                'flex size-8 cursor-pointer items-center justify-center rounded-lg border text-slate-500 transition-colors dark:text-slate-300',
+                'flex size-10 cursor-pointer items-center justify-center rounded-lg border text-slate-500 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 dark:text-slate-300',
                 variant === 'default' &&
                     'border-slate-200 bg-white hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/10 dark:hover:text-brand-200',
                 variant === 'primary' &&
