@@ -1,7 +1,11 @@
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronRightIcon } from 'lucide-react';
 import { useState } from 'react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -11,15 +15,18 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 
 function NavCollapsibleItem({ item }: { item: NavItem }) {
+    const { state, setOpen: setSidebarOpen } = useSidebar();
     const page = usePage();
     const currentUrl = page.url;
 
-    const isSubActive = (subHref: string) => currentUrl === subHref || currentUrl.startsWith(subHref + '/');
+    const isSubActive = (subHref: string) =>
+        currentUrl === subHref || currentUrl.startsWith(subHref + '/');
     const isParentActive =
         currentUrl === item.href ||
         currentUrl.startsWith(item.href + '/') ||
@@ -29,22 +36,37 @@ function NavCollapsibleItem({ item }: { item: NavItem }) {
 
     return (
         <SidebarMenuItem>
-            <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+            <Collapsible
+                open={open}
+                onOpenChange={(nextOpen) =>
+                    setOpen(state === 'collapsed' ? true : nextOpen)
+                }
+                className="group/collapsible"
+            >
                 <CollapsibleTrigger asChild>
-                    <SidebarMenuButton isActive={isParentActive} tooltip={{ children: item.title }}>
+                    <SidebarMenuButton
+                        isActive={isParentActive}
+                        tooltip={{ children: item.title }}
+                        onClick={() => {
+                            if (state === 'collapsed') {
+                                setSidebarOpen(true);
+                            }
+                        }}
+                        className="h-9 gap-2.5 px-2.5 text-[13px] font-medium text-brand-100/75 hover:bg-white/[0.06] hover:text-white data-[active=true]:bg-brand-600 data-[active=true]:text-white group-data-[collapsible=icon]:mx-auto"
+                    >
                         {item.icon && <item.icon />}
                         <span>{item.title}</span>
                         <ChevronRightIcon className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                    <SidebarMenuSub>
+                    <SidebarMenuSub className="border-white/10">
                         {(item.items ?? []).map((sub) => (
                             <SidebarMenuSubItem key={sub.title}>
                                 <SidebarMenuSubButton
                                     asChild
                                     isActive={isSubActive(sub.href)}
-                                    className="h-auto min-h-7 py-1.5 leading-snug"
+                                    className="h-auto min-h-7 py-1.5 text-xs leading-snug text-brand-100/70 hover:bg-white/[0.06] hover:text-white data-[active=true]:bg-brand-600 data-[active=true]:text-white"
                                 >
                                     <Link href={sub.href} prefetch>
                                         {sub.title}
@@ -63,9 +85,11 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     const { isCurrentUrl } = useCurrentUrl();
 
     return (
-        <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
-            <SidebarMenu>
+        <SidebarGroup className="p-0">
+            <SidebarGroupLabel className="h-7 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-brand-200/50">
+                Administration
+            </SidebarGroupLabel>
+            <SidebarMenu className="gap-0.5">
                 {items.map((item) =>
                     item.items && item.items.length > 0 ? (
                         <NavCollapsibleItem key={item.title} item={item} />
@@ -75,6 +99,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                 asChild
                                 isActive={isCurrentUrl(item.href)}
                                 tooltip={{ children: item.title }}
+                                className="h-9 gap-2.5 px-2.5 text-[13px] font-medium text-brand-100/75 hover:bg-white/[0.06] hover:text-white data-[active=true]:bg-brand-600 data-[active=true]:text-white group-data-[collapsible=icon]:mx-auto"
                             >
                                 <Link href={item.href} prefetch>
                                     {item.icon && <item.icon />}

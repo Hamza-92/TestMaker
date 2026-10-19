@@ -158,11 +158,6 @@
     --progress: rgba(75, 85, 99, 0.15);
 }
 
-[data-slot='sidebar-wrapper']:has([data-collapsible='icon'])
-    [data-slot='app-sidebar-header'] {
-    height: 3rem;
-}
-
 [data-slot='sidebar-menu-item']:has([data-sidebar='menu-action'])
     [data-slot='sidebar-menu-button'] {
     padding-right: 2rem;
@@ -230,6 +225,16 @@
     --accent-foreground: 219 234 254;
     --ring: 84 162 255;
     --progress: var(--color-brand-400);
+}
+
+/* Admin shell sidebar shares the customer app's dark navy surface. */
+.theme-admin {
+    --sidebar: 22 36 86;
+    --sidebar-foreground: 255 255 255;
+    --sidebar-accent: 34 51 99;
+    --sidebar-accent-foreground: 255 255 255;
+    --sidebar-border: 255 255 255;
+    --sidebar-ring: 84 162 255;
 }
 
 /* == Accent-driven surfaces ===========================================
@@ -656,7 +661,8 @@ input[type='date']::-webkit-calendar-picker-indicator {
         user-select: none;
     }
 
-    [data-print-paper] :is(input:not([readonly]), textarea, [contenteditable='true']) {
+    [data-print-paper]
+        :is(input:not([readonly]), textarea, [contenteditable='true']) {
         -webkit-user-select: text;
         user-select: text;
     }

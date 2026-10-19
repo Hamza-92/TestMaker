@@ -18,13 +18,11 @@ import {
     UserRoundCogIcon,
     Users,
 } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { NavMain } from '@/components/nav-main';
-import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
@@ -232,26 +230,36 @@ export function AppSidebar() {
     ];
 
     return (
-        <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r-0">
+            <SidebarHeader className="h-14 justify-center border-b border-white/10 px-3 py-0 group-data-[collapsible=icon]:px-2">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            className="h-11 gap-2.5 px-1 text-white hover:bg-white/[0.06] hover:text-white group-data-[collapsible=icon]:mx-auto"
+                        >
                             <Link href={dashboard()} prefetch>
-                                <AppLogo />
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+                                    <AppLogoIcon className="size-4 fill-current" />
+                                </span>
+                                <span className="min-w-0 text-left">
+                                    <span className="block truncate text-sm font-semibold leading-tight">
+                                        TestMaker
+                                    </span>
+                                    <span className="block truncate text-[11px] leading-tight text-brand-200/60">
+                                        Administration
+                                    </span>
+                                </span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
+            <SidebarContent className="scrollbar-slim gap-0 overflow-x-hidden px-2 py-3 group-data-[collapsible=icon]:overflow-y-auto">
                 <NavMain items={navItems} />
             </SidebarContent>
-
-            <SidebarFooter>
-                <NavUser />
-            </SidebarFooter>
         </Sidebar>
     );
 }
