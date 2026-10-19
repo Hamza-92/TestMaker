@@ -204,15 +204,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('superadmin/site/pricing/revisions/{revision}/restore', [SitePricingController::class, 'restore'])->name('superadmin.site.pricing.restore')->middleware('permission:site_pages.edit');
 
         // â”€â”€â”€ Customers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        Route::get('superadmin/customers', [CustomerController::class, 'index'])->name('superadmin.customers')->middleware('permission:customers.view');
-        Route::get('superadmin/customers/add', [CustomerController::class, 'create'])->name('superadmin.customers.add')->middleware('permission:customers.create');
-        Route::post('superadmin/customers', [CustomerController::class, 'store'])->name('superadmin.customers.store')->middleware('permission:customers.create');
+        Route::get('superadmin/customers', [CustomerController::class, 'index'])->name('superadmin.customers')->middleware('permission:customers.view|customers.paid.view|customers.trial.view');
+        Route::get('superadmin/customers/paid', [CustomerController::class, 'paid'])->name('superadmin.customers.paid')->middleware('permission:customers.view|customers.paid.view');
+        Route::get('superadmin/customers/trial', [CustomerController::class, 'trial'])->name('superadmin.customers.trial')->middleware('permission:customers.view|customers.trial.view');
+        Route::get('superadmin/customers/add', [CustomerController::class, 'create'])->name('superadmin.customers.add')->middleware('permission:customers.create,customers.view|customers.paid.view|customers.trial.view');
+        Route::post('superadmin/customers', [CustomerController::class, 'store'])->name('superadmin.customers.store')->middleware('permission:customers.create,customers.view|customers.paid.view|customers.trial.view');
         Route::get('superadmin/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('superadmin.customers.edit')->middleware('permission:customers.edit');
         Route::put('superadmin/customers/{customer}', [CustomerController::class, 'update'])->name('superadmin.customers.update')->middleware('permission:customers.edit');
         Route::post('superadmin/customers/{customer}/reset-password', [CustomerController::class, 'resetPassword'])->name('superadmin.customers.reset-password')->middleware('permission:customers.edit');
         Route::post('superadmin/customers/{customer}/login', [CustomerController::class, 'loginAsCustomer'])->name('superadmin.customers.login')->middleware('permission:customers.impersonate');
-        Route::get('superadmin/customers/{customer}/logs/{log}', [CustomerController::class, 'showLog'])->name('superadmin.customers.logs.show')->middleware('permission:customers.view');
-        Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view');
+        Route::get('superadmin/customers/{customer}/logs/{log}', [CustomerController::class, 'showLog'])->name('superadmin.customers.logs.show')->middleware('permission:customers.view|customers.paid.view|customers.trial.view');
+        Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view|customers.paid.view|customers.trial.view');
 
         // Data Transfer
         Route::get('superadmin/data-transfer', [DataTransferController::class, 'index'])->name('superadmin.data-transfer')->middleware('permission:data_transfer.manage');

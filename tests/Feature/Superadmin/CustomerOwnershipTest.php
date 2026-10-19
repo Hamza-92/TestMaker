@@ -62,7 +62,9 @@ it('lists only customers created by the delegated user and calculates totals fro
         ]);
     }
 
-    $page = $this->actingAs($this->staff)->get(route('superadmin.customers'))->assertOk()->viewData('page');
+    $this->actingAs($this->staff)->get(route('superadmin.customers'))
+        ->assertRedirect(route('superadmin.customers.paid'));
+    $page = $this->get(route('superadmin.customers.paid'))->assertOk()->viewData('page');
     $customers = collect($page['props']['customers']);
 
     expect($customers->pluck('id')->all())->toBe([$this->ownCustomer->id]);
@@ -70,7 +72,7 @@ it('lists only customers created by the delegated user and calculates totals fro
     expect($customers->first()['my_commission'])->toBe('50');
     expect($page['props']['canViewAllCustomers'])->toBeFalse();
 
-    $masterPage = $this->actingAs($this->master)->get(route('superadmin.customers'))->assertOk()->viewData('page');
+    $masterPage = $this->actingAs($this->master)->get(route('superadmin.customers.paid'))->assertOk()->viewData('page');
     expect(collect($masterPage['props']['customers'])->pluck('id')->sort()->values()->all())
         ->toBe([$this->ownCustomer->id, $this->otherCustomer->id]);
     expect($masterPage['props']['canViewAllCustomers'])->toBeTrue();

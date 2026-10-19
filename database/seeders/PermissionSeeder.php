@@ -11,7 +11,9 @@ class PermissionSeeder extends Seeder
     {
         $permissions = [
             // Customers
-            ['name' => 'customers.view',   'display_name' => 'View Customers',   'group' => 'Customers'],
+            ['name' => 'customers.view',   'display_name' => 'View All Customers',   'group' => 'Customers'],
+            ['name' => 'customers.paid.view', 'display_name' => 'View Paid Customers', 'group' => 'Customers'],
+            ['name' => 'customers.trial.view', 'display_name' => 'View Trial Customers', 'group' => 'Customers'],
             ['name' => 'customers.create', 'display_name' => 'Create Customers', 'group' => 'Customers'],
             ['name' => 'customers.edit',   'display_name' => 'Edit Customers',   'group' => 'Customers'],
             ['name' => 'customers.delete', 'display_name' => 'Delete Customers', 'group' => 'Customers'],

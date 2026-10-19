@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import {
     BookOpenIcon,
     CircleDotIcon,
+    Clock3Icon,
     MegaphoneIcon,
     Globe2Icon,
     DatabaseIcon,
@@ -38,12 +39,21 @@ export function AppSidebar() {
 
     const navItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
-        ...(can('customers.view')
+        ...(can('customers.view') || can('customers.paid.view')
             ? [
                   {
-                      title: 'Customers',
-                      href: '/superadmin/customers',
+                      title: 'Paid Customers',
+                      href: '/superadmin/customers/paid',
                       icon: Users,
+                  },
+              ]
+            : []),
+        ...(can('customers.view') || can('customers.trial.view')
+            ? [
+                  {
+                      title: 'Trial Customers',
+                      href: '/superadmin/customers/trial',
+                      icon: Clock3Icon,
                   },
               ]
             : []),

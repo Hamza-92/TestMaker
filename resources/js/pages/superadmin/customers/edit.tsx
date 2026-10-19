@@ -127,7 +127,9 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
-export default function EditCustomer({ customer }: { customer: Customer }) {
+export default function EditCustomer({ customer, allowedAccountTypes }: {
+    customer: Customer; allowedAccountTypes: ('trial' | 'paid')[];
+}) {
     const [logoPreview, setLogoPreview] = useState<string | null>(customer.logo ? `/storage/${customer.logo}` : null);
     const logoRef = useRef<HTMLInputElement>(null);
 
@@ -254,16 +256,16 @@ export default function EditCustomer({ customer }: { customer: Customer }) {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="trial">
+                                        {allowedAccountTypes.includes('trial') && <SelectItem value="trial">
                                             <span className="flex items-center gap-2">
                                                 <span className="size-2 rounded-full bg-amber-400" /> Trial
                                             </span>
-                                        </SelectItem>
-                                        <SelectItem value="paid">
+                                        </SelectItem>}
+                                        {allowedAccountTypes.includes('paid') && <SelectItem value="paid">
                                             <span className="flex items-center gap-2">
                                                 <span className="size-2 rounded-full bg-emerald-500" /> Paid
                                             </span>
-                                        </SelectItem>
+                                        </SelectItem>}
                                     </SelectContent>
                                 </Select>
                             </Field>

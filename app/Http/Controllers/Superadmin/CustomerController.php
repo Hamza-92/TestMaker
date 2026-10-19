@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers\Superadmin;
 
+use App\Enums\AccountType;
 use App\Enums\AuditEvent;
 use App\Enums\UserType;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\PaymentLog;
+use App\Models\TrialSetting;
 use App\Models\User;
 use App\Support\CustomerAccess;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -20,12 +22,34 @@ class CustomerController extends Controller
 {
     public function index()
     {
-        $today = now()->startOfDay();
+        $actor = auth()->user();
+
+        return redirect()->route(CustomerAccess::canViewType($actor, AccountType::Paid)
+            ? 'superadmin.customers.paid'
+            : 'superadmin.customers.trial');
+    }
+
+    public function paid()
+    {
+        return $this->customerList(AccountType::Paid);
+    }
+
+    public function trial()
+    {
+        return $this->customerList(AccountType::Trial);
+    }
+
+    private function customerList(AccountType $accountType)
+    {
+        abort_unless(CustomerAccess::canViewType(auth()->user(), $accountType), 403);
+
+        $today = now('Asia/Karachi')->startOfDay();
         $todayStr = $today->toDateString();
-        $nearExpiryThresholdDays = 7;
+        $nearExpiryThresholdDays = 30;
+        $trialDurationDays = $accountType === AccountType::Trial ? TrialSetting::current()->trial_duration_days : null;
         $currentUserId = auth()->id();
 
-        $customers = CustomerAccess::visibleTo(auth()->user())
+        $customers = CustomerAccess::visibleTo(auth()->user(), $accountType)
             ->with([
                 'subscriptions' => fn ($q) => $q
                     ->latest('started_at')
@@ -35,25 +59,30 @@ class CustomerController extends Controller
                         'status', 'next_payment_date', 'created_by',
                     ])]),
             ])
-            ->orderByDesc('created_at')
-            ->get(['id', 'name', 'email', 'phone', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at', 'created_by'])
-            ->map(function (User $customer) use ($today, $todayStr, $nearExpiryThresholdDays, $currentUserId) {
+            ->orderByRaw('COALESCE(updated_at, created_at) DESC')
+            ->orderByDesc('id')
+            ->get(['id', 'name', 'email', 'phone', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at', 'updated_at', 'created_by'])
+            ->map(function (User $customer) use ($today, $todayStr, $nearExpiryThresholdDays, $trialDurationDays, $currentUserId) {
                 $activeSubscription = $customer->subscriptions->first(
                     fn ($subscription) => $subscription->status?->value === 'active'
                 );
 
                 $subscription = $activeSubscription ?? $customer->subscriptions->first();
                 $subscriptionStatus = $subscription?->status?->value;
-                $daysToExpiry = $subscription?->expired_at
-                    ? $today->diffInDays($subscription->expired_at->copy()->startOfDay(), false)
+                $trialExpiresAt = $subscription === null && $customer->account_type === AccountType::Trial
+                    ? $customer->created_at?->copy()->addDays($trialDurationDays)
+                    : null;
+                $expiresAt = $subscription?->expired_at ?? $trialExpiresAt;
+                $daysToExpiry = $expiresAt
+                    ? (int) $today->diffInDays($expiresAt->copy()->timezone('Asia/Karachi')->startOfDay(), false)
                     : null;
 
                 $planState = match (true) {
-                    $subscription === null => 'no_plan',
+                    $subscription === null && $trialExpiresAt === null => 'no_plan',
                     $subscriptionStatus === 'cancelled' => 'cancelled',
                     $subscriptionStatus === 'expired' || ($daysToExpiry !== null && $daysToExpiry < 0) => 'expired',
-                    $subscriptionStatus === 'active' && $daysToExpiry !== null && $daysToExpiry <= $nearExpiryThresholdDays => 'near_expiry',
-                    $subscriptionStatus === 'active' => 'active',
+                    $daysToExpiry !== null && $daysToExpiry <= $nearExpiryThresholdDays => 'near_expiry',
+                    $daysToExpiry !== null => 'active',
                     default => 'no_plan',
                 };
 
@@ -82,41 +111,43 @@ class CustomerController extends Controller
                 $isMyCustomer = (int) $customer->created_by === $currentUserId;
 
                 return [
-                    'id'                 => $customer->id,
-                    'name'               => $customer->name,
-                    'email'              => $customer->email,
-                    'phone'              => $customer->phone,
-                    'school_name'        => $customer->school_name,
-                    'logo'               => $customer->logo,
-                    'city'               => $customer->city,
-                    'province'           => $customer->province,
-                    'status'             => $customer->status?->value,
-                    'account_type'       => $customer->account_type?->value,
-                    'created_at'         => $customer->created_at?->toISOString(),
+                    'id' => $customer->id,
+                    'name' => $customer->name,
+                    'email' => $customer->email,
+                    'phone' => $customer->phone,
+                    'school_name' => $customer->school_name,
+                    'logo' => $customer->logo,
+                    'city' => $customer->city,
+                    'province' => $customer->province,
+                    'status' => $customer->status?->value,
+                    'account_type' => $customer->account_type?->value,
+                    'created_at' => $customer->created_at?->toISOString(),
+                    'updated_at' => $customer->updated_at?->toISOString() ?? $customer->created_at?->toISOString(),
                     'subscription_count' => $customer->subscriptions->count(),
-                    'plan_state'         => $planState,
-                    'subscription'       => $subscription ? [
-                        'id'             => $subscription->id,
-                        'name'           => $subscription->name,
-                        'amount'         => (string) $subscription->amount,
-                        'started_at'     => $subscription->started_at?->toISOString(),
-                        'expired_at'     => $subscription->expired_at?->toISOString(),
-                        'duration'       => $subscription->duration,
-                        'status'         => $subscription->status?->value,
+                    'plan_state' => $planState,
+                    'subscription' => $subscription || $trialExpiresAt ? [
+                        'id' => $subscription?->id,
+                        'name' => $subscription?->name ?? 'Trial',
+                        'amount' => (string) ($subscription?->amount ?? 0),
+                        'started_at' => $subscription?->started_at?->toISOString() ?? $customer->created_at?->toISOString(),
+                        'expired_at' => $expiresAt?->toISOString(),
+                        'duration' => $subscription?->duration ?? $trialDurationDays,
+                        'status' => $subscription?->status?->value ?? 'active',
                         'days_to_expiry' => $daysToExpiry,
                     ] : null,
-                    'total_paid'         => (string) $totalPaid,
-                    'total_pending'      => (string) $totalPending,
-                    'total_dues'         => (string) $totalDues,
-                    'my_commission'      => (string) $myCommission,
-                    'next_payment_date'  => $nextPaymentDate,
-                    'is_my_customer'     => $isMyCustomer,
+                    'total_paid' => (string) $totalPaid,
+                    'total_pending' => (string) $totalPending,
+                    'total_dues' => (string) $totalDues,
+                    'my_commission' => (string) $myCommission,
+                    'next_payment_date' => $nextPaymentDate,
+                    'is_my_customer' => $isMyCustomer,
                 ];
             })
             ->values();
 
         return Inertia::render('superadmin/customers', [
             'customers' => $customers,
+            'accountType' => $accountType->value,
             'canViewAllCustomers' => auth()->user()->isMasterSuperAdmin(),
         ]);
     }
@@ -141,20 +172,20 @@ class CustomerController extends Controller
             ->latest()
             ->get()
             ->map(fn (PaymentLog $log) => [
-                'id'                   => $log->id,
-                'subscription_id'      => $log->subscription_id,
-                'subscription_name'    => $log->subscription?->name,
-                'amount'               => (string) $log->amount,
-                'payment_method'       => $log->payment_method?->value,
+                'id' => $log->id,
+                'subscription_id' => $log->subscription_id,
+                'subscription_name' => $log->subscription?->name,
+                'amount' => (string) $log->amount,
+                'payment_method' => $log->payment_method?->value,
                 'payment_method_label' => $log->payment_method?->label(),
-                'status'               => $log->status?->value,
-                'status_label'         => $log->status?->label(),
-                'account_number'       => $log->account_number,
-                'notes'                => $log->notes,
-                'created_at'           => $log->created_at?->toISOString(),
-                'creator_name'         => $log->creator?->name,
-                'reviewed_at'          => $log->reviewed_at?->toISOString(),
-                'reviewer_name'        => $log->reviewer?->name,
+                'status' => $log->status?->value,
+                'status_label' => $log->status?->label(),
+                'account_number' => $log->account_number,
+                'notes' => $log->notes,
+                'created_at' => $log->created_at?->toISOString(),
+                'creator_name' => $log->creator?->name,
+                'reviewed_at' => $log->reviewed_at?->toISOString(),
+                'reviewer_name' => $log->reviewer?->name,
             ]);
 
         $customerLogs = $customer->auditLogs
@@ -207,6 +238,7 @@ class CustomerController extends Controller
         CustomerAccess::ensureVisible(auth()->user(), $customer);
 
         return Inertia::render('superadmin/customers/edit', [
+            'allowedAccountTypes' => $this->allowedAccountTypes(auth()->user()),
             'customer' => $customer->only([
                 'id', 'name', 'email', 'phone',
                 'school_name', 'logo',
@@ -216,34 +248,43 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return Inertia::render('superadmin/customers/add');
+        $allowedAccountTypes = $this->allowedAccountTypes($request->user());
+
+        return Inertia::render('superadmin/customers/add', [
+            'allowedAccountTypes' => $allowedAccountTypes,
+            'preferredAccountType' => in_array($request->query('account_type'), $allowedAccountTypes, true)
+                ? $request->query('account_type')
+                : $allowedAccountTypes[0],
+        ]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'                  => ['required', 'string', 'max:255'],
-            'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone'                 => ['required', 'string', 'max:30'],
-            'password'              => ['required', 'string', 'min:3', 'confirmed'],
-            'status'                => ['required', 'in:active,inactive,suspended'],
-            'account_type'          => ['required', 'in:trial,paid'],
-            'school_name'           => ['nullable', 'string', 'max:255'],
-            'logo'                  => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
-            'address'               => ['nullable', 'string', 'max:255'],
-            'city'                  => ['nullable', 'string', 'max:100'],
-            'province'              => ['nullable', 'string', 'max:100'],
-            'is_show_address'       => ['boolean'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:30'],
+            'password' => ['required', 'string', 'min:3', 'confirmed'],
+            'status' => ['required', 'in:active,inactive,suspended'],
+            'account_type' => ['required', 'in:trial,paid'],
+            'school_name' => ['nullable', 'string', 'max:255'],
+            'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'province' => ['nullable', 'string', 'max:100'],
+            'is_show_address' => ['boolean'],
         ]);
+
+        abort_unless(CustomerAccess::canViewType($request->user(), AccountType::from($validated['account_type'])), 403);
 
         if ($request->hasFile('logo')) {
             $validated['logo'] = $request->file('logo')->store('logos', 'public');
         }
 
-        $validated['password']   = Hash::make($validated['password']);
-        $validated['user_type']  = UserType::Customer->value;
+        $validated['password'] = Hash::make($validated['password']);
+        $validated['user_type'] = UserType::Customer->value;
         $validated['created_by'] = auth()->id();
 
         $customer = User::create($validated);
@@ -261,7 +302,7 @@ class CustomerController extends Controller
             notes: 'Customer account created.',
         );
 
-        return redirect()->route('superadmin.customers')
+        return redirect()->route('superadmin.customers.'.$customer->account_type->value)
             ->with('success', 'Customer created successfully.');
     }
 
@@ -283,6 +324,8 @@ class CustomerController extends Controller
             'is_show_address' => ['boolean'],
             'remove_logo' => ['boolean'],
         ]);
+
+        abort_unless(CustomerAccess::canViewType($request->user(), AccountType::from($validated['account_type'])), 403);
 
         $oldValues = [
             'name' => $customer->name,
@@ -317,7 +360,7 @@ class CustomerController extends Controller
 
         $changes = $customer->getDirty();
 
-        if (!empty($changes)) {
+        if (! empty($changes)) {
             $customer->save();
 
             $newValues = [];
@@ -401,7 +444,18 @@ class CustomerController extends Controller
         Auth::login($admin);
         $request->session()->regenerate();
 
-        return redirect()->route($admin->can('customers.view') ? 'superadmin.customers' : 'dashboard');
+        return redirect()->route(
+            CustomerAccess::canViewType($admin, AccountType::Paid) ? 'superadmin.customers.paid'
+                : (CustomerAccess::canViewType($admin, AccountType::Trial) ? 'superadmin.customers.trial' : 'dashboard')
+        );
+    }
+
+    private function allowedAccountTypes(User $actor): array
+    {
+        return array_values(array_map(
+            fn (AccountType $type) => $type->value,
+            array_filter(AccountType::cases(), fn (AccountType $type) => CustomerAccess::canViewType($actor, $type)),
+        ));
     }
 
     private function transformCustomerLog(User $customer, AuditLog $log): array
@@ -467,7 +521,7 @@ class CustomerController extends Controller
                 $details[] = 'Payment log created';
             }
 
-            return !empty($details) ? implode(' · ', $details) : $log->notes;
+            return ! empty($details) ? implode(' · ', $details) : $log->notes;
         }
 
         if (empty($newValues)) {

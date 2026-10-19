@@ -210,10 +210,11 @@ it('keeps every Superadmin route tied to a seeded Gate', function () {
     }
 });
 
-it('allows explicitly granted impersonation and returns to the admin dashboard', function () {
-    $admin = delegatedAdmin($this->master, ['customers.impersonate']);
+it('allows explicitly granted impersonation within the trial account scope', function () {
+    $admin = delegatedAdmin($this->master, ['customers.trial.view', 'customers.impersonate']);
     $customer = User::factory()->create([
         'user_type' => UserType::Customer,
+        'account_type' => 'trial',
         'status' => UserStatus::Active,
         'created_by' => $admin->id,
     ]);
@@ -222,7 +223,7 @@ it('allows explicitly granted impersonation and returns to the admin dashboard',
         ->assertRedirect(route('dashboard'));
     expect(auth()->id())->toBe($customer->id);
 
-    $this->post(route('impersonation.stop'))->assertRedirect(route('dashboard'));
+    $this->post(route('impersonation.stop'))->assertRedirect(route('superadmin.customers.trial'));
     expect(auth()->id())->toBe($admin->id);
 });
 

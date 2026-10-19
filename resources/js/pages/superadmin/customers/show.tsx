@@ -451,7 +451,7 @@ export default function ShowCustomer({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <Link
-                            href="/superadmin/customers"
+                            href={`/superadmin/customers/${customer.account_type}`}
                             className="hover:bg-accent border-input flex size-10 items-center justify-center rounded-2xl border transition-colors"
                         >
                             <ArrowLeftIcon className="size-4" />

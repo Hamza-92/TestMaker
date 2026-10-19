@@ -118,7 +118,9 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
-export default function AddCustomer() {
+export default function AddCustomer({ allowedAccountTypes, preferredAccountType }: {
+    allowedAccountTypes: ('trial' | 'paid')[]; preferredAccountType: 'trial' | 'paid';
+}) {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm]   = useState(false);
     const [logoPreview, setLogoPreview]   = useState<string | null>(null);
@@ -131,7 +133,7 @@ export default function AddCustomer() {
         password:              '',
         password_confirmation: '',
         status:                'active',
-        account_type:          'trial',
+        account_type:          preferredAccountType,
         school_name:           '',
         logo:                  null,
         address:               '',
@@ -298,16 +300,16 @@ export default function AddCustomer() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="trial">
+                                        {allowedAccountTypes.includes('trial') && <SelectItem value="trial">
                                             <span className="flex items-center gap-2">
                                                 <span className="size-2 rounded-full bg-amber-400" /> Trial
                                             </span>
-                                        </SelectItem>
-                                        <SelectItem value="paid">
+                                        </SelectItem>}
+                                        {allowedAccountTypes.includes('paid') && <SelectItem value="paid">
                                             <span className="flex items-center gap-2">
                                                 <span className="size-2 rounded-full bg-emerald-500" /> Paid
                                             </span>
-                                        </SelectItem>
+                                        </SelectItem>}
                                     </SelectContent>
                                 </Select>
                             </Field>

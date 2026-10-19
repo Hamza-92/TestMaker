@@ -14,6 +14,7 @@ import {
     LogInIcon,
     MapPinIcon,
     PencilIcon,
+    PhoneIcon,
     SchoolIcon,
     SearchIcon,
     SlidersHorizontalIcon,
@@ -23,6 +24,7 @@ import {
     XCircleIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Fragment } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { usePermission } from '@/hooks/use-permission';
 import PlusIcon from '@/components/icons/PlusIcon';
@@ -43,7 +45,7 @@ type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
 type PlanState = 'active' | 'near_expiry' | 'expired' | 'cancelled' | 'no_plan';
 
 interface SubscriptionSummary {
-    id: number;
+    id: number | null;
     name: string;
     amount: string;
     started_at: string | null;
@@ -65,6 +67,7 @@ interface Customer {
     status: AccountStatus;
     account_type: 'trial' | 'paid';
     created_at: string;
+    updated_at: string;
     subscription_count: number;
     plan_state: PlanState;
     subscription: SubscriptionSummary | null;
@@ -80,6 +83,7 @@ type ColumnKey =
     | 'customer'
     | 'setup'
     | 'email'
+    | 'phone'
     | 'school'
     | 'location'
     | 'account_type'
@@ -94,10 +98,10 @@ type ColumnKey =
     | 'joined'
     | 'actions';
 
-const PAGE_SIZE_OPTIONS = [100, 200, 300, 500, 1000];
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 300];
 
 const ALL_COLUMNS: ColumnKey[] = [
-    'customer', 'setup', 'email', 'school', 'location', 'account_type', 'account_status',
+    'customer', 'setup', 'email', 'phone', 'school', 'location', 'account_type', 'account_status',
     'plan', 'plan_status', 'expires', 'dues', 'next_payment',
     'pending', 'commission', 'joined', 'actions',
 ];
@@ -106,6 +110,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
     customer: 'Customer',
     setup: 'Setup',
     email: 'Email',
+    phone: 'Phone Number',
     school: 'School',
     location: 'Location',
     account_type: 'Account Type',
@@ -138,16 +143,17 @@ const PLAN_STATE_CONFIG: Record<PlanState, { label: string; className: string }>
 const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
     customer: true,
     setup: false,
-    email: false,
+    email: true,
+    phone: true,
     school: true,
     location: false,
-    account_type: true,
+    account_type: false,
     account_status: false,
     plan: true,
     plan_status: true,
     expires: true,
     dues: true,
-    next_payment: true,
+    next_payment: false,
     pending: false,
     commission: false,
     joined: false,
@@ -190,7 +196,39 @@ function initials(name: string): string {
 
 function fmt(date: string | null): string {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(date).toLocaleDateString('en-US', {
+        timeZone: 'Asia/Karachi', month: 'short', day: 'numeric', year: 'numeric',
+    });
+}
+
+function updatedDateKey(date: string): string {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date(date));
+
+    const value = (part: string) => parts.find((item) => item.type === part)?.value ?? '00';
+
+    return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
+function CustomerDateStrip({ date, count, colSpan }: { date: string; count: number; colSpan: number }) {
+    return (
+        <tr className="bg-slate-100/90 dark:bg-slate-800/70">
+            <th colSpan={colSpan} scope="rowgroup" className="border-y border-slate-200 px-4 py-2.5 dark:border-slate-700">
+                <div className="relative flex items-center justify-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-200">
+                    <span className="inline-flex items-center gap-2">
+                        <CalendarIcon className="size-3.5" />
+                        {new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', {
+                            timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric',
+                        })}
+                    </span>
+                    <span className="absolute right-0 hidden rounded-full bg-white px-2 py-0.5 text-[11px] font-medium tracking-normal text-slate-600 sm:inline-flex dark:bg-slate-900 dark:text-slate-300">
+                        {count} {count === 1 ? 'customer' : 'customers'}
+                    </span>
+                </div>
+            </th>
+        </tr>
+    );
 }
 
 function money(amount: string | number): string {
@@ -262,12 +300,13 @@ function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 
     );
 }
 
-export default function Customers({ customers, canViewAllCustomers }: { customers: Customer[]; canViewAllCustomers: boolean }) {
+export default function Customers({ customers, canViewAllCustomers, accountType }: {
+    customers: Customer[]; canViewAllCustomers: boolean; accountType: 'paid' | 'trial';
+}) {
     const { can } = usePermission();
     const loginForm = useForm({});
     const [tab, setTab] = useState<'all' | 'mine'>(canViewAllCustomers ? 'all' : 'mine');
     const [search, setSearch] = useState('');
-    const [accountTypeFilter, setAccountTypeFilter] = useState<string>('all');
     const [accountStatusFilter, setAccountStatusFilter] = useState<string>('all');
     const [planFilter, setPlanFilter] = useState<string>('all');
     const [joinedFrom, setJoinedFrom] = useState('');
@@ -300,7 +339,7 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
         return tabCustomers.filter((customer) => {
             const location = [customer.city, customer.province].filter(Boolean).join(', ').toLowerCase();
             const planName = customer.subscription?.name?.toLowerCase() ?? '';
-            const createdAt = customer.created_at.slice(0, 10);
+            const updatedAt = updatedDateKey(customer.updated_at);
             const matchesSearch = !query ||
                 customer.name.toLowerCase().includes(query) ||
                 customer.email.toLowerCase().includes(query) ||
@@ -309,14 +348,13 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                 (customer.school_name ?? '').toLowerCase().includes(query) ||
                 location.includes(query) ||
                 planName.includes(query);
-            const matchesAccountType   = accountTypeFilter === 'all' || customer.account_type === accountTypeFilter;
             const matchesAccountStatus = accountStatusFilter === 'all' || customer.status === accountStatusFilter;
             const matchesPlanState     = planFilter === 'all' || customer.plan_state === planFilter;
-            const matchesJoinedFrom    = !joinedFrom || createdAt >= joinedFrom;
-            const matchesJoinedTo      = !joinedTo || createdAt <= joinedTo;
-            return matchesSearch && matchesAccountType && matchesAccountStatus && matchesPlanState && matchesJoinedFrom && matchesJoinedTo;
+            const matchesJoinedFrom    = !joinedFrom || updatedAt >= joinedFrom;
+            const matchesJoinedTo      = !joinedTo || updatedAt <= joinedTo;
+            return matchesSearch && matchesAccountStatus && matchesPlanState && matchesJoinedFrom && matchesJoinedTo;
         });
-    }, [tabCustomers, search, accountTypeFilter, accountStatusFilter, planFilter, joinedFrom, joinedTo]);
+    }, [tabCustomers, search, accountStatusFilter, planFilter, joinedFrom, joinedTo]);
 
     const financials = useMemo(() => ({
         totalDues: filtered.reduce((s, c) => s + Number(c.total_dues), 0),
@@ -327,6 +365,11 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const safePage = Math.min(page, totalPages);
     const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+    const dateCounts = useMemo(() => filtered.reduce<Record<string, number>>((counts, customer) => {
+        const key = updatedDateKey(customer.updated_at);
+        counts[key] = (counts[key] ?? 0) + 1;
+        return counts;
+    }, {}), [filtered]);
 
     const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
     const toggleCol = (col: ColumnKey) => setVisibleCols((c) => ({ ...c, [col]: !c[col] }));
@@ -335,28 +378,23 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
     const handleTab = (next: 'all' | 'mine') => { setTab(next); setPage(1); };
 
     const clearFilters = () => {
-        setSearch(''); setAccountTypeFilter('all'); setAccountStatusFilter('all');
+        setSearch(''); setAccountStatusFilter('all');
         setPlanFilter('all'); setJoinedFrom(''); setJoinedTo(''); setPage(1);
     };
 
-    const hasActiveFilters = search !== '' || accountTypeFilter !== 'all' || accountStatusFilter !== 'all' || planFilter !== 'all' || joinedFrom !== '' || joinedTo !== '';
+    const hasActiveFilters = search !== '' || accountStatusFilter !== 'all' || planFilter !== 'all' || joinedFrom !== '' || joinedTo !== '';
 
     return (
         <>
-            <Head title="Customers" />
+            <Head title={`${accountType === 'paid' ? 'Paid' : 'Trial'} Customers`} />
 
             <div className="space-y-5 p-4 md:p-6">
                 {/* Page header */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="h1-semibold">Customers</h1>
-                        <p className="text-muted-foreground mt-0.5 text-sm">
-                            {filtered.length} shown / {customers.length} total
-                        </p>
-                    </div>
+                    <h1 className="h1-semibold">{accountType === 'paid' ? 'Paid' : 'Trial'} Customers</h1>
                     {can('customers.create') && (
                         <Link
-                            href="/superadmin/customers/add"
+                            href={`/superadmin/customers/add?account_type=${accountType}`}
                             className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                         >
                             <PlusIcon size={16} color="currentColor" />
@@ -365,49 +403,59 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                     )}
                 </div>
 
-                {/* Tab toggle */}
-                {canViewAllCustomers && (
-                    <div className="flex w-fit items-center gap-1 rounded-xl border bg-card p-1 shadow-sm">
-                    <button
-                        type="button"
-                        onClick={() => handleTab('all')}
-                        className={cn(
-                            'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-                            tab === 'all'
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-                        )}
-                    >
-                        <UsersIcon className="size-4" />
-                        All Customers
-                        <span className={cn(
-                            'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
-                            tab === 'all' ? 'bg-white/20' : 'bg-muted',
-                        )}>
-                            {customers.length}
+                {/* Customer view and expiry legend */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    {canViewAllCustomers && (
+                        <div className="flex w-fit items-center gap-1 rounded-xl border bg-card p-1 shadow-sm">
+                            <button
+                                type="button"
+                                onClick={() => handleTab('all')}
+                                className={cn(
+                                    'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                                    tab === 'all'
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                                )}
+                            >
+                                <UsersIcon className="size-4" />
+                                All Customers
+                                <span className={cn(
+                                    'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+                                    tab === 'all' ? 'bg-white/20' : 'bg-muted',
+                                )}>
+                                    {customers.length}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTab('mine')}
+                                className={cn(
+                                    'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                                    tab === 'mine'
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                                )}
+                            >
+                                <UserIcon className="size-4" />
+                                My Customers
+                                <span className={cn(
+                                    'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+                                    tab === 'mine' ? 'bg-white/20' : 'bg-muted',
+                                )}>
+                                    {myCount}
+                                </span>
+                            </button>
+                        </div>
+                    )}
+                    <div className="ml-auto flex items-center gap-3 text-xs font-medium">
+                        <span className="flex items-center gap-1.5 text-rose-700">
+                            <span className="size-2.5 rounded-full bg-rose-500" /> Expired
                         </span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleTab('mine')}
-                        className={cn(
-                            'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-                            tab === 'mine'
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-                        )}
-                    >
-                        <UserIcon className="size-4" />
-                        My Customers
-                        <span className={cn(
-                            'rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
-                            tab === 'mine' ? 'bg-white/20' : 'bg-muted',
-                        )}>
-                            {myCount}
+                        <span className="flex items-center gap-1.5 text-amber-700">
+                            <span className="size-2.5 rounded-full bg-amber-400" /> 30 days or less
                         </span>
-                    </button>
                     </div>
-                )}
+                </div>
 
                 {/* Plan-state summary cards */}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -452,23 +500,6 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                                 onChange={(e) => handleSearch(e.target.value)} className="w-full pl-9" />
                         </div>
 
-                        <Select value={accountTypeFilter} onValueChange={(v) => { setAccountTypeFilter(v); setPage(1); }}>
-                            <SelectTrigger className="w-36"><SelectValue placeholder="Type" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Types</SelectItem>
-                                <SelectItem value="trial">
-                                    <span className="flex items-center gap-2">
-                                        <span className="size-2 rounded-full bg-amber-400" /> Trial
-                                    </span>
-                                </SelectItem>
-                                <SelectItem value="paid">
-                                    <span className="flex items-center gap-2">
-                                        <span className="size-2 rounded-full bg-emerald-500" /> Paid
-                                    </span>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
                         <Select value={accountStatusFilter} onValueChange={(v) => { setAccountStatusFilter(v); setPage(1); }}>
                             <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
                             <SelectContent>
@@ -511,11 +542,11 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
 
                     <div className="flex flex-wrap items-end gap-2">
                         <div className="w-full sm:w-auto">
-                            <p className="text-muted-foreground mb-1 text-xs font-medium">Joined From</p>
+                            <p className="text-muted-foreground mb-1 text-xs font-medium">Updated From</p>
                             <DateInput value={joinedFrom} onChange={(e) => { setJoinedFrom(e.target.value); setPage(1); }} className="w-full sm:w-40" />
                         </div>
                         <div className="w-full sm:w-auto">
-                            <p className="text-muted-foreground mb-1 text-xs font-medium">Joined To</p>
+                            <p className="text-muted-foreground mb-1 text-xs font-medium">Updated To</p>
                             <DateInput value={joinedTo} onChange={(e) => { setJoinedTo(e.target.value); setPage(1); }} className="w-full sm:w-40" />
                         </div>
                         <div className="w-full sm:w-auto">
@@ -538,7 +569,7 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                 {/* Table */}
                 <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="w-full min-w-[1250px] text-sm">
                             <thead>
                                 <tr className="bg-muted/40 border-b text-left">
                                     {visibleCols.customer && (
@@ -552,9 +583,16 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                                         <th className="text-muted-foreground px-4 py-3 font-medium">Setup</th>
                                     )}
                                     {visibleCols.email && (
-                                        <th className="px-4 py-3 font-medium">
+                                        <th className="min-w-48 px-4 py-3 font-medium">
                                             <div className="text-muted-foreground flex items-center gap-1.5">
                                                 <MailIcon className="size-3.5" /> Email
+                                            </div>
+                                        </th>
+                                    )}
+                                    {visibleCols.phone && (
+                                        <th className="whitespace-nowrap px-4 py-3 font-medium">
+                                            <div className="text-muted-foreground flex items-center gap-1.5">
+                                                <PhoneIcon className="size-3.5" /> Phone Number
                                             </div>
                                         </th>
                                     )}
@@ -640,7 +678,7 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginated.map((customer) => {
+                                    paginated.map((customer, index) => {
                                         const location = [customer.city, customer.province].filter(Boolean).join(', ');
                                         const logoUrl = customer.logo ? `/storage/${customer.logo}` : null;
                                         const accountStatus = ACCOUNT_STATUS_CONFIG[customer.status];
@@ -649,9 +687,17 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                                         const dues = Number(customer.total_dues);
                                         const pending = Number(customer.total_pending);
                                         const commission = Number(customer.my_commission);
+                                        const dateKey = updatedDateKey(customer.updated_at);
+                                        const showDateStrip = index === 0 || updatedDateKey(paginated[index - 1].updated_at) !== dateKey;
 
                                         return (
-                                            <tr key={customer.id} className="hover:bg-muted/20 transition-colors">
+                                            <Fragment key={customer.id}>
+                                            {showDateStrip && <CustomerDateStrip date={dateKey} count={dateCounts[dateKey]} colSpan={ALL_COLUMNS.filter((col) => visibleCols[col]).length} />}
+                                            <tr className={cn('transition-colors',
+                                                customer.plan_state === 'expired' && 'bg-rose-50/85 hover:bg-rose-100 dark:bg-rose-950/25',
+                                                customer.plan_state === 'near_expiry' && 'bg-amber-50/90 hover:bg-amber-100 dark:bg-amber-950/25',
+                                                customer.plan_state !== 'expired' && customer.plan_state !== 'near_expiry' && 'hover:bg-muted/20',
+                                            )}>
                                                 {visibleCols.customer && (
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center gap-3">
@@ -685,7 +731,13 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                                                 )}
 
                                                 {visibleCols.email && (
-                                                    <td className="text-muted-foreground px-4 py-3">{customer.email}</td>
+                                                    <td className="text-muted-foreground max-w-60 break-all px-4 py-3">{customer.email}</td>
+                                                )}
+
+                                                {visibleCols.phone && (
+                                                    <td className="text-muted-foreground whitespace-nowrap px-4 py-3">
+                                                        {customer.phone || <span className="italic">-</span>}
+                                                    </td>
                                                 )}
 
                                                 {visibleCols.school && (
@@ -830,6 +882,7 @@ export default function Customers({ customers, canViewAllCustomers }: { customer
                                                     </td>
                                                 )}
                                             </tr>
+                                            </Fragment>
                                         );
                                     })
                                 )}

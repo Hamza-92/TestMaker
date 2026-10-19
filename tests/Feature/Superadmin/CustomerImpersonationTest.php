@@ -35,7 +35,7 @@ it('allows a superadmin to log in as a customer and return to the admin account'
 
     $returnResponse = $this->post(route('impersonation.stop'));
 
-    $returnResponse->assertRedirect(route('superadmin.customers'));
+    $returnResponse->assertRedirect(route('superadmin.customers.paid'));
     expect(auth()->id())->toBe($admin->id)
         ->and(session()->has('impersonator_id'))->toBeFalse();
 });
