@@ -11,6 +11,7 @@ use App\Models\Subscription;
 use App\Models\TrialSetting;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Storage;
 
 class SuperadminDashboardSummary
 {
@@ -200,19 +201,63 @@ class SuperadminDashboardSummary
 
         return self::visiblePayments($actor, $visibleTypes)
             ->whereIn('status', [PaymentStatus::PendingReview->value, PaymentStatus::Reviewed->value])
-            ->with('subscription.user:id,name,school_name')
+            ->with([
+                'subscription.user:id,name,school_name,email,phone',
+                'subscription.paymentLogs:id,subscription_id,amount,status,created_at',
+                'creator:id,name',
+                'reviewer:id,name',
+            ])
             ->latest('created_at')
             ->limit(5)
             ->get()
-            ->map(fn (PaymentLog $log) => [
-                'id' => $log->id,
-                'customer_id' => $log->subscription->user_id,
-                'customer_name' => $log->subscription->user->school_name ?: $log->subscription->user->name,
-                'subscription_id' => $log->subscription_id,
-                'amount' => (string) $log->amount,
-                'status' => $log->status->value,
-                'created_at' => $log->created_at->toISOString(),
-            ])
+            ->map(function (PaymentLog $log) {
+                $subscription = $log->subscription;
+                $payments = $subscription->paymentLogs;
+                $approved = (float) $payments
+                    ->filter(fn (PaymentLog $payment) => $payment->status === PaymentStatus::Approved)
+                    ->sum('amount');
+
+                return [
+                    'id' => $log->id,
+                    'customer_id' => $subscription->user_id,
+                    'customer_name' => $subscription->user->school_name ?: $subscription->user->name,
+                    'school_name' => $subscription->user->school_name,
+                    'customer_contact_name' => $subscription->user->name,
+                    'customer_email' => $subscription->user->email,
+                    'customer_phone' => $subscription->user->phone,
+                    'subscription_id' => $subscription->id,
+                    'subscription_name' => $subscription->name,
+                    'subscription_amount' => (string) $subscription->amount,
+                    'approved_amount' => number_format($approved, 2, '.', ''),
+                    'balance_amount' => number_format(max((float) $subscription->amount - $approved, 0), 2, '.', ''),
+                    'subscription_started_at' => $subscription->started_at?->toISOString(),
+                    'subscription_expired_at' => $subscription->expired_at?->toISOString(),
+                    'amount' => (string) $log->amount,
+                    'payment_method' => $log->account_number === 'legacy-testmaker'
+                        ? 'Legacy TestMaker Record'
+                        : $log->payment_method?->label(),
+                    'account_number' => $log->account_number === 'legacy-testmaker' ? null : $log->account_number,
+                    'next_payment_date' => $log->next_payment_date?->toDateString(),
+                    'status' => $log->status->value,
+                    'created_at' => $log->created_at->toISOString(),
+                    'recorded_by' => $log->creator?->name,
+                    'reviewed_at' => $log->reviewed_at?->toISOString(),
+                    'reviewed_by' => $log->reviewer?->name,
+                    'notes' => $log->notes,
+                    'receipts' => collect($log->attachments ?? [])->map(fn (string $path) => Storage::url($path))->all(),
+                    'recent_payments' => $payments
+                        ->sortByDesc('created_at')
+                        ->take(4)
+                        ->map(fn (PaymentLog $payment) => [
+                            'id' => $payment->id,
+                            'amount' => (string) $payment->amount,
+                            'status' => $payment->status?->value,
+                            'created_at' => $payment->created_at?->toISOString(),
+                        ])
+                        ->values()
+                        ->all(),
+                ];
+            })
             ->all();
     }
 

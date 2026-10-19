@@ -105,6 +105,54 @@ it('shows accurate customer and payment summary values to the master admin', fun
         ->and(collect($trends['customerDays'])->sum('paid'))->toBe(4)
         ->and(collect($trends['customerDays'])->sum('trial'))->toBe(collect($trends['customers'])->firstWhere('month', $thisMonth)['trial'])
         ->and($page['props']['paymentsToReview'])->toHaveCount(3);
+
+    $review = collect($page['props']['paymentsToReview'])->firstWhere('amount', '100.00');
+    expect($review['customer_name'])->toBe($expiring->school_name ?: $expiring->name)
+        ->and($review['recorded_by'])->toBe($this->master->name)
+        ->and($review['subscription_name'])->toBe('Standard')
+        ->and($review['subscription_amount'])->toBe('1000.00')
+        ->and($review['approved_amount'])->toBe('1150.50')
+        ->and($review['balance_amount'])->toBe('0.00')
+        ->and($review['payment_method'])->toBe('Cash')
+        ->and($review['recent_payments'])->not->toBeEmpty();
+});
+
+it('reviews and approves a dashboard payment without changing recorded details', function () {
+    $recorder = User::factory()->create(['user_type' => UserType::SuperAdmin]);
+    $school = dashboardCustomer($this->master, 'paid', [
+        'school_name' => 'North Campus',
+        'phone' => '03001234567',
+    ]);
+    $subscription = dashboardSubscription($school, $this->master, 20);
+    $payment = dashboardPayment($subscription, $recorder, 'pending_review', '275.50');
+
+    $page = $this->actingAs($this->master)->get(route('dashboard'))->assertOk()->viewData('page');
+    $detail = collect($page['props']['paymentsToReview'])->firstWhere('id', $payment->id);
+
+    expect($detail['customer_name'])->toBe('North Campus')
+        ->and($detail['school_name'])->toBe('North Campus')
+        ->and($detail['customer_contact_name'])->toBe($school->name)
+        ->and($detail['customer_email'])->toBe($school->email)
+        ->and($detail['customer_phone'])->toBe('03001234567')
+        ->and($detail['recorded_by'])->toBe($recorder->name)
+        ->and($detail['amount'])->toBe('275.50')
+        ->and($detail['status'])->toBe('pending_review');
+
+    $reviewUrl = route('superadmin.customers.subscriptions.payment-logs.review', [$school, $subscription, $payment]);
+    $this->from(route('dashboard'))->patch($reviewUrl, ['status' => 'reviewed'])->assertSessionHasNoErrors();
+
+    $page = $this->get(route('dashboard'))->assertOk()->viewData('page');
+    $detail = collect($page['props']['paymentsToReview'])->firstWhere('id', $payment->id);
+    expect($detail['status'])->toBe('reviewed')
+        ->and($detail['reviewed_by'])->toBe($this->master->name);
+
+    $this->from(route('dashboard'))->patch($reviewUrl, ['status' => 'approved'])->assertSessionHasNoErrors();
+
+    $page = $this->get(route('dashboard'))->assertOk()->viewData('page');
+    expect($page['props']['paymentsToReview'])->toBe([])
+        ->and($page['props']['summary']['pending_payments'])->toBe(0)
+        ->and((float) $page['props']['summary']['approved_payments_this_month'])->toBe(275.5)
+        ->and((string) $payment->fresh()->amount)->toBe('275.50');
 });
 
 it('limits delegated admin metrics to granted account types and owned customers', function () {

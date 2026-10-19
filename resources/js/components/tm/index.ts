@@ -27,6 +27,7 @@
  */
 export { Button, buttonVariants } from './button';
 export { Card, cardVariants } from './card';
+export { Modal } from './modal';
 export { Badge, badgeVariants } from './badge';
 export { EmptyState } from './empty-state';
 export { PageHeader } from './page-header';
