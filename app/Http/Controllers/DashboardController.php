@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\UserType;
 use App\Support\CustomerDashboardData;
+use App\Support\SuperadminDashboardSummary;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -13,7 +14,11 @@ class DashboardController extends Controller
         $user = auth()->user();
 
         if (in_array($user->user_type, [UserType::SuperAdmin, UserType::Staff])) {
-            return Inertia::render('dashboard');
+            return Inertia::render('dashboard', [
+                'summary' => SuperadminDashboardSummary::for($user),
+                'trends' => SuperadminDashboardSummary::trendsFor($user),
+                'paymentsToReview' => SuperadminDashboardSummary::paymentsToReviewFor($user),
+            ]);
         }
 
         return Inertia::render(
