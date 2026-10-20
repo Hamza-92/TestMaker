@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\AuditEvent;
 use App\Enums\UserStatus;
 use App\Enums\UserType;
+use App\Models\AuditLog;
 use App\Models\PaymentLog;
 use App\Models\Subscription;
 use App\Models\TrialSetting;
@@ -67,7 +69,7 @@ it('shows accurate customer and payment summary values to the master admin', fun
     $subscribedTrial = dashboardCustomer($this->master, 'trial');
 
     $expiringPlan = dashboardSubscription($expiring, $this->master, 10);
-    dashboardSubscription($expiring, $this->master, 20);
+    $laterExpiringPlan = dashboardSubscription($expiring, $this->master, 20);
     dashboardSubscription($longPlan, $this->master, 60);
     dashboardSubscription($expired, $this->master, -1);
     dashboardSubscription($suspended, $this->master, 10);
@@ -95,16 +97,19 @@ it('shows accurate customer and payment summary values to the master admin', fun
 
     $trends = $page['props']['trends'];
     $thisMonth = now('Asia/Karachi')->format('Y-m');
-    $lastMonth = now('Asia/Karachi')->subMonth()->format('Y-m');
-    expect($trends['payments'])->toHaveCount(12)
-        ->and(collect($trends['payments'])->firstWhere('month', $thisMonth)['amount_cents'])->toBe(30050)
-        ->and(collect($trends['payments'])->firstWhere('month', $lastMonth)['amount_cents'])->toBe(90000)
-        ->and(collect($trends['paymentDays'])->sum('amount_cents'))->toBe(30050)
+    expect($trends)->not->toHaveKey('payments')
+        ->and($trends)->not->toHaveKey('paymentDays')
         ->and(collect($trends['customers'])->firstWhere('month', $thisMonth)['paid'])->toBe(4)
         ->and(collect($trends['customers'])->sum('trial'))->toBe(3)
         ->and(collect($trends['customerDays'])->sum('paid'))->toBe(4)
         ->and(collect($trends['customerDays'])->sum('trial'))->toBe(collect($trends['customers'])->firstWhere('month', $thisMonth)['trial'])
+        ->and($page['props']['subscriptionStatus'])->toBe(['active' => 5, 'expired' => 1])
+        ->and($page['props']['recentExpiredCustomers'])->toHaveCount(1)
+        ->and($page['props']['recentExpiredCustomers'][0]['customer_id'])->toBe($expired->id)
         ->and($page['props']['paymentsToReview'])->toHaveCount(3);
+
+    expect(array_column($page['props']['expiringSubscriptions'], 'id'))
+        ->toBe([$expiringPlan->id, $laterExpiringPlan->id]);
 
     $review = collect($page['props']['paymentsToReview'])->firstWhere('amount', '100.00');
     expect($review['customer_name'])->toBe($expiring->school_name ?: $expiring->name)
@@ -115,6 +120,72 @@ it('shows accurate customer and payment summary values to the master admin', fun
         ->and($review['balance_amount'])->toBe('0.00')
         ->and($review['payment_method'])->toBe('Cash')
         ->and($review['recent_payments'])->not->toBeEmpty();
+});
+
+it('shows recently expired paid customers without an active replacement plan', function () {
+    $twoDaysAgo = dashboardCustomer($this->master, 'paid');
+    $fiveDaysAgo = dashboardCustomer($this->master, 'paid');
+    $old = dashboardCustomer($this->master, 'paid');
+    $renewed = dashboardCustomer($this->master, 'paid');
+
+    dashboardSubscription($twoDaysAgo, $this->master, -2);
+    dashboardSubscription($fiveDaysAgo, $this->master, -5);
+    dashboardSubscription($old, $this->master, -35);
+    dashboardSubscription($renewed, $this->master, -1);
+    dashboardSubscription($renewed, $this->master, 40);
+
+    $page = $this->actingAs($this->master)->get(route('dashboard'))->assertOk()->viewData('page');
+
+    expect(array_column($page['props']['recentExpiredCustomers'], 'customer_id'))
+        ->toBe([$twoDaysAgo->id, $fiveDaysAgo->id])
+        ->and($page['props']['subscriptionStatus'])->toBe(['active' => 1, 'expired' => 4]);
+});
+
+it('shows employee customer, subscription and payment activity within the viewer scope', function () {
+    $delegate = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->master->id]);
+    $delegate->syncPermissions(['customers.paid.view', 'subscriptions.view']);
+    $ownCustomer = dashboardCustomer($delegate, 'paid', ['school_name' => 'Own School']);
+    $otherCustomer = dashboardCustomer($this->master, 'paid');
+    $subscription = dashboardSubscription($ownCustomer, $delegate, 8);
+    $payment = dashboardPayment($subscription, $delegate, 'pending_review', '150.00');
+
+    AuditLog::record($ownCustomer, AuditEvent::Created, newValues: ['name' => $ownCustomer->name], actor: $delegate);
+    AuditLog::record($subscription, AuditEvent::Created, newValues: ['name' => 'Standard'], actor: $delegate);
+    AuditLog::record($payment, AuditEvent::Created, newValues: ['amount' => '150.00'], actor: $delegate);
+    AuditLog::record($ownCustomer, AuditEvent::Updated, newValues: ['subscription_id' => $subscription->id], actor: $delegate);
+    AuditLog::record($otherCustomer, AuditEvent::Updated, newValues: ['status' => 'active'], actor: $this->master);
+
+    $page = $this->actingAs($delegate)->get(route('dashboard'))->assertOk()->viewData('page');
+    $activity = $page['props']['recentEmployeeActivity'];
+
+    expect($activity)->toHaveCount(3)
+        ->and(array_column($activity, 'type'))->toContain('customer', 'subscription', 'payment')
+        ->and(array_unique(array_column($activity, 'customer_id')))->toBe([$ownCustomer->id]);
+});
+
+it('shows the five nearest active paid expiries with seven day markers', function () {
+    $school = dashboardCustomer($this->master, 'paid', ['school_name' => 'North Campus']);
+    $plans = [];
+
+    foreach ([29, 8, 2, 4, 6, 20] as $days) {
+        $plans[$days] = dashboardSubscription($school, $this->master, $days);
+    }
+
+    dashboardSubscription($school, $this->master, -1);
+    dashboardSubscription($school, $this->master, 1)->update(['status' => 'cancelled']);
+
+    $page = $this->actingAs($this->master)->get(route('dashboard'))->assertOk()->viewData('page');
+    $rows = $page['props']['expiringSubscriptions'];
+
+    expect($page['props']['summary']['expiring_soon'])->toBe(6)
+        ->and(array_column($rows, 'id'))->toBe([
+            $plans[2]->id, $plans[4]->id, $plans[6]->id, $plans[8]->id, $plans[20]->id,
+        ])
+        ->and(array_column($rows, 'within_7_days'))->toBe([true, true, true, false, false])
+        ->and($rows[0]['customer_id'])->toBe($school->id)
+        ->and($rows[0]['school_name'])->toBe('North Campus')
+        ->and($rows[0]['plan_name'])->toBe('Standard')
+        ->and($rows[0]['days_left'])->toBe(2);
 });
 
 it('reviews and approves a dashboard payment without changing recorded details', function () {
@@ -190,15 +261,33 @@ it('limits delegated admin metrics to granted account types and owned customers'
 
     $current = now('Asia/Karachi')->format('Y-m');
     $customerMonth = collect($page['props']['trends']['customers'])->firstWhere('month', $current);
-    $paymentMonth = collect($page['props']['trends']['payments'])->firstWhere('month', $current);
     expect($customerMonth['paid'])->toBe(1)
         ->and($customerMonth['trial'])->toBeNull()
-        ->and($paymentMonth['amount_cents'])->toBe(12025)
-        ->and(collect($page['props']['trends']['paymentDays'])->sum('amount_cents'))->toBe(12025)
         ->and(collect($page['props']['trends']['customerDays'])->sum('paid'))->toBe(1)
         ->and($page['props']['trends']['customerDays'][0]['trial'])->toBeNull()
+        ->and($page['props']['subscriptionStatus'])->toBe(['active' => 1, 'expired' => 0])
+        ->and($page['props']['expiringSubscriptions'])->toHaveCount(1)
+        ->and($page['props']['recentExpiredCustomers'])->toBe([])
+        ->and($page['props']['expiringSubscriptions'][0]['customer_id'])->toBe($ownPaid->id)
         ->and($page['props']['paymentsToReview'])->toHaveCount(1)
         ->and($page['props']['paymentsToReview'][0]['customer_id'])->toBe($ownPaid->id);
+});
+
+it('hides expiring subscription details without subscription view permission', function () {
+    $delegate = User::factory()->create([
+        'user_type' => UserType::SuperAdmin,
+        'created_by' => $this->master->id,
+    ]);
+    $delegate->syncPermissions(['customers.paid.view']);
+    $school = dashboardCustomer($delegate, 'paid');
+    dashboardSubscription($school, $delegate, 5);
+
+    $page = $this->actingAs($delegate)->get(route('dashboard'))->assertOk()->viewData('page');
+
+    expect($page['props']['summary']['expiring_soon'])->toBe(1)
+        ->and($page['props']['expiringSubscriptions'])->toBeNull()
+        ->and($page['props']['recentExpiredCustomers'])->toBeNull()
+        ->and($page['props']['subscriptionStatus'])->toBeNull();
 });
 
 it('omits unauthorized cards without creating trial settings on a dashboard read', function () {
@@ -212,6 +301,10 @@ it('omits unauthorized cards without creating trial settings on a dashboard read
         ->assertInertia(fn ($page) => $page
             ->where('summary', [])
             ->where('trends', [])
+            ->where('subscriptionStatus', null)
+            ->where('recentEmployeeActivity', null)
+            ->where('expiringSubscriptions', null)
+            ->where('recentExpiredCustomers', null)
             ->where('paymentsToReview', null));
 
     $delegate->syncPermissions(['customers.trial.view']);
@@ -221,7 +314,10 @@ it('omits unauthorized cards without creating trial settings on a dashboard read
     expect($page['props']['trends'])->toHaveKeys(['customers', 'customerDays'])
         ->not->toHaveKey('payments')
         ->not->toHaveKey('paymentDays');
-    expect($page['props']['paymentsToReview'])->toBeNull();
+    expect($page['props']['paymentsToReview'])->toBeNull()
+        ->and($page['props']['expiringSubscriptions'])->toBeNull()
+        ->and($page['props']['recentExpiredCustomers'])->toBeNull()
+        ->and($page['props']['subscriptionStatus'])->toBeNull();
 
     $trialPlan = dashboardSubscription($trial, $delegate, 10);
     dashboardPayment($trialPlan, $delegate, 'approved', '25.00');
@@ -234,7 +330,10 @@ it('omits unauthorized cards without creating trial settings on a dashboard read
         ->not->toHaveKey('pending_payments')
         ->and($summary['active_trials'])->toBe(1)
         ->and((float) $summary['approved_payments_this_month'])->toBe(25.0);
-    expect($page['props']['trends'])->toHaveKeys(['customers', 'customerDays', 'payments', 'paymentDays'])
-        ->and($page['props']['paymentsToReview'])->toBeNull();
+    expect($page['props']['trends'])->toHaveKeys(['customers', 'customerDays'])
+        ->and($page['props']['paymentsToReview'])->toBeNull()
+        ->and($page['props']['expiringSubscriptions'])->toBeNull()
+        ->and($page['props']['recentExpiredCustomers'])->toBeNull()
+        ->and($page['props']['subscriptionStatus'])->toBe(['active' => 1, 'expired' => 0]);
     expect(TrialSetting::count())->toBe(0);
 });

@@ -8,8 +8,17 @@ import {
 } from 'lucide-react';
 import { DashboardTrends } from '@/components/admin/dashboard-trends';
 import type { DashboardTrendsData } from '@/components/admin/dashboard-trends';
+import { EmployeeActivityCard } from '@/components/admin/employee-activity';
+import type { EmployeeActivity } from '@/components/admin/employee-activity';
+import { NeedsAttention } from '@/components/admin/needs-attention';
+import type {
+    ExpiringSubscription,
+    RecentlyExpiredCustomer,
+} from '@/components/admin/needs-attention';
 import { PaymentsToReview } from '@/components/admin/payment-review';
 import type { PaymentToReview } from '@/components/admin/payment-review';
+import { SubscriptionStatusChart } from '@/components/admin/subscription-status-chart';
+import type { SubscriptionStatusData } from '@/components/admin/subscription-status-chart';
 import { SummaryCard } from '@/components/admin/summary-card';
 import { dashboard } from '@/routes';
 
@@ -35,11 +44,19 @@ function formatMoney(value: string): string {
 export default function Dashboard({
     summary,
     trends,
+    subscriptionStatus,
+    recentEmployeeActivity,
     paymentsToReview,
+    expiringSubscriptions,
+    recentExpiredCustomers,
 }: {
     summary: Summary;
     trends: DashboardTrendsData;
+    subscriptionStatus: SubscriptionStatusData | null;
+    recentEmployeeActivity: EmployeeActivity[] | null;
     paymentsToReview: PaymentToReview[] | null;
+    expiringSubscriptions: ExpiringSubscription[] | null;
+    recentExpiredCustomers: RecentlyExpiredCustomer[] | null;
 }) {
     const hasSummary = Object.keys(summary).length > 0;
 
@@ -104,7 +121,38 @@ export default function Dashboard({
                     </div>
                 )}
 
-                <DashboardTrends trends={trends} />
+                {(trends.customers || subscriptionStatus) && (
+                    <div
+                        className={`grid gap-4 ${trends.customers && subscriptionStatus ? 'xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,1fr)]' : ''}`}
+                    >
+                        <DashboardTrends trends={trends} />
+                        {subscriptionStatus && (
+                            <SubscriptionStatusChart
+                                status={subscriptionStatus}
+                            />
+                        )}
+                    </div>
+                )}
+
+                {(expiringSubscriptions !== null ||
+                    recentEmployeeActivity !== null) && (
+                    <div
+                        className={`grid gap-4 ${expiringSubscriptions !== null && recentExpiredCustomers !== null && recentEmployeeActivity !== null ? 'xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]' : ''}`}
+                    >
+                        {expiringSubscriptions !== null &&
+                            recentExpiredCustomers !== null && (
+                                <NeedsAttention
+                                    nearExpiry={expiringSubscriptions}
+                                    recentlyExpired={recentExpiredCustomers}
+                                />
+                            )}
+                        {recentEmployeeActivity !== null && (
+                            <EmployeeActivityCard
+                                activities={recentEmployeeActivity}
+                            />
+                        )}
+                    </div>
+                )}
 
                 {paymentsToReview !== null && (
                     <PaymentsToReview

@@ -17,7 +17,11 @@ class DashboardController extends Controller
             return Inertia::render('dashboard', [
                 'summary' => SuperadminDashboardSummary::for($user),
                 'trends' => SuperadminDashboardSummary::trendsFor($user),
+                'subscriptionStatus' => SuperadminDashboardSummary::subscriptionStatusFor($user),
+                'recentEmployeeActivity' => SuperadminDashboardSummary::recentEmployeeActivityFor($user),
                 'paymentsToReview' => SuperadminDashboardSummary::paymentsToReviewFor($user),
+                'expiringSubscriptions' => SuperadminDashboardSummary::expiringSubscriptionsFor($user),
+                'recentExpiredCustomers' => SuperadminDashboardSummary::recentExpiredCustomersFor($user),
             ]);
         }
 
