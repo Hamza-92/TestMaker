@@ -17,7 +17,7 @@ export function SubscriptionStatusChart({
         { name: 'Active', value: status.active, color: '#0284c7' },
         { name: 'Expired', value: status.expired, color: '#f59e0b' },
     ];
-    const hasData = status.active + status.expired > 0;
+    const chartData = data.filter((entry) => entry.value > 0);
 
     return (
         <Card
@@ -34,7 +34,7 @@ export function SubscriptionStatusChart({
                     Subscriptions
                 </h2>
             </div>
-            {hasData ? (
+            {chartData.length > 0 ? (
                 <div
                     className="mt-3 h-52 w-full"
                     role="img"
@@ -43,17 +43,16 @@ export function SubscriptionStatusChart({
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
-                                data={data}
+                                data={chartData}
                                 dataKey="value"
                                 nameKey="name"
                                 cx="50%"
                                 cy="50%"
                                 innerRadius="59%"
                                 outerRadius="82%"
-                                paddingAngle={3}
                                 stroke="none"
                             >
-                                {data.map((entry) => (
+                                {chartData.map((entry) => (
                                     <Cell key={entry.name} fill={entry.color} />
                                 ))}
                             </Pie>
