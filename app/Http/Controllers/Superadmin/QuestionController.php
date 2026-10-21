@@ -698,7 +698,7 @@ class QuestionController extends Controller
         ]);
     }
 
-    public function edit(Question $question)
+    public function edit(Request $request, Question $question)
     {
         $question->load([
             'questionType:id,name,is_objective,is_single,have_statement,statement_label,have_description,description_label,have_answer,schema_key,objective_type_id,column_per_row,status',
@@ -709,7 +709,7 @@ class QuestionController extends Controller
 
         $backHref = $this->browseHrefForChapter($question->chapter, $question->topic_id);
 
-        return Inertia::render('superadmin/questions/edit', [
+        $props = [
             'question' => [
                 'id' => $question->id,
                 'question_type_id' => $question->question_type_id,
@@ -742,10 +742,16 @@ class QuestionController extends Controller
             'sourceOptions' => $this->sourceOptions(),
             'mediumOptions' => $this->mediumOptions(),
             'backHref' => $backHref,
-        ]);
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json($props);
+        }
+
+        return Inertia::render('superadmin/questions/edit', $props);
     }
 
-    public function update(QuestionUpsertRequest $request, Question $question): RedirectResponse
+    public function update(QuestionUpsertRequest $request, Question $question): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
         $questionType = QuestionType::query()->findOrFail($validated['question_type_id']);
@@ -795,6 +801,10 @@ class QuestionController extends Controller
                 );
             }
         });
+
+        if ($request->expectsJson()) {
+            return response()->json(['id' => $question->id]);
+        }
 
         $topicId = $validated['topic_id'] ?? null;
         $listUrl = $this->browseHrefForChapter($chapter, $topicId);

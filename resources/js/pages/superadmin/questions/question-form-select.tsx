@@ -14,14 +14,18 @@ export function QuestionFormSelect({
     options,
     placeholder,
     searchable = false,
+    searchPlaceholder = 'Search options',
     disabled = false,
+    onOpen,
 }: {
     value: string;
     onValueChange: (value: string) => void;
     options: FormSelectOption[];
     placeholder: string;
     searchable?: boolean;
+    searchPlaceholder?: string;
     disabled?: boolean;
+    onOpen?: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
@@ -122,6 +126,7 @@ export function QuestionFormSelect({
                         close();
                     } else {
                         setOpen(true);
+                        onOpen?.();
                     }
                 }}
                 className="flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 outline-none transition-colors hover:border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
@@ -156,7 +161,7 @@ export function QuestionFormSelect({
                                 onChange={(event) =>
                                     setQuery(event.target.value)
                                 }
-                                placeholder="Search types"
+                                placeholder={searchPlaceholder}
                                 className="mb-1.5"
                             />
                         )}

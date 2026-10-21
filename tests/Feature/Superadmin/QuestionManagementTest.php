@@ -198,6 +198,35 @@ it('allows enabled subjective answers to be omitted on create and edit', functio
     'grouped subjective' => ['subjective_grouped', ['intro_en' => 'Answer the following.', 'items' => [['prompt_en' => 'What is evaporation?']]]],
 ]);
 
+it('saves an edited question as JSON for the modal', function () {
+    $admin = makeQuestionAdmin();
+    $questionType = makeObjectiveQuestionTypeForManagement($admin, [
+        'is_objective' => false,
+        'is_single' => false,
+        'schema_key' => 'subjective_standard',
+    ]);
+    $context = makeQuestionContextForManagement($admin);
+    $payload = [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $context['chapter']->id,
+        'topic_id' => null,
+        'source' => 'exercise',
+        'status' => true,
+        'content' => ['prompt_en' => 'Original question'],
+    ];
+
+    $this->actingAs($admin)->post(route('superadmin.questions.store'), $payload)
+        ->assertRedirect(managementQuestionListUrl($context));
+    $question = Question::query()->sole();
+
+    $this->putJson(route('superadmin.questions.update', $question), [
+        ...$payload,
+        'content' => ['prompt_en' => 'Updated question'],
+    ])->assertOk()->assertJsonPath('id', $question->id);
+
+    expect($question->fresh()->statement_en)->toBe('Updated question');
+});
+
 it('sorts questions within one chapter topic and question type scope', function () {
     $admin = makeQuestionAdmin();
     $questionType = makeObjectiveQuestionTypeForManagement($admin);

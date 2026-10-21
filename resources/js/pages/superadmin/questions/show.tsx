@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     CalendarIcon,
@@ -7,9 +7,13 @@ import {
     PencilIcon,
     SparklesIcon,
 } from 'lucide-react';
+import { lazy, Suspense, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { usePermission } from '@/hooks/use-permission';
+
+const EditQuestionModal = lazy(() => import('./edit-question-modal'));
 
 interface AuditLogEntry {
     id: number;
@@ -234,13 +238,13 @@ function TextPanel({
             <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl border p-4">
                     <p className="text-xs text-muted-foreground">English</p>
-                    <p className="mt-2 text-sm whitespace-pre-wrap">
+                    <p className="mt-2 whitespace-pre-wrap text-sm">
                         {english || '-'}
                     </p>
                 </div>
                 <div className="rounded-xl border p-4">
                     <p className="text-xs text-muted-foreground">Urdu</p>
-                    <p className="mt-2 text-sm whitespace-pre-wrap" dir="rtl">
+                    <p className="mt-2 whitespace-pre-wrap text-sm" dir="rtl">
                         {urdu || '-'}
                     </p>
                 </div>
@@ -307,7 +311,7 @@ function renderContent(question: QuestionData) {
                                             <Badge>Correct</Badge>
                                         ) : null}
                                     </div>
-                                    <p className="text-sm whitespace-pre-wrap">
+                                    <p className="whitespace-pre-wrap text-sm">
                                         {option.text_en ||
                                             option.text_ur ||
                                             '-'}
@@ -380,7 +384,7 @@ function renderContent(question: QuestionData) {
                                             Question {itemIndex + 1}
                                         </Badge>
                                     </div>
-                                    <p className="mb-4 text-sm whitespace-pre-wrap">
+                                    <p className="mb-4 whitespace-pre-wrap text-sm">
                                         {item.prompt_en ||
                                             item.prompt_ur ||
                                             '-'}
@@ -403,7 +407,7 @@ function renderContent(question: QuestionData) {
                                                             </Badge>
                                                         ) : null}
                                                     </div>
-                                                    <p className="text-sm whitespace-pre-wrap">
+                                                    <p className="whitespace-pre-wrap text-sm">
                                                         {option.text_en ||
                                                             option.text_ur ||
                                                             '-'}
@@ -465,7 +469,7 @@ function renderContent(question: QuestionData) {
                                             Item {itemIndex + 1}
                                         </Badge>
                                     </div>
-                                    <p className="text-sm whitespace-pre-wrap">
+                                    <p className="whitespace-pre-wrap text-sm">
                                         {item.prompt_en ||
                                             item.prompt_ur ||
                                             '-'}
@@ -475,7 +479,7 @@ function renderContent(question: QuestionData) {
                                             <p className="text-xs text-muted-foreground">
                                                 Answer
                                             </p>
-                                            <p className="mt-1 text-sm whitespace-pre-wrap">
+                                            <p className="mt-1 whitespace-pre-wrap text-sm">
                                                 {item.answer_en ||
                                                     item.answer_ur ||
                                                     '-'}
@@ -512,7 +516,7 @@ function renderContent(question: QuestionData) {
                                         <p className="text-xs text-muted-foreground">
                                             Left
                                         </p>
-                                        <p className="mt-1 text-sm whitespace-pre-wrap">
+                                        <p className="mt-1 whitespace-pre-wrap text-sm">
                                             {pair.left_en ||
                                                 pair.left_ur ||
                                                 '-'}
@@ -522,7 +526,7 @@ function renderContent(question: QuestionData) {
                                         <p className="text-xs text-muted-foreground">
                                             Right
                                         </p>
-                                        <p className="mt-1 text-sm whitespace-pre-wrap">
+                                        <p className="mt-1 whitespace-pre-wrap text-sm">
                                             {pair.right_en ||
                                                 pair.right_ur ||
                                                 '-'}
@@ -560,6 +564,8 @@ function renderContent(question: QuestionData) {
 }
 
 export default function ShowQuestion({ question }: { question: QuestionData }) {
+    const { can } = usePermission();
+    const [editOpen, setEditOpen] = useState(false);
     const questionsHref = question.topic
         ? `/superadmin/questions/chapters/${question.chapter.id}/topics/${question.topic.id}`
         : `/superadmin/questions/chapters/${question.chapter.id}`;
@@ -587,14 +593,17 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                             </p>
                         </div>
                     </div>
-                    <Button asChild variant="outline" className="sm:shrink-0">
-                        <Link
-                            href={`/superadmin/questions/${question.id}/edit`}
+                    {can('questions.edit') && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="sm:shrink-0"
+                            onClick={() => setEditOpen(true)}
                         >
                             <PencilIcon className="size-4" />
                             Edit Question
-                        </Link>
-                    </Button>
+                        </Button>
+                    )}
                 </div>
 
                 <div className="overflow-hidden rounded-xl border shadow-sm">
@@ -700,6 +709,22 @@ export default function ShowQuestion({ question }: { question: QuestionData }) {
                     </div>
                 </div>
             </div>
+            {editOpen && (
+                <Suspense fallback={null}>
+                    <EditQuestionModal
+                        questionId={question.id}
+                        scope={[
+                            question.chapter.pattern.name,
+                            question.chapter.class.name,
+                            question.chapter.subject.name_eng,
+                            chapterLabel(question.chapter),
+                            ...(question.topic ? [question.topic.name] : []),
+                        ]}
+                        onClose={() => setEditOpen(false)}
+                        onSaved={() => router.reload({ only: ['question'] })}
+                    />
+                </Suspense>
+            )}
         </>
     );
 }

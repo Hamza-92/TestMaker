@@ -15,7 +15,7 @@ import {
     SearchIcon,
     Trash2Icon,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -39,6 +39,8 @@ import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions
 import { BulkQuestionTypeChangeDialog } from './change-type-dialog';
 import type { QuestionTypeOption, SourceOption } from './form';
 import { SourceBadge } from './source-badge';
+
+const EditQuestionModal = lazy(() => import('./edit-question-modal'));
 
 interface TopicContext {
     id: number;
@@ -169,6 +171,7 @@ export default function ChapterQuestions({
     const [pageSize, setPageSize] = useState(300);
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState<QuestionRow | null>(null);
+    const [editQuestionId, setEditQuestionId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [changeTypeOpen, setChangeTypeOpen] = useState(false);
@@ -507,7 +510,7 @@ export default function ChapterQuestions({
                         className={`grid gap-2 md:grid-cols-2 ${isTopicWise && !scopedTopic ? 'xl:grid-cols-[minmax(220px,1fr)_10rem_11rem_10rem_8rem_auto_auto]' : 'xl:grid-cols-[minmax(220px,1fr)_11rem_10rem_8rem_auto_auto]'}`}
                     >
                         <div className="relative min-w-0">
-                            <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 placeholder="Search questions"
                                 value={search}
@@ -834,7 +837,9 @@ export default function ChapterQuestions({
                                             <td className="px-3 py-2.5">
                                                 <SourceBadge
                                                     source={question.source}
-                                                    label={question.source_label}
+                                                    label={
+                                                        question.source_label
+                                                    }
                                                 />
                                             </td>
                                             <td className="px-3 py-2.5">
@@ -854,12 +859,20 @@ export default function ChapterQuestions({
                                                     >
                                                         <EyeIcon className="size-4" />
                                                     </Link>
-                                                    <Link
-                                                        href={`/superadmin/questions/${question.id}/edit`}
-                                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                                    >
-                                                        <PencilIcon className="size-4" />
-                                                    </Link>
+                                                    {canEditQuestions && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setEditQuestionId(
+                                                                    question.id,
+                                                                )
+                                                            }
+                                                            aria-label={`Edit question ${question.id}`}
+                                                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                                                        >
+                                                            <PencilIcon className="size-4" />
+                                                        </button>
+                                                    )}
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -973,6 +986,22 @@ export default function ChapterQuestions({
                 questionTypes={questionTypes}
                 onChanged={() => setSelectedIds(new Set())}
             />
+            {editQuestionId !== null && (
+                <Suspense fallback={null}>
+                    <EditQuestionModal
+                        questionId={editQuestionId}
+                        scope={[
+                            chapter.pattern.name,
+                            chapter.class.name,
+                            chapter.subject.name_eng,
+                            chapterTitle(chapter),
+                            ...(scopedTopic ? [scopedTopic.name] : []),
+                        ]}
+                        onClose={() => setEditQuestionId(null)}
+                        onSaved={() => router.reload({ only: ['questions'] })}
+                    />
+                </Suspense>
+            )}
         </>
     );
 }

@@ -1544,6 +1544,7 @@ export function QuestionForm({
                                 {embedded ? (
                                     <QuestionFormSelect
                                         searchable
+                                        searchPlaceholder="Search types"
                                         placeholder="Select type"
                                         options={questionTypeOptions.map(
                                             (option) => ({
@@ -1590,59 +1591,107 @@ export function QuestionForm({
                                     required
                                     error={form.errors.chapter_id}
                                 >
-                                    <Select
-                                        value={form.data.chapter_id || 'none'}
-                                        disabled={chapterOptions.length === 0}
-                                        onOpenChange={(open) => {
-                                            if (open) {
-                                                void loadChapters();
+                                    {embedded ? (
+                                        <QuestionFormSelect
+                                            searchable
+                                            searchPlaceholder="Search chapters"
+                                            placeholder="Select chapter"
+                                            disabled={
+                                                chapterOptions.length === 0
                                             }
-                                        }}
-                                        onValueChange={(value) => {
-                                            form.setData(
-                                                'chapter_id',
-                                                value === 'none' ? '' : value,
-                                            );
-                                            form.setData('topic_id', '');
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue
-                                                placeholder={
-                                                    chapterOptions.length === 0
-                                                        ? 'No chapters'
-                                                        : 'Select chapter'
-                                                }
-                                            />
-                                        </SelectTrigger>
-                                        <SelectContent className="max-h-80">
-                                            <SelectItem value="none">
-                                                Select chapter
-                                            </SelectItem>
-                                            {loadingChapters && (
-                                                <SelectItem
-                                                    value="loading"
-                                                    disabled
-                                                >
-                                                    Loading chapters…
-                                                </SelectItem>
+                                            onOpen={() => void loadChapters()}
+                                            options={chapterOptions.map(
+                                                (chapter) => ({
+                                                    value: String(chapter.id),
+                                                    label: `${chapter.subject.name_eng} — ${chapterTitle(chapter)} · ${chapter.class.name}`,
+                                                }),
                                             )}
-                                            {chapterOptions.map((chapter) => (
-                                                <SelectItem
-                                                    key={chapter.id}
-                                                    value={String(chapter.id)}
-                                                >
-                                                    {chapter.subject.name_eng} —{' '}
-                                                    {chapterTitle(chapter)} ·{' '}
-                                                    {chapter.class.name}
+                                            value={form.data.chapter_id}
+                                            onValueChange={(value) => {
+                                                form.setData(
+                                                    'chapter_id',
+                                                    value,
+                                                );
+                                                form.setData('topic_id', '');
+                                            }}
+                                        />
+                                    ) : (
+                                        <Select
+                                            value={
+                                                form.data.chapter_id || 'none'
+                                            }
+                                            disabled={
+                                                chapterOptions.length === 0
+                                            }
+                                            onOpenChange={(open) => {
+                                                if (open) {
+                                                    void loadChapters();
+                                                }
+                                            }}
+                                            onValueChange={(value) => {
+                                                form.setData(
+                                                    'chapter_id',
+                                                    value === 'none'
+                                                        ? ''
+                                                        : value,
+                                                );
+                                                form.setData('topic_id', '');
+                                            }}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue
+                                                    placeholder={
+                                                        chapterOptions.length ===
+                                                        0
+                                                            ? 'No chapters'
+                                                            : 'Select chapter'
+                                                    }
+                                                />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-80">
+                                                <SelectItem value="none">
+                                                    Select chapter
                                                 </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                                {loadingChapters && (
+                                                    <SelectItem
+                                                        value="loading"
+                                                        disabled
+                                                    >
+                                                        Loading chapters…
+                                                    </SelectItem>
+                                                )}
+                                                {chapterOptions.map(
+                                                    (chapter) => (
+                                                        <SelectItem
+                                                            key={chapter.id}
+                                                            value={String(
+                                                                chapter.id,
+                                                            )}
+                                                        >
+                                                            {
+                                                                chapter.subject
+                                                                    .name_eng
+                                                            }{' '}
+                                                            —{' '}
+                                                            {chapterTitle(
+                                                                chapter,
+                                                            )}{' '}
+                                                            ·{' '}
+                                                            {chapter.class.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                     {chapterLoadError && (
                                         <p
                                             role="alert"
-                                            className="text-xs text-destructive"
+                                            className={
+                                                embedded
+                                                    ? 'text-xs text-rose-600'
+                                                    : 'text-xs text-destructive'
+                                            }
                                         >
                                             {chapterLoadError}
                                         </p>

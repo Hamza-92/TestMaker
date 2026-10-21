@@ -45,6 +45,7 @@ import { SourceBadge } from './source-badge';
 import { fetchQuestionJson } from './use-question-options';
 
 const AddQuestionModal = lazy(() => import('./add-question-modal'));
+const EditQuestionModal = lazy(() => import('./edit-question-modal'));
 
 interface QuestionRow {
     id: number;
@@ -210,6 +211,7 @@ export default function ListQuestions({
     const [search, setSearch] = useState(filters.q);
     const [addOptionsCacheOwner] = useState(() => ({}));
     const [addModalOpen, setAddModalOpen] = useState(false);
+    const [editQuestionId, setEditQuestionId] = useState<number | null>(null);
     const [selected, setSelected] = useState<Map<number, SelectionRow>>(
         new Map(),
     );
@@ -867,14 +869,15 @@ export default function ListQuestions({
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon-sm"
-                                                                asChild
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setEditQuestionId(
+                                                                        row.id,
+                                                                    )
+                                                                }
+                                                                aria-label={`Edit question ${row.id}`}
                                                             >
-                                                                <Link
-                                                                    href={`/superadmin/questions/${row.id}/edit`}
-                                                                    aria-label={`Edit question ${row.id}`}
-                                                                >
-                                                                    <PencilIcon />
-                                                                </Link>
+                                                                <PencilIcon />
                                                             </Button>
                                                         )}
                                                         {can(
@@ -1006,6 +1009,27 @@ export default function ListQuestions({
                         topicId={scope.topic_id}
                         scope={breadcrumbs.slice(-4).map((item) => item.label)}
                         onClose={() => setAddModalOpen(false)}
+                    />
+                </Suspense>
+            )}
+            {editQuestionId !== null && (
+                <Suspense
+                    fallback={
+                        <div
+                            role="status"
+                            className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 text-sm font-medium text-white backdrop-blur-[2px]"
+                        >
+                            Loading question form…
+                        </div>
+                    }
+                >
+                    <EditQuestionModal
+                        questionId={editQuestionId}
+                        scope={breadcrumbs.slice(-4).map((item) => item.label)}
+                        onClose={() => setEditQuestionId(null)}
+                        onSaved={() =>
+                            router.reload({ only: ['items', 'filters'] })
+                        }
                     />
                 </Suspense>
             )}

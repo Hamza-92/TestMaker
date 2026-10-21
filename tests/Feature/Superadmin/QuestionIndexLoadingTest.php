@@ -572,6 +572,20 @@ it('loads only the current chapter on edit until the chapter picker is opened', 
         ->assertForbidden();
 });
 
+it('loads one question and its form options as JSON for the edit modal', function () {
+    $context = questionLoadingContext();
+    $question = loadingQuestion($context);
+
+    $this->actingAs($context['admin'])
+        ->getJson(route('superadmin.questions.edit', $question))
+        ->assertOk()
+        ->assertJsonPath('question.id', $question->id)
+        ->assertJsonPath('question.chapter_id', $context['chapter']->id)
+        ->assertJsonPath('question.content.prompt_en', 'A question')
+        ->assertJsonCount(1, 'chapters')
+        ->assertJsonPath('questionTypes.0.id', $context['type']->id);
+});
+
 it('opens add question from the full topic path and shows that path on the form', function () {
     $context = questionLoadingContext();
     $parents = [$context['pattern'], $context['class'], $context['subject'], $context['chapter']];
