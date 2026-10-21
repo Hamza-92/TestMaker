@@ -78,19 +78,66 @@ it('lists only customers created by the delegated user and calculates totals fro
     expect($masterPage['props']['canViewAllCustomers'])->toBeTrue();
 });
 
-it('counts subscription commission before any payment is recorded', function () {
+it('counts subscription commission once the first pending payment is recorded', function () {
     $subscription = ownershipSubscription($this->ownCustomer, $this->staff);
     $subscription->update(['commission_amount' => 125]);
+
+    $myCommission = function (): string {
+        $page = $this->actingAs($this->staff)
+            ->get(route('superadmin.customers.paid'))
+            ->assertOk()
+            ->viewData('page');
+
+        return collect($page['props']['customers'])->firstWhere('id', $this->ownCustomer->id)['my_commission'];
+    };
+
+    expect($myCommission())->toBe('0');
+
+    $payment = PaymentLog::create([
+        'subscription_id' => $subscription->id,
+        'amount' => 200,
+        'payment_method' => PaymentMethod::Online,
+        'status' => PaymentStatus::PendingReview,
+        'created_by' => $this->staff->id,
+    ]);
+
+    expect($myCommission())->toBe('125');
+
+    $payment->transitionTo(PaymentStatus::Reviewed, actor: $this->staff);
+    expect($myCommission())->toBe('125');
+
+    $payment->transitionTo(PaymentStatus::Approved, actor: $this->staff);
+    expect($myCommission())->toBe('125');
+
+    PaymentLog::create([
+        'subscription_id' => $subscription->id,
+        'amount' => 100,
+        'payment_method' => PaymentMethod::Online,
+        'status' => PaymentStatus::Approved,
+        'created_by' => $this->staff->id,
+    ]);
+
+    expect($myCommission())->toBe('125');
+});
+
+it('does not count rejected payment commission', function () {
+    $subscription = ownershipSubscription($this->ownCustomer, $this->staff);
+    $subscription->update(['commission_amount' => 125]);
+
+    PaymentLog::create([
+        'subscription_id' => $subscription->id,
+        'amount' => 200,
+        'payment_method' => PaymentMethod::Online,
+        'status' => PaymentStatus::Rejected,
+        'created_by' => $this->staff->id,
+    ]);
 
     $page = $this->actingAs($this->staff)
         ->get(route('superadmin.customers.paid'))
         ->assertOk()
         ->viewData('page');
 
-    $customer = collect($page['props']['customers'])->firstWhere('id', $this->ownCustomer->id);
-
-    expect($customer['my_commission'])->toBe('125')
-        ->and($customer['total_paid'])->toBe('0');
+    expect(collect($page['props']['customers'])->firstWhere('id', $this->ownCustomer->id)['my_commission'])->toBe('0');
 });
 
 it('blocks customer and subscription URLs for customers created by someone else', function () {

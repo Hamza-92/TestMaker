@@ -10,6 +10,7 @@ import {
     LayoutGrid,
     LayoutPanelTopIcon,
     LanguagesIcon,
+    CreditCardIcon,
     SchoolIcon,
     Settings2Icon,
     ShapesIcon,
@@ -52,6 +53,19 @@ export function AppSidebar() {
                       title: 'Trial Customers',
                       href: '/superadmin/customers/trial',
                       icon: Clock3Icon,
+                  },
+              ]
+            : []),
+        ...(can('subscriptions.manage_payments') &&
+        can('subscriptions.view') &&
+        (can('customers.view') ||
+            can('customers.paid.view') ||
+            can('customers.trial.view'))
+            ? [
+                  {
+                      title: 'Payments',
+                      href: '/superadmin/payments',
+                      icon: CreditCardIcon,
                   },
               ]
             : []),

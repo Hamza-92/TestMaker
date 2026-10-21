@@ -4,7 +4,6 @@ import {
     BadgeCheckIcon,
     CalendarIcon,
     CheckCircle2Icon,
-    CheckIcon,
     ClockIcon,
     CreditCardIcon,
     ExternalLinkIcon,
@@ -122,6 +121,7 @@ interface PaymentLog {
     status_label: string | null;
     notes: string | null;
     rejection_reason: string | null;
+    recorder_remarks: string | null;
     attachments: string[];
     created_at: string | null;
     reviewed_at: string | null;
@@ -303,7 +303,7 @@ function InfoCell({
 }) {
     return (
         <div className="space-y-1">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {label}
             </p>
             <div
@@ -335,7 +335,7 @@ function MetricCard({
 
     return (
         <div className={`rounded-lg border p-4 ${toneClass}`}>
-            <div className="flex items-center gap-2 text-xs font-medium tracking-wide uppercase">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide">
                 {icon}
                 <span>{label}</span>
             </div>
@@ -503,7 +503,7 @@ function DetailRow({
         <div className="flex items-start gap-3 rounded-lg border p-3">
             <span className="mt-0.5 text-muted-foreground">{icon}</span>
             <div className="min-w-0">
-                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {label}
                 </p>
                 <div className="mt-1 text-sm font-medium">{value}</div>
@@ -608,7 +608,7 @@ export default function ShowSubscription({
 
     function movePaymentStatus(
         log: PaymentLog,
-        nextStatus: 'reviewed' | 'approved' | 'rejected',
+        nextStatus: 'approved' | 'rejected',
     ) {
         const payload: Record<string, string> = { status: nextStatus };
 
@@ -734,7 +734,11 @@ export default function ShowSubscription({
                         {subscription.payment_hold && (
                             <InfoCell
                                 label="Account Access"
-                                value={<Badge variant="destructive">Paused · Payment overdue</Badge>}
+                                value={
+                                    <Badge variant="destructive">
+                                        Paused · Payment overdue
+                                    </Badge>
+                                }
                             />
                         )}
                         <InfoCell
@@ -760,7 +764,7 @@ export default function ShowSubscription({
                                             : 'Unlimited'}
                                     </span>
                                 ) : (
-                                    <span className="text-muted-foreground italic">
+                                    <span className="italic text-muted-foreground">
                                         Not allowed
                                     </span>
                                 )
@@ -775,7 +779,7 @@ export default function ShowSubscription({
                                         Enabled
                                     </span>
                                 ) : (
-                                    <span className="text-muted-foreground italic">
+                                    <span className="italic text-muted-foreground">
                                         Disabled
                                     </span>
                                 )
@@ -790,7 +794,7 @@ export default function ShowSubscription({
                                         Enabled
                                     </span>
                                 ) : (
-                                    <span className="text-muted-foreground italic">
+                                    <span className="italic text-muted-foreground">
                                         Disabled
                                     </span>
                                 )
@@ -800,7 +804,7 @@ export default function ShowSubscription({
                             label="Created By"
                             value={
                                 subscription.creator_name ?? (
-                                    <span className="text-muted-foreground italic">
+                                    <span className="italic text-muted-foreground">
                                         Unknown
                                     </span>
                                 )
@@ -906,7 +910,7 @@ export default function ShowSubscription({
                                             className="transition-colors hover:bg-muted/25"
                                         >
                                             <td className="px-4 py-3 align-top">
-                                                <p className="text-xs font-medium whitespace-nowrap">
+                                                <p className="whitespace-nowrap text-xs font-medium">
                                                     {fmtDt(log.created_at)}
                                                 </p>
                                                 {log.creator_name && (
@@ -915,7 +919,7 @@ export default function ShowSubscription({
                                                     </p>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 align-top font-semibold whitespace-nowrap">
+                                            <td className="whitespace-nowrap px-4 py-3 align-top font-semibold">
                                                 {money(log.amount)}
                                             </td>
                                             <td className="px-4 py-3 align-top text-sm">
@@ -1105,7 +1109,7 @@ export default function ShowSubscription({
                                         notes: e.target.value,
                                     }))
                                 }
-                                className="flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                className="flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                             />
                             {paymentErrors.notes && (
                                 <p className="text-xs text-destructive">
@@ -1317,8 +1321,20 @@ export default function ShowSubscription({
                                 />
                             )}
 
+                            {paymentDetail.recorder_remarks && (
+                                <DetailRow
+                                    icon={<FileTextIcon className="size-4" />}
+                                    label="Recorder remarks"
+                                    value={
+                                        <p className="whitespace-pre-wrap">
+                                            {paymentDetail.recorder_remarks}
+                                        </p>
+                                    }
+                                />
+                            )}
+
                             <div className="rounded-lg border p-3">
-                                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                                     Attachments
                                 </p>
                                 <div className="mt-2 flex flex-col gap-2">
@@ -1346,7 +1362,8 @@ export default function ShowSubscription({
                                 </div>
                             </div>
 
-                            {paymentDetail.status === 'reviewed' && (
+                            {(paymentDetail.status === 'pending_review' ||
+                                paymentDetail.status === 'reviewed') && (
                                 <div className="space-y-2 rounded-lg border border-red-200 p-3">
                                     <Label htmlFor="reject-reason">
                                         Rejection Reason
@@ -1358,7 +1375,7 @@ export default function ShowSubscription({
                                         onChange={(e) =>
                                             setRejectionReason(e.target.value)
                                         }
-                                        className="flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                        className="flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                     />
                                     {detailErrors.rejection_reason && (
                                         <p className="text-xs text-destructive">
@@ -1375,26 +1392,8 @@ export default function ShowSubscription({
                             )}
 
                             <DialogFooter>
-                                {paymentDetail.status === 'pending_review' &&
-                                    can('subscriptions.manage_payments') && (
-                                        <Button
-                                            type="button"
-                                            onClick={() =>
-                                                movePaymentStatus(
-                                                    paymentDetail,
-                                                    'reviewed',
-                                                )
-                                            }
-                                            disabled={detailProcessing}
-                                        >
-                                            <CheckIcon className="size-3.5" />
-                                            {detailProcessing
-                                                ? 'Saving…'
-                                                : 'Mark Reviewed'}
-                                        </Button>
-                                    )}
-
-                                {paymentDetail.status === 'reviewed' &&
+                                {(paymentDetail.status === 'pending_review' ||
+                                    paymentDetail.status === 'reviewed') &&
                                     can('subscriptions.manage_payments') && (
                                         <>
                                             <Button
@@ -1431,18 +1430,32 @@ export default function ShowSubscription({
                                         </>
                                     )}
 
-                                {paymentDetail.status !== 'pending_review' &&
-                                    paymentDetail.status !== 'reviewed' && (
+                                {paymentDetail.status === 'rejected' &&
+                                    can('subscriptions.manage_payments') && (
                                         <Button
                                             type="button"
-                                            variant="outline"
                                             onClick={() =>
-                                                closeDetailModal(false)
+                                                movePaymentStatus(
+                                                    paymentDetail,
+                                                    'approved',
+                                                )
                                             }
+                                            disabled={detailProcessing}
                                         >
-                                            Close
+                                            <CheckCircle2Icon className="size-3.5" />
+                                            Approve
                                         </Button>
                                     )}
+
+                                {paymentDetail.status === 'approved' && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => closeDetailModal(false)}
+                                    >
+                                        Close
+                                    </Button>
+                                )}
                             </DialogFooter>
                         </div>
                     )}

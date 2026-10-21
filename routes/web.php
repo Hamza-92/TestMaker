@@ -32,10 +32,12 @@ use App\Http\Controllers\Superadmin\ObjectiveLayoutController;
 use App\Http\Controllers\Superadmin\PaperLayoutController;
 use App\Http\Controllers\Superadmin\PaperQuestionSectionController;
 use App\Http\Controllers\Superadmin\PatternController;
+use App\Http\Controllers\Superadmin\PaymentsController;
 use App\Http\Controllers\Superadmin\QuestionBrowseController;
 use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\QuestionTypePairingController;
+use App\Http\Controllers\Superadmin\RejectedPaymentController;
 use App\Http\Controllers\Superadmin\SiteMediaController;
 use App\Http\Controllers\Superadmin\SiteNavigationController;
 use App\Http\Controllers\Superadmin\SitePageController;
@@ -180,6 +182,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // â”€â”€â”€ Superadmin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::middleware('superadmin')->group(function () {
+
+        Route::patch('superadmin/rejected-payments/{paymentLog}/resubmit', [RejectedPaymentController::class, 'resubmit'])
+            ->name('superadmin.rejected-payments.resubmit');
+
+        Route::get('superadmin/payments', [PaymentsController::class, 'index'])
+            ->name('superadmin.payments')
+            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
+        Route::get('superadmin/payments/requests/{paymentLog}', [PaymentsController::class, 'show'])
+            ->name('superadmin.payments.requests.show')
+            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
 
         Route::get('superadmin/site/pages', [SitePageController::class, 'index'])->name('superadmin.site.pages')->middleware('permission:site_pages.view');
         Route::post('superadmin/site/pages', [SitePageController::class, 'store'])->name('superadmin.site.pages.store')->middleware('permission:site_pages.edit');

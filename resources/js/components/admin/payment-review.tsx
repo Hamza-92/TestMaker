@@ -12,7 +12,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Badge, Button, Card, Modal } from '@/components/tm';
 
-type ReviewStatus = 'pending_review' | 'reviewed';
+type ReviewStatus = 'pending_review' | 'reviewed' | 'approved' | 'rejected';
 
 interface RecentPayment {
     id: number;
@@ -46,6 +46,8 @@ export interface PaymentToReview {
     reviewed_at: string | null;
     reviewed_by: string | null;
     notes: string | null;
+    rejection_reason?: string | null;
+    recorder_remarks?: string | null;
     receipts: string[];
     recent_payments: RecentPayment[];
 }
@@ -93,11 +95,19 @@ function statusLabel(status: string): string {
 export function PaymentsToReview({
     payments,
     total,
+    hideTable = false,
+    selectedPaymentId = null,
+    onClose,
 }: {
     payments: PaymentToReview[];
     total: number;
+    hideTable?: boolean;
+    selectedPaymentId?: number | null;
+    onClose?: () => void;
 }) {
-    const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [selectedId, setSelectedId] = useState<number | null>(
+        selectedPaymentId,
+    );
     const [rejecting, setRejecting] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -113,9 +123,10 @@ export function PaymentsToReview({
         setRejecting(false);
         setRejectionReason('');
         setErrors({});
+        onClose?.();
     }
 
-    function submit(status: 'reviewed' | 'approved' | 'rejected') {
+    function submit(status: 'approved' | 'rejected') {
         if (!selected) {
             return;
         }
@@ -139,9 +150,8 @@ export function PaymentsToReview({
             {
                 preserveScroll: true,
                 onSuccess: () => {
-                    if (status !== 'reviewed') {
-                        setSelectedId(null);
-                    }
+                    setSelectedId(null);
+                    onClose?.();
 
                     setRejecting(false);
                     setRejectionReason('');
@@ -153,110 +163,118 @@ export function PaymentsToReview({
     }
 
     return (
-        <section aria-labelledby="payments-to-review-title">
-            <Card padding="none" className="overflow-hidden">
-                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                    <h2
-                        id="payments-to-review-title"
-                        className="text-sm font-semibold text-slate-900 dark:text-white"
-                    >
-                        Payments to review
-                    </h2>
-                    <span className="flex h-9 min-w-9 items-center justify-center rounded-lg bg-rose-600 px-2 text-sm font-bold text-white">
-                        {total.toLocaleString('en-PK')}
-                    </span>
-                </div>
-                {payments.length === 0 ? (
-                    <p className="px-5 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                        No payments need review.
-                    </p>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[720px] text-left">
-                            <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                                <tr>
-                                    <th scope="col" className="px-5 py-3">
-                                        School
-                                    </th>
-                                    <th scope="col" className="px-5 py-3">
-                                        Recorded by
-                                    </th>
-                                    <th scope="col" className="px-5 py-3">
-                                        Payment
-                                    </th>
-                                    <th scope="col" className="px-5 py-3">
-                                        Status
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="px-5 py-3 text-right"
-                                    >
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {payments.map((payment) => (
-                                    <tr
-                                        key={payment.id}
-                                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
-                                    >
-                                        <td className="px-5 py-3.5">
-                                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                                {payment.customer_name}
-                                            </p>
-                                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                                {payment.subscription_name}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-3.5">
-                                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                                                {payment.recorded_by ??
-                                                    'Unknown'}
-                                            </p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                {date(payment.created_at)}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-3.5 text-sm font-bold tabular-nums text-slate-950 dark:text-white">
-                                            {money(payment.amount)}
-                                        </td>
-                                        <td className="px-5 py-3.5">
-                                            <Badge
-                                                tone={
-                                                    payment.status ===
-                                                    'reviewed'
-                                                        ? 'info'
-                                                        : 'draft'
-                                                }
-                                            >
-                                                {payment.status === 'reviewed'
-                                                    ? 'Reviewed'
-                                                    : 'Pending'}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-5 py-3.5 text-right">
-                                            <Button
-                                                type="button"
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedId(payment.id);
-                                                    setErrors({});
-                                                    setRejecting(false);
-                                                }}
-                                            >
-                                                View details
-                                                <ArrowUpRightIcon aria-hidden="true" />
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+        <section
+            aria-label={hideTable ? 'Payment details' : undefined}
+            aria-labelledby={hideTable ? undefined : 'payments-to-review-title'}
+        >
+            {!hideTable && (
+                <Card padding="none" className="overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                        <h2
+                            id="payments-to-review-title"
+                            className="text-sm font-semibold text-slate-900 dark:text-white"
+                        >
+                            Payments to review
+                        </h2>
+                        <span className="flex h-9 min-w-9 items-center justify-center rounded-lg bg-rose-600 px-2 text-sm font-bold text-white">
+                            {total.toLocaleString('en-PK')}
+                        </span>
                     </div>
-                )}
-            </Card>
+                    {payments.length === 0 ? (
+                        <p className="px-5 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                            No payments need review.
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[720px] text-left">
+                                <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" className="px-5 py-3">
+                                            School
+                                        </th>
+                                        <th scope="col" className="px-5 py-3">
+                                            Recorded by
+                                        </th>
+                                        <th scope="col" className="px-5 py-3">
+                                            Payment
+                                        </th>
+                                        <th scope="col" className="px-5 py-3">
+                                            Status
+                                        </th>
+                                        <th
+                                            scope="col"
+                                            className="px-5 py-3 text-right"
+                                        >
+                                            Action
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {payments.map((payment) => (
+                                        <tr
+                                            key={payment.id}
+                                            className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
+                                        >
+                                            <td className="px-5 py-3.5">
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                    {payment.customer_name}
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                                    {payment.subscription_name}
+                                                </p>
+                                            </td>
+                                            <td className="px-5 py-3.5">
+                                                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                                                    {payment.recorded_by ??
+                                                        'Unknown'}
+                                                </p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                    {date(payment.created_at)}
+                                                </p>
+                                            </td>
+                                            <td className="px-5 py-3.5 text-sm font-bold tabular-nums text-slate-950 dark:text-white">
+                                                {money(payment.amount)}
+                                            </td>
+                                            <td className="px-5 py-3.5">
+                                                <Badge
+                                                    tone={
+                                                        payment.status ===
+                                                        'reviewed'
+                                                            ? 'info'
+                                                            : 'draft'
+                                                    }
+                                                >
+                                                    {payment.status ===
+                                                    'reviewed'
+                                                        ? 'Reviewed'
+                                                        : 'Pending'}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-5 py-3.5 text-right">
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedId(
+                                                            payment.id,
+                                                        );
+                                                        setErrors({});
+                                                        setRejecting(false);
+                                                    }}
+                                                >
+                                                    View details
+                                                    <ArrowUpRightIcon aria-hidden="true" />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </Card>
+            )}
 
             <Modal
                 open={selected !== undefined}
@@ -265,9 +283,15 @@ export function PaymentsToReview({
                         close();
                     }
                 }}
-                title="Payment review"
+                title={
+                    selected?.status === 'approved' ||
+                    selected?.status === 'rejected'
+                        ? 'Payment details'
+                        : 'Payment review'
+                }
                 footer={
-                    selected && (
+                    selected &&
+                    selected.status !== 'approved' && (
                         <>
                             {errors.status && (
                                 <p
@@ -277,17 +301,7 @@ export function PaymentsToReview({
                                     {errors.status}
                                 </p>
                             )}
-                            {selected.status === 'pending_review' ? (
-                                <Button
-                                    type="button"
-                                    variant="primary"
-                                    disabled={processing}
-                                    onClick={() => submit('reviewed')}
-                                >
-                                    <CheckIcon aria-hidden="true" />
-                                    Mark reviewed
-                                </Button>
-                            ) : rejecting ? (
+                            {rejecting ? (
                                 <>
                                     <Button
                                         type="button"
@@ -312,14 +326,16 @@ export function PaymentsToReview({
                                 </>
                             ) : (
                                 <>
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        disabled={processing}
-                                        onClick={() => setRejecting(true)}
-                                    >
-                                        Reject
-                                    </Button>
+                                    {selected.status !== 'rejected' && (
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            disabled={processing}
+                                            onClick={() => setRejecting(true)}
+                                        >
+                                            Reject
+                                        </Button>
+                                    )}
                                     <Button
                                         type="button"
                                         variant="primary"
@@ -353,13 +369,15 @@ export function PaymentsToReview({
                                 tone={
                                     selected.status === 'reviewed'
                                         ? 'info'
-                                        : 'draft'
+                                        : selected.status === 'approved'
+                                          ? 'saved'
+                                          : selected.status === 'rejected'
+                                            ? 'danger'
+                                            : 'draft'
                                 }
                                 size="md"
                             >
-                                {selected.status === 'reviewed'
-                                    ? 'Reviewed'
-                                    : 'Pending review'}
+                                {statusLabel(selected.status)}
                             </Badge>
                         </div>
 
@@ -496,21 +514,50 @@ export function PaymentsToReview({
                                     {selected.notes}
                                 </p>
                             )}
+                            {selected.rejection_reason && (
+                                <p className="mt-3 whitespace-pre-wrap rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                                    <span className="block text-xs font-semibold">
+                                        {selected.status === 'rejected'
+                                            ? 'Rejection reason'
+                                            : 'Previous rejection reason'}
+                                    </span>
+                                    {selected.rejection_reason}
+                                </p>
+                            )}
+                            {selected.recorder_remarks && (
+                                <p className="mt-3 whitespace-pre-wrap rounded-lg bg-brand-50 px-3 py-2 text-sm text-slate-800 dark:bg-brand-950/30 dark:text-slate-100">
+                                    <span className="block text-xs font-semibold text-brand-700 dark:text-brand-300">
+                                        Recorder remarks
+                                    </span>
+                                    {selected.recorder_remarks}
+                                </p>
+                            )}
                             {selected.receipts.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2">
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                                     {selected.receipts.map((url, index) => (
                                         <a
                                             key={`${url}-${index}`}
                                             href={url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-500 dark:border-slate-700 dark:text-brand-300 dark:hover:bg-slate-800"
+                                            className="group overflow-hidden rounded-lg border border-slate-200 text-xs font-semibold text-brand-700 hover:border-brand-300 focus-visible:outline-2 focus-visible:outline-brand-500 dark:border-slate-700 dark:text-brand-300"
                                         >
-                                            Receipt {index + 1}
-                                            <ExternalLinkIcon
-                                                className="size-3.5"
-                                                aria-hidden="true"
-                                            />
+                                            {/\.(?:jpe?g|png|webp)(?:\?|$)/i.test(
+                                                url,
+                                            ) && (
+                                                <img
+                                                    src={url}
+                                                    alt={`Receipt ${index + 1}`}
+                                                    className="max-h-52 w-full bg-slate-50 object-contain dark:bg-slate-800"
+                                                />
+                                            )}
+                                            <span className="flex items-center justify-between gap-2 px-3 py-2">
+                                                Receipt {index + 1}
+                                                <ExternalLinkIcon
+                                                    className="size-3.5"
+                                                    aria-hidden="true"
+                                                />
+                                            </span>
                                         </a>
                                     ))}
                                 </div>

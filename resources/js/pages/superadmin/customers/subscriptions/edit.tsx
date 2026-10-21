@@ -316,7 +316,6 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                             <Field
                                 label="Payment Due Date"
                                 error={errors.payment_due_date}
-                                hint="Access pauses after this date if payment is not approved."
                             >
                                 <DateInput
                                     min={data.started_at || undefined}

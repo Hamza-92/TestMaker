@@ -56,6 +56,7 @@ class CustomerSubscriptionController extends Controller
             'status_label' => $log->status?->label(),
             'notes' => $log->notes,
             'rejection_reason' => $log->rejection_reason,
+            'recorder_remarks' => $log->recorder_remarks,
             'attachments' => collect($log->attachments ?? [])->map(fn ($p) => Storage::url($p))->all(),
             'created_at' => $log->created_at?->toISOString(),
             'reviewed_at' => $log->reviewed_at?->toISOString(),
@@ -176,18 +177,12 @@ class CustomerSubscriptionController extends Controller
         abort_unless((int) $paymentLog->subscription_id === (int) $subscription->id, 404);
 
         $validated = $request->validate([
-            'status' => ['required', 'in:reviewed,approved,rejected'],
+            'status' => ['required', 'in:approved,rejected'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'rejection_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $nextStatus = PaymentStatus::from($validated['status']);
-
-        if (! $paymentLog->canTransitionTo($nextStatus)) {
-            throw ValidationException::withMessages([
-                'status' => 'Invalid payment status transition.',
-            ]);
-        }
 
         if ($nextStatus === PaymentStatus::Rejected && blank($validated['rejection_reason'] ?? null)) {
             throw ValidationException::withMessages([
@@ -195,12 +190,25 @@ class CustomerSubscriptionController extends Controller
             ]);
         }
 
-        $paymentLog->transitionTo(
-            $nextStatus,
-            $validated['notes'] ?? null,
-            auth()->user(),
-            $validated['rejection_reason'] ?? null,
-        );
+        DB::transaction(function () use ($paymentLog, $subscription, $nextStatus, $validated, $request): void {
+            $locked = PaymentLog::query()
+                ->where('subscription_id', $subscription->id)
+                ->lockForUpdate()
+                ->findOrFail($paymentLog->id);
+
+            if (! $locked->canTransitionTo($nextStatus)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Invalid payment status transition.',
+                ]);
+            }
+
+            $locked->transitionTo(
+                $nextStatus,
+                $validated['notes'] ?? null,
+                $request->user(),
+                $validated['rejection_reason'] ?? null,
+            );
+        });
 
         app(CustomerPaymentAccess::class)->syncCustomer($customer);
 

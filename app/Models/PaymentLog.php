@@ -24,6 +24,7 @@ class PaymentLog extends Model
         'reviewed_at',
         'notes',
         'rejection_reason',
+        'recorder_remarks',
         'created_by',
     ];
 
@@ -55,8 +56,8 @@ class PaymentLog extends Model
     public function allowedTransitionValues(): array
     {
         return match ($this->status) {
-            PaymentStatus::PendingReview => [PaymentStatus::Reviewed->value],
-            PaymentStatus::Reviewed => [PaymentStatus::Approved->value, PaymentStatus::Rejected->value],
+            PaymentStatus::PendingReview, PaymentStatus::Reviewed => [PaymentStatus::Approved->value, PaymentStatus::Rejected->value],
+            PaymentStatus::Rejected => [PaymentStatus::Approved->value],
             default => [],
         };
     }
@@ -81,16 +82,18 @@ class PaymentLog extends Model
 
         $this->status = $newStatus;
 
-        if ($this->reviewed_by === null && $actor !== null) {
+        if ($actor !== null) {
             $this->reviewed_by = $actor->id;
         }
 
-        if ($this->reviewed_at === null) {
-            $this->reviewed_at = now();
-        }
+        $this->reviewed_at = now();
 
         $this->notes = $notes ?? $this->notes;
-        $this->rejection_reason = $newStatus === PaymentStatus::Rejected ? $rejectionReason : null;
+        $this->rejection_reason = match ($newStatus) {
+            PaymentStatus::Rejected => $rejectionReason,
+            PaymentStatus::Approved => null,
+            default => $this->rejection_reason,
+        };
         $this->save();
 
         AuditLog::record(
@@ -106,6 +109,27 @@ class PaymentLog extends Model
             ],
             actor: $actor,
             notes: $notes,
+        );
+
+        return $this;
+    }
+
+    public function resubmitWithRemarks(string $remarks, User $recorder): static
+    {
+        $oldStatus = $this->status;
+        $this->recorder_remarks = $remarks;
+        $this->status = PaymentStatus::PendingReview;
+        $this->reviewed_by = null;
+        $this->reviewed_at = null;
+        $this->save();
+
+        AuditLog::record(
+            model: $this,
+            event: AuditEvent::Updated,
+            oldValues: ['status' => $oldStatus?->value],
+            newValues: ['status' => PaymentStatus::PendingReview->value, 'recorder_remarks' => $remarks],
+            actor: $recorder,
+            notes: 'Recorder resubmitted rejected payment.',
         );
 
         return $this;

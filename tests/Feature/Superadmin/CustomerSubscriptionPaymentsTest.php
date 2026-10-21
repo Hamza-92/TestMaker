@@ -200,31 +200,11 @@ it('does not allow a saved payment log to be edited before review', function () 
         ->and($payment->status)->toBe(PaymentStatus::PendingReview);
 });
 
-it('enforces stepwise payment status transitions', function () {
+it('approves a pending payment directly and keeps approved payments final', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
     $subscription = makeSubscription($customer, $admin);
     $payment = makePaymentLog($subscription, $admin);
-
-    $this
-        ->actingAs($admin)
-        ->from(route('superadmin.customers.subscriptions.show', [$customer, $subscription]))
-        ->patch(route('superadmin.customers.subscriptions.payment-logs.review', [$customer, $subscription, $payment]), [
-            'status' => PaymentStatus::Approved->value,
-        ])
-        ->assertSessionHasErrors('status');
-
-    expect($payment->fresh()->status)->toBe(PaymentStatus::PendingReview);
-
-    $this
-        ->actingAs($admin)
-        ->from(route('superadmin.customers.subscriptions.show', [$customer, $subscription]))
-        ->patch(route('superadmin.customers.subscriptions.payment-logs.review', [$customer, $subscription, $payment]), [
-            'status' => PaymentStatus::Reviewed->value,
-        ])
-        ->assertSessionHasNoErrors();
-
-    expect($payment->fresh()->status)->toBe(PaymentStatus::Reviewed);
 
     $this
         ->actingAs($admin)
@@ -239,16 +219,18 @@ it('enforces stepwise payment status transitions', function () {
     expect($payment->status)->toBe(PaymentStatus::Approved)
         ->and($payment->reviewed_by)->toBe($admin->id)
         ->and($payment->reviewed_at)->not()->toBeNull();
+
+    $this->patch(route('superadmin.customers.subscriptions.payment-logs.review', [$customer, $subscription, $payment]), [
+        'status' => PaymentStatus::Rejected->value,
+        'rejection_reason' => 'Late objection',
+    ])->assertSessionHasErrors('status');
 });
 
-it('requires a rejection reason before rejecting a reviewed payment', function () {
+it('requires a rejection reason before rejecting a pending payment', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
     $subscription = makeSubscription($customer, $admin);
     $payment = makePaymentLog($subscription, $admin, [
-        'status' => PaymentStatus::Reviewed->value,
-        'reviewed_by' => $admin->id,
-        'reviewed_at' => now(),
     ]);
 
     $this
@@ -259,7 +241,7 @@ it('requires a rejection reason before rejecting a reviewed payment', function (
         ])
         ->assertSessionHasErrors('rejection_reason');
 
-    expect($payment->fresh()->status)->toBe(PaymentStatus::Reviewed)
+    expect($payment->fresh()->status)->toBe(PaymentStatus::PendingReview)
         ->and($payment->rejection_reason)->toBeNull();
 
     $this

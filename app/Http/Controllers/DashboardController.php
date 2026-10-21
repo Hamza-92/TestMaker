@@ -20,6 +20,7 @@ class DashboardController extends Controller
                 'subscriptionStatus' => SuperadminDashboardSummary::subscriptionStatusFor($user),
                 'recentEmployeeActivity' => SuperadminDashboardSummary::recentEmployeeActivityFor($user),
                 'paymentsToReview' => SuperadminDashboardSummary::paymentsToReviewFor($user),
+                'rejectedPayments' => SuperadminDashboardSummary::rejectedPaymentsFor($user),
                 'expiringSubscriptions' => SuperadminDashboardSummary::expiringSubscriptionsFor($user),
                 'recentExpiredCustomers' => SuperadminDashboardSummary::recentExpiredCustomersFor($user),
             ]);

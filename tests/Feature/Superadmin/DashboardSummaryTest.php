@@ -188,7 +188,7 @@ it('shows the five nearest active paid expiries with seven day markers', functio
         ->and($rows[0]['days_left'])->toBe(2);
 });
 
-it('reviews and approves a dashboard payment without changing recorded details', function () {
+it('approves a dashboard payment directly without changing recorded details', function () {
     $recorder = User::factory()->create(['user_type' => UserType::SuperAdmin]);
     $school = dashboardCustomer($this->master, 'paid', [
         'school_name' => 'North Campus',
@@ -210,13 +210,6 @@ it('reviews and approves a dashboard payment without changing recorded details',
         ->and($detail['status'])->toBe('pending_review');
 
     $reviewUrl = route('superadmin.customers.subscriptions.payment-logs.review', [$school, $subscription, $payment]);
-    $this->from(route('dashboard'))->patch($reviewUrl, ['status' => 'reviewed'])->assertSessionHasNoErrors();
-
-    $page = $this->get(route('dashboard'))->assertOk()->viewData('page');
-    $detail = collect($page['props']['paymentsToReview'])->firstWhere('id', $payment->id);
-    expect($detail['status'])->toBe('reviewed')
-        ->and($detail['reviewed_by'])->toBe($this->master->name);
-
     $this->from(route('dashboard'))->patch($reviewUrl, ['status' => 'approved'])->assertSessionHasNoErrors();
 
     $page = $this->get(route('dashboard'))->assertOk()->viewData('page');

@@ -182,55 +182,82 @@ class SuperadminDashboardSummary
             ->latest('created_at')
             ->limit(5)
             ->get()
-            ->map(function (PaymentLog $log) {
-                $subscription = $log->subscription;
-                $payments = $subscription->paymentLogs;
-                $approved = (float) $payments
-                    ->filter(fn (PaymentLog $payment) => $payment->status === PaymentStatus::Approved)
-                    ->sum('amount');
-
-                return [
-                    'id' => $log->id,
-                    'customer_id' => $subscription->user_id,
-                    'customer_name' => $subscription->user->school_name ?: $subscription->user->name,
-                    'school_name' => $subscription->user->school_name,
-                    'customer_contact_name' => $subscription->user->name,
-                    'customer_email' => $subscription->user->email,
-                    'customer_phone' => $subscription->user->phone,
-                    'subscription_id' => $subscription->id,
-                    'subscription_name' => $subscription->name,
-                    'subscription_amount' => (string) $subscription->amount,
-                    'approved_amount' => number_format($approved, 2, '.', ''),
-                    'balance_amount' => number_format(max((float) $subscription->amount - $approved, 0), 2, '.', ''),
-                    'subscription_started_at' => $subscription->started_at?->toISOString(),
-                    'subscription_expired_at' => $subscription->expired_at?->toISOString(),
-                    'amount' => (string) $log->amount,
-                    'payment_method' => $log->account_number === 'legacy-testmaker'
-                        ? 'Legacy TestMaker Record'
-                        : $log->payment_method?->label(),
-                    'account_number' => $log->account_number === 'legacy-testmaker' ? null : $log->account_number,
-                    'next_payment_date' => $log->next_payment_date?->toDateString(),
-                    'status' => $log->status->value,
-                    'created_at' => $log->created_at->toISOString(),
-                    'recorded_by' => $log->creator?->name,
-                    'reviewed_at' => $log->reviewed_at?->toISOString(),
-                    'reviewed_by' => $log->reviewer?->name,
-                    'notes' => $log->notes,
-                    'receipts' => collect($log->attachments ?? [])->map(fn (string $path) => Storage::url($path))->all(),
-                    'recent_payments' => $payments
-                        ->sortByDesc('created_at')
-                        ->take(4)
-                        ->map(fn (PaymentLog $payment) => [
-                            'id' => $payment->id,
-                            'amount' => (string) $payment->amount,
-                            'status' => $payment->status?->value,
-                            'created_at' => $payment->created_at?->toISOString(),
-                        ])
-                        ->values()
-                        ->all(),
-                ];
-            })
+            ->map(fn (PaymentLog $log) => self::paymentDetail($log))
             ->all();
+    }
+
+    public static function rejectedPaymentsFor(User $actor): array
+    {
+        return PaymentLog::query()
+            ->where('created_by', $actor->id)
+            ->where('status', PaymentStatus::Rejected->value)
+            ->with('subscription.user:id,name,school_name')
+            ->latest('updated_at')
+            ->get(['id', 'subscription_id', 'amount', 'payment_method', 'attachments', 'rejection_reason', 'recorder_remarks', 'updated_at'])
+            ->map(fn (PaymentLog $payment) => [
+                'id' => $payment->id,
+                'customer' => $payment->subscription?->user?->name ?? '—',
+                'school' => $payment->subscription?->user?->school_name,
+                'subscription' => $payment->subscription?->name ?? '—',
+                'amount' => (string) $payment->amount,
+                'payment_method' => $payment->payment_method?->label(),
+                'receipts' => collect($payment->attachments ?? [])->map(fn (string $path) => Storage::url($path))->all(),
+                'rejection_reason' => $payment->rejection_reason,
+                'recorder_remarks' => $payment->recorder_remarks,
+                'rejected_at' => $payment->updated_at?->toISOString(),
+            ])->all();
+    }
+
+    public static function paymentDetail(PaymentLog $log): array
+    {
+        $subscription = $log->subscription;
+        $payments = $subscription->paymentLogs;
+        $approved = (float) $payments
+            ->filter(fn (PaymentLog $payment) => $payment->status === PaymentStatus::Approved)
+            ->sum('amount');
+
+        return [
+            'id' => $log->id,
+            'customer_id' => $subscription->user_id,
+            'customer_name' => $subscription->user->school_name ?: $subscription->user->name,
+            'school_name' => $subscription->user->school_name,
+            'customer_contact_name' => $subscription->user->name,
+            'customer_email' => $subscription->user->email,
+            'customer_phone' => $subscription->user->phone,
+            'subscription_id' => $subscription->id,
+            'subscription_name' => $subscription->name,
+            'subscription_amount' => (string) $subscription->amount,
+            'approved_amount' => number_format($approved, 2, '.', ''),
+            'balance_amount' => number_format(max((float) $subscription->amount - $approved, 0), 2, '.', ''),
+            'subscription_started_at' => $subscription->started_at?->toISOString(),
+            'subscription_expired_at' => $subscription->expired_at?->toISOString(),
+            'amount' => (string) $log->amount,
+            'payment_method' => $log->account_number === 'legacy-testmaker'
+                ? 'Legacy TestMaker Record'
+                : $log->payment_method?->label(),
+            'account_number' => $log->account_number === 'legacy-testmaker' ? null : $log->account_number,
+            'next_payment_date' => $log->next_payment_date?->toDateString(),
+            'status' => $log->status->value,
+            'created_at' => $log->created_at->toISOString(),
+            'recorded_by' => $log->creator?->name,
+            'reviewed_at' => $log->reviewed_at?->toISOString(),
+            'reviewed_by' => $log->reviewer?->name,
+            'notes' => $log->notes,
+            'rejection_reason' => $log->rejection_reason,
+            'recorder_remarks' => $log->recorder_remarks,
+            'receipts' => collect($log->attachments ?? [])->map(fn (string $path) => Storage::url($path))->all(),
+            'recent_payments' => $payments
+                ->sortByDesc('created_at')
+                ->take(4)
+                ->map(fn (PaymentLog $payment) => [
+                    'id' => $payment->id,
+                    'amount' => (string) $payment->amount,
+                    'status' => $payment->status?->value,
+                    'created_at' => $payment->created_at?->toISOString(),
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     public static function expiringSubscriptionsFor(User $actor): ?array

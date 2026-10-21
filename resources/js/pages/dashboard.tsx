@@ -17,6 +17,8 @@ import type {
 } from '@/components/admin/needs-attention';
 import { PaymentsToReview } from '@/components/admin/payment-review';
 import type { PaymentToReview } from '@/components/admin/payment-review';
+import { RejectedPayments } from '@/components/admin/rejected-payments';
+import type { RejectedPayment } from '@/components/admin/rejected-payments';
 import { SubscriptionStatusChart } from '@/components/admin/subscription-status-chart';
 import type { SubscriptionStatusData } from '@/components/admin/subscription-status-chart';
 import { SummaryCard } from '@/components/admin/summary-card';
@@ -47,6 +49,7 @@ export default function Dashboard({
     subscriptionStatus,
     recentEmployeeActivity,
     paymentsToReview,
+    rejectedPayments,
     expiringSubscriptions,
     recentExpiredCustomers,
 }: {
@@ -55,6 +58,7 @@ export default function Dashboard({
     subscriptionStatus: SubscriptionStatusData | null;
     recentEmployeeActivity: EmployeeActivity[] | null;
     paymentsToReview: PaymentToReview[] | null;
+    rejectedPayments: RejectedPayment[];
     expiringSubscriptions: ExpiringSubscription[] | null;
     recentExpiredCustomers: RecentlyExpiredCustomer[] | null;
 }) {
@@ -153,6 +157,8 @@ export default function Dashboard({
                         )}
                     </div>
                 )}
+
+                <RejectedPayments payments={rejectedPayments} />
 
                 {paymentsToReview !== null && (
                     <PaymentsToReview

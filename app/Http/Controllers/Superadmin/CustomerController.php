@@ -99,6 +99,14 @@ class CustomerController extends Controller
                 $totalDues = max(0, (int) $customer->subscriptions->sum('amount') - $totalPaid);
 
                 $myCommission = (int) $customer->subscriptions->sum(function ($subscription) use ($currentUserId) {
+                    $hasRecordedPayment = $subscription->paymentLogs->contains(
+                        fn ($log) => in_array($log->status?->value, ['pending_review', 'reviewed', 'approved'], true)
+                    );
+
+                    if (! $hasRecordedPayment) {
+                        return 0;
+                    }
+
                     if ($subscription->commission_amount !== null) {
                         return (int) $subscription->created_by === $currentUserId
                             ? $subscription->commission_amount
@@ -106,7 +114,8 @@ class CustomerController extends Controller
                     }
 
                     return $subscription->paymentLogs
-                        ->filter(fn ($log) => (int) $log->created_by === $currentUserId)
+                        ->filter(fn ($log) => (int) $log->created_by === $currentUserId
+                            && in_array($log->status?->value, ['pending_review', 'reviewed', 'approved'], true))
                         ->sum('commission_amount');
                 });
 

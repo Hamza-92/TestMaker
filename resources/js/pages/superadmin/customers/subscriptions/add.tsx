@@ -329,7 +329,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                             <Field
                                 label="Payment Due Date"
                                 error={errors.payment_due_date}
-                                hint="Access pauses after this date if payment is not approved."
                             >
                                 <DateInput
                                     min={data.started_at || undefined}
