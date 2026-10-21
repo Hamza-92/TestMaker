@@ -63,9 +63,16 @@ export function AppSidebar() {
             can('customers.trial.view'))
             ? [
                   {
-                      title: 'Payments',
+                      title: 'Payments Management',
                       href: '/superadmin/payments',
                       icon: CreditCardIcon,
+                      items: [
+                          { title: 'Payments', href: '/superadmin/payments' },
+                          {
+                              title: 'Payment Ledger',
+                              href: '/superadmin/payments/ledger',
+                          },
+                      ],
                   },
               ]
             : []),

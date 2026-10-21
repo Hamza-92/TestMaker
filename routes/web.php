@@ -32,6 +32,7 @@ use App\Http\Controllers\Superadmin\ObjectiveLayoutController;
 use App\Http\Controllers\Superadmin\PaperLayoutController;
 use App\Http\Controllers\Superadmin\PaperQuestionSectionController;
 use App\Http\Controllers\Superadmin\PatternController;
+use App\Http\Controllers\Superadmin\PaymentLedgerController;
 use App\Http\Controllers\Superadmin\PaymentsController;
 use App\Http\Controllers\Superadmin\QuestionBrowseController;
 use App\Http\Controllers\Superadmin\QuestionController;
@@ -188,6 +189,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('superadmin/payments', [PaymentsController::class, 'index'])
             ->name('superadmin.payments')
+            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
+        Route::get('superadmin/payments/ledger', [PaymentLedgerController::class, 'index'])
+            ->name('superadmin.payments.ledger')
             ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
         Route::get('superadmin/payments/requests/{paymentLog}', [PaymentsController::class, 'show'])
             ->name('superadmin.payments.requests.show')

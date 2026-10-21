@@ -26,6 +26,7 @@ interface PaymentRequest {
 export interface PaymentRequests {
     filters: { from: string; to: string; status: StatusFilter };
     data: PaymentRequest[];
+    totals: { payable: string; paid: string; due: string; commission: string };
     meta: PageMeta;
 }
 
@@ -364,6 +365,31 @@ export function PaymentSubmissions({
                                 ))
                             )}
                         </tbody>
+                        <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white">
+                            <tr>
+                                <th
+                                    colSpan={6}
+                                    scope="row"
+                                    className="px-5 py-3 text-left text-xs uppercase tracking-wide"
+                                    title="Subscriptions are counted once; payments follow the selected filters."
+                                >
+                                    Total (filtered)
+                                </th>
+                                <td className="px-3 py-3 text-right tabular-nums">
+                                    {money(requests.totals.payable)}
+                                </td>
+                                <td className="px-3 py-3 text-right tabular-nums">
+                                    {money(requests.totals.paid)}
+                                </td>
+                                <td className="px-3 py-3 text-right tabular-nums">
+                                    {money(requests.totals.due)}
+                                </td>
+                                <td className="px-3 py-3 text-right tabular-nums">
+                                    {money(requests.totals.commission)}
+                                </td>
+                                <td colSpan={2} />
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </Card>

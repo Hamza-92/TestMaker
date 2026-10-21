@@ -23,14 +23,22 @@ import type { NavItem } from '@/types';
 function NavCollapsibleItem({ item }: { item: NavItem }) {
     const { state, setOpen: setSidebarOpen } = useSidebar();
     const page = usePage();
-    const currentUrl = page.url;
+    const currentPath = page.url.split('?')[0];
+    const activeSubHref = (item.items ?? [])
+        .filter(
+            (sub) =>
+                currentPath === sub.href ||
+                currentPath.startsWith(sub.href + '/'),
+        )
+        .sort(
+            (first, second) => second.href.length - first.href.length,
+        )[0]?.href;
 
-    const isSubActive = (subHref: string) =>
-        currentUrl === subHref || currentUrl.startsWith(subHref + '/');
+    const isSubActive = (subHref: string) => activeSubHref === subHref;
     const isParentActive =
-        currentUrl === item.href ||
-        currentUrl.startsWith(item.href + '/') ||
-        (item.items ?? []).some((sub) => isSubActive(sub.href));
+        currentPath === item.href ||
+        currentPath.startsWith(item.href + '/') ||
+        activeSubHref !== undefined;
 
     const [open, setOpen] = useState(isParentActive);
 

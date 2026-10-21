@@ -198,6 +198,12 @@ it('lists this months submissions with payment status filters and a date range',
         'status' => 'all',
     ])
         ->and($requests['meta']['total'])->toBe(4)
+        ->and($requests['totals'])->toBe([
+            'payable' => '1000.00',
+            'paid' => '575.00',
+            'due' => '700.00',
+            'commission' => '90.00',
+        ])
         ->and(collect($requests['data'])->pluck('id')->all())->toBe([$rejected->id, $reviewed->id, $pending->id, $approved->id]);
 
     $row = collect($requests['data'])->firstWhere('id', $pending->id);
@@ -215,9 +221,11 @@ it('lists this months submissions with payment status filters and a date range',
         'status' => 'pending_review',
     ]);
 
-    $pendingRows = $this->get(route('superadmin.payments', ['status' => 'pending']))
-        ->assertOk()->viewData('page')['props']['paymentRequests']['data'];
+    $pendingRequests = $this->get(route('superadmin.payments', ['status' => 'pending']))
+        ->assertOk()->viewData('page')['props']['paymentRequests'];
+    $pendingRows = $pendingRequests['data'];
     expect(collect($pendingRows)->pluck('id')->all())->toBe([$reviewed->id, $pending->id]);
+    expect($pendingRequests['totals']['paid'])->toBe('325.00');
 
     $approvedRows = $this->get(route('superadmin.payments', ['status' => 'approved']))
         ->assertOk()->viewData('page')['props']['paymentRequests']['data'];

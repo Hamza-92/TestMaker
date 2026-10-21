@@ -146,10 +146,40 @@ class PaymentsController extends Controller
             default => null,
         };
 
+        $filteredSubscriptions = (clone $query)
+            ->reorder()
+            ->select('subscription_id')
+            ->distinct();
+        $approvedBySubscription = PaymentLog::query()
+            ->where('status', PaymentStatus::Approved->value)
+            ->select('subscription_id')
+            ->selectRaw('SUM(amount) as approved_amount')
+            ->groupBy('subscription_id');
+        $legacyCommissionBySubscription = PaymentLog::query()
+            ->select('subscription_id')
+            ->selectRaw('SUM(commission_amount) as legacy_commission')
+            ->groupBy('subscription_id');
+        $subscriptionTotals = Subscription::query()
+            ->whereIn('subscriptions.id', $filteredSubscriptions)
+            ->leftJoinSub($approvedBySubscription, 'approved_payments', fn ($join) => $join
+                ->on('approved_payments.subscription_id', '=', 'subscriptions.id'))
+            ->leftJoinSub($legacyCommissionBySubscription, 'legacy_commissions', fn ($join) => $join
+                ->on('legacy_commissions.subscription_id', '=', 'subscriptions.id'))
+            ->selectRaw('COALESCE(SUM(subscriptions.amount), 0) as payable')
+            ->selectRaw('COALESCE(SUM(CASE WHEN subscriptions.amount > COALESCE(approved_payments.approved_amount, 0) THEN subscriptions.amount - COALESCE(approved_payments.approved_amount, 0) ELSE 0 END), 0) as due')
+            ->selectRaw('COALESCE(SUM(COALESCE(subscriptions.commission_amount, legacy_commissions.legacy_commission, 0)), 0) as commission')
+            ->first();
+        $paidTotal = (clone $query)->sum('amount');
         $page = $query->latest('created_at')->orderByDesc('id')->paginate(20);
 
         return [
             'filters' => ['from' => $from, 'to' => $to, 'status' => $status],
+            'totals' => [
+                'payable' => number_format((float) $subscriptionTotals->payable, 2, '.', ''),
+                'paid' => number_format((float) $paidTotal, 2, '.', ''),
+                'due' => number_format((float) $subscriptionTotals->due, 2, '.', ''),
+                'commission' => number_format((float) $subscriptionTotals->commission, 2, '.', ''),
+            ],
             'data' => $page->getCollection()->map(function (PaymentLog $log) {
                 $subscription = $log->subscription;
 
