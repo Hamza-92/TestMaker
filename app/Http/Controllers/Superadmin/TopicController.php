@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Superadmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Chapter;
+use App\Models\ClassSubject;
+use App\Models\Pattern;
+use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Topic;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -15,20 +19,37 @@ class TopicController extends Controller
     {
         abort_if($chapter->subject_id !== $subject->id, 403);
 
+        return $this->createTopic($request, $chapter);
+    }
+
+    public function storeInQuestionScope(Request $request, Pattern $pattern, SchoolClass $schoolClass, Subject $subject, Chapter $chapter): RedirectResponse
+    {
+        abort_unless((int) $chapter->pattern_id === (int) $pattern->id
+            && (int) $chapter->class_id === (int) $schoolClass->id
+            && (int) $chapter->subject_id === (int) $subject->id
+            && ClassSubject::subjectTypeForScope($pattern->id, $schoolClass->id, $subject->id, $subject->subject_type) === 'topic-wise', 404);
+
+        $request->merge(['status' => 1]);
+
+        return $this->createTopic($request, $chapter);
+    }
+
+    private function createTopic(Request $request, Chapter $chapter): RedirectResponse
+    {
         $validated = $request->validate([
-            'name'    => [
+            'name' => [
                 'required', 'string', 'max:150',
                 Rule::unique('topics')->where(fn ($q) => $q->where('chapter_id', $chapter->id)),
             ],
             'name_ur' => ['nullable', 'string', 'max:150'],
-            'status'  => ['required', 'boolean'],
+            'status' => ['required', 'boolean'],
         ]);
 
         Topic::create([
             'chapter_id' => $chapter->id,
-            'name'       => $validated['name'],
-            'name_ur'    => $validated['name_ur'] ?? null,
-            'status'     => $validated['status'],
+            'name' => $validated['name'],
+            'name_ur' => $validated['name_ur'] ?? null,
+            'status' => $validated['status'],
             'created_by' => auth()->id(),
         ]);
 
@@ -41,18 +62,18 @@ class TopicController extends Controller
         abort_if($topic->chapter_id !== $chapter->id, 403);
 
         $validated = $request->validate([
-            'name'    => [
+            'name' => [
                 'required', 'string', 'max:150',
                 Rule::unique('topics')->where(fn ($q) => $q->where('chapter_id', $chapter->id))->ignore($topic->id),
             ],
             'name_ur' => ['nullable', 'string', 'max:150'],
-            'status'  => ['required', 'boolean'],
+            'status' => ['required', 'boolean'],
         ]);
 
         $topic->update([
-            'name'    => $validated['name'],
+            'name' => $validated['name'],
             'name_ur' => $validated['name_ur'] ?? null,
-            'status'  => $validated['status'],
+            'status' => $validated['status'],
         ]);
 
         return back()->with('success', 'Topic updated successfully.');

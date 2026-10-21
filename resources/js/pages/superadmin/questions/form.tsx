@@ -7,12 +7,26 @@ import {
     PencilIcon,
     Trash2Icon,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import {
+    createContext,
+    lazy,
+    Suspense,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+import type { ComponentProps, ReactNode } from 'react';
+import {
+    Badge as TmBadge,
+    Button as TmButton,
+    Input as TmInput,
+} from '@/components/tm';
+import { Badge as LegacyBadge } from '@/components/ui/badge';
+import { Button as LegacyButton } from '@/components/ui/button';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
-import { Input } from '@/components/ui/input';
+import { Input as LegacyInput } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -25,7 +39,46 @@ import { Separator } from '@/components/ui/separator';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { QuestionPathBreadcrumbs } from './path-breadcrumbs';
 import type { QuestionBreadcrumb } from './path-breadcrumbs';
+import { QuestionFormSelect } from './question-form-select';
 import { fetchQuestionJson } from './use-question-options';
+
+const QuestionFormUiContext = createContext(false);
+
+function Input(props: ComponentProps<typeof LegacyInput>) {
+    return useContext(QuestionFormUiContext) ? (
+        <TmInput {...props} />
+    ) : (
+        <LegacyInput {...props} />
+    );
+}
+
+function Button({
+    variant,
+    size,
+    ...props
+}: ComponentProps<typeof LegacyButton>) {
+    const modern = useContext(QuestionFormUiContext);
+
+    if (!modern) {
+        return <LegacyButton variant={variant} size={size} {...props} />;
+    }
+
+    return (
+        <TmButton
+            variant={variant === 'ghost' ? 'ghost' : 'secondary'}
+            size={size === 'icon' ? 'icon-sm' : size === 'sm' ? 'sm' : 'md'}
+            {...props}
+        />
+    );
+}
+
+function Badge({ variant, ...props }: ComponentProps<typeof LegacyBadge>) {
+    return useContext(QuestionFormUiContext) ? (
+        <TmBadge tone="neutral" {...props} />
+    ) : (
+        <LegacyBadge variant={variant} {...props} />
+    );
+}
 
 const QuestionEditModal = lazy(() =>
     import('@/pages/customer/papers/paper-layouts/questions/question-edit-modal').then(
@@ -179,6 +232,11 @@ interface QuestionFormProps {
     lockedChapterId?: number | null;
     lockedTopicId?: number | null;
     breadcrumbs?: QuestionBreadcrumb[];
+    embedded?: boolean;
+    onCancel?: () => void;
+    submitting?: boolean;
+    hideActions?: boolean;
+    formId?: string;
 }
 
 const textareaClassName =
@@ -194,6 +252,7 @@ function AutoTextarea({
     dir?: string;
 }) {
     const ref = useRef<HTMLTextAreaElement>(null);
+    const modern = useContext(QuestionFormUiContext);
 
     useEffect(() => {
         const el = ref.current;
@@ -213,7 +272,11 @@ function AutoTextarea({
             value={value}
             onChange={onChange}
             dir={dir}
-            className={`${textareaClassName} pr-11`}
+            className={
+                modern
+                    ? 'min-h-9 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 pr-11 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+                    : `${textareaClassName} pr-11`
+            }
         />
     );
 }
@@ -230,6 +293,7 @@ function RichContentControl({
     multiline?: boolean;
 }) {
     const [editing, setEditing] = useState(false);
+    const modern = useContext(QuestionFormUiContext);
     const hasMarkup = /<\/?[a-z][^>]*>/i.test(value);
 
     return (
@@ -237,7 +301,11 @@ function RichContentControl({
             {hasMarkup ? (
                 <QuestionContent
                     value={value}
-                    className="min-h-9 rounded-xl border border-input px-3 py-2 pr-11 text-sm"
+                    className={
+                        modern
+                            ? 'min-h-9 rounded-lg border border-slate-200 px-3 py-2 pr-11 text-sm dark:border-slate-700'
+                            : 'min-h-9 rounded-xl border border-input px-3 py-2 pr-11 text-sm'
+                    }
                 />
             ) : multiline ? (
                 <AutoTextarea
@@ -258,7 +326,11 @@ function RichContentControl({
                 onClick={() => setEditing(true)}
                 aria-label="Open content editor"
                 title="Open content editor"
-                className="absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-md bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                className={
+                    modern
+                        ? 'absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500 dark:hover:bg-slate-800'
+                        : 'absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-md bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary'
+                }
             >
                 <PencilIcon className="size-4" />
             </button>
@@ -360,16 +432,36 @@ function Field({
     error?: string;
     children: ReactNode;
 }) {
+    const modern = useContext(QuestionFormUiContext);
+
     return (
         <div className="min-w-0 space-y-1.5">
-            <Label className="flex items-center gap-1">
-                {label}
-                {required ? (
-                    <span className="text-xs text-destructive">*</span>
-                ) : null}
-            </Label>
+            {modern ? (
+                <span className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {label}
+                    {required && <span className="text-rose-600">*</span>}
+                </span>
+            ) : (
+                <Label className="flex items-center gap-1">
+                    {label}
+                    {required ? (
+                        <span className="text-xs text-destructive">*</span>
+                    ) : null}
+                </Label>
+            )}
             {children}
-            {error ? <p className="text-xs text-destructive">{error}</p> : null}
+            {error ? (
+                <p
+                    role="alert"
+                    className={
+                        modern
+                            ? 'text-xs text-rose-600'
+                            : 'text-xs text-destructive'
+                    }
+                >
+                    {error}
+                </p>
+            ) : null}
         </div>
     );
 }
@@ -397,6 +489,11 @@ export function QuestionForm({
     lockedChapterId,
     lockedTopicId,
     breadcrumbs,
+    embedded = false,
+    onCancel,
+    submitting = false,
+    hideActions = false,
+    formId,
 }: QuestionFormProps) {
     const [chapterOptions, setChapterOptions] = useState(chapters);
     const [allChaptersLoaded, setAllChaptersLoaded] = useState(false);
@@ -745,10 +842,20 @@ export function QuestionForm({
                     Add option
                 </Button>
             </div>
-            <div className="overflow-hidden rounded-xl border">
+            <div
+                className={
+                    embedded
+                        ? 'overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700'
+                        : 'overflow-hidden rounded-xl border'
+                }
+            >
                 {/* Header */}
                 <div
-                    className="grid items-center border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground"
+                    className={
+                        embedded
+                            ? 'grid items-center border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-800/40'
+                            : 'grid items-center border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground'
+                    }
                     style={{ gridTemplateColumns: '2rem 1fr 1fr 4.5rem 2rem' }}
                 >
                     <span>#</span>
@@ -762,12 +869,18 @@ export function QuestionForm({
                 {options.map((option, index) => (
                     <div
                         key={`${prefix}-${index}`}
-                        className={`grid items-start gap-2 px-3 py-2${index !== 0 ? 'border-t' : ''}`}
+                        className={`grid items-start gap-2 px-3 py-2${index !== 0 ? (embedded ? 'border-t border-slate-100 dark:border-slate-800' : 'border-t') : ''}`}
                         style={{
                             gridTemplateColumns: '2rem 1fr 1fr 4.5rem 2rem',
                         }}
                     >
-                        <span className="pt-2 text-xs font-semibold text-muted-foreground">
+                        <span
+                            className={
+                                embedded
+                                    ? 'pt-2 text-xs font-semibold text-slate-500'
+                                    : 'pt-2 text-xs font-semibold text-muted-foreground'
+                            }
+                        >
                             {String.fromCharCode(65 + index)}
                         </span>
 
@@ -779,7 +892,13 @@ export function QuestionForm({
                                 }
                             />
                             {errorFor(`${prefix}.${index}.text_en`) && (
-                                <p className="mt-1 text-xs text-destructive">
+                                <p
+                                    className={
+                                        embedded
+                                            ? 'mt-1 text-xs text-rose-600'
+                                            : 'mt-1 text-xs text-destructive'
+                                    }
+                                >
                                     {errorFor(`${prefix}.${index}.text_en`)}
                                 </p>
                             )}
@@ -794,7 +913,13 @@ export function QuestionForm({
                                 }
                             />
                             {errorFor(`${prefix}.${index}.text_ur`) && (
-                                <p className="mt-1 text-xs text-destructive">
+                                <p
+                                    className={
+                                        embedded
+                                            ? 'mt-1 text-xs text-rose-600'
+                                            : 'mt-1 text-xs text-destructive'
+                                    }
+                                >
                                     {errorFor(`${prefix}.${index}.text_ur`)}
                                 </p>
                             )}
@@ -806,14 +931,22 @@ export function QuestionForm({
                                 name={prefix}
                                 checked={option.is_correct}
                                 onChange={() => onToggleCorrect(index)}
-                                className="size-4 cursor-pointer accent-primary"
+                                className={
+                                    embedded
+                                        ? 'size-4 cursor-pointer accent-brand-600'
+                                        : 'size-4 cursor-pointer accent-primary'
+                                }
                             />
                         </div>
 
                         <button
                             type="button"
                             onClick={() => onRemove(index)}
-                            className="mt-1.5 rounded p-1 text-muted-foreground transition-colors hover:text-destructive"
+                            className={
+                                embedded
+                                    ? 'mt-1.5 rounded p-1 text-slate-400 transition-colors hover:text-rose-600'
+                                    : 'mt-1.5 rounded p-1 text-muted-foreground transition-colors hover:text-destructive'
+                            }
                         >
                             <Trash2Icon className="size-3.5" />
                         </button>
@@ -822,7 +955,15 @@ export function QuestionForm({
             </div>
 
             {errorFor(prefix) && (
-                <p className="text-xs text-destructive">{errorFor(prefix)}</p>
+                <p
+                    className={
+                        embedded
+                            ? 'text-xs text-rose-600'
+                            : 'text-xs text-destructive'
+                    }
+                >
+                    {errorFor(prefix)}
+                </p>
             )}
         </div>
     );
@@ -844,7 +985,11 @@ export function QuestionForm({
                 {form.data.content.items.map((item, itemIndex) => (
                     <div
                         key={`passage-item-${itemIndex}`}
-                        className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3"
+                        className={
+                            embedded
+                                ? 'space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/30'
+                                : 'space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3'
+                        }
                     >
                         <div className="flex items-center justify-between gap-3">
                             <Badge variant="outline">
@@ -941,7 +1086,11 @@ export function QuestionForm({
                 {form.data.content.items.map((item, itemIndex) => (
                     <div
                         key={`group-item-${itemIndex}`}
-                        className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3"
+                        className={
+                            embedded
+                                ? 'space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/30'
+                                : 'space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3'
+                        }
                     >
                         <div className="flex items-center justify-between gap-3">
                             <Badge variant="outline">
@@ -1057,7 +1206,11 @@ export function QuestionForm({
                 {form.data.content.pairs.map((pair, pairIndex) => (
                     <div
                         key={`pair-${pairIndex}`}
-                        className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3"
+                        className={
+                            embedded
+                                ? 'space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/30'
+                                : 'space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3'
+                        }
                     >
                         <div className="flex items-center justify-between gap-3">
                             <Badge variant="outline">
@@ -1192,28 +1345,58 @@ export function QuestionForm({
                             required
                             error={errorFor('content.correct_boolean')}
                         >
-                            <Select
-                                value={
-                                    form.data.content.correct_boolean || 'none'
-                                }
-                                onValueChange={(value) =>
-                                    setContentValue(
-                                        'correct_boolean',
-                                        value === 'none' ? '' : value,
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="w-full sm:w-48">
-                                    <SelectValue placeholder="Select answer" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">
-                                        Select answer
-                                    </SelectItem>
-                                    <SelectItem value="true">True</SelectItem>
-                                    <SelectItem value="false">False</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            {embedded ? (
+                                <div className="sm:max-w-48">
+                                    <QuestionFormSelect
+                                        placeholder="Select answer"
+                                        options={[
+                                            {
+                                                value: '',
+                                                label: 'Select answer',
+                                            },
+                                            { value: 'true', label: 'True' },
+                                            { value: 'false', label: 'False' },
+                                        ]}
+                                        value={
+                                            form.data.content.correct_boolean
+                                        }
+                                        onValueChange={(value) =>
+                                            setContentValue(
+                                                'correct_boolean',
+                                                value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                            ) : (
+                                <Select
+                                    value={
+                                        form.data.content.correct_boolean ||
+                                        'none'
+                                    }
+                                    onValueChange={(value) =>
+                                        setContentValue(
+                                            'correct_boolean',
+                                            value === 'none' ? '' : value,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger className="w-full sm:w-48">
+                                        <SelectValue placeholder="Select answer" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Select answer
+                                        </SelectItem>
+                                        <SelectItem value="true">
+                                            True
+                                        </SelectItem>
+                                        <SelectItem value="false">
+                                            False
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}
                         </Field>
                     </div>
                 );
@@ -1317,270 +1500,423 @@ export function QuestionForm({
     };
 
     return (
-        <div className="w-full min-w-0 space-y-6 p-4 md:p-6">
-            {breadcrumbs && <QuestionPathBreadcrumbs items={breadcrumbs} />}
-            <div className="flex min-w-0 items-center gap-4">
-                <Link
-                    href={backHref}
-                    className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
-                >
-                    <ArrowLeftIcon className="size-4" />
-                </Link>
-                <h1 className="h1-semibold">{title}</h1>
-            </div>
-
-            <form onSubmit={onSubmit} className="w-full min-w-0 space-y-4">
-                <section className="w-full min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-card p-4 shadow-sm">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <Field
-                            label="Question Type"
-                            required
-                            error={form.errors.question_type_id}
+        <QuestionFormUiContext.Provider value={embedded}>
+            <div
+                className={
+                    embedded
+                        ? 'w-full min-w-0 space-y-4'
+                        : 'w-full min-w-0 space-y-6 p-4 md:p-6'
+                }
+            >
+                {!embedded && breadcrumbs && (
+                    <QuestionPathBreadcrumbs items={breadcrumbs} />
+                )}
+                {!embedded && (
+                    <div className="flex min-w-0 items-center gap-4">
+                        <Link
+                            href={backHref}
+                            className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-input transition-colors hover:bg-accent"
                         >
-                            <FloatingCombobox
-                                label="Question Type"
-                                hideLabel
-                                compact
-                                maxVisibleOptions={50}
-                                placeholder="Select type"
-                                options={questionTypeOptions}
-                                value={
-                                    questionTypeOptions.find(
-                                        (option) =>
-                                            String(option.id) ===
-                                            form.data.question_type_id,
-                                    ) ?? null
-                                }
-                                onChange={(option) =>
-                                    form.setData(
-                                        'question_type_id',
-                                        option ? String(option.id) : '',
-                                    )
-                                }
-                            />
-                        </Field>
+                            <ArrowLeftIcon className="size-4" />
+                        </Link>
+                        <h1 className="h1-semibold">{title}</h1>
+                    </div>
+                )}
 
-                        {!isChapterLocked && (
+                <form
+                    id={formId}
+                    onSubmit={onSubmit}
+                    className="w-full min-w-0 space-y-4"
+                >
+                    <section
+                        className={
+                            embedded
+                                ? 'w-full min-w-0 space-y-4'
+                                : 'w-full min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-card p-4 shadow-sm'
+                        }
+                    >
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Field
-                                label="Chapter"
+                                label="Question Type"
                                 required
-                                error={form.errors.chapter_id}
+                                error={form.errors.question_type_id}
                             >
-                                <Select
-                                    value={form.data.chapter_id || 'none'}
-                                    disabled={chapterOptions.length === 0}
-                                    onOpenChange={(open) => {
-                                        if (open) {
-                                            void loadChapters();
-                                        }
-                                    }}
-                                    onValueChange={(value) => {
-                                        form.setData(
-                                            'chapter_id',
-                                            value === 'none' ? '' : value,
-                                        );
-                                        form.setData('topic_id', '');
-                                    }}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
-                                            placeholder={
-                                                chapterOptions.length === 0
-                                                    ? 'No chapters'
-                                                    : 'Select chapter'
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-80">
-                                        <SelectItem value="none">
-                                            Select chapter
-                                        </SelectItem>
-                                        {loadingChapters && (
-                                            <SelectItem
-                                                value="loading"
-                                                disabled
-                                            >
-                                                Loading chapters…
-                                            </SelectItem>
+                                {embedded ? (
+                                    <QuestionFormSelect
+                                        searchable
+                                        placeholder="Select type"
+                                        options={questionTypeOptions.map(
+                                            (option) => ({
+                                                value: String(option.id),
+                                                label: option.label,
+                                            }),
                                         )}
-                                        {chapterOptions.map((chapter) => (
-                                            <SelectItem
-                                                key={chapter.id}
-                                                value={String(chapter.id)}
-                                            >
-                                                {chapter.subject.name_eng} —{' '}
-                                                {chapterTitle(chapter)} ·{' '}
-                                                {chapter.class.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {chapterLoadError && (
-                                    <p
-                                        role="alert"
-                                        className="text-xs text-destructive"
-                                    >
-                                        {chapterLoadError}
-                                    </p>
+                                        value={form.data.question_type_id}
+                                        onValueChange={(value) =>
+                                            form.setData(
+                                                'question_type_id',
+                                                value,
+                                            )
+                                        }
+                                    />
+                                ) : (
+                                    <FloatingCombobox
+                                        label="Question Type"
+                                        hideLabel
+                                        compact
+                                        maxVisibleOptions={50}
+                                        placeholder="Select type"
+                                        options={questionTypeOptions}
+                                        value={
+                                            questionTypeOptions.find(
+                                                (option) =>
+                                                    String(option.id) ===
+                                                    form.data.question_type_id,
+                                            ) ?? null
+                                        }
+                                        onChange={(option) =>
+                                            form.setData(
+                                                'question_type_id',
+                                                option ? String(option.id) : '',
+                                            )
+                                        }
+                                    />
                                 )}
                             </Field>
-                        )}
 
-                        {usesTopicSelection && !isTopicLocked && (
-                            <Field label="Topic" error={form.errors.topic_id}>
-                                <Select
-                                    value={form.data.topic_id || 'none'}
-                                    disabled={availableTopics.length === 0}
-                                    onValueChange={(value) =>
-                                        form.setData(
-                                            'topic_id',
-                                            value === 'none' ? '' : value,
-                                        )
-                                    }
+                            {!isChapterLocked && (
+                                <Field
+                                    label="Chapter"
+                                    required
+                                    error={form.errors.chapter_id}
                                 >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
+                                    <Select
+                                        value={form.data.chapter_id || 'none'}
+                                        disabled={chapterOptions.length === 0}
+                                        onOpenChange={(open) => {
+                                            if (open) {
+                                                void loadChapters();
+                                            }
+                                        }}
+                                        onValueChange={(value) => {
+                                            form.setData(
+                                                'chapter_id',
+                                                value === 'none' ? '' : value,
+                                            );
+                                            form.setData('topic_id', '');
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue
+                                                placeholder={
+                                                    chapterOptions.length === 0
+                                                        ? 'No chapters'
+                                                        : 'Select chapter'
+                                                }
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-80">
+                                            <SelectItem value="none">
+                                                Select chapter
+                                            </SelectItem>
+                                            {loadingChapters && (
+                                                <SelectItem
+                                                    value="loading"
+                                                    disabled
+                                                >
+                                                    Loading chapters…
+                                                </SelectItem>
+                                            )}
+                                            {chapterOptions.map((chapter) => (
+                                                <SelectItem
+                                                    key={chapter.id}
+                                                    value={String(chapter.id)}
+                                                >
+                                                    {chapter.subject.name_eng} —{' '}
+                                                    {chapterTitle(chapter)} ·{' '}
+                                                    {chapter.class.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {chapterLoadError && (
+                                        <p
+                                            role="alert"
+                                            className="text-xs text-destructive"
+                                        >
+                                            {chapterLoadError}
+                                        </p>
+                                    )}
+                                </Field>
+                            )}
+
+                            {usesTopicSelection && !isTopicLocked && (
+                                <Field
+                                    label="Topic"
+                                    error={form.errors.topic_id}
+                                >
+                                    {embedded ? (
+                                        <QuestionFormSelect
                                             placeholder={
                                                 availableTopics.length === 0
                                                     ? 'No topics'
                                                     : 'Select topic'
                                             }
+                                            disabled={
+                                                availableTopics.length === 0
+                                            }
+                                            options={[
+                                                { value: '', label: 'None' },
+                                                ...availableTopics.map(
+                                                    (topic) => ({
+                                                        value: String(topic.id),
+                                                        label: topic.name,
+                                                    }),
+                                                ),
+                                            ]}
+                                            value={form.data.topic_id}
+                                            onValueChange={(value) =>
+                                                form.setData('topic_id', value)
+                                            }
                                         />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">
-                                            None
-                                        </SelectItem>
-                                        {availableTopics.map((topic) => (
-                                            <SelectItem
-                                                key={topic.id}
-                                                value={String(topic.id)}
-                                            >
-                                                {topic.name}
+                                    ) : (
+                                        <Select
+                                            value={form.data.topic_id || 'none'}
+                                            disabled={
+                                                availableTopics.length === 0
+                                            }
+                                            onValueChange={(value) =>
+                                                form.setData(
+                                                    'topic_id',
+                                                    value === 'none'
+                                                        ? ''
+                                                        : value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue
+                                                    placeholder={
+                                                        availableTopics.length ===
+                                                        0
+                                                            ? 'No topics'
+                                                            : 'Select topic'
+                                                    }
+                                                />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">
+                                                    None
+                                                </SelectItem>
+                                                {availableTopics.map(
+                                                    (topic) => (
+                                                        <SelectItem
+                                                            key={topic.id}
+                                                            value={String(
+                                                                topic.id,
+                                                            )}
+                                                        >
+                                                            {topic.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                </Field>
+                            )}
+
+                            <Field label="Source" error={form.errors.source}>
+                                {embedded ? (
+                                    <QuestionFormSelect
+                                        placeholder="Select source"
+                                        options={[
+                                            {
+                                                value: '',
+                                                label: 'Select source',
+                                            },
+                                            ...sourceOptions.map((source) => ({
+                                                value: source.value,
+                                                label: source.label,
+                                            })),
+                                        ]}
+                                        value={form.data.source}
+                                        onValueChange={(value) =>
+                                            form.setData('source', value)
+                                        }
+                                    />
+                                ) : (
+                                    <Select
+                                        value={form.data.source || 'none'}
+                                        onValueChange={(value) =>
+                                            form.setData(
+                                                'source',
+                                                value === 'none' ? '' : value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select source" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                Select source
                                             </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                            {sourceOptions.map((source) => (
+                                                <SelectItem
+                                                    key={source.value}
+                                                    value={source.value}
+                                                >
+                                                    {source.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </Field>
+
+                            <Field
+                                label="Medium"
+                                required
+                                error={form.errors.medium_id}
+                            >
+                                {embedded ? (
+                                    <QuestionFormSelect
+                                        placeholder="Select medium"
+                                        options={mediumOptions.map(
+                                            (medium) => ({
+                                                value: String(medium.id),
+                                                label: medium.name,
+                                            }),
+                                        )}
+                                        value={form.data.medium_id}
+                                        onValueChange={(value) =>
+                                            form.setData('medium_id', value)
+                                        }
+                                    />
+                                ) : (
+                                    <Select
+                                        value={form.data.medium_id || 'none'}
+                                        onValueChange={(value) =>
+                                            form.setData(
+                                                'medium_id',
+                                                value === 'none' ? '' : value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select medium" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                Select medium
+                                            </SelectItem>
+                                            {mediumOptions.map((medium) => (
+                                                <SelectItem
+                                                    key={medium.id}
+                                                    value={String(medium.id)}
+                                                >
+                                                    {medium.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </Field>
+
+                            <Field
+                                required
+                                label="Status"
+                                error={form.errors.status}
+                            >
+                                {embedded ? (
+                                    <QuestionFormSelect
+                                        placeholder="Select status"
+                                        options={[
+                                            { value: '1', label: 'Active' },
+                                            { value: '0', label: 'Inactive' },
+                                        ]}
+                                        value={form.data.status}
+                                        onValueChange={(value) =>
+                                            form.setData('status', value)
+                                        }
+                                    />
+                                ) : (
+                                    <Select
+                                        value={form.data.status}
+                                        onValueChange={(value) =>
+                                            form.setData('status', value)
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1">
+                                                Active
+                                            </SelectItem>
+                                            <SelectItem value="0">
+                                                Inactive
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </Field>
+                        </div>
+
+                        {selectedType && (
+                            <>
+                                {embedded ? (
+                                    <div className="border-t border-slate-100 dark:border-slate-800" />
+                                ) : (
+                                    <Separator />
+                                )}
+                                {renderSchemaBuilder()}
+                            </>
                         )}
+                    </section>
 
-                        <Field label="Source" error={form.errors.source}>
-                            <Select
-                                value={form.data.source || 'none'}
-                                onValueChange={(value) =>
-                                    form.setData(
-                                        'source',
-                                        value === 'none' ? '' : value,
-                                    )
-                                }
+                    {!hideActions && (
+                        <div className="flex flex-col gap-3 pb-2 sm:flex-row sm:justify-end">
+                            {embedded ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onCancel}
+                                    disabled={form.processing || submitting}
+                                >
+                                    Cancel
+                                </Button>
+                            ) : (
+                                <Button asChild variant="outline">
+                                    <Link href={backHref}>Cancel</Link>
+                                </Button>
+                            )}
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                disabled={form.processing || submitting}
                             >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select source" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">
-                                        Select source
-                                    </SelectItem>
-                                    {sourceOptions.map((source) => (
-                                        <SelectItem
-                                            key={source.value}
-                                            value={source.value}
-                                        >
-                                            {source.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-
-                        <Field
-                            label="Medium"
-                            required
-                            error={form.errors.medium_id}
-                        >
-                            <Select
-                                value={form.data.medium_id || 'none'}
-                                onValueChange={(value) =>
-                                    form.setData(
-                                        'medium_id',
-                                        value === 'none' ? '' : value,
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select medium" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">
-                                        Select medium
-                                    </SelectItem>
-                                    {mediumOptions.map((medium) => (
-                                        <SelectItem
-                                            key={medium.id}
-                                            value={String(medium.id)}
-                                        >
-                                            {medium.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-
-                        <Field
-                            required
-                            label="Status"
-                            error={form.errors.status}
-                        >
-                            <Select
-                                value={form.data.status}
-                                onValueChange={(value) =>
-                                    form.setData('status', value)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">Active</SelectItem>
-                                    <SelectItem value="0">Inactive</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </Field>
-                    </div>
-
-                    {selectedType && (
-                        <>
-                            <Separator />
-                            {renderSchemaBuilder()}
-                        </>
+                                <CheckCircle2Icon className="size-4" />
+                                {form.processing || submitting
+                                    ? 'Saving...'
+                                    : submitLabel}
+                            </Button>
+                            {secondarySubmitLabel ? (
+                                <Button
+                                    type="submit"
+                                    name="save_and_add_new"
+                                    value="save-and-add-new"
+                                    disabled={form.processing || submitting}
+                                >
+                                    <CirclePlusIcon className="size-4" />
+                                    {secondarySubmitLabel}
+                                </Button>
+                            ) : null}
+                        </div>
                     )}
-                </section>
-
-                <div className="flex flex-col gap-3 pb-2 sm:flex-row sm:justify-end">
-                    <Button asChild variant="outline">
-                        <Link href={backHref}>Cancel</Link>
-                    </Button>
-                    <Button
-                        type="submit"
-                        variant="outline"
-                        disabled={form.processing}
-                    >
-                        <CheckCircle2Icon className="size-4" />
-                        {form.processing ? 'Saving...' : submitLabel}
-                    </Button>
-                    {secondarySubmitLabel ? (
-                        <Button
-                            type="submit"
-                            name="save_and_add_new"
-                            value="save-and-add-new"
-                            disabled={form.processing}
-                        >
-                            <CirclePlusIcon className="size-4" />
-                            {secondarySubmitLabel}
-                        </Button>
-                    ) : null}
-                </div>
-            </form>
-        </div>
+                </form>
+            </div>
+        </QuestionFormUiContext.Provider>
     );
 }

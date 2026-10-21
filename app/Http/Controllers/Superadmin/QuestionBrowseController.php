@@ -86,7 +86,8 @@ class QuestionBrowseController extends Controller
                 'name' => ($chapter->chapter_number ? $chapter->chapter_number.'. ' : '').$chapter->name,
                 'detail' => $chapter->name_ur ?: $chapter->group_name,
                 'href' => route('superadmin.questions.browse.chapter', [$pattern, $schoolClass, $subject, $chapter], false),
-            ])->all(), $this->crumbs($pattern, $schoolClass, $subject));
+            ])->all(), $this->crumbs($pattern, $schoolClass, $subject),
+            route('superadmin.questions.browse.chapters.store', [$pattern, $schoolClass, $subject], false));
     }
 
     public function chapter(Request $request, Pattern $pattern, SchoolClass $schoolClass, Subject $subject, Chapter $chapter): Response
@@ -98,7 +99,7 @@ class QuestionBrowseController extends Controller
                 ->orderBy('name')->orderBy('id')->get(['id', 'name', 'name_ur'])
             : collect();
 
-        if ($topics->isNotEmpty()) {
+        if ($subjectType === 'topic-wise') {
             $rows = $topics->map(fn (Topic $topic) => [
                 'id' => $topic->id,
                 'name' => $topic->name,
@@ -115,7 +116,8 @@ class QuestionBrowseController extends Controller
             }
 
             return $this->browse('topics', $chapter->name, $rows,
-                $this->crumbs($pattern, $schoolClass, $subject, $chapter));
+                $this->crumbs($pattern, $schoolClass, $subject, $chapter), null,
+                route('superadmin.questions.browse.topics.store', [$pattern, $schoolClass, $subject, $chapter], false));
         }
 
         return $this->questions($request, $pattern, $schoolClass, $subject, $chapter, null, false);
@@ -134,7 +136,8 @@ class QuestionBrowseController extends Controller
     {
         $this->ensureChapter($pattern, $schoolClass, $subject, $chapter);
         abort_unless($this->subjectType($pattern, $schoolClass, $subject) === 'topic-wise'
-            && Topic::query()->where('chapter_id', $chapter->id)->exists(), 404);
+            && (Topic::query()->where('chapter_id', $chapter->id)->exists()
+                || Question::query()->where('chapter_id', $chapter->id)->whereNull('topic_id')->exists()), 404);
 
         return $this->questions($request, $pattern, $schoolClass, $subject, $chapter, null, true);
     }
@@ -267,14 +270,15 @@ class QuestionBrowseController extends Controller
             'addHref' => $topic
                 ? route('superadmin.questions.browse.topic.add', [$pattern, $schoolClass, $subject, $chapter, $topic], false)
                 : route('superadmin.questions.browse.chapter.add', [$pattern, $schoolClass, $subject, $chapter], false),
+            'addOptionsHref' => route('superadmin.questions.browse.chapter.form-options', [$pattern, $schoolClass, $subject, $chapter], false),
             'importHref' => route('superadmin.subjects.chapters.questions.import', [$subject, $chapter], false)
                 .($topic ? '?topic_id='.$topic->id : ''),
         ]);
     }
 
-    private function browse(string $level, string $title, array $rows, array $breadcrumbs = []): Response
+    private function browse(string $level, string $title, array $rows, array $breadcrumbs = [], ?string $createChapterHref = null, ?string $createTopicHref = null): Response
     {
-        return Inertia::render('superadmin/questions/browse', compact('level', 'title', 'rows', 'breadcrumbs'));
+        return Inertia::render('superadmin/questions/browse', compact('level', 'title', 'rows', 'breadcrumbs', 'createChapterHref', 'createTopicHref'));
     }
 
     private function validatedListScope(Request $request): array

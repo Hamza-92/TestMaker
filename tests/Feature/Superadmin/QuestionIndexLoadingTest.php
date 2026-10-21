@@ -7,6 +7,7 @@ use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\QuestionType;
+use App\Models\QuestionTypeHeading;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Topic;
@@ -89,6 +90,250 @@ it('loads scoped chapters without topics and fetches topics separately in order'
         ->assertOk()->assertJsonCount(2, 'options')->assertJsonPath('options.0.id', $context['topic']->id)->assertJsonPath('options.1.id', $later->id);
     $this->getJson(route('superadmin.questions.list-data', ['chapter_id' => $context['chapter']->id, 'topic_id' => $other['topic']->id]))->assertNotFound();
     $this->getJson(route('superadmin.questions.filter-options', ['level' => 'subjects', 'pattern_id' => $context['pattern']->id]))->assertUnprocessable()->assertJsonValidationErrors('class_id');
+});
+
+it('adds a chapter from the questions browse scope without trusting posted scope fields', function () {
+    $context = questionLoadingContext();
+    $other = questionLoadingContext();
+    $browseUrl = route('superadmin.questions.browse.chapters', [
+        $context['pattern'], $context['class'], $context['subject'],
+    ]);
+    $storeUrl = route('superadmin.questions.browse.chapters.store', [
+        $context['pattern'], $context['class'], $context['subject'],
+    ]);
+
+    $this->actingAs($context['admin'])->get($browseUrl)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('superadmin/questions/browse')
+            ->where('createChapterHref', parse_url($storeUrl, PHP_URL_PATH)));
+
+    $this->from($browseUrl)->post($storeUrl, [
+        'chapter_number' => 2,
+        'name' => 'New chapter',
+        'name_ur' => 'نیا باب',
+        'group_name' => 'Group A',
+        'group_heading' => 'Section One',
+        'pattern_id' => $other['pattern']->id,
+        'class_id' => $other['class']->id,
+        'status' => 0,
+    ])->assertRedirect($browseUrl)->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('chapters', [
+        'pattern_id' => $context['pattern']->id,
+        'class_id' => $context['class']->id,
+        'subject_id' => $context['subject']->id,
+        'chapter_number' => 2,
+        'name' => 'New chapter',
+        'name_ur' => 'نیا باب',
+        'group_name' => 'Group A',
+        'group_heading' => 'Section One',
+        'status' => 1,
+    ]);
+    $this->get($browseUrl)->assertOk()->assertInertia(fn (Assert $page) => $page->has('rows', 2));
+
+    $this->from($browseUrl)->post($storeUrl, [
+        'chapter_number' => 2,
+        'name' => 'Duplicate number',
+    ])->assertSessionHasErrors('chapter_number');
+
+    $this->post(route('superadmin.questions.browse.chapters.store', [
+        $context['pattern'], $other['class'], $context['subject'],
+    ]), ['name' => 'Wrong scope'])->assertNotFound();
+
+    ClassSubject::query()->where('pattern_id', $context['pattern']->id)
+        ->where('class_id', $context['class']->id)
+        ->where('subject_id', $context['subject']->id)
+        ->delete();
+    $this->from($browseUrl)->post($storeUrl, [
+        'chapter_number' => 3,
+        'name' => 'Legacy scope chapter',
+    ])->assertRedirect($browseUrl)->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('chapters', [
+        'pattern_id' => $context['pattern']->id,
+        'class_id' => $context['class']->id,
+        'subject_id' => $context['subject']->id,
+        'name' => 'Legacy scope chapter',
+    ]);
+});
+
+it('requires chapter creation permission on the questions browse route', function () {
+    $context = questionLoadingContext();
+    $restricted = User::factory()->create([
+        'user_type' => UserType::SuperAdmin->value,
+        'created_by' => $context['admin']->id,
+    ]);
+
+    $this->actingAs($restricted)->post(route('superadmin.questions.browse.chapters.store', [
+        $context['pattern'], $context['class'], $context['subject'],
+    ]), ['name' => 'Unauthorized'])->assertForbidden();
+});
+
+it('shows an empty topics table for a new topic-wise chapter and adds topics within that scope', function () {
+    $context = questionLoadingContext();
+    $chapter = Chapter::create([
+        'pattern_id' => $context['pattern']->id,
+        'class_id' => $context['class']->id,
+        'subject_id' => $context['subject']->id,
+        'name' => 'New chapter',
+        'status' => 1,
+        'created_by' => $context['admin']->id,
+    ]);
+    $parents = [$context['pattern'], $context['class'], $context['subject'], $chapter];
+    $browseUrl = route('superadmin.questions.browse.chapter', $parents);
+    $storeUrl = route('superadmin.questions.browse.topics.store', $parents);
+
+    $this->actingAs($context['admin'])->get($browseUrl)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('superadmin/questions/browse')->where('level', 'topics')
+            ->has('rows', 0)->where('createTopicHref', parse_url($storeUrl, PHP_URL_PATH)));
+
+    $this->from($browseUrl)->post($storeUrl, [
+        'name' => 'New topic',
+        'name_ur' => 'نیا موضوع',
+        'status' => 0,
+    ])->assertRedirect($browseUrl)->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('topics', [
+        'chapter_id' => $chapter->id,
+        'name' => 'New topic',
+        'name_ur' => 'نیا موضوع',
+        'status' => 1,
+    ]);
+    $this->get($browseUrl)->assertOk()->assertInertia(fn (Assert $page) => $page->has('rows', 1));
+    $this->from($browseUrl)->post($storeUrl, ['name' => 'New topic'])
+        ->assertSessionHasErrors('name');
+
+    $this->post(route('superadmin.questions.browse.topics.store', [
+        $context['pattern'], $context['class'], $context['subject'], $context['chapter'],
+    ]), ['name' => 'Cell structure'])->assertSessionHasErrors('name');
+});
+
+it('rejects topic creation outside a topic-wise chapter or without permission', function () {
+    $context = questionLoadingContext();
+    $other = questionLoadingContext();
+    $this->actingAs($context['admin'])->post(route('superadmin.questions.browse.topics.store', [
+        $context['pattern'], $context['class'], $context['subject'], $other['chapter'],
+    ]), ['name' => 'Wrong scope'])->assertNotFound();
+
+    ClassSubject::query()->where('pattern_id', $context['pattern']->id)
+        ->where('class_id', $context['class']->id)->where('subject_id', $context['subject']->id)
+        ->update(['subject_type' => 'chapter-wise']);
+    $this->post(route('superadmin.questions.browse.topics.store', [
+        $context['pattern'], $context['class'], $context['subject'], $context['chapter'],
+    ]), ['name' => 'Wrong type'])->assertNotFound();
+
+    $restricted = User::factory()->create([
+        'user_type' => UserType::SuperAdmin->value,
+        'created_by' => $context['admin']->id,
+    ]);
+    $this->actingAs($restricted)->post(route('superadmin.questions.browse.topics.store', [
+        $context['pattern'], $context['class'], $context['subject'], $context['chapter'],
+    ]), ['name' => 'Unauthorized'])->assertForbidden();
+});
+
+it('keeps unassigned questions accessible when a topic-wise chapter has no topics', function () {
+    $context = questionLoadingContext();
+    $chapter = Chapter::create([
+        'pattern_id' => $context['pattern']->id,
+        'class_id' => $context['class']->id,
+        'subject_id' => $context['subject']->id,
+        'name' => 'Legacy chapter',
+        'status' => 1,
+        'created_by' => $context['admin']->id,
+    ]);
+    loadingQuestion($context, ['chapter_id' => $chapter->id, 'topic_id' => null]);
+    $parents = [$context['pattern'], $context['class'], $context['subject'], $chapter];
+
+    $this->actingAs($context['admin'])->get(route('superadmin.questions.browse.chapter', $parents))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/browse')->where('level', 'topics')
+        ->has('rows', 1)->where('rows.0.name', 'Unassigned questions'));
+    $this->get(route('superadmin.questions.browse.unassigned', $parents))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/questions/list')->where('items.total', 1));
+});
+
+it('loads only scoped add-question options and saves from the list modal', function () {
+    $context = questionLoadingContext();
+    $other = questionLoadingContext();
+    $parents = [$context['pattern'], $context['class'], $context['subject'], $context['chapter']];
+    $optionsUrl = route('superadmin.questions.browse.chapter.form-options', $parents);
+    $listUrl = route('superadmin.questions.browse.topic', [...$parents, $context['topic']]);
+
+    $this->actingAs($context['admin'])->get($listUrl)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('superadmin/questions/list')
+            ->where('addOptionsHref', parse_url($optionsUrl, PHP_URL_PATH)));
+    $this->getJson($optionsUrl)->assertOk()
+        ->assertJsonCount(1, 'chapters')
+        ->assertJsonPath('chapters.0.id', $context['chapter']->id)
+        ->assertJsonPath('chapters.0.subject.subject_type', 'topic-wise')
+        ->assertJsonStructure(['questionTypes' => [['id', 'name', 'schema_key', 'schema']]])
+        ->assertJsonMissingPath('items');
+
+    $this->from($listUrl)->post(route('superadmin.questions.store', ['modal' => 1, 'save_and_add_new' => 1]), [
+        'question_type_id' => $context['type']->id,
+        'chapter_id' => $context['chapter']->id,
+        'topic_id' => $context['topic']->id,
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => 1,
+        'content' => [
+            'prompt_en' => 'Question from modal',
+            'options' => [
+                ['text_en' => 'A', 'is_correct' => true],
+                ['text_en' => 'B', 'is_correct' => false],
+            ],
+        ],
+    ])->assertRedirect($listUrl)->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('questions', [
+        'chapter_id' => $context['chapter']->id,
+        'topic_id' => $context['topic']->id,
+        'statement_en' => 'Question from modal',
+    ]);
+
+    $this->postJson(route('superadmin.questions.store'), [
+        'question_type_id' => $context['type']->id,
+        'chapter_id' => $context['chapter']->id,
+        'topic_id' => $context['topic']->id,
+        'status' => 1,
+        'content' => [
+            'prompt_en' => 'Another modal question',
+            'options' => [
+                ['text_en' => 'A', 'is_correct' => true],
+                ['text_en' => 'B', 'is_correct' => false],
+            ],
+        ],
+    ])->assertCreated()->assertJsonStructure(['id']);
+    $this->assertDatabaseHas('questions', ['statement_en' => 'Another modal question']);
+
+    $this->getJson(route('superadmin.questions.browse.chapter.form-options', [
+        $context['pattern'], $context['class'], $context['subject'], $other['chapter'],
+    ]))->assertNotFound();
+
+    $restricted = User::factory()->create([
+        'user_type' => UserType::SuperAdmin->value,
+        'created_by' => $context['admin']->id,
+    ]);
+    $this->actingAs($restricted)->getJson($optionsUrl)->assertForbidden();
+});
+
+it('sends the resolved schema for the selected question scope', function () {
+    $context = questionLoadingContext();
+    QuestionTypeHeading::create([
+        'question_type_id' => $context['type']->id,
+        'pattern_id' => $context['pattern']->id,
+        'class_id' => $context['class']->id,
+        'subject_id' => $context['subject']->id,
+        'scope_key' => QuestionTypeHeading::scopeKey(
+            $context['pattern']->id, $context['class']->id, $context['subject']->id,
+        ),
+        'schema_key' => 'objective_true_false',
+    ]);
+
+    $this->actingAs($context['admin'])->getJson(route('superadmin.questions.browse.chapter.form-options', [
+        $context['pattern'], $context['class'], $context['subject'], $context['chapter'],
+    ]))->assertOk()
+        ->assertJsonPath('questionTypes.0.schema_key', 'objective_true_false')
+        ->assertJsonPath('questionTypes.0.scope_rules', []);
 });
 
 it('keeps existing chapter deep links without eagerly loading the question bank', function () {

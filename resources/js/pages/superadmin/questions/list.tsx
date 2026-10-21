@@ -9,7 +9,7 @@ import {
     Trash2Icon,
     UploadIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import {
     Button,
     Card,
@@ -43,6 +43,8 @@ import { QuestionPathBreadcrumbs } from './path-breadcrumbs';
 import type { QuestionBreadcrumb } from './path-breadcrumbs';
 import { SourceBadge } from './source-badge';
 import { fetchQuestionJson } from './use-question-options';
+
+const AddQuestionModal = lazy(() => import('./add-question-modal'));
 
 interface QuestionRow {
     id: number;
@@ -190,7 +192,7 @@ export default function ListQuestions({
     questionTypes,
     sourceOptions,
     scope,
-    addHref,
+    addOptionsHref,
     importHref,
 }: {
     title: string;
@@ -200,12 +202,14 @@ export default function ListQuestions({
     questionTypes: { id: number; name: string }[];
     sourceOptions: { value: string; label: string }[];
     scope: Scope;
-    addHref: string;
+    addOptionsHref: string;
     importHref: string;
 }) {
     const { can } = usePermission();
     const pageUrl = usePage().url.split('?')[0];
     const [search, setSearch] = useState(filters.q);
+    const [addOptionsCacheOwner] = useState(() => ({}));
+    const [addModalOpen, setAddModalOpen] = useState(false);
     const [selected, setSelected] = useState<Map<number, SelectionRow>>(
         new Map(),
     );
@@ -547,11 +551,11 @@ export default function ListQuestions({
                                     </Button>
                                 )}
                                 {can('questions.create') && (
-                                    <Button variant="primary" asChild>
-                                        <Link href={addHref}>
-                                            <PlusIcon />
-                                            Add Question
-                                        </Link>
+                                    <Button
+                                        variant="primary"
+                                        onClick={() => setAddModalOpen(true)}
+                                    >
+                                        <PlusIcon /> Add Question
                                     </Button>
                                 )}
                             </>
@@ -734,11 +738,13 @@ export default function ListQuestions({
                                 title="No questions found"
                                 action={
                                     can('questions.create') ? (
-                                        <Button variant="primary" asChild>
-                                            <Link href={addHref}>
-                                                <PlusIcon />
-                                                Add Question
-                                            </Link>
+                                        <Button
+                                            variant="primary"
+                                            onClick={() =>
+                                                setAddModalOpen(true)
+                                            }
+                                        >
+                                            <PlusIcon /> Add Question
                                         </Button>
                                     ) : undefined
                                 }
@@ -981,6 +987,27 @@ export default function ListQuestions({
                         setSelectionMode(false);
                     }}
                 />
+            )}
+            {addModalOpen && (
+                <Suspense
+                    fallback={
+                        <div
+                            role="status"
+                            className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 text-sm font-medium text-white backdrop-blur-[2px]"
+                        >
+                            Loading question form…
+                        </div>
+                    }
+                >
+                    <AddQuestionModal
+                        cacheOwner={addOptionsCacheOwner}
+                        optionsHref={addOptionsHref}
+                        chapterId={scope.chapter_id}
+                        topicId={scope.topic_id}
+                        scope={breadcrumbs.slice(-4).map((item) => item.label)}
+                        onClose={() => setAddModalOpen(false)}
+                    />
+                </Suspense>
             )}
         </>
     );

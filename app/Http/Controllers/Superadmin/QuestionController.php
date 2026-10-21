@@ -356,6 +356,18 @@ class QuestionController extends Controller
         return $this->renderCreateForm($chapter->id, $topic->id);
     }
 
+    public function createOptionsForChapterPath(Pattern $pattern, SchoolClass $schoolClass, Subject $subject, Chapter $chapter): JsonResponse
+    {
+        $this->ensureChapterMatchesPath($pattern, $schoolClass, $subject, $chapter);
+
+        return response()->json([
+            'questionTypes' => $this->questionTypeFormOptionsForScope($chapter),
+            'chapters' => $this->chapterFormOptions(includeInactive: true, onlyChapterId: $chapter->id),
+            'sourceOptions' => $this->sourceOptions(),
+            'mediumOptions' => $this->mediumOptions(),
+        ]);
+    }
+
     private function renderCreateForm(?int $chapterId, ?int $topicId)
     {
         $chapter = $chapterId
@@ -610,7 +622,7 @@ class QuestionController extends Controller
         ]);
     }
 
-    public function store(QuestionUpsertRequest $request): RedirectResponse
+    public function store(QuestionUpsertRequest $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validated();
         $questionType = QuestionType::query()->findOrFail($validated['question_type_id']);
@@ -646,6 +658,14 @@ class QuestionController extends Controller
         });
 
         $topicId = $validated['topic_id'] ?? null;
+
+        if ($request->expectsJson()) {
+            return response()->json(['id' => $question->id], 201);
+        }
+
+        if ($request->boolean('modal')) {
+            return back()->with('success', 'Question created successfully.');
+        }
 
         if ($saveAndAddNew) {
             $parents = [$chapter->pattern_id, $chapter->class_id, $chapter->subject_id, $chapter->id];
@@ -1041,6 +1061,27 @@ class QuestionController extends Controller
                 'status',
             ])
             ->map(fn (QuestionType $questionType) => $this->serializeQuestionType($questionType))
+            ->values();
+    }
+
+    private function questionTypeFormOptionsForScope(Chapter $chapter): Collection
+    {
+        $types = QuestionType::query()
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get([
+                'id', 'name', 'heading_en', 'is_objective', 'options_only', 'is_single',
+                'have_answer', 'have_description', 'schema_key', 'objective_type_id',
+                'column_per_row', 'status',
+            ]);
+
+        return QuestionTypeHeadingResolver::apply(
+            $types,
+            (int) $chapter->pattern_id,
+            (int) $chapter->class_id,
+            (int) $chapter->subject_id,
+        )
+            ->map(fn (QuestionType $type) => $this->serializeQuestionType($type))
             ->values();
     }
 
