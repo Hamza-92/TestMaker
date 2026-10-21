@@ -25,9 +25,11 @@ class Subscription extends Model
         'allowed_questions',
         'remaining_questions',
         'amount',
+        'commission_amount',
         'started_at',
         'duration',
         'expired_at',
+        'payment_due_date',
         'status',
         'created_by',
     ];
@@ -44,8 +46,10 @@ class Subscription extends Model
             'allow_subjective_answers' => 'boolean',
             'is_question_based' => 'boolean',
             'amount' => 'decimal:2',
+            'commission_amount' => 'integer',
             'started_at' => 'datetime',
             'expired_at' => 'datetime',
+            'payment_due_date' => 'date',
             'status' => SubscriptionStatus::class,
         ];
     }

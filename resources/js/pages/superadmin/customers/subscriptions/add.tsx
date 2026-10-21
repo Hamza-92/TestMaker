@@ -49,10 +49,12 @@ interface Props {
 interface FormData {
     name: string;
     amount: string;
+    commission_amount: string;
     is_question_based: boolean;
     allowed_questions: string;
     started_at: string;
     expired_at: string;
+    payment_due_date: string;
     status: string;
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
@@ -62,7 +64,6 @@ interface FormData {
     // Payment
     has_payment: boolean;
     payment_paid: string;
-    commission_amount: string;
     payment_method: string;
     next_payment_date: string;
     receipt: File | null;
@@ -193,10 +194,12 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
     const { data, setData, post, processing, errors } = useForm<FormData>({
         name: '',
         amount: '',
+        commission_amount: '',
         is_question_based: false,
         allowed_questions: '',
         started_at: today,
         expired_at: '',
+        payment_due_date: '',
         status: 'active',
         access_scope: null,
         allow_teachers: false,
@@ -205,7 +208,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
         max_teachers: '',
         has_payment: false,
         payment_paid: '',
-        commission_amount: '',
         payment_method: 'online',
         next_payment_date: '',
         receipt: null,
@@ -297,6 +299,18 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                 </div>
                             </Field>
 
+                            <Field label="Commission Amount" error={errors.commission_amount}>
+                                <InputWithIcon
+                                    icon={<CoinsIcon />}
+                                    type="number"
+                                    min="0"
+                                    max={data.amount || undefined}
+                                    value={data.commission_amount}
+                                    onChange={(e) => setData('commission_amount', e.target.value)}
+                                    placeholder="Optional"
+                                />
+                            </Field>
+
                             <Field label="Start Date" required error={errors.started_at}>
                                 <DateInput
                                     value={data.started_at}
@@ -309,6 +323,19 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                     min={data.started_at || today}
                                     value={data.expired_at}
                                     onChange={(e) => setData('expired_at', e.target.value)}
+                                />
+                            </Field>
+
+                            <Field
+                                label="Payment Due Date"
+                                error={errors.payment_due_date}
+                                hint="Access pauses after this date if payment is not approved."
+                            >
+                                <DateInput
+                                    min={data.started_at || undefined}
+                                    max={data.expired_at || undefined}
+                                    value={data.payment_due_date}
+                                    onChange={(e) => setData('payment_due_date', e.target.value)}
                                 />
                             </Field>
 
@@ -415,7 +442,6 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                     setData('has_payment', checked);
                                     if (!checked) {
                                         setData('payment_paid', '');
-                                        setData('commission_amount', '');
                                         setData('payment_method', 'online');
                                         setData('next_payment_date', '');
                                         setData('receipt', null);
@@ -477,25 +503,8 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                     </Field>
                                 </div>
 
-                                {/* Row 2: Commission | Method | Next Payment Date */}
-                                <div className="grid gap-4 sm:grid-cols-3">
-                                    <Field label="Commission Amount" error={errors.commission_amount}>
-                                        <div className="relative">
-                                            <div className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 [&_svg]:size-4">
-                                                <CoinsIcon />
-                                            </div>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                onKeyDown={(e) => ['e', 'E', '+', '-', '.'].includes(e.key) && e.preventDefault()}
-                                                className="pl-9"
-                                                value={data.commission_amount}
-                                                onChange={(e) => setData('commission_amount', e.target.value)}
-                                                placeholder="Optional"
-                                            />
-                                        </div>
-                                    </Field>
-
+                                {/* Row 2: Method | Next Payment Date */}
+                                <div className="grid gap-4 sm:grid-cols-2">
                                     <Field label="Payment Method" required error={errors.payment_method}>
                                         <Select value={data.payment_method} onValueChange={(v) => setData('payment_method', v)}>
                                             <SelectTrigger className="w-full">
@@ -517,8 +526,10 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                         label="Next Payment Date"
                                         required={nextPmtRequired}
                                         error={errors.next_payment_date}
+                                        hint="Planned payment date; before the due date if one is set."
                                     >
                                         <DateInput
+                                            max={data.payment_due_date || undefined}
                                             value={data.next_payment_date}
                                             onChange={(e) => setData('next_payment_date', e.target.value)}
                                         />

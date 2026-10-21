@@ -78,6 +78,21 @@ it('lists only customers created by the delegated user and calculates totals fro
     expect($masterPage['props']['canViewAllCustomers'])->toBeTrue();
 });
 
+it('counts subscription commission before any payment is recorded', function () {
+    $subscription = ownershipSubscription($this->ownCustomer, $this->staff);
+    $subscription->update(['commission_amount' => 125]);
+
+    $page = $this->actingAs($this->staff)
+        ->get(route('superadmin.customers.paid'))
+        ->assertOk()
+        ->viewData('page');
+
+    $customer = collect($page['props']['customers'])->firstWhere('id', $this->ownCustomer->id);
+
+    expect($customer['my_commission'])->toBe('125')
+        ->and($customer['total_paid'])->toBe('0');
+});
+
 it('blocks customer and subscription URLs for customers created by someone else', function () {
     $subscription = ownershipSubscription($this->otherCustomer, $this->staff);
     $payment = PaymentLog::create([

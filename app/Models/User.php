@@ -44,6 +44,7 @@ class User extends Authenticatable
             'teacher_permissions' => 'array',
             'access_scope' => 'array',
             'teacher_expires_on' => 'date',
+            'payment_hold_at' => 'datetime',
         ];
     }
 

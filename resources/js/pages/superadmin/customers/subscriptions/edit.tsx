@@ -3,6 +3,7 @@ import {
     ArrowLeftIcon,
     CalendarIcon,
     ClipboardListIcon,
+    CoinsIcon,
     FileTextIcon,
     HashIcon,
     SaveIcon,
@@ -36,9 +37,11 @@ interface SubscriptionData {
     id: number;
     name: string;
     amount: string;
+    commission_amount: string;
     allowed_questions: number | null;
     started_at: string | null;
     expired_at: string | null;
+    payment_due_date: string | null;
     status: string;
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
@@ -61,10 +64,12 @@ interface Props {
 interface FormData {
     name: string;
     amount: string;
+    commission_amount: string;
     is_question_based: boolean;
     allowed_questions: string;
     started_at: string;
     expired_at: string;
+    payment_due_date: string;
     status: string;
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
@@ -193,10 +198,12 @@ export default function EditCustomerSubscription({ customer, subscription, patte
     const { data, setData, put, processing, errors } = useForm<FormData>({
         name: subscription.name,
         amount: subscription.amount,
+        commission_amount: subscription.commission_amount,
         is_question_based: subscription.is_question_based,
         allowed_questions: subscription.allowed_questions != null ? String(subscription.allowed_questions) : '',
         started_at: subscription.started_at ?? '',
         expired_at: subscription.expired_at ?? '',
+        payment_due_date: subscription.payment_due_date ?? '',
         status: subscription.status,
         access_scope: subscription.access_scope,
         allow_teachers: subscription.allow_teachers,
@@ -279,6 +286,18 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                 </div>
                             </Field>
 
+                            <Field label="Commission Amount" error={errors.commission_amount}>
+                                <InputWithIcon
+                                    icon={<CoinsIcon />}
+                                    type="number"
+                                    min="0"
+                                    max={data.amount || undefined}
+                                    value={data.commission_amount}
+                                    onChange={(e) => setData('commission_amount', e.target.value)}
+                                    placeholder="Optional"
+                                />
+                            </Field>
+
                             <Field label="Start Date" required error={errors.started_at}>
                                 <DateInput
                                     value={data.started_at}
@@ -291,6 +310,19 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                     min={data.started_at || undefined}
                                     value={data.expired_at}
                                     onChange={(e) => setData('expired_at', e.target.value)}
+                                />
+                            </Field>
+
+                            <Field
+                                label="Payment Due Date"
+                                error={errors.payment_due_date}
+                                hint="Access pauses after this date if payment is not approved."
+                            >
+                                <DateInput
+                                    min={data.started_at || undefined}
+                                    max={data.expired_at || undefined}
+                                    value={data.payment_due_date}
+                                    onChange={(e) => setData('payment_due_date', e.target.value)}
                                 />
                             </Field>
 

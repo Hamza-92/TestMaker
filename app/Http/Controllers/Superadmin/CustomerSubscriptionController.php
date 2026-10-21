@@ -13,6 +13,7 @@ use App\Models\Subject;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Support\CustomerAccess;
+use App\Support\CustomerPaymentAccess;
 use App\Support\SubscriptionAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -28,6 +29,8 @@ class CustomerSubscriptionController extends Controller
     {
         CustomerAccess::ensureVisible(auth()->user(), $customer);
         abort_unless((int) $subscription->user_id === (int) $customer->id, 404);
+
+        app(CustomerPaymentAccess::class)->syncCustomer($customer);
 
         $subscription->load([
             'creator:id,name',
@@ -78,9 +81,12 @@ class CustomerSubscriptionController extends Controller
                 'id' => $subscription->id,
                 'name' => $subscription->name,
                 'amount' => (string) $subscription->amount,
+                'commission_amount' => (string) ($subscription->commission_amount ?? $subscription->paymentLogs->sum('commission_amount')),
                 'allowed_questions' => $subscription->allowed_questions,
                 'started_at' => $subscription->started_at?->toISOString(),
                 'expired_at' => $subscription->expired_at?->toISOString(),
+                'payment_due_date' => $subscription->payment_due_date?->toDateString(),
+                'payment_hold' => $customer->payment_hold_at !== null,
                 'duration' => $subscription->duration,
                 'status' => $subscription->status?->value,
                 'allow_teachers' => $subscription->allow_teachers,
@@ -149,6 +155,8 @@ class CustomerSubscriptionController extends Controller
             );
         });
 
+        app(CustomerPaymentAccess::class)->syncCustomer($customer);
+
         return back()->with('success', 'Payment recorded.');
     }
 
@@ -194,6 +202,8 @@ class CustomerSubscriptionController extends Controller
             $validated['rejection_reason'] ?? null,
         );
 
+        app(CustomerPaymentAccess::class)->syncCustomer($customer);
+
         return back()->with('success', 'Payment status updated.');
     }
 
@@ -232,9 +242,11 @@ class CustomerSubscriptionController extends Controller
                 'id' => $subscription->id,
                 'name' => $subscription->name,
                 'amount' => (string) $subscription->amount,
+                'commission_amount' => $subscription->commission_amount !== null ? (string) $subscription->commission_amount : '',
                 'allowed_questions' => $subscription->allowed_questions,
                 'started_at' => $subscription->started_at?->toDateString(),
                 'expired_at' => $subscription->expired_at?->toDateString(),
+                'payment_due_date' => $subscription->payment_due_date?->toDateString(),
                 'status' => $subscription->status?->value,
                 'allow_teachers' => $subscription->allow_teachers,
                 'allow_online_mcq_tests' => $subscription->allow_online_mcq_tests,
@@ -261,6 +273,7 @@ class CustomerSubscriptionController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
+            'commission_amount' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'is_question_based' => ['boolean'],
             'allowed_questions' => [
                 Rule::requiredIf(fn () => $request->boolean('is_question_based')),
@@ -269,6 +282,7 @@ class CustomerSubscriptionController extends Controller
             'started_at' => ['required', 'date'],
             'duration' => ['nullable', 'integer', 'min:1'],
             'expired_at' => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
+            'payment_due_date' => ['nullable', 'date', 'after_or_equal:started_at'],
             'status' => ['required', 'in:active,expired,cancelled'],
             'access_scope' => ['nullable', 'array'],
             'allow_teachers' => ['boolean'],
@@ -284,6 +298,20 @@ class CustomerSubscriptionController extends Controller
         $expiredAt = filled($validated['expired_at'] ?? null)
             ? Carbon::parse($validated['expired_at'])->startOfDay()
             : $startedAt->copy()->addDays($duration);
+        $paymentDueDate = filled($validated['payment_due_date'] ?? null)
+            ? Carbon::parse($validated['payment_due_date'])->startOfDay()
+            : null;
+
+        if ($paymentDueDate?->greaterThan($expiredAt)) {
+            throw ValidationException::withMessages(['payment_due_date' => 'The payment due date must be on or before the expiry date.']);
+        }
+
+        if ($paymentDueDate !== null && $subscription->paymentLogs()
+            ->whereIn('status', [PaymentStatus::PendingReview->value, PaymentStatus::Reviewed->value])
+            ->whereDate('next_payment_date', '>', $paymentDueDate->toDateString())
+            ->exists()) {
+            throw ValidationException::withMessages(['payment_due_date' => 'The payment due date cannot be before a scheduled next payment date.']);
+        }
         $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
         $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
         $oldAccessScope = SubscriptionAccess::resolveScope($subscription, $resources);
@@ -292,7 +320,9 @@ class CustomerSubscriptionController extends Controller
         $oldValues = [
             'name' => $subscription->name,
             'amount' => (string) $subscription->amount,
+            'commission_amount' => $subscription->commission_amount,
             'status' => $subscription->status?->value,
+            'payment_due_date' => $subscription->payment_due_date?->toDateString(),
             'pattern_access' => $oldSummaryIds['pattern_access'],
             'class_access' => $oldSummaryIds['class_access'],
             'subject_access' => $oldSummaryIds['subject_access'],
@@ -300,7 +330,7 @@ class CustomerSubscriptionController extends Controller
             'allow_subjective_answers' => (bool) $subscription->allow_subjective_answers,
         ];
 
-        DB::transaction(function () use ($validated, $startedAt, $expiredAt, $duration, $subscription, $oldValues, $accessScope, $summaryIds) {
+        DB::transaction(function () use ($validated, $startedAt, $expiredAt, $paymentDueDate, $duration, $subscription, $oldValues, $accessScope, $summaryIds) {
             $isQuestionBased = $validated['is_question_based'] ?? false;
             $subscription->update([
                 'name' => $validated['name'],
@@ -315,9 +345,11 @@ class CustomerSubscriptionController extends Controller
                 'is_question_based' => $isQuestionBased,
                 'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
                 'amount' => $validated['amount'],
+                'commission_amount' => $validated['commission_amount'] ?? null,
                 'started_at' => $startedAt,
                 'duration' => $duration,
                 'expired_at' => $expiredAt,
+                'payment_due_date' => $paymentDueDate,
                 'status' => $validated['status'],
             ]);
 
@@ -328,7 +360,9 @@ class CustomerSubscriptionController extends Controller
                 newValues: [
                     'name' => $subscription->name,
                     'amount' => (string) $subscription->amount,
+                    'commission_amount' => $subscription->commission_amount,
                     'status' => $subscription->status->value,
+                    'payment_due_date' => $subscription->payment_due_date?->toDateString(),
                     'pattern_access' => $subscription->pattern_access,
                     'class_access' => $subscription->class_access,
                     'subject_access' => $subscription->subject_access,
@@ -339,6 +373,8 @@ class CustomerSubscriptionController extends Controller
                 notes: 'Subscription updated.',
             );
         });
+
+        app(CustomerPaymentAccess::class)->syncCustomer($customer);
 
         return redirect()
             ->route('superadmin.customers.subscriptions.show', [$customer, $subscription])
@@ -380,6 +416,7 @@ class CustomerSubscriptionController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'integer', 'min:0'],
+            'commission_amount' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'is_question_based' => ['boolean'],
             'allowed_questions' => [
                 Rule::requiredIf(fn () => $request->boolean('is_question_based')),
@@ -388,6 +425,7 @@ class CustomerSubscriptionController extends Controller
             'started_at' => ['required', 'date'],
             'duration' => ['nullable', 'integer', 'min:1'],
             'expired_at' => [Rule::requiredIf(fn () => ! filled($request->input('duration'))), 'nullable', 'date', 'after:started_at'],
+            'payment_due_date' => ['nullable', 'date', 'after_or_equal:started_at'],
             'status' => ['required', 'in:active,expired,cancelled'],
             'access_scope' => ['nullable', 'array'],
             'allow_teachers' => ['boolean'],
@@ -400,7 +438,6 @@ class CustomerSubscriptionController extends Controller
                 Rule::requiredIf(fn () => $request->boolean('has_payment')),
                 'nullable', 'integer', 'min:1',
             ],
-            'commission_amount' => ['nullable', 'integer', 'min:0'],
             'payment_method' => [
                 Rule::requiredIf(fn () => $request->boolean('has_payment')),
                 'nullable', 'in:cash,bank_transfer,online,cheque',
@@ -422,6 +459,19 @@ class CustomerSubscriptionController extends Controller
         $expiredAt = filled($validated['expired_at'] ?? null)
             ? Carbon::parse($validated['expired_at'])->startOfDay()
             : $startedAt->copy()->addDays($duration);
+        $paymentDueDate = filled($validated['payment_due_date'] ?? null)
+            ? Carbon::parse($validated['payment_due_date'])->startOfDay()
+            : null;
+
+        if ($paymentDueDate?->greaterThan($expiredAt)) {
+            throw ValidationException::withMessages(['payment_due_date' => 'The payment due date must be on or before the expiry date.']);
+        }
+
+        if (filled($validated['next_payment_date'] ?? null)
+            && $paymentDueDate !== null
+            && Carbon::parse($validated['next_payment_date'])->startOfDay()->greaterThan($paymentDueDate)) {
+            throw ValidationException::withMessages(['next_payment_date' => 'The next payment date must be on or before the payment due date.']);
+        }
         $accessScope = SubscriptionAccess::normalizeScope($validated['access_scope'] ?? null, $resources);
         $summaryIds = SubscriptionAccess::summaryIds($accessScope, $resources);
         $createdSubscription = null;
@@ -431,7 +481,7 @@ class CustomerSubscriptionController extends Controller
             $attachments[] = $request->file('receipt')->store('payment-receipts', 'public');
         }
 
-        DB::transaction(function () use ($validated, $startedAt, $expiredAt, $duration, $customer, $accessScope, $summaryIds, $attachments, &$createdSubscription) {
+        DB::transaction(function () use ($validated, $startedAt, $expiredAt, $paymentDueDate, $duration, $customer, $accessScope, $summaryIds, $attachments, &$createdSubscription) {
             $isQuestionBased = $validated['is_question_based'] ?? false;
             $createdSubscription = Subscription::create([
                 'user_id' => $customer->id,
@@ -447,9 +497,11 @@ class CustomerSubscriptionController extends Controller
                 'is_question_based' => $isQuestionBased,
                 'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
                 'amount' => $validated['amount'],
+                'commission_amount' => $validated['commission_amount'] ?? null,
                 'started_at' => $startedAt,
                 'duration' => $duration,
                 'expired_at' => $expiredAt,
+                'payment_due_date' => $paymentDueDate,
                 'status' => $validated['status'],
                 'created_by' => auth()->id(),
             ]);
@@ -460,6 +512,7 @@ class CustomerSubscriptionController extends Controller
                 newValues: [
                     'name' => $createdSubscription->name,
                     'amount' => $createdSubscription->amount,
+                    'commission_amount' => $createdSubscription->commission_amount,
                     'status' => $createdSubscription->status->value,
                     'pattern_access' => $createdSubscription->pattern_access,
                     'class_access' => $createdSubscription->class_access,
@@ -478,7 +531,9 @@ class CustomerSubscriptionController extends Controller
                     'subscription_id' => $createdSubscription->id,
                     'subscription_name' => $createdSubscription->name,
                     'subscription_amount' => (string) $createdSubscription->amount,
+                    'subscription_commission_amount' => $createdSubscription->commission_amount,
                     'subscription_status' => $createdSubscription->status->value,
+                    'payment_due_date' => $createdSubscription->payment_due_date?->toDateString(),
                 ],
                 actor: auth()->user(),
                 notes: 'A new subscription was added for this customer.',
@@ -488,12 +543,11 @@ class CustomerSubscriptionController extends Controller
                 $paymentLog = PaymentLog::create([
                     'subscription_id' => $createdSubscription->id,
                     'amount' => $validated['payment_paid'],
-                    'commission_amount' => $validated['commission_amount'] ?: null,
                     'payment_method' => $validated['payment_method'],
-                    'next_payment_date' => $validated['next_payment_date'] ?: null,
+                    'next_payment_date' => $validated['next_payment_date'] ?? null,
                     'status' => PaymentStatus::PendingReview->value,
                     'attachments' => $attachments ?: null,
-                    'notes' => $validated['payment_notes'] ?: null,
+                    'notes' => $validated['payment_notes'] ?? null,
                     'created_by' => auth()->id(),
                 ]);
 
@@ -510,6 +564,8 @@ class CustomerSubscriptionController extends Controller
                 );
             }
         });
+
+        app(CustomerPaymentAccess::class)->syncCustomer($customer);
 
         return redirect()
             ->route('superadmin.customers.subscriptions.show', [$customer, $createdSubscription])

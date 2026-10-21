@@ -84,6 +84,70 @@ it('creates a subscription without auto-creating a payment record', function () 
     $response->assertRedirect(route('superadmin.customers.subscriptions.show', [$customer, $subscription]));
 
     expect(PaymentLog::count())->toBe(0);
+    expect($subscription->payment_due_date)->toBeNull();
+});
+
+it('stores commission on the subscription even without a payment', function () {
+    $admin = makeSuperAdmin();
+    $customer = makeCustomer();
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.customers.subscriptions.store', $customer), [
+            'name' => 'Starter Plan',
+            'amount' => 1200,
+            'commission_amount' => 150,
+            'started_at' => '2026-04-18',
+            'duration' => 30,
+            'status' => 'active',
+            'access_scope' => null,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Subscription::query()->sole()->commission_amount)->toBe(150)
+        ->and(PaymentLog::count())->toBe(0);
+});
+
+it('keeps commission on the subscription when an initial payment is recorded', function () {
+    $admin = makeSuperAdmin();
+    $customer = makeCustomer();
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.customers.subscriptions.store', $customer), [
+            'name' => 'Starter Plan',
+            'amount' => 1200,
+            'commission_amount' => 150,
+            'started_at' => '2026-04-18',
+            'duration' => 30,
+            'status' => 'active',
+            'has_payment' => true,
+            'payment_paid' => 1200,
+            'payment_method' => PaymentMethod::Online->value,
+            'next_payment_date' => '',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Subscription::query()->sole()->commission_amount)->toBe(150)
+        ->and(PaymentLog::query()->sole()->commission_amount)->toBeNull();
+});
+
+it('updates subscription commission without requiring a payment', function () {
+    $admin = makeSuperAdmin();
+    $customer = makeCustomer();
+    $subscription = makeSubscription($customer, $admin);
+
+    $this->actingAs($admin)
+        ->put(route('superadmin.customers.subscriptions.update', [$customer, $subscription]), [
+            'name' => $subscription->name,
+            'amount' => 1000,
+            'commission_amount' => 120,
+            'started_at' => $subscription->started_at->toDateString(),
+            'expired_at' => $subscription->expired_at->toDateString(),
+            'status' => 'active',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($subscription->fresh()->commission_amount)->toBe(120)
+        ->and(PaymentLog::count())->toBe(0);
 });
 
 it('stores subscription payments in pending review status', function () {

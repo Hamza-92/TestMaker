@@ -84,10 +84,13 @@ interface Subscription {
     id: number;
     name: string;
     amount: string;
+    commission_amount: string;
     allowed_questions: number | null;
     is_question_based: boolean;
     started_at: string | null;
     expired_at: string | null;
+    payment_due_date: string | null;
+    payment_hold: boolean;
     duration: number;
     status: SubscriptionStatus;
     allow_teachers: boolean;
@@ -687,6 +690,10 @@ export default function ShowSubscription({
                             highlight
                             value={money(subscription.amount)}
                         />
+                        <InfoCell
+                            label="Commission"
+                            value={money(subscription.commission_amount)}
+                        />
                         {subscription.is_question_based && (
                             <InfoCell
                                 label="Allowed Questions"
@@ -716,6 +723,20 @@ export default function ShowSubscription({
                             label="Expiry Date"
                             value={fmt(subscription.expired_at)}
                         />
+                        <InfoCell
+                            label="Payment Due Date"
+                            value={
+                                subscription.payment_due_date
+                                    ? fmt(subscription.payment_due_date)
+                                    : '—'
+                            }
+                        />
+                        {subscription.payment_hold && (
+                            <InfoCell
+                                label="Account Access"
+                                value={<Badge variant="destructive">Paused · Payment overdue</Badge>}
+                            />
+                        )}
                         <InfoCell
                             label="Status"
                             value={

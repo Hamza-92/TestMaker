@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureAppUser;
+use App\Http\Middleware\EnsureCustomerPaymentCurrent;
 use App\Http\Middleware\EnsureSchoolOwner;
 use App\Http\Middleware\EnsureSchoolSubscriptionFeature;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleAppearance::class,
             EnsureTeacherNotExpired::class,
+            EnsureCustomerPaymentCurrent::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::using(20),
         ]);

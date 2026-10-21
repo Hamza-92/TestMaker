@@ -3,6 +3,7 @@
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use App\Support\CustomerPaymentAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -43,6 +44,12 @@ class AuthenticateUser
         if ($user->teacherAccessExpired()) {
             throw ValidationException::withMessages([
                 'email' => 'Your teacher access has expired. Contact your school administrator.',
+            ]);
+        }
+
+        if (app(CustomerPaymentAccess::class)->isBlockedFor($user)) {
+            throw ValidationException::withMessages([
+                'email' => 'Your school account is paused because a subscription payment is overdue. Contact TestMaker.',
             ]);
         }
 

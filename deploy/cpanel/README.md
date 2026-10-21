@@ -54,6 +54,15 @@ workflow publishes the complete built release after `git push origin master`.
 
    The runner is uploaded by the workflow. It logs deployment results to
    `/home/tmpk/public_html/_deploy/deploy.log`, which is blocked from HTTP.
+8. For subscription payment due dates, add a second cPanel cron job to run every minute:
+
+   ```text
+   /usr/local/bin/ea-php84 /home/tmpk/public_html/_app/current/artisan schedule:run >/dev/null 2>&1
+   ```
+
+   Laravel checks overdue subscriptions daily at 00:05 Asia/Karachi. Customer
+   and teacher requests also check the payment cutoff immediately, including
+   when this cron job has not yet run.
 
 ## Deploy and verify
 
