@@ -1,6 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    ArrowUpRightIcon,
     CircleDollarSignIcon,
     HeartHandshakeIcon,
     PencilIcon,
@@ -131,20 +130,8 @@ export default function Shareholder({ summary, ledger }: ShareholderProps) {
                                     '"Amiri", "Noto Naskh Arabic", serif',
                             }}
                         >
-                            وَمَا أَنْفَقْتُم مِّن شَيْءٍ فَهُوَ يُخْلِفُهُ
+                            اللَّهُمَّ بَارِكْ لِي فِيمَا رَزَقْتَنِي
                         </p>
-                        <a
-                            href="https://quran.com/34/39"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
-                        >
-                            Surah Saba 34:39{' '}
-                            <ArrowUpRightIcon
-                                className="size-3"
-                                aria-hidden="true"
-                            />
-                        </a>
                     </Card>
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <SummaryCard
