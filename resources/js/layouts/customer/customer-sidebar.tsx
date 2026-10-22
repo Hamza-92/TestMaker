@@ -8,6 +8,7 @@ import {
     LayoutTemplateIcon,
     SettingsIcon,
     SparklesIcon,
+    ClipboardListIcon,
     UsersIcon,
     XIcon,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ interface SchoolContext {
     is_owner: boolean;
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
+    allow_qat_tests: boolean;
     max_teachers: number | null;
     teachers_used: number;
     has_subscription: boolean;
@@ -75,6 +77,12 @@ const NAV_GROUPS: NavGroup[] = [
                 href: '/online-tests',
                 icon: SparklesIcon,
                 requires: 'manage_online_tests',
+            },
+            {
+                label: 'QAT Tests',
+                href: '/qat-tests',
+                icon: ClipboardListIcon,
+                requires: 'generate_papers',
             },
         ],
     },
@@ -197,6 +205,10 @@ function SidebarContent({
                 return false;
             }
 
+            if (item.href === '/qat-tests' && !schoolContext?.allow_qat_tests) {
+                return false;
+            }
+
             if (isOwner) {
                 return true;
             }
@@ -240,7 +252,7 @@ function SidebarContent({
                 </div>
                 {!collapsed && (
                     <div className="min-w-0">
-                        <p className="truncate text-sm leading-tight font-semibold text-white">
+                        <p className="truncate text-sm font-semibold leading-tight text-white">
                             TestMaker
                         </p>
                         <p className="truncate text-[11px] leading-tight text-brand-200/60">
@@ -253,7 +265,7 @@ function SidebarContent({
             {/* ── Nav ────────────────────────────────────────────────────────── */}
             <nav
                 className={[
-                    'flex-1 space-y-4 overflow-x-hidden overflow-y-auto pt-3 pb-3',
+                    'flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-3 pt-3',
                     isTeacherAccessPage ? 'scrollbar-hidden' : 'scrollbar-slim',
                     collapsed ? 'px-2' : 'px-3',
                 ].join(' ')}
@@ -274,7 +286,7 @@ function SidebarContent({
                         {collapsed ? (
                             <div className="mx-auto mb-2 h-px w-5 bg-white/10" />
                         ) : (
-                            <p className="mb-1 px-2.5 text-[10px] font-semibold tracking-wider text-brand-200/50 uppercase">
+                            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-brand-200/50">
                                 {group.title}
                             </p>
                         )}
@@ -312,16 +324,16 @@ function SidebarContent({
                         </div>
                     </div>
                     <div className="border-t border-white/10 pt-3">
-                        <p className="mb-1 text-[10px] font-semibold tracking-wide text-brand-100/60 uppercase">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-brand-100/60">
                             Email
                         </p>
                         <a
                             href={`mailto:${CONTACT_EMAIL}`}
-                            className="block text-[13px] font-medium tracking-tight whitespace-nowrap text-white hover:underline"
+                            className="block whitespace-nowrap text-[13px] font-medium tracking-tight text-white hover:underline"
                         >
                             {CONTACT_EMAIL}
                         </a>
-                        <p className="mt-3 mb-1 text-[10px] font-semibold tracking-wide text-brand-100/60 uppercase">
+                        <p className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-wide text-brand-100/60">
                             Call / WhatsApp
                         </p>
                         <div className="space-y-1">
@@ -371,7 +383,7 @@ export function CustomerSidebar() {
                     >
                         <button
                             onClick={() => setMobileOpen(false)}
-                            className="absolute top-3.5 right-3 flex size-7 items-center justify-center rounded-md text-brand-200/70 transition-colors hover:bg-white/10 hover:text-white"
+                            className="absolute right-3 top-3.5 flex size-7 items-center justify-center rounded-md text-brand-200/70 transition-colors hover:bg-white/10 hover:text-white"
                             aria-label="Close menu"
                         >
                             <XIcon className="size-4" />

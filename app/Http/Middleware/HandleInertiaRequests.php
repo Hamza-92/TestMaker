@@ -86,6 +86,7 @@ class HandleInertiaRequests extends Middleware
             'is_owner' => $user->isSchoolOwner(),
             'allow_teachers' => (bool) ($subscription?->allow_teachers ?? false),
             'allow_online_mcq_tests' => (bool) ($subscription?->allow_online_mcq_tests ?? false),
+            'allow_qat_tests' => (bool) ($subscription?->allow_qat_tests ?? false),
             'max_teachers' => $user->isSchoolOwner() ? $subscription?->max_teachers : null,
             'teachers_used' => $teacherCount,
             'has_subscription' => $subscription !== null,

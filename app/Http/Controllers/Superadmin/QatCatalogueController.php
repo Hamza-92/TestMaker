@@ -1,0 +1,71 @@
+<?php
+
+namespace App\Http\Controllers\Superadmin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Chapter;
+use App\Models\ClassSubject;
+use App\Models\Pattern;
+use App\Support\Qat\QatCatalogueTransfer;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class QatCatalogueController extends Controller
+{
+    public function transfer(): Response
+    {
+        $sources = Pattern::query()->where('status', 1)->ordered()
+            ->get(['id', 'name'])->map(fn (Pattern $pattern) => [
+                'id' => $pattern->id,
+                'name' => $pattern->name,
+                'classes' => ClassSubject::query()
+                    ->join('classes', 'classes.id', '=', 'class_subjects.class_id')
+                    ->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
+                    ->where('class_subjects.pattern_id', $pattern->id)
+                    ->where('classes.status', 1)->where('subjects.status', 1)
+                    ->orderBy('classes.sort_order')->orderBy('subjects.name_eng')
+                    ->get(['classes.id as class_id', 'classes.name as class_name', 'subjects.id as subject_id', 'subjects.name_eng as subject_name']),
+            ]);
+
+        return Inertia::render('superadmin/qat-transfer', [
+            'sources' => $sources,
+            'report' => session('qat_transfer_report'),
+        ]);
+    }
+
+    public function chapters(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'source_pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            'subject_id' => ['required', 'integer', 'exists:subjects,id'],
+        ]);
+
+        return response()->json(Chapter::query()
+            ->where('pattern_id', $data['source_pattern_id'])
+            ->where('class_id', $data['class_id'])
+            ->where('subject_id', $data['subject_id'])
+            ->orderBy('sort_id')->orderBy('id')
+            ->get(['id', 'name', 'chapter_number', 'status']));
+    }
+
+    public function store(Request $request, QatCatalogueTransfer $transfer): RedirectResponse
+    {
+        $data = $request->validate([
+            'academic_year' => ['required', 'regex:/^20\d{2}-\d{2}$/'],
+            'month' => ['required', 'integer', 'between:1,12'],
+            'source_pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            'subject_id' => ['required', 'integer', 'exists:subjects,id'],
+            'chapter_ids' => ['required', 'array', 'min:1'],
+            'chapter_ids.*' => ['required', 'integer', 'distinct', 'exists:chapters,id'],
+        ]);
+
+        $report = $transfer->copy($data);
+
+        return back()->with('qat_transfer_report', $report);
+    }
+}

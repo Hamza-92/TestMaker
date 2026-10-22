@@ -134,6 +134,21 @@ export function AppSidebar() {
         ...(can('data_transfer.manage')
             ? [
                   {
+                      title: 'QAT Tests',
+                      href: '/superadmin/qat-catalogue',
+                      icon: DatabaseIcon,
+                      items: [
+                          {
+                              title: 'QAT Data',
+                              href: '/superadmin/qat-catalogue',
+                          },
+                          {
+                              title: 'QAT Transfer',
+                              href: '/superadmin/qat-transfer',
+                          },
+                      ],
+                  },
+                  {
                       title: 'Data Transfer',
                       href: '/superadmin/data-transfer',
                       icon: DatabaseIcon,

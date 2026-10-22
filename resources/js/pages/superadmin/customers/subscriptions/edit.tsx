@@ -45,6 +45,7 @@ interface SubscriptionData {
     status: string;
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
+    allow_qat_tests: boolean;
     allow_subjective_answers: boolean;
     max_teachers: number | null;
     is_question_based: boolean;
@@ -74,6 +75,7 @@ interface FormData {
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
+    allow_qat_tests: boolean;
     allow_subjective_answers: boolean;
     max_teachers: string;
 }
@@ -208,6 +210,7 @@ export default function EditCustomerSubscription({ customer, subscription, patte
         access_scope: subscription.access_scope,
         allow_teachers: subscription.allow_teachers,
         allow_online_mcq_tests: subscription.allow_online_mcq_tests,
+        allow_qat_tests: subscription.allow_qat_tests,
         allow_subjective_answers: subscription.allow_subjective_answers,
         max_teachers: subscription.max_teachers != null ? String(subscription.max_teachers) : '',
     });
@@ -411,6 +414,12 @@ export default function EditCustomerSubscription({ customer, subscription, patte
                                 label="Subjective Answers"
                                 checked={data.allow_subjective_answers}
                                 onCheckedChange={(checked) => setData('allow_subjective_answers', checked)}
+                            />
+                            <ToggleField
+                                icon={<ClipboardListIcon />}
+                                label="QAT Tests"
+                                checked={data.allow_qat_tests}
+                                onCheckedChange={(checked) => setData('allow_qat_tests', checked)}
                             />
                         </div>
                     </div>

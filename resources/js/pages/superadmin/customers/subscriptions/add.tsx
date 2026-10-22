@@ -59,6 +59,7 @@ interface FormData {
     access_scope: SubscriptionAccessScope | null;
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
+    allow_qat_tests: boolean;
     allow_subjective_answers: boolean;
     max_teachers: string;
     // Payment
@@ -204,6 +205,7 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
         access_scope: null,
         allow_teachers: false,
         allow_online_mcq_tests: false,
+        allow_qat_tests: false,
         allow_subjective_answers: false,
         max_teachers: '',
         has_payment: false,
@@ -424,6 +426,12 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
                                 label="Subjective Answers"
                                 checked={data.allow_subjective_answers}
                                 onCheckedChange={(checked) => setData('allow_subjective_answers', checked)}
+                            />
+                            <ToggleField
+                                icon={<ClipboardListIcon />}
+                                label="QAT Tests"
+                                checked={data.allow_qat_tests}
+                                onCheckedChange={(checked) => setData('allow_qat_tests', checked)}
                             />
                         </div>
 

@@ -1,0 +1,173 @@
+<?php
+
+namespace App\Support\Qat;
+
+use App\Models\Chapter;
+use App\Models\ClassSubject;
+use App\Models\Pattern;
+use App\Models\Question;
+use App\Models\SchoolClass;
+use App\Models\Subject;
+use App\Models\Topic;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class QatCatalogueTransfer
+{
+    public function copy(array $data): array
+    {
+        return DB::transaction(function () use ($data): array {
+            $patternId = (int) $data['source_pattern_id'];
+            $classId = (int) $data['class_id'];
+            $subjectId = (int) $data['subject_id'];
+            $month = (int) $data['month'];
+
+            $assigned = ClassSubject::query()
+                ->where('pattern_id', $patternId)
+                ->where('class_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->exists();
+            if (! $assigned) {
+                throw ValidationException::withMessages([
+                    'subject_id' => 'The selected subject does not belong to that pattern and class.',
+                ]);
+            }
+
+            $chapters = Chapter::query()
+                ->where('pattern_id', $patternId)
+                ->where('class_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->whereIn('id', $data['chapter_ids'])
+                ->orderBy('sort_id')
+                ->get();
+            if ($chapters->count() !== count($data['chapter_ids'])) {
+                throw ValidationException::withMessages([
+                    'chapter_ids' => 'Select chapters from the chosen pattern, class and subject.',
+                ]);
+            }
+
+            $now = now();
+            $catalogueId = DB::table('qat_catalogues')->where('academic_year', $data['academic_year'])->value('id');
+            if ($catalogueId === null) {
+                $catalogueId = DB::table('qat_catalogues')->insertGetId([
+                    'academic_year' => $data['academic_year'], 'created_at' => $now, 'updated_at' => $now,
+                ]);
+            }
+
+            $qatClassId = DB::table('qat_classes')
+                ->where('qat_catalogue_id', $catalogueId)
+                ->where('source_class_id', $classId)
+                ->value('id');
+            if ($qatClassId === null) {
+                $qatClassId = DB::table('qat_classes')->insertGetId([
+                    'qat_catalogue_id' => $catalogueId,
+                    'source_class_id' => $classId,
+                    'name' => SchoolClass::query()->whereKey($classId)->value('name'),
+                    'status' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            $qatSubject = DB::table('qat_subjects')
+                ->where('qat_class_id', $qatClassId)
+                ->where('subject_id', $subjectId)
+                ->first();
+            if (! $qatSubject) {
+                $qatSubject = DB::table('qat_subjects')
+                    ->where('qat_catalogue_id', $catalogueId)
+                    ->where('class_id', $classId)
+                    ->where('subject_id', $subjectId)
+                    ->first();
+                if ($qatSubject) {
+                    DB::table('qat_subjects')->where('id', $qatSubject->id)->update(['qat_class_id' => $qatClassId]);
+                }
+            }
+            if ($qatSubject && (int) $qatSubject->source_pattern_id !== $patternId) {
+                throw ValidationException::withMessages([
+                    'source_pattern_id' => 'This year, class and subject already use another source pattern.',
+                ]);
+            }
+            $qatSubjectId = $qatSubject?->id ?? DB::table('qat_subjects')->insertGetId([
+                'qat_class_id' => $qatClassId,
+                'qat_catalogue_id' => $catalogueId,
+                'class_id' => $classId,
+                'class_name' => SchoolClass::query()->whereKey($classId)->value('name'),
+                'subject_id' => $subjectId,
+                'subject_name' => Subject::query()->whereKey($subjectId)->value('name_eng'),
+                'status' => true,
+                'source_pattern_id' => $patternId,
+                'source_pattern_name' => Pattern::query()->whereKey($patternId)->value('name'),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $report = ['chapters' => 0, 'topics' => 0, 'questions' => 0, 'month_assignments' => 0];
+            foreach ($chapters as $chapter) {
+                $qatChapterId = DB::table('qat_chapters')
+                    ->where('qat_subject_id', $qatSubjectId)
+                    ->where('source_chapter_id', $chapter->id)
+                    ->value('id');
+                if ($qatChapterId === null) {
+                    $qatChapterId = DB::table('qat_chapters')->insertGetId([
+                        'qat_subject_id' => $qatSubjectId,
+                        'source_chapter_id' => $chapter->id,
+                        'name' => $chapter->name,
+                        'name_ur' => $chapter->name_ur,
+                        'chapter_number' => $chapter->chapter_number,
+                        'sort_id' => $chapter->sort_id,
+                        'status' => $chapter->status,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                    $report['chapters']++;
+                }
+
+                $inserted = DB::table('qat_chapter_months')->insertOrIgnore([
+                    'qat_chapter_id' => $qatChapterId, 'month' => $month,
+                ]);
+                $report['month_assignments'] += $inserted;
+
+                $topicIds = [];
+                foreach (Topic::query()->where('chapter_id', $chapter->id)->orderBy('sort_id')->get() as $topic) {
+                    $qatTopicId = DB::table('qat_topics')
+                        ->where('qat_chapter_id', $qatChapterId)
+                        ->where('source_topic_id', $topic->id)
+                        ->value('id');
+                    if ($qatTopicId === null) {
+                        $qatTopicId = DB::table('qat_topics')->insertGetId([
+                            'qat_chapter_id' => $qatChapterId,
+                            'source_topic_id' => $topic->id,
+                            'name' => $topic->name,
+                            'name_ur' => $topic->name_ur,
+                            'sort_id' => $topic->sort_id,
+                            'status' => $topic->status,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]);
+                        $report['topics']++;
+                    }
+                    $topicIds[$topic->id] = $qatTopicId;
+                }
+
+                Question::query()->with(['options', 'questionType'])->where('chapter_id', $chapter->id)
+                    ->orderBy('id')->chunk(200, function ($questions) use ($qatChapterId, $topicIds, $now, &$report): void {
+                        foreach ($questions as $question) {
+                            $report['questions'] += DB::table('qat_questions')->insertOrIgnore([
+                                'qat_chapter_id' => $qatChapterId,
+                                'qat_topic_id' => $question->topic_id ? ($topicIds[$question->topic_id] ?? null) : null,
+                                'source_question_id' => $question->id,
+                                'question_type_id' => $question->question_type_id,
+                                'status' => $question->status,
+                                'question_data' => json_encode($question->toArray(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ]);
+                        }
+                    });
+            }
+
+            return $report;
+        });
+    }
+}

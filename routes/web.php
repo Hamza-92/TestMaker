@@ -10,6 +10,7 @@ use App\Http\Controllers\Customer\PaperDefaultsController;
 use App\Http\Controllers\Customer\PaperFolderController;
 use App\Http\Controllers\Customer\PaperTemplateController;
 use App\Http\Controllers\Customer\ProfileController;
+use App\Http\Controllers\Customer\QatCatalogueController as CustomerQatCatalogueController;
 use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
@@ -36,6 +37,8 @@ use App\Http\Controllers\Superadmin\PaperQuestionSectionController;
 use App\Http\Controllers\Superadmin\PatternController;
 use App\Http\Controllers\Superadmin\PaymentLedgerController;
 use App\Http\Controllers\Superadmin\PaymentsController;
+use App\Http\Controllers\Superadmin\QatCatalogueController as SuperadminQatCatalogueController;
+use App\Http\Controllers\Superadmin\QatDataController as SuperadminQatDataController;
 use App\Http\Controllers\Superadmin\QuestionBrowseController;
 use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
@@ -108,6 +111,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // â”€â”€â”€ Customer / Teacher app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::middleware('app.user')->group(function () {
+
+        Route::get('qat-tests', [CustomerQatCatalogueController::class, 'index'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->name('customer.qat.index');
 
         Route::middleware('teacher.feature:generate_papers')->group(function () {
             Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
@@ -249,6 +256,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view|customers.paid.view|customers.trial.view');
 
         // Data Transfer
+        Route::get('superadmin/qat-catalogue', [SuperadminQatDataController::class, 'index'])->name('superadmin.qat-catalogue')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/qat-catalogue/classes/{qatClass}', [SuperadminQatDataController::class, 'showClass'])->name('superadmin.qat-catalogue.classes.show')->middleware('permission:data_transfer.manage');
+        Route::patch('superadmin/qat-catalogue/classes/{qatClass}', [SuperadminQatDataController::class, 'updateClass'])->name('superadmin.qat-catalogue.classes.update')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/qat-catalogue/classes/{qatClass}/subjects/{qatSubject}', [SuperadminQatDataController::class, 'showSubject'])->name('superadmin.qat-catalogue.subjects.show')->middleware('permission:data_transfer.manage');
+        Route::patch('superadmin/qat-catalogue/classes/{qatClass}/subjects/{qatSubject}', [SuperadminQatDataController::class, 'updateSubject'])->name('superadmin.qat-catalogue.subjects.update')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/qat-catalogue/classes/{qatClass}/subjects/{qatSubject}/chapters/{qatChapter}', [SuperadminQatDataController::class, 'showChapter'])->name('superadmin.qat-catalogue.chapters.show')->middleware('permission:data_transfer.manage');
+        Route::patch('superadmin/qat-catalogue/classes/{qatClass}/subjects/{qatSubject}/chapters/{qatChapter}', [SuperadminQatDataController::class, 'updateChapter'])->name('superadmin.qat-catalogue.chapters.update')->middleware('permission:data_transfer.manage');
+        Route::patch('superadmin/qat-catalogue/classes/{qatClass}/subjects/{qatSubject}/chapters/{qatChapter}/topics/{qatTopic}', [SuperadminQatDataController::class, 'updateTopic'])->name('superadmin.qat-catalogue.topics.update')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/qat-catalogue/classes/{qatClass}/subjects/{qatSubject}/chapters/{qatChapter}/questions', [SuperadminQatDataController::class, 'questions'])->name('superadmin.qat-catalogue.questions.index')->middleware('permission:data_transfer.manage');
+        Route::patch('superadmin/qat-catalogue/classes/{qatClass}/subjects/{qatSubject}/chapters/{qatChapter}/questions/{qatQuestion}', [SuperadminQatDataController::class, 'updateQuestion'])->name('superadmin.qat-catalogue.questions.update')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/qat-transfer', [SuperadminQatCatalogueController::class, 'transfer'])->name('superadmin.qat-transfer')->middleware('permission:data_transfer.manage');
+        Route::get('superadmin/qat-transfer/chapters', [SuperadminQatCatalogueController::class, 'chapters'])->name('superadmin.qat-transfer.chapters')->middleware('permission:data_transfer.manage');
+        Route::post('superadmin/qat-transfer', [SuperadminQatCatalogueController::class, 'store'])->name('superadmin.qat-transfer.store')->middleware('permission:data_transfer.manage');
         Route::get('superadmin/data-transfer', [DataTransferController::class, 'index'])->name('superadmin.data-transfer')->middleware('permission:data_transfer.manage');
         Route::get('superadmin/data-transfer/catalog', [DataTransferController::class, 'catalog'])->name('superadmin.data-transfer.catalog')->middleware('permission:data_transfer.manage');
         Route::post('superadmin/data-transfer', [DataTransferController::class, 'store'])->name('superadmin.data-transfer.store')->middleware('permission:data_transfer.manage');

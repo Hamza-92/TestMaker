@@ -26,12 +26,14 @@ class EnsureSchoolSubscriptionFeature
         }
 
         return Inertia::render('customer/blocked', [
-            'title'   => 'Feature unavailable',
+            'title' => 'Feature unavailable',
             'heading' => 'This feature is not in your plan',
-            'message' => 'Your current school subscription does not include online MCQ tests. Contact TestMaker to ask about access.',
+            'message' => in_array('allow_qat_tests', $features, true)
+                ? 'Your current school subscription does not include QAT tests. Contact TestMaker to ask about access.'
+                : 'Your current school subscription does not include online MCQ tests. Contact TestMaker to ask about access.',
             'contactSupport' => true,
             'primary' => [
-                'href'  => '/dashboard',
+                'href' => '/dashboard',
                 'label' => 'Back to Dashboard',
             ],
         ])->toResponse($request)->setStatusCode(403);

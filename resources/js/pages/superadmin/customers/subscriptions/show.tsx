@@ -94,6 +94,7 @@ interface Subscription {
     status: SubscriptionStatus;
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
+    allow_qat_tests: boolean;
     allow_subjective_answers: boolean;
     max_teachers: number | null;
     access_scope: SubscriptionAccessScope | null;
@@ -798,6 +799,14 @@ export default function ShowSubscription({
                                         Disabled
                                     </span>
                                 )
+                            }
+                        />
+                        <InfoCell
+                            label="QAT Tests"
+                            value={
+                                subscription.allow_qat_tests
+                                    ? 'Enabled'
+                                    : 'Disabled'
                             }
                         />
                         <InfoCell
