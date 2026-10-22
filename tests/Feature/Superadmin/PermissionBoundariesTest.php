@@ -2,6 +2,7 @@
 
 use App\Enums\UserStatus;
 use App\Enums\UserType;
+use App\Http\Controllers\Superadmin\RejectedPaymentController;
 use App\Models\Permission;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
@@ -186,7 +187,7 @@ it('allows question form resources to admins with create or edit permission', fu
     ])->assertForbidden();
 });
 
-it('keeps every Superadmin route tied to a seeded Gate', function () {
+it('keeps every Superadmin route behind a seeded Gate or an explicit account boundary', function () {
     foreach (Route::getRoutes() as $route) {
         if (! str_starts_with($route->uri(), 'superadmin/')) {
             continue;
@@ -197,7 +198,17 @@ it('keeps every Superadmin route tied to a seeded Gate', function () {
             fn (string $middleware) => str_starts_with($middleware, 'permission:')
         );
 
-        expect($permissions)->not->toBeEmpty();
+        if ($permissions === []) {
+            if (in_array('master.superadmin', $route->gatherMiddleware(), true)) {
+                continue;
+            }
+
+            // The recorder-only resubmission checks ownership in its controller.
+            expect($route->getName())->toBe('superadmin.rejected-payments.resubmit');
+            expect($route->getActionName())->toBe(RejectedPaymentController::class.'@resubmit');
+
+            continue;
+        }
 
         foreach ($permissions as $middleware) {
             foreach (explode(',', substr($middleware, strlen('permission:'))) as $requirement) {

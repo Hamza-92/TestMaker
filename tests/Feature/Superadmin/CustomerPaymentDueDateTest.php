@@ -160,7 +160,7 @@ test('editing a subscription does not require a payment due date', function () {
         ->and($subscription->fresh()->payment_due_date)->toBeNull();
 });
 
-test('approving the full payment removes the access hold through the review workflow', function () {
+test('approving the full payment directly removes the access hold', function () {
     [$admin, $customer, $subscription] = paymentDueFixture(now('Asia/Karachi')->subDay()->toDateString());
     $payment = PaymentLog::create([
         'subscription_id' => $subscription->id,
@@ -171,11 +171,9 @@ test('approving the full payment removes the access hold through the review work
     ]);
 
     app(CustomerPaymentAccess::class)->syncCustomer($customer);
-
-    $route = route('superadmin.customers.subscriptions.payment-logs.review', [$customer, $subscription, $payment]);
-    $this->actingAs($admin)->patch($route, ['status' => PaymentStatus::Reviewed->value])->assertSessionHasNoErrors();
     expect($customer->fresh()->payment_hold_at)->not->toBeNull();
 
+    $route = route('superadmin.customers.subscriptions.payment-logs.review', [$customer, $subscription, $payment]);
     $this->actingAs($admin)->patch($route, ['status' => PaymentStatus::Approved->value])->assertSessionHasNoErrors();
     expect($customer->fresh()->payment_hold_at)->toBeNull();
 });
