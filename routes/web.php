@@ -41,6 +41,7 @@ use App\Http\Controllers\Superadmin\QuestionController;
 use App\Http\Controllers\Superadmin\QuestionTypeController;
 use App\Http\Controllers\Superadmin\QuestionTypePairingController;
 use App\Http\Controllers\Superadmin\RejectedPaymentController;
+use App\Http\Controllers\Superadmin\ShareholderController;
 use App\Http\Controllers\Superadmin\SiteMediaController;
 use App\Http\Controllers\Superadmin\SiteNavigationController;
 use App\Http\Controllers\Superadmin\SitePageController;
@@ -204,6 +205,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('superadmin/payments/expenses', [ExpenseController::class, 'store'])
             ->name('superadmin.payments.expenses.store')
             ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
+        Route::get('superadmin/payments/shareholder', [ShareholderController::class, 'index'])
+            ->name('superadmin.payments.shareholder')
+            ->middleware('master.superadmin');
+        Route::post('superadmin/payments/shareholder/spends', [ShareholderController::class, 'store'])
+            ->name('superadmin.payments.shareholder.spends.store')
+            ->middleware('master.superadmin');
+        Route::put('superadmin/payments/shareholder/spends/{spend}', [ShareholderController::class, 'update'])
+            ->name('superadmin.payments.shareholder.spends.update')
+            ->middleware('master.superadmin');
+        Route::delete('superadmin/payments/shareholder/spends/{spend}', [ShareholderController::class, 'destroy'])
+            ->name('superadmin.payments.shareholder.spends.destroy')
+            ->middleware('master.superadmin');
         Route::get('superadmin/payments/requests/{paymentLog}', [PaymentsController::class, 'show'])
             ->name('superadmin.payments.requests.show')
             ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');

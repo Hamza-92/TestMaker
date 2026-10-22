@@ -34,7 +34,7 @@ import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
-    const { can } = usePermission();
+    const { can, isMaster } = usePermission();
 
     const navItems: NavItem[] = [
         { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
@@ -80,6 +80,14 @@ export function AppSidebar() {
                               title: 'Expenses',
                               href: '/superadmin/payments/expenses',
                           },
+                          ...(isMaster
+                              ? [
+                                    {
+                                        title: 'Shareholder',
+                                        href: '/superadmin/payments/shareholder',
+                                    },
+                                ]
+                              : []),
                       ],
                   },
               ]
