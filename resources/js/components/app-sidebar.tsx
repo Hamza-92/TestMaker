@@ -72,6 +72,14 @@ export function AppSidebar() {
                               title: 'Payment Ledger',
                               href: '/superadmin/payments/ledger',
                           },
+                          {
+                              title: 'Annual Report',
+                              href: '/superadmin/payments/annual-report',
+                          },
+                          {
+                              title: 'Expenses',
+                              href: '/superadmin/payments/expenses',
+                          },
                       ],
                   },
               ]

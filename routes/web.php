@@ -18,6 +18,7 @@ use App\Http\Controllers\PublicSiteMediaController;
 use App\Http\Controllers\PublicSitePageController;
 use App\Http\Controllers\QuestionImageController;
 use App\Http\Controllers\Superadmin\AnnouncementController;
+use App\Http\Controllers\Superadmin\AnnualReportController;
 use App\Http\Controllers\Superadmin\ArabicSubjectController;
 use App\Http\Controllers\Superadmin\ChapterController;
 use App\Http\Controllers\Superadmin\CircularLabelController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
 use App\Http\Controllers\Superadmin\CustomPaperLayoutController;
 use App\Http\Controllers\Superadmin\DataTransferController;
+use App\Http\Controllers\Superadmin\ExpenseController;
 use App\Http\Controllers\Superadmin\LegacyExportController;
 use App\Http\Controllers\Superadmin\MultipartQuestionSettingController;
 use App\Http\Controllers\Superadmin\ObjectiveLayoutController;
@@ -192,6 +194,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
         Route::get('superadmin/payments/ledger', [PaymentLedgerController::class, 'index'])
             ->name('superadmin.payments.ledger')
+            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
+        Route::get('superadmin/payments/annual-report', [AnnualReportController::class, 'index'])
+            ->name('superadmin.payments.annual-report')
+            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
+        Route::get('superadmin/payments/expenses', [ExpenseController::class, 'index'])
+            ->name('superadmin.payments.expenses')
+            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
+        Route::post('superadmin/payments/expenses', [ExpenseController::class, 'store'])
+            ->name('superadmin.payments.expenses.store')
             ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
         Route::get('superadmin/payments/requests/{paymentLog}', [PaymentsController::class, 'show'])
             ->name('superadmin.payments.requests.show')

@@ -6,8 +6,10 @@ use App\Enums\AccountType;
 use App\Enums\PaymentStatus;
 use App\Enums\UserType;
 use App\Http\Controllers\Controller;
+use App\Models\Expense;
 use App\Models\PaymentLog;
 use App\Models\Subscription;
+use App\Models\User;
 use App\Support\CustomerAccess;
 use App\Support\SuperadminDashboardSummary;
 use Carbon\CarbonImmutable;
@@ -36,13 +38,13 @@ class PaymentsController extends Controller
         };
 
         return Inertia::render('superadmin/payments', [
-            'summary' => fn () => $this->summary($visibleCustomer),
+            'summary' => fn () => $this->summary($visibleCustomer, $actor),
             'agentCommissions' => fn () => $this->monthlyAgentCommissions($visibleCustomer),
             'paymentRequests' => fn () => $this->paymentRequests($request, $visibleCustomer),
         ]);
     }
 
-    private function summary(callable $visibleCustomer): array
+    private function summary(callable $visibleCustomer, User $actor): array
     {
         $payments = PaymentLog::query()->whereHas('subscription.user', $visibleCustomer);
         $subscriptions = Subscription::query()->whereHas('user', $visibleCustomer);
@@ -67,7 +69,11 @@ class PaymentsController extends Controller
 
         $grossCents = (int) round((float) $gross * 100);
         $commissionCents = ((int) $subscriptionCommission + (int) $legacyCommission) * 100;
-        $expensesCents = 0;
+        $expenseQuery = Expense::query();
+        if (! $actor->isMasterSuperAdmin()) {
+            $expenseQuery->where('created_by', $actor->id);
+        }
+        $expensesCents = (int) round((float) $expenseQuery->sum('amount') * 100);
         $netCents = $grossCents - $commissionCents;
 
         return [
