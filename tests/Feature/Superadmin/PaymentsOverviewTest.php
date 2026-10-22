@@ -150,32 +150,6 @@ it('shows one approved sale per subscription in the month of first approval', fu
         ->and($data['totalCommission'])->toBe('225.00');
 });
 
-it('limits delegated admins to their customers and requires payment permissions', function () {
-    $staff = User::factory()->create([
-        'user_type' => UserType::SuperAdmin,
-        'created_by' => $this->master->id,
-    ]);
-    $staff->syncPermissions(['subscriptions.view', 'subscriptions.manage_payments', 'customers.paid.view']);
-
-    overviewPayment(overviewSubscription($staff, 30), $staff, 'approved', '100.00');
-    overviewPayment(overviewSubscription($this->master, 70), $this->master, 'approved', '200.00');
-
-    $page = $this->actingAs($staff)
-        ->get(route('superadmin.payments'))
-        ->assertOk()
-        ->viewData('page');
-    $summary = $page['props']['summary'];
-
-    expect($summary['approved'])->toBe('100.00')
-        ->and($summary['gross'])->toBe('100.00')
-        ->and($summary['commissions'])->toBe('30.00')
-        ->and($page['props']['agentCommissions']['totalSales'])->toBe(1)
-        ->and($page['props']['agentCommissions']['agents'][0]['id'])->toBe($staff->id);
-
-    $staff->syncPermissions(['subscriptions.view', 'customers.paid.view']);
-    $this->actingAs($staff)->get(route('superadmin.payments'))->assertForbidden();
-});
-
 it('lists this months submissions with payment status filters and a date range', function () {
     $subscription = overviewSubscription($this->master, 90);
     $subscription->user->update(['name' => 'A Customer', 'phone' => '03001234567', 'school_name' => 'A School']);
@@ -255,7 +229,7 @@ it('lists this months submissions with payment status filters and a date range',
         ->assertJsonPath('props.paymentRequests.meta.total', 2);
 });
 
-it('loads a scoped payment summary and reviews a submission from the payments page', function () {
+it('restricts payments and submission details to the master superadmin', function () {
     $staff = User::factory()->create([
         'user_type' => UserType::SuperAdmin,
         'created_by' => $this->master->id,
@@ -263,25 +237,15 @@ it('loads a scoped payment summary and reviews a submission from the payments pa
     $staff->syncPermissions(['customers.paid.view', 'subscriptions.view', 'subscriptions.manage_payments']);
     $owned = overviewSubscription($staff, 120);
     $payment = overviewPayment($owned, $staff, 'pending_review', '250.00');
-    $other = overviewPayment(overviewSubscription($this->master, 50), $this->master, 'pending_review', '300.00');
-
     $detailUrl = route('superadmin.payments.requests.show', $payment->id);
-    $this->actingAs($staff)->getJson($detailUrl)->assertOk()
-        ->assertJsonPath('id', $payment->id)
-        ->assertJsonPath('customer_id', $owned->user_id)
-        ->assertJsonPath('amount', '250.00')
-        ->assertJsonPath('status', 'pending_review');
-    $this->getJson(route('superadmin.payments.requests.show', $other->id))->assertNotFound();
-
-    $rows = $this->get(route('superadmin.payments'))->assertOk()
-        ->viewData('page')['props']['paymentRequests']['data'];
-    expect(collect($rows)->pluck('id')->all())->toBe([$payment->id]);
+    $this->actingAs($staff)->get(route('superadmin.payments'))->assertForbidden();
+    $this->getJson($detailUrl)->assertForbidden();
 
     $reviewUrl = route('superadmin.customers.subscriptions.payment-logs.review', [$owned->user_id, $owned->id, $payment->id]);
-    $this->from(route('superadmin.payments'))->patch($reviewUrl, ['status' => 'approved'])->assertSessionHasNoErrors();
-    $this->getJson($detailUrl)->assertJsonPath('status', 'approved');
+    $this->patch($reviewUrl, ['status' => 'approved'])->assertSessionHasNoErrors();
 
-    $approvedRows = $this->get(route('superadmin.payments', ['status' => 'approved']))
+    $approvedRows = $this->actingAs($this->master)->get(route('superadmin.payments', ['status' => 'approved']))
         ->assertOk()->viewData('page')['props']['paymentRequests']['data'];
     expect(collect($approvedRows)->pluck('id')->all())->toBe([$payment->id]);
+    $this->getJson($detailUrl)->assertJsonPath('status', 'approved');
 });

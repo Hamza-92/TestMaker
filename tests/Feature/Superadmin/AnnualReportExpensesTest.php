@@ -101,27 +101,11 @@ it('reports approved payments commissions and expenses by Pakistan calendar mont
     expect($priorYear['totals']['gross'])->toBe('0.00');
 });
 
-it('keeps delegated admin expenses and reports within their scope', function () {
+it('denies delegated admins access to expenses and annual reports', function () {
     $staff = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->master->id]);
     $staff->syncPermissions(['subscriptions.view', 'subscriptions.manage_payments', 'customers.paid.view']);
-    $owned = User::factory()->create(['user_type' => UserType::Customer, 'account_type' => 'paid', 'created_by' => $staff->id]);
-    $other = User::factory()->create(['user_type' => UserType::Customer, 'account_type' => 'paid', 'created_by' => $this->master->id]);
-    reportPayment($staff, $owned, 10, '60.00', 'cash', '2026-10-10 12:00:00');
-    reportPayment($this->master, $other, 20, '90.00', 'cash', '2026-10-10 12:00:00');
-    Expense::create(['name' => 'Mine', 'amount' => '5.00', 'created_by' => $staff->id]);
-    Expense::create(['name' => 'Other', 'amount' => '25.00', 'created_by' => $this->master->id]);
-
-    $this->actingAs($staff);
-    $expenses = $this->get(route('superadmin.payments.expenses'))->assertOk()->viewData('page')['props']['expenses'];
-    expect($expenses['total'])->toBe('5.00')
-        ->and(collect($expenses['data'])->pluck('name')->all())->toBe(['Mine']);
-
-    $report = $this->get(route('superadmin.payments.annual-report'))->assertOk()->viewData('page')['props'];
-    expect($report['months'][9]['gross'])->toBe('60.00')
-        ->and($report['months'][9]['expenses'])->toBe('5.00');
-
-    $staff->syncPermissions(['subscriptions.view', 'customers.paid.view']);
-    $this->get(route('superadmin.payments.expenses'))->assertForbidden();
+    $this->actingAs($staff)->get(route('superadmin.payments.expenses'))->assertForbidden();
     $this->post(route('superadmin.payments.expenses.store'), ['name' => 'Denied', 'amount' => '1.00'])->assertForbidden();
     $this->get(route('superadmin.payments.annual-report'))->assertForbidden();
+    expect(Expense::query()->count())->toBe(0);
 });

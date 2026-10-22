@@ -190,36 +190,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('superadmin/rejected-payments/{paymentLog}/resubmit', [RejectedPaymentController::class, 'resubmit'])
             ->name('superadmin.rejected-payments.resubmit');
 
-        Route::get('superadmin/payments', [PaymentsController::class, 'index'])
-            ->name('superadmin.payments')
-            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
-        Route::get('superadmin/payments/ledger', [PaymentLedgerController::class, 'index'])
-            ->name('superadmin.payments.ledger')
-            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
-        Route::get('superadmin/payments/annual-report', [AnnualReportController::class, 'index'])
-            ->name('superadmin.payments.annual-report')
-            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
-        Route::get('superadmin/payments/expenses', [ExpenseController::class, 'index'])
-            ->name('superadmin.payments.expenses')
-            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
-        Route::post('superadmin/payments/expenses', [ExpenseController::class, 'store'])
-            ->name('superadmin.payments.expenses.store')
-            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
-        Route::get('superadmin/payments/shareholder', [ShareholderController::class, 'index'])
-            ->name('superadmin.payments.shareholder')
-            ->middleware('master.superadmin');
-        Route::post('superadmin/payments/shareholder/spends', [ShareholderController::class, 'store'])
-            ->name('superadmin.payments.shareholder.spends.store')
-            ->middleware('master.superadmin');
-        Route::put('superadmin/payments/shareholder/spends/{spend}', [ShareholderController::class, 'update'])
-            ->name('superadmin.payments.shareholder.spends.update')
-            ->middleware('master.superadmin');
-        Route::delete('superadmin/payments/shareholder/spends/{spend}', [ShareholderController::class, 'destroy'])
-            ->name('superadmin.payments.shareholder.spends.destroy')
-            ->middleware('master.superadmin');
-        Route::get('superadmin/payments/requests/{paymentLog}', [PaymentsController::class, 'show'])
-            ->name('superadmin.payments.requests.show')
-            ->middleware('permission:subscriptions.manage_payments,subscriptions.view,customers.view|customers.paid.view|customers.trial.view');
+        Route::middleware('master.superadmin')->group(function () {
+            Route::get('superadmin/payments', [PaymentsController::class, 'index'])
+                ->name('superadmin.payments');
+            Route::get('superadmin/payments/ledger', [PaymentLedgerController::class, 'index'])
+                ->name('superadmin.payments.ledger');
+            Route::get('superadmin/payments/annual-report', [AnnualReportController::class, 'index'])
+                ->name('superadmin.payments.annual-report');
+            Route::get('superadmin/payments/expenses', [ExpenseController::class, 'index'])
+                ->name('superadmin.payments.expenses');
+            Route::post('superadmin/payments/expenses', [ExpenseController::class, 'store'])
+                ->name('superadmin.payments.expenses.store');
+            Route::get('superadmin/payments/shareholder', [ShareholderController::class, 'index'])
+                ->name('superadmin.payments.shareholder');
+            Route::post('superadmin/payments/shareholder/spends', [ShareholderController::class, 'store'])
+                ->name('superadmin.payments.shareholder.spends.store');
+            Route::put('superadmin/payments/shareholder/spends/{spend}', [ShareholderController::class, 'update'])
+                ->name('superadmin.payments.shareholder.spends.update');
+            Route::delete('superadmin/payments/shareholder/spends/{spend}', [ShareholderController::class, 'destroy'])
+                ->name('superadmin.payments.shareholder.spends.destroy');
+            Route::get('superadmin/payments/requests/{paymentLog}', [PaymentsController::class, 'show'])
+                ->name('superadmin.payments.requests.show');
+        });
 
         Route::get('superadmin/site/pages', [SitePageController::class, 'index'])->name('superadmin.site.pages')->middleware('permission:site_pages.view');
         Route::post('superadmin/site/pages', [SitePageController::class, 'store'])->name('superadmin.site.pages.store')->middleware('permission:site_pages.edit');

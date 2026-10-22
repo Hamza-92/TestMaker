@@ -56,11 +56,7 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        ...(can('subscriptions.manage_payments') &&
-        can('subscriptions.view') &&
-        (can('customers.view') ||
-            can('customers.paid.view') ||
-            can('customers.trial.view'))
+        ...(isMaster
             ? [
                   {
                       title: 'Payments Management',
@@ -80,14 +76,10 @@ export function AppSidebar() {
                               title: 'Expenses',
                               href: '/superadmin/payments/expenses',
                           },
-                          ...(isMaster
-                              ? [
-                                    {
-                                        title: 'Shareholder',
-                                        href: '/superadmin/payments/shareholder',
-                                    },
-                                ]
-                              : []),
+                          {
+                              title: 'Shareholder',
+                              href: '/superadmin/payments/shareholder',
+                          },
                       ],
                   },
               ]

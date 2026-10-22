@@ -110,7 +110,7 @@ it('groups approved receipts into new sales renewals and due installments across
         ->assertSessionHasErrors('to');
 });
 
-it('scopes ledger rows and receipt details to a delegated admins customers', function () {
+it('denies delegated admins access to the payment ledger even with payment permissions', function () {
     $staff = User::factory()->create([
         'user_type' => UserType::SuperAdmin,
         'created_by' => $this->master->id,
@@ -121,22 +121,7 @@ it('scopes ledger rows and receipt details to a delegated admins customers', fun
         'account_type' => 'paid',
         'created_by' => $staff->id,
     ]);
-    $hidden = User::factory()->create([
-        'user_type' => UserType::Customer,
-        'account_type' => 'paid',
-        'created_by' => $this->master->id,
-    ]);
     $visiblePayment = ledgerPayment(ledgerSubscription($owned, $staff), $staff, 'approved', '70.00', '2026-10-10 12:00:00');
-    $hiddenPayment = ledgerPayment(ledgerSubscription($hidden, $this->master), $this->master, 'approved', '90.00', '2026-10-10 12:00:00');
-
-    $ledger = $this->actingAs($staff)->get(route('superadmin.payments.ledger'))
-        ->assertOk()->viewData('page')['props']['ledger'];
-    expect(collect($ledger['data'])->pluck('id')->all())->toBe([$visiblePayment->id])
-        ->and($ledger['summary']['total_received'])->toBe('70.00');
-
-    $this->getJson(route('superadmin.payments.requests.show', $visiblePayment->id))->assertOk();
-    $this->getJson(route('superadmin.payments.requests.show', $hiddenPayment->id))->assertNotFound();
-
-    $staff->syncPermissions(['subscriptions.view', 'customers.paid.view']);
-    $this->get(route('superadmin.payments.ledger'))->assertForbidden();
+    $this->actingAs($staff)->get(route('superadmin.payments.ledger'))->assertForbidden();
+    $this->getJson(route('superadmin.payments.requests.show', $visiblePayment->id))->assertForbidden();
 });
