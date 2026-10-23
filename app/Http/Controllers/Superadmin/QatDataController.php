@@ -3,8 +3,14 @@
 namespace App\Http\Controllers\Superadmin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Superadmin\QatQuestionUpsertRequest;
+use App\Models\Medium;
+use App\Models\Question;
+use App\Models\QuestionOption;
 use App\Models\QuestionType;
+use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -276,27 +282,165 @@ class QatDataController extends Controller
         return back();
     }
 
-    public function updateQuestion(Request $request, int $qatClass, int $qatSubject, int $qatChapter, int $qatQuestion): RedirectResponse
+    public function editQuestion(int $qatClass, int $qatSubject, int $qatChapter, int $qatQuestion): JsonResponse
     {
+        $class = $this->classRow($qatClass);
+        $subject = $this->subjectRow($qatClass, $qatSubject);
+        $chapter = $this->chapterRow($qatSubject, $qatChapter);
+        $question = $this->questionRow($qatChapter, $qatQuestion);
+        $data = json_decode($question->question_data, true) ?: [];
+        $type = $this->snapshotType($question, $data);
+        $sourceQuestion = new Question;
+        $sourceQuestion->forceFill(collect($data)->except(['options', 'question_type'])->all());
+        $sourceQuestion->setRelation('options', QuestionOption::hydrate($data['options'] ?? []));
+        $type->schema_key = $data['schema_key'] ?? $type->schema_key;
+        $schema = $this->questionSchema($type);
+
+        $types = QuestionType::query()->where('status', 1)->orderBy('name')->get()
+            ->map(fn (QuestionType $item) => $this->typeOption(QuestionTypeHeadingResolver::one(
+                $item, (int) $subject->source_pattern_id, (int) $class->source_class_id, (int) $subject->subject_id,
+            )));
+        $types = $types->reject(fn (array $item) => $item['id'] === (int) $question->question_type_id)
+            ->prepend($this->typeOption($type))->values();
+        $topics = DB::table('qat_topics')->where('qat_chapter_id', $qatChapter)
+            ->orderBy('sort_id')->get(['id', 'name', 'name_ur', 'status']);
+        $sourceSubject = DB::table('subjects')->where('id', $subject->subject_id)->first(['subject_type', 'name_ur']);
+        $baseUrl = route('superadmin.qat-catalogue.questions.index', [$qatClass, $qatSubject, $qatChapter], false);
+
+        return response()->json([
+            'question' => [
+                'id' => $question->id,
+                'question_type_id' => $question->question_type_id,
+                'chapter_id' => $qatChapter,
+                'medium_id' => $data['medium_id'] ?? null,
+                'topic_id' => $question->qat_topic_id,
+                'source' => $data['source'] ?? null,
+                'status' => $question->status,
+                'schema_key' => $schema['key'],
+                'schema' => $schema,
+                'content' => QuestionTypeSchemaRegistry::contentFromQuestion($sourceQuestion, $type),
+            ],
+            'lockedChapterId' => $qatChapter,
+            'questionTypes' => $types,
+            'chapters' => [[
+                'id' => $chapter->id,
+                'name' => $chapter->name,
+                'name_ur' => $chapter->name_ur,
+                'chapter_number' => $chapter->chapter_number,
+                'group_name' => null,
+                'group_heading' => null,
+                'status' => $chapter->status,
+                'subject' => [
+                    'id' => $subject->subject_id,
+                    'name_eng' => $subject->subject_name,
+                    'name_ur' => $sourceSubject->name_ur ?? null,
+                    'subject_type' => $topics->isNotEmpty() ? 'topic-wise' : ($sourceSubject->subject_type ?? 'chapter-wise'),
+                    'status' => $subject->status,
+                ],
+                'class' => ['id' => $class->source_class_id, 'name' => $class->name],
+                'pattern' => ['id' => $subject->source_pattern_id, 'name' => $subject->source_pattern_name, 'short_name' => null],
+                'topics' => $topics,
+            ]],
+            'sourceOptions' => collect(Question::sourceOptions())->map(fn (string $label, string $value) => [
+                'value' => $value, 'label' => $label,
+            ])->values(),
+            'mediumOptions' => Medium::query()->orderBy('id')->get(['id', 'name']),
+            'backHref' => $baseUrl,
+        ]);
+    }
+
+    public function updateQuestion(QatQuestionUpsertRequest $request, int $qatClass, int $qatSubject, int $qatChapter, int $qatQuestion): JsonResponse
+    {
+        $this->classRow($qatClass);
         $this->subjectRow($qatClass, $qatSubject);
         $this->chapterRow($qatSubject, $qatChapter);
-        $question = DB::table('qat_questions')->where('id', $qatQuestion)->where('qat_chapter_id', $qatChapter)->first();
-        abort_unless($question, 404);
-        $input = $request->validate([
-            'statement_en' => ['nullable', 'string', 'max:20000'],
-            'statement_ur' => ['nullable', 'string', 'max:20000'],
-            'status' => ['required', 'boolean'],
-        ]);
+        $question = $this->questionRow($qatChapter, $qatQuestion);
+        $input = $request->validated();
         $data = json_decode($question->question_data, true) ?: [];
-        $data['statement_en'] = $input['statement_en'] ?? null;
-        $data['statement_ur'] = $input['statement_ur'] ?? null;
+        $type = (int) $input['question_type_id'] === (int) $question->question_type_id
+            ? $this->snapshotType($question, $data)
+            : QuestionType::query()->findOrFail($input['question_type_id']);
+        if ((int) $input['question_type_id'] === (int) $question->question_type_id) {
+            $type->schema_key = $data['schema_key'] ?? $type->schema_key;
+        } else {
+            $class = $this->classRow($qatClass);
+            $subject = $this->subjectRow($qatClass, $qatSubject);
+            $type = QuestionTypeHeadingResolver::one(
+                $type, (int) $subject->source_pattern_id, (int) $class->source_class_id, (int) $subject->subject_id,
+            );
+        }
+        $payload = QuestionTypeSchemaRegistry::buildQuestionPayload($type, $input['content']);
+        $data = array_replace($data, $payload, [
+            'question_type_id' => (int) $input['question_type_id'],
+            'schema_key' => $this->questionSchema($type)['key'],
+            'medium_id' => $input['medium_id'] ?? null,
+            'source' => $input['source'] ?? null,
+            'status' => $input['status'],
+            'question_type' => $type->toArray(),
+        ]);
+        if (isset($data['options'])) {
+            $data['options'] = array_map(fn (array $option, int $index) => [
+                ...$option, 'sort_order' => $index + 1,
+            ], $data['options'], array_keys($data['options']));
+        }
         DB::table('qat_questions')->where('id', $qatQuestion)->update([
             'question_data' => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'question_type_id' => $input['question_type_id'],
+            'qat_topic_id' => $input['topic_id'] ?? null,
             'status' => $input['status'],
             'updated_at' => now(),
         ]);
 
-        return back();
+        return response()->json(['id' => $qatQuestion]);
+    }
+
+    private function questionRow(int $qatChapter, int $qatQuestion): object
+    {
+        $question = DB::table('qat_questions')->where('id', $qatQuestion)
+            ->where('qat_chapter_id', $qatChapter)->first();
+        abort_unless($question, 404);
+
+        return $question;
+    }
+
+    private function snapshotType(object $question, array $data): QuestionType
+    {
+        $type = new QuestionType((array) ($data['question_type'] ?? []));
+        if (! $type->name) {
+            $type = QuestionType::query()->findOrFail($question->question_type_id);
+        }
+        $type->id = $question->question_type_id;
+
+        return $type;
+    }
+
+    private function questionSchema(QuestionType $type): array
+    {
+        return QuestionTypeSchemaRegistry::resolve($type->schema_key, $type->is_objective, [
+            'objective_type_id' => $type->objective_type_id,
+            'have_description' => $type->have_description,
+            'have_answer' => $type->have_answer,
+        ]);
+    }
+
+    private function typeOption(QuestionType $type): array
+    {
+        $schema = $this->questionSchema($type);
+
+        return [
+            'id' => (int) $type->id,
+            'name' => $type->name,
+            'heading_en' => $type->heading_en,
+            'is_objective' => $type->is_objective,
+            'options_only' => $type->options_only,
+            'is_single' => $type->is_single,
+            'have_answer' => $type->have_answer,
+            'supports_simple_import' => QuestionTypeSchemaRegistry::supportsSimpleImport($type),
+            'schema_key' => $schema['key'],
+            'schema' => $schema,
+            'scope_rules' => [],
+            'status' => $type->status,
+        ];
     }
 
     private function classRow(int $qatClass): object
@@ -304,7 +448,7 @@ class QatDataController extends Controller
         $class = DB::table('qat_classes')
             ->join('qat_catalogues', 'qat_catalogues.id', '=', 'qat_classes.qat_catalogue_id')
             ->where('qat_classes.id', $qatClass)
-            ->first(['qat_classes.id', 'qat_classes.name', 'qat_classes.status', 'qat_catalogues.academic_year']);
+            ->first(['qat_classes.id', 'qat_classes.name', 'qat_classes.source_class_id', 'qat_classes.status', 'qat_catalogues.academic_year']);
         abort_unless($class, 404);
 
         return $class;
@@ -313,7 +457,7 @@ class QatDataController extends Controller
     private function subjectRow(int $qatClass, int $qatSubject): object
     {
         $subject = DB::table('qat_subjects')->where('id', $qatSubject)->where('qat_class_id', $qatClass)
-            ->first(['id', 'subject_name', 'source_pattern_name', 'status']);
+            ->first(['id', 'subject_id', 'subject_name', 'source_pattern_id', 'source_pattern_name', 'status']);
         abort_unless($subject, 404);
 
         return $subject;

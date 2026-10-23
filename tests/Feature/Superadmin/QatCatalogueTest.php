@@ -41,6 +41,7 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
         'statement_en' => 'What do leaves do?', 'source' => Question::SOURCE_EXERCISE, 'status' => 1,
     ]);
     QuestionOption::create(['question_id' => $question->id, 'text_en' => 'Make food', 'is_correct' => true, 'sort_order' => 1]);
+    QuestionOption::create(['question_id' => $question->id, 'text_en' => 'Absorb sunlight', 'is_correct' => false, 'sort_order' => 2]);
 
     $payload = [
         'academic_year' => '2026-27', 'month' => 4, 'source_pattern_id' => $pattern->id,
@@ -134,22 +135,72 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $this->actingAs($admin)->patch(route('superadmin.qat-catalogue.topics.update', [$qatClassId, $qatSubjectId, $qatChapterId, $qatTopicId]), [
         'name' => 'QAT Leaves', 'sort_id' => 2, 'status' => false,
     ])->assertSessionHasNoErrors();
-    $this->actingAs($admin)->patch(route('superadmin.qat-catalogue.questions.update', [$qatClassId, $qatSubjectId, $qatChapterId, $qatQuestionId]), [
-        'statement_en' => 'How do leaves make food?', 'status' => false,
-    ])->assertSessionHasNoErrors();
+    $questionRoute = [$qatClassId, $qatSubjectId, $qatChapterId, $qatQuestionId];
+    $this->actingAs($admin)->getJson(route('superadmin.qat-catalogue.questions.edit', $questionRoute))
+        ->assertOk()
+        ->assertJsonPath('question.content.prompt_en', 'What do leaves do?')
+        ->assertJsonPath('question.content.options.0.text_en', 'Make food')
+        ->assertJsonPath('question.chapter_id', $qatChapterId)
+        ->assertJsonPath('lockedChapterId', $qatChapterId);
+    $editPayload = [
+        'question_type_id' => $type->id,
+        'chapter_id' => $qatChapterId,
+        'topic_id' => $qatTopicId,
+        'medium_id' => null,
+        'source' => Question::SOURCE_EXERCISE,
+        'status' => false,
+        'content' => [
+            'prompt_en' => 'How do leaves make food?',
+            'prompt_ur' => '',
+            'options' => [
+                ['text_en' => 'By photosynthesis', 'text_ur' => '', 'is_correct' => true],
+                ['text_en' => 'By breathing', 'text_ur' => '', 'is_correct' => false],
+            ],
+        ],
+    ];
+    $this->actingAs($admin)->putJson(route('superadmin.qat-catalogue.questions.update', $questionRoute), [
+        ...$editPayload, 'content' => [...$editPayload['content'], 'options' => []],
+    ])->assertUnprocessable()->assertJsonValidationErrors('content.options');
+    $this->actingAs($admin)->putJson(route('superadmin.qat-catalogue.questions.update', $questionRoute), $editPayload)
+        ->assertOk()->assertJsonPath('id', $qatQuestionId);
     expect(DB::table('qat_classes')->value('name'))->toBe('QAT Class 5')
         ->and(DB::table('qat_subjects')->value('subject_name'))->toBe('QAT Science')
         ->and(DB::table('qat_chapters')->value('name'))->toBe('QAT Plants')
         ->and(DB::table('qat_topics')->value('name'))->toBe('QAT Leaves')
         ->and(DB::table('qat_chapter_months')->pluck('month')->sort()->values()->all())->toBe([4, 6])
-        ->and(json_decode(DB::table('qat_questions')->value('question_data'), true)['options'][0]['text_en'])->toBe('Make food')
+        ->and(json_decode(DB::table('qat_questions')->value('question_data'), true)['statement_en'])->toBe('How do leaves make food?')
+        ->and(json_decode(DB::table('qat_questions')->value('question_data'), true)['options'][0]['text_en'])->toBe('By photosynthesis')
+        ->and(json_decode(DB::table('qat_questions')->value('question_data'), true)['content']['options'][1]['text_en'])->toBe('By breathing')
         ->and(Question::query()->first()->statement_en)->toBe('What do leaves do?')
         ->and(SchoolClass::query()->first()->name)->toBe('Class 5');
     $this->actingAs($admin)->get(route('superadmin.qat-catalogue.subjects.show', [$qatClassId, $qatSubjectId]).'?month=5')
         ->assertOk()->assertInertia(fn (Assert $page) => $page->has('chapters.data', 0));
-    $this->actingAs($admin)->patch(route('superadmin.qat-catalogue.questions.update', [$qatClassId, $qatSubjectId, $qatChapterId + 999, $qatQuestionId]), [
-        'statement_en' => 'Wrong scope', 'status' => true,
+    $this->actingAs($admin)->getJson(route('superadmin.qat-catalogue.questions.edit', [$qatClassId, $qatSubjectId, $qatChapterId + 999, $qatQuestionId]))
+        ->assertNotFound();
+    $this->actingAs($admin)->putJson(route('superadmin.qat-catalogue.questions.update', [$qatClassId, $qatSubjectId, $qatChapterId + 999, $qatQuestionId]), [
+        ...$editPayload, 'chapter_id' => $qatChapterId + 999,
     ])->assertNotFound();
+
+    $groupedType = QuestionType::create([
+        'name' => 'Grouped short questions', 'heading_en' => 'Answer the following',
+        'have_exercise' => false, 'have_statement' => true,
+        'have_description' => false, 'have_answer' => true, 'is_single' => false,
+        'is_objective' => false, 'schema_key' => 'subjective_grouped',
+        'column_per_row' => 1, 'status' => 1,
+    ]);
+    $this->actingAs($admin)->putJson(route('superadmin.qat-catalogue.questions.update', $questionRoute), [
+        ...$editPayload,
+        'question_type_id' => $groupedType->id,
+        'content' => [
+            'intro_en' => 'Answer these questions about leaves.',
+            'items' => [['prompt_en' => 'Name one function.', 'answer_en' => 'Making food.']],
+        ],
+    ])->assertOk();
+    $this->actingAs($admin)->getJson(route('superadmin.qat-catalogue.questions.edit', $questionRoute))
+        ->assertJsonPath('question.schema_key', 'subjective_grouped')
+        ->assertJsonPath('question.content.items.0.answer_en', 'Making food.');
+    expect(Question::query()->findOrFail($question->id)->question_type_id)->toBe($type->id)
+        ->and(QuestionOption::query()->where('question_id', $question->id)->count())->toBe(2);
 });
 
 test('QAT catalogue requires subscription access', function () {

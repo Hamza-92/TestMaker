@@ -15,6 +15,8 @@ import type {
 import { fetchQuestionJson } from './use-question-options';
 
 interface EditPayload {
+    lockedChapterId?: number;
+    backHref?: string;
     question: {
         id: number;
         question_type_id: number;
@@ -29,7 +31,7 @@ interface EditPayload {
     };
     questionTypes: QuestionTypeOption[];
     chapters: ChapterOption[];
-    chapterOptionsUrl: string;
+    chapterOptionsUrl?: string;
     sourceOptions: SourceOption[];
     mediumOptions: MediumOption[];
 }
@@ -57,12 +59,14 @@ function initialValues({
 
 function EditQuestionForm({
     payload,
+    updateUrl,
     footerTarget,
     onClose,
     onSaved,
     onSavingChange,
 }: {
     payload: EditPayload;
+    updateUrl: string;
     footerTarget: HTMLDivElement | null;
     onClose: () => void;
     onSaved: () => void;
@@ -98,22 +102,19 @@ function EditQuestionForm({
         let didSave = false;
 
         try {
-            const response = await fetch(
-                `/superadmin/questions/${payload.question.id}`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        Accept: 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN':
-                            document.querySelector<HTMLMetaElement>(
-                                'meta[name="csrf-token"]',
-                            )?.content ?? '',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify(form.data),
+            const response = await fetch(updateUrl, {
+                method: 'PUT',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN':
+                        document.querySelector<HTMLMetaElement>(
+                            'meta[name="csrf-token"]',
+                        )?.content ?? '',
                 },
-            );
+                credentials: 'same-origin',
+                body: JSON.stringify(form.data),
+            });
 
             if (response.status === 422) {
                 const result = (await response.json()) as {
@@ -162,13 +163,14 @@ function EditQuestionForm({
             <QuestionForm
                 title="Edit Question"
                 submitLabel="Save Changes"
-                backHref="/superadmin/questions"
+                backHref={payload.backHref ?? '/superadmin/questions'}
                 form={form}
                 questionTypes={effectiveQuestionTypes}
                 chapters={payload.chapters}
                 chapterOptionsUrl={payload.chapterOptionsUrl}
                 sourceOptions={payload.sourceOptions}
                 mediumOptions={payload.mediumOptions}
+                lockedChapterId={payload.lockedChapterId}
                 embedded
                 submitting={submitting}
                 hideActions
@@ -205,11 +207,17 @@ function EditQuestionForm({
 
 export default function EditQuestionModal({
     questionId,
+    editUrl,
+    updateUrl,
+    title = 'Edit Question',
     scope,
     onClose,
     onSaved,
 }: {
     questionId: number;
+    editUrl?: string;
+    updateUrl?: string;
+    title?: string;
     scope?: string[];
     onClose: () => void;
     onSaved: () => void;
@@ -226,7 +234,7 @@ export default function EditQuestionModal({
         const controller = new AbortController();
 
         fetchQuestionJson<EditPayload>(
-            `/superadmin/questions/${questionId}/edit`,
+            editUrl ?? `/superadmin/questions/${questionId}/edit`,
             controller.signal,
         )
             .then((result) => {
@@ -242,7 +250,7 @@ export default function EditQuestionModal({
             });
 
         return () => controller.abort();
-    }, [questionId, retry]);
+    }, [editUrl, questionId, retry]);
 
     function close() {
         if (!saving) {
@@ -271,7 +279,7 @@ export default function EditQuestionModal({
                             id="edit-question-title"
                             className="text-base font-semibold text-slate-950 dark:text-white"
                         >
-                            Edit Question
+                            {title}
                         </h2>
                         <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                             {scope?.length
@@ -310,6 +318,10 @@ export default function EditQuestionModal({
                     ) : payload ? (
                         <EditQuestionForm
                             payload={payload}
+                            updateUrl={
+                                updateUrl ??
+                                `/superadmin/questions/${questionId}`
+                            }
                             footerTarget={footerTarget}
                             onClose={onClose}
                             onSaved={onSaved}

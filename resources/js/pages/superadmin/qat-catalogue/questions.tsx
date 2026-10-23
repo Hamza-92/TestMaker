@@ -1,13 +1,13 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { lazy, Suspense, useState } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
+const EditQuestionModal = lazy(
+    () => import('../questions/edit-question-modal'),
+);
 import {
-    EditModal,
     FilterBar,
     Pager,
     StatusBadge,
-    inputClass,
     statusChoices,
     tableClass,
     tdClass,
@@ -26,18 +26,7 @@ type Question = {
     status: number;
     topic_name: string | null;
     type_name: string;
-    statement_en: string;
-    statement_ur: string;
     summary_text: string;
-    description_en: string | null;
-    description_ur: string | null;
-    answer_en: string | null;
-    answer_ur: string | null;
-    options: {
-        text_en: string | null;
-        text_ur: string | null;
-        is_correct: boolean;
-    }[];
 };
 
 function summary(value: string) {
@@ -66,31 +55,8 @@ export default function QatQuestionsPage({
     filters: Filters;
 }) {
     const [editing, setEditing] = useState<Question | null>(null);
-    const { data, setData, patch, processing, errors } = useForm({
-        statement_en: '',
-        statement_ur: '',
-        status: true,
-    });
     const chapterUrl = `/superadmin/qat-catalogue/classes/${qatClass.id}/subjects/${subject.id}/chapters/${chapter.id}`;
     const base = `${chapterUrl}/questions`;
-    const edit = (item: Question) => {
-        setEditing(item);
-        setData({
-            statement_en: item.statement_en ?? '',
-            statement_ur: item.statement_ur ?? '',
-            status: Boolean(item.status),
-        });
-    };
-    const save = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
-        if (editing) {
-            patch(`${base}/${editing.id}`, {
-                preserveScroll: true,
-                onSuccess: () => setEditing(null),
-            });
-        }
-    };
 
     return (
         <div className="w-full min-w-0 space-y-5 p-4 md:p-6">
@@ -198,7 +164,7 @@ export default function QatQuestionsPage({
                                     <td className={tdClass}>
                                         <Button
                                             type="button"
-                                            onClick={() => edit(item)}
+                                            onClick={() => setEditing(item)}
                                             variant="ghost"
                                             size="sm"
                                         >
@@ -222,98 +188,23 @@ export default function QatQuestionsPage({
                 </div>
                 <Pager page={questions} />
             </Card>
-            <EditModal
-                open={editing !== null}
-                onClose={() => setEditing(null)}
-                onSave={save}
-                title={`QAT question #${editing?.id ?? ''}`}
-                description="Edit the copied statement text. Existing options and other question details are preserved."
-                busy={processing}
-            >
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                    {editing?.type_name} · {editing?.topic_name ?? 'No topic'}
-                </div>
-                {editing?.options.length ? (
-                    <div className="space-y-1 rounded-md border p-3 text-sm">
-                        <div className="font-medium">Copied options</div>
-                        {editing.options.map((option, index) => (
-                            <div key={index}>
-                                {index + 1}.{' '}
-                                {summary(
-                                    option.text_en ?? option.text_ur ?? '',
-                                )}
-                                {option.is_correct ? ' ✓' : ''}
-                            </div>
-                        ))}
-                    </div>
-                ) : null}
-                {(editing?.description_en || editing?.description_ur) && (
-                    <div className="rounded-md border p-3 text-sm">
-                        <div className="font-medium">Description</div>
-                        <div>
-                            {summary(
-                                editing.description_en ??
-                                    editing.description_ur ??
-                                    '',
-                            )}
-                        </div>
-                    </div>
-                )}
-                {(editing?.answer_en || editing?.answer_ur) && (
-                    <div className="rounded-md border p-3 text-sm">
-                        <div className="font-medium">Answer</div>
-                        <div>
-                            {summary(
-                                editing.answer_en ?? editing.answer_ur ?? '',
-                            )}
-                        </div>
-                    </div>
-                )}
-                <label className="block space-y-1 text-sm">
-                    English statement
-                    <textarea
-                        rows={5}
-                        className={inputClass}
-                        value={data.statement_en}
-                        onChange={(event) =>
-                            setData('statement_en', event.target.value)
-                        }
+            {editing && (
+                <Suspense fallback={null}>
+                    <EditQuestionModal
+                        questionId={editing.id}
+                        editUrl={`${base}/${editing.id}/edit`}
+                        updateUrl={`${base}/${editing.id}`}
+                        title={`Edit QAT question #${editing.id}`}
+                        scope={[
+                            qatClass.name,
+                            subject.subject_name,
+                            chapter.name,
+                        ]}
+                        onClose={() => setEditing(null)}
+                        onSaved={() => router.reload({ only: ['questions'] })}
                     />
-                    {errors.statement_en && (
-                        <span className="text-red-600">
-                            {errors.statement_en}
-                        </span>
-                    )}
-                </label>
-                <label className="block space-y-1 text-sm">
-                    Urdu statement
-                    <textarea
-                        rows={5}
-                        dir="rtl"
-                        className={inputClass}
-                        value={data.statement_ur}
-                        onChange={(event) =>
-                            setData('statement_ur', event.target.value)
-                        }
-                    />
-                    {errors.statement_ur && (
-                        <span className="text-red-600">
-                            {errors.statement_ur}
-                        </span>
-                    )}
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                    <input
-                        type="checkbox"
-                        className="accent-brand-600"
-                        checked={data.status}
-                        onChange={(event) =>
-                            setData('status', event.target.checked)
-                        }
-                    />{' '}
-                    Active
-                </label>
-            </EditModal>
+                </Suspense>
+            )}
         </div>
     );
 }
