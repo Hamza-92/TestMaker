@@ -10,6 +10,7 @@ use App\Http\Middleware\EnsureMasterSuperAdmin;
 use App\Http\Middleware\EnsureTeacherFeature;
 use App\Http\Middleware\EnsureTeacherNotExpired;
 use App\Http\Middleware\EnsureNonCustomer;
+use App\Http\Middleware\RequireTestbaseExportToken;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -20,6 +21,7 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -43,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'school.feature'  => EnsureSchoolSubscriptionFeature::class,
             'teacher.feature' => EnsureTeacherFeature::class,
             'non.customer'   => EnsureNonCustomer::class,
+            'testbase.export' => RequireTestbaseExportToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
