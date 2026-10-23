@@ -229,7 +229,7 @@ it('converts supported grouped, true-false and shared schemas without dropping c
         ->and($grouped['issues'])->toBeEmpty();
 });
 
-it('blocks meaningful unsupported HTML and missing assignment translations', function () {
+it('blocks unsafe HTML but retains available translations for destination validation', function () {
     $converter = new TestbasePayloadConverter;
     $type = new QuestionType(['schema_key' => 'subjective_standard', 'is_objective' => false]);
     $question = new Question(['schema_key' => 'subjective_standard', 'content' => [
@@ -239,12 +239,110 @@ it('blocks meaningful unsupported HTML and missing assignment translations', fun
     expect($converter->convert($question, $type, 'ENGLISH')['payload'])->toBeNull();
     $question->content = ['prompt_en' => 'English only'];
     $missing = $converter->convert($question, $type, 'BOTH');
-    expect($missing['payload'])->toBeNull()
-        ->and($missing['issues'])->not->toBeEmpty();
+    expect($missing['payload']['statement']['en'])->not->toBeNull()
+        ->and($missing['payload']['statement']['ur'])->toBeNull()
+        ->and($missing['issues'])->toBeEmpty();
     $question->content = ['prompt_en' => 'A &amp; B'];
     $decoded = $converter->convert($question, $type, 'ENGLISH');
     expect($decoded['payload']['statement']['en']['content'][0]['content'][0]['text'])->toBe('A & B');
 });
+
+it('exports legacy shared images with CSS pixel dimensions through the authenticated API', function () {
+    $fixture = exportFixture();
+    $imageId = (string) Str::uuid();
+    $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+juz8AAAAASUVORK5CYII=', true);
+    DB::table('question_images')->insert([
+        'id' => $imageId, 'mime_type' => 'image/png', 'data' => base64_encode($bytes), 'created_at' => now(),
+    ]);
+    $fixture['type']->update(['schema_key' => 'subjective_same_statement', 'is_objective' => false]);
+    $image = '<img alt="" src="/question-images/'.$imageId.'" width="1" style="height:74px; width:95px" />';
+    $content = [
+        'prompt_en' => 'Count the objects and write the correct number in the box.',
+        'prompt_ur' => 'تصویروں کو گنیں اور دیئے گئے ڈبے میں نمبر لکھیں۔',
+        'shared_en' => $image, 'shared_ur' => $image,
+        'answer_en' => null, 'answer_ur' => null,
+    ];
+    $fixture['question']->update(['schema_key' => 'subjective_same_statement', 'content' => $content]);
+    $manifest = exportGet('scope?'.$fixture['query'])->assertOk()->json();
+    $page = exportGet('questions?'.$fixture['query'].'&revision='.$manifest['revision'].'&pageSize=10')->assertOk()->json();
+    $converted = $page['items'][0];
+    expect($converted['issues'])->toBeEmpty()
+        ->and($converted['payload']['shared']['content'][0]['attrs']['width'])->toBe(95)
+        ->and($converted['payload']['shared']['content'][0]['attrs']['height'])->toBe(74)
+        ->and($converted['payload']['statement']['ur'])->not->toBeNull()
+        ->and($manifest['assets'][0]['available'])->toBeTrue()
+        ->and($fixture['question']->fresh()->content)->toBe($content);
+    exportGet('assets/'.$manifest['assets'][0]['id'].'?'.$fixture['query'].'&revision='.$manifest['revision'])
+        ->assertOk()->assertContent($bytes);
+});
+
+it('preserves styled text semantics, inherited marks, table alignment and ordered-list numbering', function () {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => 'subjective_standard', 'is_objective' => false]);
+    $question = new Question(['schema_key' => 'subjective_standard', 'content' => [
+        'prompt_en' => '<p style="font-weight:700"><span style="font-style:italic; text-decoration:underline line-through">Marked</span><span style="font-weight:normal"> plain</span><span style="vertical-align:super">2</span></p><ol start="3" type="1"><li><strong>Third</strong></li></ol><table><tbody><tr><td style="text-align:center"><u>Cell</u></td></tr></tbody></table>',
+    ]]);
+    $question->id = 801;
+    $converted = $converter->convert($question, $type, 'ENGLISH');
+    $blocks = $converted['payload']['statement']['en']['content'];
+    expect($converted['issues'])->toBeEmpty()
+        ->and(array_column($blocks[0]['content'][0]['marks'], 'type'))->toBe(['bold', 'italic', 'underline', 'strike'])
+        ->and($blocks[0]['content'][1])->not->toHaveKey('marks')
+        ->and(array_column($blocks[0]['content'][2]['marks'], 'type'))->toBe(['bold', 'superscript'])
+        ->and($blocks[1]['attrs'])->toBe(['start' => 3, 'type' => '1'])
+        ->and($blocks[2]['content'][0]['content'][0]['attrs']->align)->toBe('center');
+    $question->content = ['prompt_en' => '<p><s><span style="text-decoration:underline">Both</span><span style="text-decoration:none">Strike</span></s></p>'];
+    $nested = $converter->convert($question, $type, 'ENGLISH')['payload']['statement']['en']['content'][0]['content'];
+    expect(array_column($nested[0]['marks'], 'type'))->toContain('strike', 'underline')
+        ->and(array_column($nested[1]['marks'], 'type'))->toBe(['strike']);
+});
+
+it('reports the exact field, element and unsupported style without dropping source content', function () {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => 'subjective_grouped', 'is_objective' => false]);
+    $question = new Question(['schema_key' => 'subjective_grouped', 'content' => [
+        'items' => [['prompt_en' => 'Part', 'prompt_ur' => '<p><span style="color:red">اہم</span></p>']],
+    ]]);
+    $question->id = 802;
+    $converted = $converter->convert($question, $type, 'BOTH');
+    expect($converted['payload'])->toBeNull()
+        ->and($converted['issues'])->toBe(['items[0].prompt_ur: Unsupported style on <span>: color: red.']);
+});
+
+it('blocks unsafe events and dimensions that cannot be represented as portable image attributes', function (string $html, string $issue) {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => 'subjective_standard', 'is_objective' => false]);
+    $question = new Question(['schema_key' => 'subjective_standard', 'content' => ['prompt_en' => $html]]);
+    $question->id = 803;
+    $converted = $converter->convert($question, $type, 'ENGLISH');
+    expect($converted['payload'])->toBeNull()
+        ->and($converted['issues'][0])->toContain('prompt_en:', $issue);
+})->with([
+    ['<img src="/storage/a.png" style="width:50%">', 'width: 50%'],
+    ['<img src="/storage/a.png" style="height:4001px">', 'height: 4001px'],
+    ['<span onclick="alert(1)">Text</span>', 'Unsafe HTML attribute'],
+    ['<span style="background-image:url(https://example.test/a.png)">Text</span>', 'background-image'],
+]);
+
+it('uses the actual answer keys when a source type permits multiple answers', function (string $schema) {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => $schema, 'is_objective' => true, 'is_single' => false]);
+    $item = ['prompt_en' => 'Choose one', 'options' => [
+        ['text_en' => 'A', 'is_correct' => true],
+        ['text_en' => 'B', 'is_correct' => false],
+        ['text_en' => 'C', 'is_correct' => false],
+        ['text_en' => 'D', 'is_correct' => false],
+    ]];
+    $content = $schema === 'objective_passage_mcq' ? ['passage_en' => 'Read', 'items' => [$item]] : $item;
+    $question = new Question(['schema_key' => $schema, 'content' => $content]);
+    $question->id = 804;
+    expect($converter->convert($question, $type, 'ENGLISH')['issues'])->toBeEmpty();
+    $item['options'][1]['is_correct'] = true;
+    $question->content = $schema === 'objective_passage_mcq' ? ['passage_en' => 'Read', 'items' => [$item]] : $item;
+    $multiple = $converter->convert($question, $type, 'ENGLISH');
+    expect($multiple['payload'])->toBeNull()
+        ->and($multiple['issues'])->toBe(['Objective question has multiple correct options.']);
+})->with(['objective_mcq', 'objective_passage_mcq']);
 
 it('hashes empty rich attributes as objects in the canonical contract', function () {
     $checksum = new ReflectionMethod(TestbaseExportService::class, 'checksum');

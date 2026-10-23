@@ -29,6 +29,23 @@ with a blocking issue. Image URLs resolve only through the approved local
 question-image table or public storage; missing and unsupported images are
 reported in the manifest. No academic bank records or audit rows are written.
 
+Legacy pixel image styles (`width`/`height`, 1–4000 px) become portable image
+attributes, including images in shared content. Supported font weight, italic,
+underline/strike and subscript/superscript styles become rich-text marks; table
+cell alignment and ordered-list start values are preserved. Other CSS remains
+blocked with the source field, element and property in the issue. The API never
+passes CSS or executable HTML through to TestBase.
+
+Available English and Urdu content is always exported. A missing translation
+does not discard a convertible payload: TestBase checks the selected destination
+language, including English-only or Urdu-only extraction from a Both source.
+Invalid objective answer keys and unsupported semantics still block conversion.
+Objective conversion checks the actual option keys, including for types that
+permit multiple answers: exactly one correct option converts, while zero or
+multiple correct options remain blocked.
+Start a fresh review after deploying a converter fix; saved source snapshots
+are immutable.
+
 Run the isolated SQLite tests on Windows:
 
 ```powershell

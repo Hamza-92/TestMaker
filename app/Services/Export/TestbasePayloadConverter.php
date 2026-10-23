@@ -63,7 +63,7 @@ class TestbasePayloadConverter
                 $stored = is_array($question->content) ? $question->content : [];
                 foreach ([$stored['prompt_en'] ?? null, $stored['prompt_ur'] ?? null,
                     $question->statement_en, $question->statement_ur] as $oldStatement) {
-                    if ($this->document($oldStatement) !== null) {
+                    if ($this->document($oldStatement, 'options-only statement') !== null) {
                         throw new DomainException('Options-only source retains a statement that cannot be discarded.');
                     }
                 }
@@ -78,9 +78,6 @@ class TestbasePayloadConverter
                 'parts' => [],
             ];
             if ($schema === 'PASSAGE_OBJECTIVE') {
-                if (! $type->is_single) {
-                    throw new DomainException('Multiple-answer passage questions are unsupported.');
-                }
                 $payload['passage'] = $this->pair($content, 'passage');
                 $payload['parts'] = $this->parts($question, $content, true);
             } elseif ($schema === 'GROUPED_SUBJECTIVE') {
@@ -98,17 +95,14 @@ class TestbasePayloadConverter
                     [$payload['options'], $payload['correctOptionId']] = $this->options(
                         (array) ($content['options'] ?? []), 'q'.$question->id,
                     );
-                    if (! $type->is_single) {
-                        throw new DomainException('Multiple-answer objective question is unsupported.');
-                    }
                 } elseif ($schema === 'TRUE_FALSE') {
                     $payload['truth'] = match ($content['correct_boolean'] ?? null) {
                         'true' => true, 'false' => false,
                         default => throw new DomainException('True/false answer is missing or ambiguous.'),
                     };
                 } elseif ($sourceSchema === 'subjective_same_statement') {
-                    $en = $this->document($content['shared_en'] ?? null);
-                    $ur = $this->document($content['shared_ur'] ?? null);
+                    $en = $this->document($content['shared_en'] ?? null, 'shared_en');
+                    $ur = $this->document($content['shared_ur'] ?? null, 'shared_ur');
                     if ($en !== null && $ur !== null && $en !== $ur) {
                         throw new DomainException('Different English and Urdu shared content cannot be merged.');
                     }
@@ -120,7 +114,8 @@ class TestbasePayloadConverter
                 }
             }
 
-            $this->requireMedium($payload, $schema, $medium);
+            // Export every available translation. TestBase validates the language
+            // selected for the destination, which may be one language of BOTH.
             if (strlen(json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)) > 500000) {
                 throw new DomainException('Question payload exceeds 500 KB.');
             }
@@ -148,13 +143,13 @@ class TestbasePayloadConverter
                 throw new DomainException('Grouped question item is malformed.');
             }
             $part = $this->part('p'.$question->id.'-'.$index);
-            $part['statement'] = $this->pair($item, 'prompt');
+            $part['statement'] = $this->pair($item, 'prompt', 'items['.$index.'].');
             if ($objective) {
                 [$part['options'], $part['correctOptionId']] = $this->options(
-                    (array) ($item['options'] ?? []), 'p'.$question->id.'-'.$index,
+                    (array) ($item['options'] ?? []), 'p'.$question->id.'-'.$index, 'items['.$index.'].options',
                 );
             } else {
-                $part['answer'] = $this->pair($item, 'answer');
+                $part['answer'] = $this->pair($item, 'answer', 'items['.$index.'].');
             }
             $parts[] = $part;
         }
@@ -162,7 +157,7 @@ class TestbasePayloadConverter
         return $parts;
     }
 
-    private function options(array $options, string $prefix): array
+    private function options(array $options, string $prefix, string $context = 'options'): array
     {
         if (count($options) !== 4 || ! array_is_list($options)) {
             throw new DomainException('Objective question requires exactly four ordered options.');
@@ -174,7 +169,7 @@ class TestbasePayloadConverter
                 throw new DomainException('Objective option is malformed.');
             }
             $id = 'o'.$prefix.'-'.$index;
-            $rows[] = ['id' => $id, 'content' => $this->pair($option, 'text')];
+            $rows[] = ['id' => $id, 'content' => $this->pair($option, 'text', $context.'['.$index.'].')];
             if ($option['is_correct'] ?? false) {
                 if ($correct !== null) {
                     throw new DomainException('Objective question has multiple correct options.');
@@ -203,11 +198,11 @@ class TestbasePayloadConverter
         return ['en' => null, 'ur' => null];
     }
 
-    private function pair(array $content, string $field): array
+    private function pair(array $content, string $field, string $context = ''): array
     {
         return [
-            'en' => $this->document($content[$field.'_en'] ?? null),
-            'ur' => $this->document($content[$field.'_ur'] ?? null),
+            'en' => $this->document($content[$field.'_en'] ?? null, $context.$field.'_en'),
+            'ur' => $this->document($content[$field.'_ur'] ?? null, $context.$field.'_ur'),
         ];
     }
 
@@ -216,42 +211,25 @@ class TestbasePayloadConverter
         return $pair['en'] === null && $pair['ur'] === null;
     }
 
-    private function requireMedium(array $payload, string $schema, string $medium): void
+    private function document(mixed $value, string $field): ?array
     {
-        $required = in_array($schema, ['OPTIONS_ONLY_OBJECTIVE', 'GROUPED_SUBJECTIVE'], true)
-            ? [] : ($schema === 'PASSAGE_OBJECTIVE' ? [$payload['passage']] : [$payload['statement']]);
-        if ($schema === 'GROUPED_SUBJECTIVE' && ! $this->pairIsEmpty($payload['passage'])) {
-            $required[] = $payload['passage'];
-        }
-        if (in_array($schema, ['PASSAGE_OBJECTIVE', 'GROUPED_SUBJECTIVE'], true)) {
-            foreach ($payload['parts'] as $part) {
-                $required[] = $part['statement'];
-                if ($schema === 'PASSAGE_OBJECTIVE') {
-                    foreach ($part['options'] as $option) {
-                        $required[] = $option['content'];
-                    }
-                }
-            }
-        } else {
-            foreach ($payload['options'] as $option) {
-                $required[] = $option['content'];
-            }
-        }
-        foreach ($required as $pair) {
-            if (($medium !== 'URDU' && $pair['en'] === null) ||
-                ($medium !== 'ENGLISH' && $pair['ur'] === null)) {
-                throw new DomainException('Required assignment-medium translation is missing.');
-            }
+        try {
+            return $this->parseDocument($value);
+        } catch (DomainException $exception) {
+            throw new DomainException($field.': '.$exception->getMessage(), previous: $exception);
         }
     }
 
-    private function document(mixed $value): ?array
+    private function parseDocument(mixed $value): ?array
     {
-        if ($value === null || trim((string) $value) === '') {
+        if ($value === null) {
             return null;
         }
         if (! is_string($value) || strlen($value) > 500000) {
             throw new DomainException('Rich content is too large or malformed.');
+        }
+        if (trim($value) === '') {
+            return null;
         }
         if (stripos($value, '<img') === false && stripos($value, '&lt;img') !== false) {
             $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5);
@@ -343,7 +321,7 @@ class TestbasePayloadConverter
         return false;
     }
 
-    private function blocks(DOMNode $container): array
+    private function blocks(DOMNode $container, array $marks = []): array
     {
         $blocks = [];
         $inline = [];
@@ -354,29 +332,49 @@ class TestbasePayloadConverter
             }
         };
         foreach ($container->childNodes as $child) {
-            if ($child instanceof DOMElement && $child->hasAttribute('style') && trim($child->getAttribute('style')) !== '') {
-                throw new DomainException('Unsupported styled content cannot be dropped.');
-            }
             if ($child instanceof DOMElement && in_array(strtolower($child->tagName), ['p', 'div'], true)) {
                 $flush();
-                $nested = $this->blocks($child);
+                [$childMarks] = $this->formatting($child, $marks);
+                $nested = $this->blocks($child, $childMarks);
                 $blocks = array_merge($blocks, $nested ?: [['type' => 'paragraph']]);
             } elseif ($child instanceof DOMElement && in_array(strtolower($child->tagName), ['ul', 'ol'], true)) {
                 $flush();
+                [$listMarks] = $this->formatting($child, $marks);
                 $items = [];
                 foreach ($child->childNodes as $li) {
                     if ($li instanceof DOMElement && strtolower($li->tagName) === 'li') {
-                        $items[] = ['type' => 'listItem', 'content' => $this->blocks($li)];
+                        [$itemMarks] = $this->formatting($li, $listMarks);
+                        $items[] = ['type' => 'listItem', 'content' => $this->blocks($li, $itemMarks) ?: [['type' => 'paragraph']]];
                     } elseif (trim($li->textContent) !== '') {
                         throw new DomainException('Unsupported list structure.');
                     }
                 }
-                $blocks[] = ['type' => strtolower($child->tagName) === 'ol' ? 'orderedList' : 'bulletList', 'content' => $items];
+                $list = ['type' => strtolower($child->tagName) === 'ol' ? 'orderedList' : 'bulletList', 'content' => $items];
+                if ($list['type'] === 'orderedList') {
+                    $attrs = [];
+                    if ($child->hasAttribute('start')) {
+                        $start = filter_var($child->getAttribute('start'), FILTER_VALIDATE_INT);
+                        if ($start === false || $start < 1 || $start > 100) {
+                            throw new DomainException('Unsupported ordered-list start.');
+                        }
+                        $attrs['start'] = $start;
+                    }
+                    if ($child->hasAttribute('type')) {
+                        if ($child->getAttribute('type') !== '1') {
+                            throw new DomainException('Unsupported ordered-list type.');
+                        }
+                        $attrs['type'] = '1';
+                    }
+                    if ($attrs !== []) {
+                        $list['attrs'] = $attrs;
+                    }
+                }
+                $blocks[] = $list;
             } elseif ($child instanceof DOMElement && strtolower($child->tagName) === 'table') {
                 $flush();
-                $blocks[] = $this->table($child);
+                $blocks[] = $this->table($child, $marks);
             } else {
-                foreach ($this->inline($child, []) as $node) {
+                foreach ($this->inline($child, $marks) as $node) {
                     if (in_array($node['type'], ['image', 'blockMath'], true)) {
                         $flush();
                         $blocks[] = $node;
@@ -391,15 +389,25 @@ class TestbasePayloadConverter
         return $blocks;
     }
 
-    private function table(DOMElement $table): array
+    private function table(DOMElement $table, array $marks): array
     {
+        [$marks] = $this->formatting($table, $marks);
         $rows = [];
         foreach ($table->getElementsByTagName('tr') as $tr) {
+            if ($tr->parentNode !== $table && $tr->parentNode?->parentNode !== $table) {
+                throw new DomainException('Nested tables are unsupported.');
+            }
+            $rowMarks = $marks;
+            if ($tr->parentNode instanceof DOMElement && $tr->parentNode !== $table) {
+                [$rowMarks] = $this->formatting($tr->parentNode, $rowMarks);
+            }
+            [$rowMarks] = $this->formatting($tr, $rowMarks);
             $cells = [];
             foreach ($tr->childNodes as $cell) {
                 if (! $cell instanceof DOMElement || ! in_array(strtolower($cell->tagName), ['td', 'th'], true)) {
                     continue;
                 }
+                [$cellMarks, $cellStyles] = $this->formatting($cell, $rowMarks);
                 $attrs = new \stdClass;
                 foreach (['colspan', 'rowspan'] as $name) {
                     if ($cell->hasAttribute($name)) {
@@ -410,8 +418,15 @@ class TestbasePayloadConverter
                         $attrs->{$name} = $number;
                     }
                 }
+                $align = $cellStyles['align'] ?? ($cell->hasAttribute('align') ? strtolower($cell->getAttribute('align')) : null);
+                if ($align !== null) {
+                    if (! in_array($align, ['left', 'center', 'right'], true)) {
+                        throw new DomainException('Unsupported table alignment.');
+                    }
+                    $attrs->align = $align;
+                }
                 $cells[] = ['type' => strtolower($cell->tagName) === 'th' ? 'tableHeader' : 'tableCell',
-                    'attrs' => $attrs, 'content' => $this->blocks($cell) ?: [['type' => 'paragraph']]];
+                    'attrs' => $attrs, 'content' => $this->blocks($cell, $cellMarks) ?: [['type' => 'paragraph']]];
             }
             $rows[] = ['type' => 'tableRow', 'content' => $cells];
         }
@@ -430,9 +445,16 @@ class TestbasePayloadConverter
             return [];
         }
         $tag = strtolower($node->tagName);
-        if ($node->hasAttribute('style') && trim($node->getAttribute('style')) !== '') {
-            throw new DomainException('Unsupported styled content cannot be dropped.');
+        $inheritedMarks = $marks;
+        $mark = match ($tag) {
+            'strong', 'b' => 'bold', 'em', 'i' => 'italic', 'u' => 'underline',
+            's', 'strike', 'del' => 'strike', 'sub' => 'subscript', 'sup' => 'superscript',
+            default => null,
+        };
+        if ($mark !== null) {
+            $marks = $this->mark($marks, $mark, true);
         }
+        [$marks, $styleAttrs] = $this->formatting($node, $marks, $inheritedMarks);
         if ($tag === 'br') {
             return [['type' => 'hardBreak']];
         }
@@ -450,8 +472,8 @@ class TestbasePayloadConverter
                 }
             }
             foreach (['width', 'height'] as $name) {
-                if ($node->hasAttribute($name)) {
-                    $dimension = $node->getAttribute($name);
+                if (isset($styleAttrs[$name]) || $node->hasAttribute($name)) {
+                    $dimension = (string) ($styleAttrs[$name] ?? $node->getAttribute($name));
                     if (! ctype_digit($dimension) || (int) $dimension < 1 || (int) $dimension > 4000) {
                         throw new DomainException('Image dimensions are unsupported.');
                     }
@@ -470,19 +492,8 @@ class TestbasePayloadConverter
             return [['type' => $node->getAttribute('data-display') === 'block' ? 'blockMath' : 'inlineMath',
                 'attrs' => ['latex' => $latex]]];
         }
-        $mark = match ($tag) {
-            'strong', 'b' => 'bold', 'em', 'i' => 'italic', 'u' => 'underline',
-            's', 'strike', 'del' => 'strike', 'sub' => 'subscript', 'sup' => 'superscript',
-            default => null,
-        };
         if ($mark === null && $tag !== 'span') {
             throw new DomainException('Unsupported rich HTML element: '.$tag.'.');
-        }
-        if ($tag === 'span' && $node->hasAttribute('style') && trim($node->getAttribute('style')) !== '') {
-            throw new DomainException('Unsupported styled text cannot be dropped.');
-        }
-        if ($mark !== null) {
-            $marks[] = ['type' => $mark];
         }
         $output = [];
         foreach ($node->childNodes as $child) {
@@ -490,5 +501,59 @@ class TestbasePayloadConverter
         }
 
         return $output;
+    }
+
+    private function mark(array $marks, string $type, bool $enabled): array
+    {
+        $marks = array_values(array_filter($marks, fn ($mark) => $mark['type'] !== $type));
+        if ($enabled) {
+            $marks[] = ['type' => $type];
+        }
+
+        return $marks;
+    }
+
+    /** Convert only CSS that has an equivalent in the portable rich-text contract. */
+    private function formatting(DOMElement $element, array $marks, ?array $inheritedMarks = null): array
+    {
+        $inheritedTypes = array_column($inheritedMarks ?? $marks, 'type');
+        foreach ($element->attributes as $attribute) {
+            if (str_starts_with(strtolower($attribute->name), 'on')) {
+                throw new DomainException('Unsafe HTML attribute on <'.strtolower($element->tagName).'>.');
+            }
+        }
+        $attrs = [];
+        $tag = strtolower($element->tagName);
+        foreach (explode(';', $element->getAttribute('style')) as $declaration) {
+            if (trim($declaration) === '') {
+                continue;
+            }
+            $parts = explode(':', $declaration, 2);
+            $property = strtolower(trim($parts[0]));
+            $value = strtolower(trim(preg_replace('/\s*!important\s*$/i', '', $parts[1] ?? '')));
+            if ($property === 'font-weight' && in_array($value, ['normal', 'bold', '400', '600', '700', '800', '900'], true)) {
+                $marks = $this->mark($marks, 'bold', ! in_array($value, ['normal', '400'], true));
+            } elseif ($property === 'font-style' && in_array($value, ['normal', 'italic', 'oblique'], true)) {
+                $marks = $this->mark($marks, 'italic', $value !== 'normal');
+            } elseif (in_array($property, ['text-decoration', 'text-decoration-line'], true) &&
+                preg_match('/^(?:none|(?:underline|line-through)(?:\s+(?:underline|line-through))?)$/', $value)) {
+                // Decorations on ancestors continue through descendant inline boxes.
+                $marks = $this->mark($marks, 'underline', in_array('underline', $inheritedTypes, true) || str_contains($value, 'underline'));
+                $marks = $this->mark($marks, 'strike', in_array('strike', $inheritedTypes, true) || str_contains($value, 'line-through'));
+            } elseif ($property === 'vertical-align' && in_array($value, ['sub', 'super', 'baseline'], true)) {
+                $marks = $this->mark($marks, 'subscript', in_array('subscript', $inheritedTypes, true) || $value === 'sub');
+                $marks = $this->mark($marks, 'superscript', in_array('superscript', $inheritedTypes, true) || $value === 'super');
+            } elseif ($tag === 'img' && in_array($property, ['width', 'height'], true) &&
+                preg_match('/^([0-9]+)(?:px)?$/', $value, $match) && (int) $match[1] >= 1 && (int) $match[1] <= 4000) {
+                $attrs[$property] = (int) $match[1];
+            } elseif (in_array($tag, ['td', 'th'], true) && $property === 'text-align' &&
+                in_array($value, ['left', 'center', 'right'], true)) {
+                $attrs['align'] = $value;
+            } else {
+                throw new DomainException('Unsupported style on <'.$tag.'>: '.mb_substr($property.': '.$value, 0, 120).'.');
+            }
+        }
+
+        return [$marks, $attrs];
     }
 }
