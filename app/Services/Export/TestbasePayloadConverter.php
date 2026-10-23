@@ -69,6 +69,25 @@ class TestbasePayloadConverter
                 }
             }
             $content = QuestionTypeSchemaRegistry::contentFromQuestion($question, $effectiveType);
+            if ($sourceSchema === 'subjective_standard') {
+                if (array_key_exists('items', $content) && ! $this->hasOnlyPlaceholderParts($content)) {
+                    throw new DomainException('Standalone source schema retains authored child content that cannot be flattened.');
+                }
+                foreach (['en', 'ur'] as $language) {
+                    $field = 'prompt_'.$language;
+                    if ($this->document($content[$field] ?? null, $field) === null) {
+                        $intro = $content['intro_'.$language] ?? null;
+                        $content[$field] = $this->document($intro, 'intro_'.$language) !== null
+                            ? $intro : $question->{'statement_'.$language};
+                    }
+                    foreach (['answer' => 'answer', 'guidance' => 'description'] as $fieldName => $legacyField) {
+                        $field = $fieldName.'_'.$language;
+                        if ($this->document($content[$field] ?? null, $field) === null) {
+                            $content[$field] = $question->{$legacyField.'_'.$language};
+                        }
+                    }
+                }
+            }
             $root = $this->part('q'.$question->id);
             $payload = $root + [
                 'version' => 1,
@@ -82,9 +101,26 @@ class TestbasePayloadConverter
                 $payload['parts'] = $this->parts($question, $content, true);
             } elseif ($schema === 'GROUPED_SUBJECTIVE') {
                 $payload['passage'] = $this->pair($content, 'intro');
-                $payload['parts'] = $this->parts($question, $content, false);
-                // TestMaker has no explicit passage/multipart flag. Keep its introduction
-                // in PARTS mode so an authored passage is never inferred from text alone.
+                if (! $this->pairIsEmpty($payload['passage']) && $this->hasOnlyPlaceholderParts($content)) {
+                    // Legacy worksheets keep the complete question in intro and a
+                    // single empty editor item. There is no authored child to group.
+                    $schema = 'STANDARD_SUBJECTIVE';
+                    $payload['statement'] = $payload['passage'];
+                    $payload['passage'] = $this->empty();
+                    $payload['answer'] = $this->pair([
+                        'answer_en' => $content['answer_en'] ?? $question->answer_en,
+                        'answer_ur' => $content['answer_ur'] ?? $question->answer_ur,
+                    ], 'answer');
+                    $payload['explanation'] = $this->pair([
+                        'guidance_en' => $content['guidance_en'] ?? $question->description_en,
+                        'guidance_ur' => $content['guidance_ur'] ?? $question->description_ur,
+                    ], 'guidance');
+                    $itemCount = 1;
+                } else {
+                    $payload['parts'] = $this->parts($question, $content, false);
+                    // TestMaker has no explicit passage/multipart flag. Keep authored
+                    // groups in PARTS mode rather than inferring it from their text.
+                }
             } else {
                 $payload['statement'] = $schema === 'OPTIONS_ONLY_OBJECTIVE'
                     ? $this->empty() : $this->pair($content, 'prompt');
@@ -111,6 +147,13 @@ class TestbasePayloadConverter
                 } else {
                     $payload['answer'] = $this->pair($content, 'answer');
                     $payload['explanation'] = $this->pair($content, 'guidance');
+                    if ($sourceSchema === 'subjective_standard' && $this->pairIsEmpty($payload['statement']) &&
+                        $this->isImageWorksheet($payload['explanation'])) {
+                        // Legacy identification worksheets store their only stimulus
+                        // in guidance; retain that image as the visible question.
+                        $payload['statement'] = $payload['explanation'];
+                        $payload['explanation'] = $this->empty();
+                    }
                 }
             }
 
@@ -131,6 +174,58 @@ class TestbasePayloadConverter
         }
     }
 
+    private function hasOnlyPlaceholderParts(array $content): bool
+    {
+        $items = $content['items'] ?? [];
+        if (! is_array($items) || ! array_is_list($items) || count($items) > 1) {
+            return false;
+        }
+        foreach ($items as $index => $item) {
+            if (! is_array($item) || array_diff(array_keys($item), ['prompt_en', 'prompt_ur', 'answer_en', 'answer_ur']) !== []) {
+                return false;
+            }
+            foreach (['prompt_en', 'prompt_ur', 'answer_en', 'answer_ur'] as $field) {
+                if ($this->document($item[$field] ?? null, 'items['.$index.'].'.$field) !== null) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function isImageWorksheet(array $pair): bool
+    {
+        $hasImage = false;
+        $check = function (array $node) use (&$check, &$hasImage): bool {
+            if ($node['type'] === 'image') {
+                $hasImage = true;
+
+                return true;
+            }
+            if ($node['type'] === 'text') {
+                return preg_match('/^[\s\x{00a0}]*$/u', $node['text']) === 1;
+            }
+            if (! in_array($node['type'], ['doc', 'paragraph', 'hardBreak'], true)) {
+                return false;
+            }
+            foreach ($node['content'] ?? [] as $child) {
+                if (! $check($child)) {
+                    return false;
+                }
+            }
+
+            return true;
+        };
+        foreach ($pair as $document) {
+            if ($document !== null && ! $check($document)) {
+                return false;
+            }
+        }
+
+        return $hasImage;
+    }
+
     private function parts(Question $question, array $content, bool $objective): array
     {
         $items = $content['items'] ?? [];
@@ -144,6 +239,9 @@ class TestbasePayloadConverter
             }
             $part = $this->part('p'.$question->id.'-'.$index);
             $part['statement'] = $this->pair($item, 'prompt', 'items['.$index.'].');
+            if ($this->pairIsEmpty($part['statement'])) {
+                throw new DomainException('items['.$index.'].prompt: Grouped item has no statement in either language.');
+            }
             if ($objective) {
                 [$part['options'], $part['correctOptionId']] = $this->options(
                     (array) ($item['options'] ?? []), 'p'.$question->id.'-'.$index, 'items['.$index.'].options',

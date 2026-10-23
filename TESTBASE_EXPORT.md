@@ -46,6 +46,22 @@ multiple correct options remain blocked.
 Start a fresh review after deploying a converter fix; saved source snapshots
 are immutable.
 
+Legacy `subjective_grouped` worksheets sometimes store the complete image/text
+in `intro_en`/`intro_ur` with one empty editor placeholder instead of authored
+children. These export as a separate `STANDARD_SUBJECTIVE` variant: the intro
+becomes the statement, with one parent item and no fabricated child. Existing
+answers/explanations are retained. Actual authored children remain grouped;
+incomplete children without a statement in either language stay blocked.
+
+For `subjective_standard`, an empty prompt may use a retained intro or legacy
+statement column; current authored content takes priority. Legacy answers and
+descriptions fill empty corresponding fields. If both statement languages are
+absent and guidance contains images and whitespace only, export that image as
+the statement once, removing the duplicate explanation. Ordinary explanations
+retain their role. Authored child content under a standalone schema is blocked
+instead of discarded. Map the separate worksheet variant to a Standard Subjective
+TestBase type and start a fresh review after deployment.
+
 Run the isolated SQLite tests on Windows:
 
 ```powershell

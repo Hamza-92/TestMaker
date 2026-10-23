@@ -344,6 +344,132 @@ it('uses the actual answer keys when a source type permits multiple answers', fu
         ->and($multiple['issues'])->toBe(['Objective question has multiple correct options.']);
 })->with(['objective_mcq', 'objective_passage_mcq']);
 
+it('exports legacy introductory worksheets as a separate standard-subjective variant without empty children', function () {
+    $fixture = exportFixture();
+    $imageId = (string) Str::uuid();
+    $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+juz8AAAAASUVORK5CYII=', true);
+    DB::table('question_images')->insert([
+        'id' => $imageId, 'mime_type' => 'image/png', 'data' => base64_encode($bytes), 'created_at' => now(),
+    ]);
+    $fixture['type']->update(['schema_key' => 'subjective_grouped', 'is_objective' => false]);
+    $content = [
+        'intro_en' => '<img src="/question-images/'.$imageId.'" style="height:85px; width:152px">',
+        'intro_ur' => null,
+        'items' => [['prompt_en' => null, 'prompt_ur' => null, 'answer_en' => null, 'answer_ur' => null]],
+    ];
+    $fixture['question']->update(['schema_key' => 'subjective_grouped', 'content' => $content]);
+    Question::create([
+        'chapter_id' => $fixture['chapter']->id, 'question_type_id' => $fixture['type']->id,
+        'schema_key' => 'subjective_grouped', 'status' => 1,
+        'content' => ['intro_en' => 'Read the passage', 'items' => [['prompt_en' => 'An authored child']]],
+    ]);
+    $manifest = exportGet('scope?'.$fixture['query'])->assertOk()->json();
+    $rows = exportGet('questions?'.$fixture['query'].'&revision='.$manifest['revision'].'&pageSize=10')->assertOk()->json('items');
+    expect($manifest['questionCount'])->toBe(2)
+        ->and($manifest['variants'])->toHaveCount(2)
+        ->and($rows[0]['schema'])->toBe('STANDARD_SUBJECTIVE')
+        ->and($rows[0]['itemCount'])->toBe(1)
+        ->and($rows[0]['issues'])->toBeEmpty()
+        ->and($rows[0]['payload']['statement']['en']['content'][0]['attrs']['width'])->toBe(152)
+        ->and($rows[0]['payload']['statement']['en']['content'][0]['attrs']['height'])->toBe(85)
+        ->and($rows[0]['payload']['passage'])->toBe(['en' => null, 'ur' => null])
+        ->and($rows[0]['payload']['parts'])->toBe([])
+        ->and($rows[1]['schema'])->toBe('GROUPED_SUBJECTIVE')
+        ->and($rows[0]['variantId'])->not->toBe($rows[1]['variantId'])
+        ->and($fixture['question']->fresh()->content)->toBe($content);
+    foreach ($rows as $row) {
+        $variant = collect($manifest['variants'])->firstWhere('id', $row['variantId']);
+        expect($variant['schema'])->toBe($row['schema'])
+            ->and($variant['sourceSchema'])->toBe('subjective_grouped')
+            ->and($variant['questionCount'])->toBe(1);
+    }
+});
+
+it('retains worksheet translations and legacy answers when there is no authored child content', function () {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => 'subjective_grouped', 'is_objective' => false]);
+    $question = new Question(['schema_key' => 'subjective_grouped', 'content' => [
+        'intro_en' => 'Complete the worksheet', 'intro_ur' => 'مشق مکمل کریں',
+        'items' => [['prompt_en' => '<p><br></p>', 'prompt_ur' => null]],
+    ], 'answer_en' => 'The answer', 'description_ur' => 'وضاحت']);
+    $question->id = 805;
+    $converted = $converter->convert($question, $type, 'BOTH');
+    expect($converted['schema'])->toBe('STANDARD_SUBJECTIVE')
+        ->and($converted['issues'])->toBeEmpty()
+        ->and($converted['payload']['statement']['ur'])->not->toBeNull()
+        ->and($converted['payload']['answer']['en']['content'][0]['content'][0]['text'])->toBe('The answer')
+        ->and($converted['payload']['explanation']['ur']['content'][0]['content'][0]['text'])->toBe('وضاحت');
+});
+
+it('does not flatten authored children or guess statements for incomplete groups', function () {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => 'subjective_grouped', 'is_objective' => false]);
+    $question = new Question(['schema_key' => 'subjective_grouped', 'content' => [
+        'intro_en' => 'Introduction', 'items' => [['prompt_ur' => 'اصل سوال']],
+    ]]);
+    $question->id = 806;
+    $group = $converter->convert($question, $type, 'BOTH');
+    expect($group['schema'])->toBe('GROUPED_SUBJECTIVE')
+        ->and($group['payload']['parts'])->toHaveCount(1)
+        ->and($group['payload']['parts'][0]['statement']['en'])->toBeNull()
+        ->and($group['payload']['parts'][0]['statement']['ur'])->not->toBeNull();
+    foreach ([[['answer_en' => 'Answer only']], [[], []]] as $items) {
+        $question->content = ['intro_en' => 'Introduction', 'items' => $items];
+        $blocked = $converter->convert($question, $type, 'BOTH');
+        expect($blocked['schema'])->toBe('GROUPED_SUBJECTIVE')
+            ->and($blocked['payload'])->toBeNull()
+            ->and($blocked['issues'])->toBe(['items[0].prompt: Grouped item has no statement in either language.']);
+    }
+});
+
+it('recovers standalone worksheet statements from stale intro fields or legacy columns', function () {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => 'subjective_standard', 'is_objective' => false]);
+    $question = new Question(['schema_key' => 'subjective_standard', 'content' => [
+        'intro_en' => '<img src="/storage/worksheet.jpg" width="152" height="85">',
+        'items' => [['prompt_en' => null, 'prompt_ur' => null, 'answer_en' => null, 'answer_ur' => null]],
+    ], 'statement_ur' => 'اصل سوال', 'answer_en' => 'Saved answer', 'description_en' => 'Saved explanation']);
+    $question->id = 807;
+    $converted = $converter->convert($question, $type, 'BOTH');
+    expect($converted['schema'])->toBe('STANDARD_SUBJECTIVE')
+        ->and($converted['issues'])->toBeEmpty()
+        ->and($converted['payload']['statement']['en']['content'][0]['type'])->toBe('image')
+        ->and($converted['payload']['statement']['ur']['content'][0]['content'][0]['text'])->toBe('اصل سوال')
+        ->and($converted['payload']['answer']['en']['content'][0]['content'][0]['text'])->toBe('Saved answer')
+        ->and($converted['payload']['explanation']['en']['content'][0]['content'][0]['text'])->toBe('Saved explanation');
+    $question->content = ['prompt_en' => 'Current statement'];
+    $question->statement_en = 'Old statement';
+    expect($converter->convert($question, $type, 'ENGLISH')['payload']['statement']['en']['content'][0]['content'][0]['text'])
+        ->toBe('Current statement');
+    $question->content = ['prompt_en' => '', 'items' => [['prompt_en' => 'Authored child']]];
+    $blocked = $converter->convert($question, $type, 'ENGLISH');
+    expect($blocked['payload'])->toBeNull()
+        ->and($blocked['issues'])->toBe(['Standalone source schema retains authored child content that cannot be flattened.']);
+});
+
+it('keeps an image-only guidance worksheet visible without moving ordinary explanations', function () {
+    $converter = new TestbasePayloadConverter;
+    $type = new QuestionType(['schema_key' => 'subjective_standard', 'is_objective' => false]);
+    $image = '<img src="/storage/fruit.jpg" style="height:61px; width:174px">';
+    $question = new Question(['schema_key' => 'subjective_standard', 'content' => [
+        'prompt_en' => null, 'prompt_ur' => null, 'guidance_en' => $image,
+    ]]);
+    $question->id = 808;
+    $worksheet = $converter->convert($question, $type, 'ENGLISH');
+    expect($worksheet['issues'])->toBeEmpty()
+        ->and($worksheet['payload']['statement']['en']['content'][0]['attrs']['width'])->toBe(174)
+        ->and($worksheet['payload']['statement']['en']['content'][0]['attrs']['height'])->toBe(61)
+        ->and($worksheet['payload']['explanation'])->toBe(['en' => null, 'ur' => null]);
+    $question->content = ['prompt_en' => 'An authored question', 'guidance_en' => $image];
+    $authored = $converter->convert($question, $type, 'ENGLISH')['payload'];
+    expect($authored['statement']['en']['content'][0]['content'][0]['text'])->toBe('An authored question')
+        ->and($authored['explanation']['en']['content'][0]['type'])->toBe('image');
+    $question->content = ['guidance_en' => '<p>Explanation text</p>'.$image];
+    $explanation = $converter->convert($question, $type, 'ENGLISH')['payload'];
+    expect($explanation['statement'])->toBe(['en' => null, 'ur' => null])
+        ->and($explanation['explanation']['en'])->not->toBeNull();
+});
+
 it('hashes empty rich attributes as objects in the canonical contract', function () {
     $checksum = new ReflectionMethod(TestbaseExportService::class, 'checksum');
     $actual = $checksum->invoke(new TestbaseExportService, [

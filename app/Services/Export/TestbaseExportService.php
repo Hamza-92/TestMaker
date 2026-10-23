@@ -152,8 +152,8 @@ class TestbaseExportService
                 $typeRules = $rules->get($type->id, collect());
                 $resolvedType = $this->resolvedType($type, $typeRules);
                 $sourceSchema = $question->schema_key ?: $this->sourceSchema($resolvedType);
-                $variantId = $this->ensureVariant($variants, $type, $sourceSchema, $typeRules, $converter);
                 $converted = $converter->convert($question, $resolvedType, $medium);
+                $variantId = $this->ensureVariant($variants, $type, $sourceSchema, $typeRules, $converter, $converted);
                 $chapterId = (string) $question->chapter_id;
                 $topicId = $question->topic_id === null ? null : (string) $question->topic_id;
                 $issues = $converted['issues'];
@@ -297,11 +297,11 @@ class TestbaseExportService
         });
     }
 
-    private function ensureVariant(array &$variants, QuestionType $type, string $sourceSchema, $rules, TestbasePayloadConverter $converter): string
+    private function ensureVariant(array &$variants, QuestionType $type, string $sourceSchema, $rules, TestbasePayloadConverter $converter, ?array $conversion = null): string
     {
         $effective = $this->resolvedType($type, $rules);
         $effective->schema_key = $sourceSchema;
-        $portable = $converter->convert(new Question(['schema_key' => $sourceSchema]), $effective, 'ENGLISH');
+        $portable = $conversion ?? $converter->convert(new Question(['schema_key' => $sourceSchema]), $effective, 'ENGLISH');
         $schema = $portable['schema'];
         $variantId = 'type-'.$type->id.'-'.substr(hash('sha256', $sourceSchema.'|'.($schema ?? 'null')), 0, 16);
         if (! isset($variants[$variantId])) {
