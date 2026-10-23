@@ -80,7 +80,7 @@ const NAV_GROUPS: NavGroup[] = [
             },
             {
                 label: 'QAT Tests',
-                href: '/qat-tests',
+                href: '/qa-tests',
                 icon: ClipboardListIcon,
                 requires: 'generate_papers',
             },
@@ -205,7 +205,7 @@ function SidebarContent({
                 return false;
             }
 
-            if (item.href === '/qat-tests' && !schoolContext?.allow_qat_tests) {
+            if (item.href === '/qa-tests' && !schoolContext?.allow_qat_tests) {
                 return false;
             }
 

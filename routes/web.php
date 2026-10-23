@@ -112,9 +112,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // â”€â”€â”€ Customer / Teacher app â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::middleware('app.user')->group(function () {
 
-        Route::get('qat-tests', [CustomerQatCatalogueController::class, 'index'])
+        Route::redirect('qat-tests', '/qa-tests');
+        Route::get('qa-tests', [CustomerQatCatalogueController::class, 'index'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.index');
+        Route::get('qa-tests/create/{mode}', [CustomerQatCatalogueController::class, 'create'])
+            ->whereIn('mode', ['auto', 'manual'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->name('customer.qat.create');
+        Route::get('qat-tests/subjects/{qatSubject}', [CustomerQatCatalogueController::class, 'show'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->name('customer.qat.subjects.show');
 
         Route::middleware('teacher.feature:generate_papers')->group(function () {
             Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');

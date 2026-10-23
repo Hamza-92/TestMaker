@@ -1,9 +1,11 @@
 <?php
 
+use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
+use App\Models\QatPaper;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\QuestionType;
@@ -218,7 +220,7 @@ test('QAT catalogue requires subscription access', function () {
         'qat_catalogue_id' => $catalogueId, 'source_class_id' => $class->id,
         'name' => $class->name, 'status' => true, 'created_at' => now(), 'updated_at' => now(),
     ]);
-    DB::table('qat_subjects')->insert([
+    $qatSubjectId = DB::table('qat_subjects')->insertGetId([
         'qat_class_id' => $qatClassId,
         'qat_catalogue_id' => $catalogueId, 'class_id' => $class->id, 'class_name' => $class->name,
         'subject_id' => $subject->id, 'subject_name' => $subject->name_eng,
@@ -233,6 +235,7 @@ test('QAT catalogue requires subscription access', function () {
     ]);
 
     $this->actingAs($school)->get(route('customer.qat.index'))->assertForbidden();
+    $this->actingAs($school)->get(route('customer.qat.create', 'auto'))->assertForbidden();
     $this->actingAs($admin)->put(route('superadmin.customers.subscriptions.update', [$school, $subscription]), [
         'name' => $subscription->name,
         'amount' => 1000,
@@ -245,13 +248,126 @@ test('QAT catalogue requires subscription access', function () {
     $this->actingAs($school)->get(route('customer.qat.index'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/qat/index')
+            ->has('papers.data', 0));
+    $this->actingAs($school)->get(route('customer.qat.create', 'auto'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('customer/qat/create')
+            ->where('mode', 'auto')
+            ->has('classes', 1)
+            ->where('classes.0.name', 'Class 4')
+            ->where('classes.0.subject_count', 1));
+    $this->actingAs($school)->get(route('customer.qat.create', 'manual'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('mode', 'manual'));
+    $this->actingAs($school)->get('/qa-tests/create/invalid')->assertNotFound();
+
+    QatPaper::create([
+        'user_id' => $school->id,
+        'name' => 'April QAT practice',
+        'mode' => 'manual',
+        'class_ids' => [$qatClassId],
+        'class_names' => 'Class 4',
+        'subject_name' => 'English',
+        'total_marks' => 20,
+        'question_count' => 10,
+        'paper_data' => ['sections' => []],
+        'is_draft' => false,
+    ]);
+    QatPaper::create([
+        'user_id' => $school->id,
+        'name' => 'Unfinished QAT',
+        'mode' => 'auto',
+        'class_ids' => [$qatClassId],
+        'paper_data' => ['sections' => []],
+        'is_draft' => true,
+    ]);
+    $this->actingAs($school)->get(route('customer.qat.index'))->assertInertia(fn (Assert $page) => $page
+        ->has('papers.data', 1)
+        ->where('papers.data.0.name', 'April QAT practice'));
+    $this->actingAs($school)->get(route('customer.qat.index', ['q' => 'missing']))
+        ->assertInertia(fn (Assert $page) => $page->has('papers.data', 0));
+    $questionType = QuestionType::create([
+        'name' => 'QAT MCQ', 'heading_en' => 'Choose the answer',
+        'have_exercise' => false, 'have_statement' => true,
+        'have_description' => false, 'have_answer' => false, 'is_single' => true,
+        'is_objective' => true, 'column_per_row' => 1, 'status' => 1,
+    ]);
+    $firstChapterId = DB::table('qat_chapters')->insertGetId([
+        'qat_subject_id' => $qatSubjectId, 'source_chapter_id' => 101,
+        'name' => 'April chapter', 'sort_id' => 1, 'status' => true,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $secondChapterId = DB::table('qat_chapters')->insertGetId([
+        'qat_subject_id' => $qatSubjectId, 'source_chapter_id' => 102,
+        'name' => 'May chapter', 'sort_id' => 2, 'status' => true,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('qat_chapter_months')->insert([
+        ['qat_chapter_id' => $firstChapterId, 'month' => 4],
+        ['qat_chapter_id' => $secondChapterId, 'month' => 5],
+    ]);
+    foreach ([$firstChapterId => 'April question', $secondChapterId => 'May question'] as $chapterId => $statement) {
+        DB::table('qat_questions')->insert([
+            'qat_chapter_id' => $chapterId,
+            'source_question_id' => $chapterId,
+            'question_type_id' => $questionType->id,
+            'status' => true,
+            'question_data' => json_encode([
+                'statement_en' => $statement,
+                'answer_en' => 'Private answer',
+                'question_type' => ['name' => 'QAT MCQ'],
+            ]),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+    $this->actingAs($school)->get(route('customer.qat.create', 'manual'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('classes.0.subject_count', 1)
             ->has('subjects', 1)
-            ->where('subjects.0.subject_name', 'English'));
+            ->where('subjects.0.chapter_count', 2)
+            ->has('chapters', 2));
+    $this->actingAs($school)->get(route('customer.qat.subjects.show', $qatSubjectId))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('customer/qat/subject')
+        ->has('chapters', 2)
+        ->has('questions.data', 2)
+        ->where('availableCount', 2)
+        ->missing('questions.data.0.question_data'));
+    $this->actingAs($school)->get(route('customer.qat.subjects.show', $qatSubjectId).'?month=4')
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('availableCount', 1)
+        ->has('chapters', 1)
+        ->has('questions.data', 1)
+        ->where('questions.data.0.summary', 'April question'));
+    $this->actingAs($school)->get(route('customer.qat.subjects.show', $qatSubjectId).'?chapter=999')
+        ->assertNotFound();
+    $scope = [(string) $pattern->id => [
+        'classes' => [(string) $class->id => ['subjects' => [$subject->id]]],
+    ]];
+    $subscription->update(['access_scope' => $scope]);
+    $teacher = User::factory()->create([
+        'user_type' => UserType::Teacher->value,
+        'status' => UserStatus::Active->value,
+        'school_id' => $school->id,
+        'teacher_permissions' => ['generate_papers'],
+        'access_scope' => $scope,
+    ]);
+    $this->actingAs($teacher)->get(route('customer.qat.subjects.show', $qatSubjectId))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('availableCount', 2));
+    $this->actingAs($teacher)->get(route('customer.qat.create', 'manual'))
+        ->assertInertia(fn (Assert $page) => $page->has('classes', 1));
+    $teacher->update(['access_scope' => []]);
+    $this->actingAs($teacher)->get(route('customer.qat.subjects.show', $qatSubjectId))->assertForbidden();
+    $this->actingAs($teacher)->get(route('customer.qat.create', 'manual'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('classes', 0)
+            ->has('subjects', 0)
+            ->has('chapters', 0));
     DB::table('qat_classes')->where('id', $qatClassId)->update(['status' => false]);
-    $this->actingAs($school)->get(route('customer.qat.index'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->has('subjects', 0));
+    $this->actingAs($school)->get(route('customer.qat.create', 'auto'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('classes', 0));
+    $this->actingAs($school)->get(route('customer.qat.subjects.show', $qatSubjectId))->assertNotFound();
     DB::table('qat_classes')->where('id', $qatClassId)->update(['status' => true]);
     DB::table('qat_subjects')->where('qat_class_id', $qatClassId)->update(['status' => false]);
-    $this->actingAs($school)->get(route('customer.qat.index'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->has('subjects', 0));
+    $this->actingAs($school)->get(route('customer.qat.create', 'auto'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('classes', 0));
 });
