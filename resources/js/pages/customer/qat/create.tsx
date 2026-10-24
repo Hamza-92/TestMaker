@@ -123,6 +123,7 @@ export default function QatCreate({
     const [months, setMonths] = useState<number[]>([]);
     const [targetSubjectId, setTargetSubjectId] = useState<number | null>(null);
     const [pool, setPool] = useState<Pool | null>(null);
+    const [poolScopeKey, setPoolScopeKey] = useState('');
     const [poolBusy, setPoolBusy] = useState(false);
     const [poolError, setPoolError] = useState('');
     const [questionSearch, setQuestionSearch] = useState('');
@@ -197,10 +198,29 @@ export default function QatCreate({
     );
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
+    const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
     const selectedManual = Object.values(manual);
+    const searchTerm = questionSearch.trim().toLocaleLowerCase();
     const listedQuestions = selectedOnly
         ? selectedManual.map(({ question }) => question)
-        : (pool?.questions.data ?? []);
+        : (pool?.questions.data ?? []).filter(
+              (question) =>
+                  (!typeFilter ||
+                      question.question_type_id === Number(typeFilter)) &&
+                  (!searchTerm ||
+                      JSON.stringify({
+                          statement_en: question.statement_en,
+                          statement_ur: question.statement_ur,
+                          description_en: question.description_en,
+                          description_ur: question.description_ur,
+                          content: question.content,
+                          chapter_name: question.chapter_name,
+                          topic_name: question.topic_name,
+                          type_name: question.type_name,
+                      })
+                          .toLocaleLowerCase()
+                          .includes(searchTerm)),
+          );
     const autoRows = (pool?.types ?? []).filter(
         (type) => (sections[type.id]?.quantity ?? 0) > 0,
     );
@@ -248,13 +268,19 @@ export default function QatCreate({
 
     useEffect(() => {
         setPool(null);
+        setPoolScopeKey('');
         setManual({});
         setSections({});
         setSelectedOnly(false);
-    }, [targetSubjectId, targetChapterKey, syllabus, monthKey]);
+    }, [questionScopeKey]);
 
     useEffect(() => {
-        if (step < 3 || !resolvedSubjectId || targetChapterKey === '') {
+        if (
+            step < 3 ||
+            !resolvedSubjectId ||
+            targetChapterKey === '' ||
+            poolScopeKey === questionScopeKey
+        ) {
             return;
         }
 
@@ -283,18 +309,31 @@ export default function QatCreate({
                             syllabus === 'qat'
                                 ? monthKey.split(',').map(Number)
                                 : [],
-                        type_id: typeFilter ? Number(typeFilter) : undefined,
-                        q: questionSearch || undefined,
                         include_questions: mode === 'manual',
                     }),
                 });
-                const body = await response.json();
+                const contentType = response.headers.get('content-type') ?? '';
+
+                if (!contentType.includes('application/json')) {
+                    throw new Error(
+                        response.status === 419
+                            ? 'Your session expired. Refresh the page and try again.'
+                            : 'Could not load QAT questions. Refresh the page and try again.',
+                    );
+                }
+
+                const body = await response.json().catch(() => {
+                    throw new Error(
+                        'Could not read the QAT questions response. Refresh the page and try again.',
+                    );
+                });
 
                 if (!response.ok) {
                     throw new Error(firstError(body));
                 }
 
                 setPool(body as Pool);
+                setPoolScopeKey(questionScopeKey);
             } catch (error) {
                 if (!abort.signal.aborted) {
                     setPoolError(
@@ -321,8 +360,8 @@ export default function QatCreate({
         syllabus,
         monthKey,
         mode,
-        questionSearch,
-        typeFilter,
+        questionScopeKey,
+        poolScopeKey,
     ]);
 
     function toggleClass(id: number) {
@@ -430,6 +469,7 @@ export default function QatCreate({
     function changeTarget(id: number) {
         setTargetSubjectId(id);
         setPool(null);
+        setPoolScopeKey('');
         setManual({});
         setSections({});
         setTypeFilter('');

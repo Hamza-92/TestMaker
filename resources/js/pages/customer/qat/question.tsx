@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
+import { questionTextToHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
 
 export type QatQuestion = {
     id: number;
@@ -43,6 +45,79 @@ function sameText(first: string, second: string): boolean {
     return normalize(first) === normalize(second);
 }
 
+const LATEX_DELIMITERS =
+    /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$/g;
+
+function renderDelimitedLatex(value: string): string {
+    if (typeof DOMParser === 'undefined' || !LATEX_DELIMITERS.test(value)) {
+        LATEX_DELIMITERS.lastIndex = 0;
+
+        return value;
+    }
+
+    LATEX_DELIMITERS.lastIndex = 0;
+    const doc = new DOMParser().parseFromString(
+        `<div>${questionTextToHtml(value)}</div>`,
+        'text/html',
+    );
+    const root = doc.body.firstElementChild;
+
+    if (!root) {
+        return value;
+    }
+
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let node: Node | null;
+
+    while ((node = walker.nextNode())) {
+        if (!node.parentElement?.closest('code, pre, .tm-equation, .katex')) {
+            textNodes.push(node as Text);
+        }
+    }
+
+    textNodes.forEach((textNode) => {
+        const source = textNode.textContent ?? '';
+        const matches = [...source.matchAll(LATEX_DELIMITERS)];
+
+        if (!matches.length) {
+            return;
+        }
+
+        const fragment = doc.createDocumentFragment();
+        let offset = 0;
+
+        matches.forEach((match) => {
+            const start = match.index ?? offset;
+
+            fragment.append(doc.createTextNode(source.slice(offset, start)));
+            const equation = doc.createElement('span');
+            const latex = match[1] ?? match[2] ?? match[3] ?? match[4] ?? '';
+            const isBlock = match[1] !== undefined || match[2] !== undefined;
+
+            equation.className = isBlock
+                ? 'tm-equation tm-equation-block'
+                : 'tm-equation';
+            equation.dataset.latex = latex;
+            equation.dataset.display = isBlock ? 'block' : 'inline';
+            equation.textContent = latex;
+            fragment.append(equation);
+            offset = start + match[0].length;
+        });
+
+        fragment.append(doc.createTextNode(source.slice(offset)));
+        textNode.replaceWith(fragment);
+    });
+
+    return root.innerHTML;
+}
+
+function QatRichText({ value }: { value: string }) {
+    const content = useMemo(() => renderDelimitedLatex(value), [value]);
+
+    return <QuestionContent value={content} />;
+}
+
 function LocalizedText({ en, ur }: { en?: string; ur?: string }) {
     if (!en && !ur) {
         return null;
@@ -50,10 +125,10 @@ function LocalizedText({ en, ur }: { en?: string; ur?: string }) {
 
     return (
         <div className="space-y-1">
-            {en && <QuestionContent value={en} />}
+            {en && <QatRichText value={en} />}
             {ur && (
                 <div dir="rtl" lang="ur" className="text-right">
-                    <QuestionContent value={ur} />
+                    <QatRichText value={ur} />
                 </div>
             )}
         </div>
@@ -82,12 +157,12 @@ export function QatQuestionStatement({ question }: { question: QatQuestion }) {
         >
             {en && (
                 <div className="min-w-0" lang="en">
-                    <QuestionContent value={en} />
+                    <QatRichText value={en} />
                 </div>
             )}
             {ur && (
                 <div className="min-w-0 text-right" dir="rtl" lang="ur">
-                    <QuestionContent value={ur} />
+                    <QatRichText value={ur} />
                 </div>
             )}
         </div>
