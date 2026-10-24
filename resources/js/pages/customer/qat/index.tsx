@@ -166,7 +166,7 @@ export default function QatIndex({
                         {papers.data.map((paper) => (
                             <Card
                                 key={paper.id}
-                                className="flex flex-wrap items-center justify-between gap-4"
+                                className="tm-lift flex flex-wrap items-center justify-between gap-4 transition-all duration-200 hover:border-brand-300 hover:shadow-md hover:shadow-brand-900/5 dark:hover:border-brand-500/40 dark:hover:shadow-black/20"
                             >
                                 <div className="flex min-w-0 items-center gap-3.5">
                                     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
@@ -216,6 +216,11 @@ export default function QatIndex({
                                         </div>
                                     </div>
                                 </div>
+                                <Button asChild size="sm">
+                                    <Link href={`/qa-tests/papers/${paper.id}`}>
+                                        Open
+                                    </Link>
+                                </Button>
                             </Card>
                         ))}
                     </div>

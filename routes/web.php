@@ -11,6 +11,7 @@ use App\Http\Controllers\Customer\PaperFolderController;
 use App\Http\Controllers\Customer\PaperTemplateController;
 use App\Http\Controllers\Customer\ProfileController;
 use App\Http\Controllers\Customer\QatCatalogueController as CustomerQatCatalogueController;
+use App\Http\Controllers\Customer\QatPaperController as CustomerQatPaperController;
 use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
@@ -120,6 +121,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->whereIn('mode', ['auto', 'manual'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.create');
+        Route::post('qa-tests/questions', [CustomerQatPaperController::class, 'questions'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->name('customer.qat.questions');
+        Route::post('qa-tests/papers', [CustomerQatPaperController::class, 'store'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->name('customer.qat.papers.store');
+        Route::get('qa-tests/papers/{qatPaper}', [CustomerQatPaperController::class, 'show'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->name('customer.qat.papers.show');
         Route::get('qat-tests/subjects/{qatSubject}', [CustomerQatCatalogueController::class, 'show'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.subjects.show');

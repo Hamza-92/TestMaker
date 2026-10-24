@@ -93,7 +93,7 @@ class QatCatalogueController extends Controller
                 'subject_count' => $rows->pluck('qat_subject_id')->unique()->count(),
             ])->values();
         $subjectRows = $scopeRows->keyBy('qat_subject_id');
-        $chapters = DB::table('qat_chapters')
+        $chapterRows = DB::table('qat_chapters')
             ->whereIn('qat_subject_id', $subjectRows->keys())
             ->where('status', true)
             ->orderBy('sort_id')->orderBy('id')
@@ -105,17 +105,23 @@ class QatCatalogueController extends Controller
                     $access, (int) $subject->source_pattern_id, (int) $subject->source_class_id,
                     (int) $subject->subject_id, (int) $chapter->source_chapter_id,
                 ));
-            })->map(fn ($chapter) => [
-                'id' => $chapter->id,
-                'qat_subject_id' => $chapter->qat_subject_id,
-                'name' => $chapter->name,
-            ])->values();
+            })->values();
+        $monthsByChapter = DB::table('qat_chapter_months')
+            ->whereIn('qat_chapter_id', $chapterRows->pluck('id'))
+            ->get(['qat_chapter_id', 'month'])->groupBy('qat_chapter_id');
+        $chapters = $chapterRows->map(fn ($chapter) => [
+            'id' => $chapter->id,
+            'qat_subject_id' => $chapter->qat_subject_id,
+            'name' => $chapter->name,
+            'months' => $monthsByChapter->get($chapter->id, collect())->pluck('month')->sort()->values(),
+        ])->values();
         $chapterCounts = $chapters->countBy('qat_subject_id');
         $subjects = $scopeRows->map(fn ($row) => [
             'id' => $row->qat_subject_id,
             'qat_class_id' => $row->id,
             'name' => $row->subject_name,
             'class_name' => $row->name,
+            'academic_year' => $row->academic_year,
             'chapter_count' => $chapterCounts->get($row->qat_subject_id, 0),
         ])->values();
 
