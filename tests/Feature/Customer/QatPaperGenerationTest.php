@@ -56,7 +56,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
             'qat_chapter_id' => $chapterId, 'source_question_id' => $chapterId,
             'question_type_id' => $type->id, 'status' => true,
             'question_data' => json_encode([
-                'statement_en' => $statement, 'answer_en' => 'Private answer',
+                'statement_en' => $statement, 'answer_en' => 'Private answer', 'source' => 'exercise',
                 'options' => [['text_en' => 'Option A', 'is_correct' => true]],
             ]),
             'created_at' => now(), 'updated_at' => now(),
@@ -75,6 +75,8 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
     ])->assertOk()->assertJsonPath('questions.total', 1)
         ->assertJsonPath('questions.data.0.id', $mayQuestionId)
+        ->assertJsonPath('questions.data.0.chapter_name', 'May chapter')
+        ->assertJsonPath('questions.data.0.source_label', 'Exercise')
         ->assertJsonMissingPath('questions.data.0.answer_en')
         ->assertJsonMissingPath('questions.data.0.options.0.is_correct');
 

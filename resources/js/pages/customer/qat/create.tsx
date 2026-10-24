@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
-import { QatQuestionContent } from './question';
+import { QatQuestionStatement } from './question';
 import type { QatQuestion } from './question';
 
 type QatClass = {
@@ -546,7 +546,7 @@ export default function QatCreate({
                     <Card padding="lg" className="min-w-0">
                         <nav
                             aria-label="Paper generation steps"
-                            className="overflow-x-auto"
+                            className="overflow-x-auto py-2"
                         >
                             <ol className="flex min-w-[780px] items-start">
                                 {STEPS.map((label, index) => (
@@ -601,25 +601,6 @@ export default function QatCreate({
                                             QAT catalogue.
                                         </p>
                                     </div>
-                                    <Badge tone="info">
-                                        {classIds.length} selected
-                                    </Badge>
-                                </div>
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div className="relative w-full sm:max-w-xs">
-                                        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            className={`${inputClass} pl-9`}
-                                            aria-label="Search classes"
-                                            placeholder="Search classes"
-                                            value={classSearch}
-                                            onChange={(event) =>
-                                                setClassSearch(
-                                                    event.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
                                     <label className={selectAllClass}>
                                         <input
                                             type="checkbox"
@@ -639,6 +620,18 @@ export default function QatCreate({
                                         />
                                         Select all
                                     </label>
+                                </div>
+                                <div className="relative w-full sm:max-w-xs">
+                                    <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        className={`${inputClass} pl-9`}
+                                        aria-label="Search classes"
+                                        placeholder="Search classes"
+                                        value={classSearch}
+                                        onChange={(event) =>
+                                            setClassSearch(event.target.value)
+                                        }
+                                    />
                                 </div>
                                 {visibleClasses.length ? (
                                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -694,11 +687,6 @@ export default function QatCreate({
                                             chapters.
                                         </p>
                                     </div>
-                                    <Badge tone="info">
-                                        {selectedChapters.length} chapters
-                                    </Badge>
-                                </div>
-                                <div className="flex justify-end">
                                     <label className={selectAllClass}>
                                         <input
                                             type="checkbox"
@@ -1155,10 +1143,12 @@ export default function QatCreate({
                                         </select>
                                     </label>
                                 </div>
-                                <p className="text-xs text-slate-500">
-                                    {targetCoverage.length} chapters eligible
-                                    for this paper.
-                                </p>
+                                {mode === 'auto' && (
+                                    <p className="text-xs text-slate-500">
+                                        {targetCoverage.length} chapters
+                                        eligible for this paper.
+                                    </p>
+                                )}
                                 {poolError && (
                                     <p
                                         role="alert"
@@ -1337,10 +1327,10 @@ export default function QatCreate({
                                                 key={question.id}
                                                 className={`block cursor-pointer rounded-xl border p-4 ${manual[question.id] ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}
                                             >
-                                                <span className="mb-2 flex items-center gap-2">
+                                                <div className="flex items-start gap-3">
                                                     <input
                                                         type="checkbox"
-                                                        className="size-4 accent-brand-600"
+                                                        className="mt-1 size-4 shrink-0 accent-brand-600"
                                                         checked={
                                                             !!manual[
                                                                 question.id
@@ -1380,16 +1370,38 @@ export default function QatCreate({
                                                             )
                                                         }
                                                     />
-                                                    <strong className="text-sm">
-                                                        {question.type_name}
-                                                    </strong>
-                                                    <span className="ml-auto text-xs text-slate-500">
-                                                        {question.chapter_name}
-                                                    </span>
-                                                </span>
-                                                <QatQuestionContent
-                                                    question={question}
-                                                />
+                                                    <div className="min-w-0 flex-1">
+                                                        <QatQuestionStatement
+                                                            question={question}
+                                                        />
+                                                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                                                            <span className="rounded-md bg-brand-50 px-1.5 py-0.5 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+                                                                {
+                                                                    question.type_name
+                                                                }
+                                                            </span>
+                                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                                {
+                                                                    question.chapter_name
+                                                                }
+                                                            </span>
+                                                            {question.topic_name && (
+                                                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                                    {
+                                                                        question.topic_name
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                            {question.source_label && (
+                                                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                                                                    {
+                                                                        question.source_label
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </label>
                                         ))}
                                         {!pool.questions.data.length && (

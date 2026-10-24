@@ -2,6 +2,7 @@
 
 namespace App\Support\Qat;
 
+use App\Models\Question;
 use App\Models\User;
 use App\Support\AppUserAccess;
 use Illuminate\Database\Query\Builder;
@@ -85,7 +86,7 @@ final class QatPaperBuilder
     {
         return [
             'question.id', 'question.qat_chapter_id as chapter_id', 'question.question_type_id',
-            'question.question_data', 'chapter.name as chapter_name',
+            'question.question_data', 'chapter.name as chapter_name', 'topic.name as topic_name',
             'type.name as type_name', 'type.is_objective',
         ];
     }
@@ -100,6 +101,8 @@ final class QatPaperBuilder
             'id' => (int) $question->id,
             'chapter_id' => (int) $question->chapter_id,
             'chapter_name' => (string) $question->chapter_name,
+            'topic_name' => $question->topic_name ? (string) $question->topic_name : null,
+            'source_label' => Question::sourceLabel($data['source'] ?? null),
             'question_type_id' => (int) $question->question_type_id,
             'type_name' => (string) ($question->type_name ?: ($data['question_type']['name'] ?? 'Question')),
             'is_objective' => (bool) ($question->is_objective ?? $data['question_type']['is_objective'] ?? false),

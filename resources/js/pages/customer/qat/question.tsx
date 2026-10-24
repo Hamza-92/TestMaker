@@ -4,6 +4,8 @@ export type QatQuestion = {
     id: number;
     chapter_id: number;
     chapter_name: string;
+    topic_name?: string | null;
+    source_label?: string | null;
     question_type_id: number;
     type_name: string;
     is_objective: boolean;
@@ -30,6 +32,17 @@ function records(value: unknown): Record<string, unknown>[] {
         : [];
 }
 
+function sameText(first: string, second: string): boolean {
+    const normalize = (value: string) =>
+        value
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+    return normalize(first) === normalize(second);
+}
+
 function LocalizedText({ en, ur }: { en?: string; ur?: string }) {
     if (!en && !ur) {
         return null;
@@ -40,6 +53,40 @@ function LocalizedText({ en, ur }: { en?: string; ur?: string }) {
             {en && <QuestionContent value={en} />}
             {ur && (
                 <div dir="rtl" lang="ur" className="text-right">
+                    <QuestionContent value={ur} />
+                </div>
+            )}
+        </div>
+    );
+}
+
+export function QatQuestionStatement({ question }: { question: QatQuestion }) {
+    const content = question.content ?? {};
+    const firstItem = records(content.items)[0] ?? {};
+    const en =
+        question.statement_en ||
+        field(content, 'prompt_en') ||
+        field(content, 'intro_en') ||
+        field(content, 'passage_en') ||
+        field(firstItem, 'prompt_en');
+    const ur =
+        question.statement_ur ||
+        field(content, 'prompt_ur') ||
+        field(content, 'intro_ur') ||
+        field(content, 'passage_ur') ||
+        field(firstItem, 'prompt_ur');
+
+    return (
+        <div
+            className={`${en && ur ? 'grid grid-cols-2 gap-4' : ''} text-sm leading-relaxed text-slate-800 dark:text-slate-200`}
+        >
+            {en && (
+                <div className="min-w-0" lang="en">
+                    <QuestionContent value={en} />
+                </div>
+            )}
+            {ur && (
+                <div className="min-w-0 text-right" dir="rtl" lang="ur">
                     <QuestionContent value={ur} />
                 </div>
             )}
@@ -60,25 +107,29 @@ export function QatQuestionContent({ question }: { question: QatQuestion }) {
         : records(content.options);
     const items = records(content.items);
     const pairs = records(content.pairs);
+    const primaryEn = question.statement_en || promptEn || introEn;
+    const primaryUr = question.statement_ur || promptUr || introUr;
+    const secondaryEn =
+        promptEn && !sameText(primaryEn, promptEn) ? promptEn : '';
+    const secondaryUr =
+        promptUr && !sameText(primaryUr, promptUr) ? promptUr : '';
+    const detailEn = field(content, 'shared_en') || question.description_en;
+    const detailUr = field(content, 'shared_ur') || question.description_ur;
 
     return (
         <div className="space-y-2 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-            <LocalizedText
-                en={question.statement_en || promptEn || introEn}
-                ur={question.statement_ur || promptUr || introUr}
-            />
-            {(question.statement_en || question.statement_ur) &&
-                (promptEn || promptUr) && (
-                    <LocalizedText en={promptEn} ur={promptUr} />
-                )}
+            <LocalizedText en={primaryEn} ur={primaryUr} />
+            {(secondaryEn || secondaryUr) && (
+                <LocalizedText en={secondaryEn} ur={secondaryUr} />
+            )}
             {(passageEn || passageUr) && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
                     <LocalizedText en={passageEn} ur={passageUr} />
                 </div>
             )}
             <LocalizedText
-                en={field(content, 'shared_en') || question.description_en}
-                ur={field(content, 'shared_ur') || question.description_ur}
+                en={sameText(detailEn, primaryEn) ? '' : detailEn}
+                ur={sameText(detailUr, primaryUr) ? '' : detailUr}
             />
             {options.length > 0 && (
                 <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
