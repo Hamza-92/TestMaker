@@ -124,4 +124,26 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     $variants = QatPaper::query()->where('name', 'like', 'Two variants%')->get();
     expect($variants)->toHaveCount(2)
         ->and($variants->pluck('paper_data')->pluck('sections.0.questions.0.id')->unique())->toHaveCount(2);
+
+    $extraQuestions = [];
+    foreach (range(1, 35) as $number) {
+        $extraQuestions[] = [
+            'qat_chapter_id' => $mayId, 'source_question_id' => 10000 + $number,
+            'question_type_id' => $type->id, 'status' => true,
+            'question_data' => json_encode(['statement_en' => 'Extra question '.$number]),
+            'created_at' => now(), 'updated_at' => now(),
+        ];
+    }
+    DB::table('qat_questions')->insert($extraQuestions);
+    $this->actingAs($school)->postJson(route('customer.qat.questions'), [
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
+        'include_questions' => true,
+    ])->assertOk()->assertJsonPath('questions.total', 36)
+        ->assertJsonCount(36, 'questions.data');
+    $this->actingAs($school)->postJson(route('customer.qat.questions'), [
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
+        'include_questions' => false,
+    ])->assertOk()->assertJsonPath('questions.total', 0)
+        ->assertJsonCount(0, 'questions.data')
+        ->assertJsonPath('types.0.total', 36);
 });

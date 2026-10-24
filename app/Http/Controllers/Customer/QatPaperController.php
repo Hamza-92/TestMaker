@@ -28,7 +28,7 @@ class QatPaperController extends Controller
             'months.*' => ['integer', 'between:1,12', 'distinct'],
             'type_id' => ['nullable', 'integer'],
             'q' => ['nullable', 'string', 'max:150'],
-            'page' => ['nullable', 'integer', 'min:1'],
+            'include_questions' => ['nullable', 'boolean'],
         ]);
         $this->validateSyllabus($data);
         [$subject, $chapters, $access] = $builder->resolve(
@@ -41,12 +41,14 @@ class QatPaperController extends Controller
             ->selectRaw('count(*) as total')
             ->groupBy('question.question_type_id', 'type.name', 'type.is_objective')
             ->orderBy('type.name')->get();
-        $questions = (clone $query)
-            ->when(isset($data['type_id']), fn ($query) => $query->where('question.question_type_id', $data['type_id']))
-            ->when(filled($data['q'] ?? null), fn ($query) => $query->where('question.question_data', 'like', '%'.$data['q'].'%'))
-            ->orderBy('question.id')
-            ->paginate(30, $builder->questionColumns());
-        $questions->getCollection()->transform(fn ($question) => $builder->presentQuestion($question));
+        $questions = ($data['include_questions'] ?? true)
+            ? (clone $query)
+                ->when(isset($data['type_id']), fn ($query) => $query->where('question.question_type_id', $data['type_id']))
+                ->when(filled($data['q'] ?? null), fn ($query) => $query->where('question.question_data', 'like', '%'.$data['q'].'%'))
+                ->orderBy('question.id')
+                ->get($builder->questionColumns())
+                ->map(fn ($question) => $builder->presentQuestion($question))
+            : collect();
 
         return response()->json([
             'types' => $types->map(fn ($type) => [
@@ -55,7 +57,10 @@ class QatPaperController extends Controller
                 'is_objective' => (bool) $type->is_objective,
                 'total' => (int) $type->total,
             ]),
-            'questions' => $questions,
+            'questions' => [
+                'data' => $questions,
+                'total' => $questions->count(),
+            ],
             'chapters' => $chapters->map(fn ($chapter) => [
                 'id' => (int) $chapter->id,
                 'name' => $chapter->name,

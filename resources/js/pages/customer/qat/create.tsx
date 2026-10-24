@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
+import { Switch } from '@/components/ui/switch';
 import { QatQuestionStatement } from './question';
 import type { QatQuestion } from './question';
 
@@ -43,8 +44,6 @@ type Pool = {
     types: PoolType[];
     questions: {
         data: QatQuestion[];
-        current_page: number;
-        last_page: number;
         total: number;
     };
 };
@@ -77,6 +76,8 @@ const inputClass =
     'h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
 const selectAllClass =
     'inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50 focus-within:ring-2 focus-within:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10';
+const questionMetaBadgeClass =
+    'rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200';
 
 function csrf(): string {
     return (
@@ -124,9 +125,9 @@ export default function QatCreate({
     const [pool, setPool] = useState<Pool | null>(null);
     const [poolBusy, setPoolBusy] = useState(false);
     const [poolError, setPoolError] = useState('');
-    const [questionPage, setQuestionPage] = useState(1);
     const [questionSearch, setQuestionSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
+    const [selectedOnly, setSelectedOnly] = useState(false);
     const [sections, setSections] = useState<Record<number, SectionChoice>>({});
     const [manual, setManual] = useState<Record<number, ManualChoice>>({});
     const [name, setName] = useState('QAT Practice Paper');
@@ -197,9 +198,37 @@ export default function QatCreate({
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
     const selectedManual = Object.values(manual);
+    const listedQuestions = selectedOnly
+        ? selectedManual.map(({ question }) => question)
+        : (pool?.questions.data ?? []);
     const autoRows = (pool?.types ?? []).filter(
         (type) => (sections[type.id]?.quantity ?? 0) > 0,
     );
+    const manualRows = [
+        ...new Set(
+            selectedManual.map(({ question }) => question.question_type_id),
+        ),
+    ].map((typeId) => {
+        const items = selectedManual.filter(
+            ({ question }) => question.question_type_id === typeId,
+        );
+
+        return {
+            id: typeId,
+            name: items[0]?.question.type_name ?? 'Question type',
+            count: items.length,
+            marks: items.reduce((total, item) => total + item.marks, 0),
+        };
+    });
+    const reviewRows =
+        mode === 'auto'
+            ? autoRows.map((type) => ({
+                  id: type.id,
+                  name: type.name,
+                  count: sections[type.id].quantity,
+                  marks: sections[type.id].quantity * sections[type.id].marks,
+              }))
+            : manualRows;
     const totalQuestions =
         mode === 'auto'
             ? autoRows.reduce(
@@ -221,7 +250,7 @@ export default function QatCreate({
         setPool(null);
         setManual({});
         setSections({});
-        setQuestionPage(1);
+        setSelectedOnly(false);
     }, [targetSubjectId, targetChapterKey, syllabus, monthKey]);
 
     useEffect(() => {
@@ -256,7 +285,7 @@ export default function QatCreate({
                                 : [],
                         type_id: typeFilter ? Number(typeFilter) : undefined,
                         q: questionSearch || undefined,
-                        page: questionPage,
+                        include_questions: mode === 'manual',
                     }),
                 });
                 const body = await response.json();
@@ -291,7 +320,7 @@ export default function QatCreate({
         targetChapterKey,
         syllabus,
         monthKey,
-        questionPage,
+        mode,
         questionSearch,
         typeFilter,
     ]);
@@ -403,7 +432,6 @@ export default function QatCreate({
         setPool(null);
         setManual({});
         setSections({});
-        setQuestionPage(1);
         setTypeFilter('');
         setQuestionSearch('');
     }
@@ -596,10 +624,6 @@ export default function QatCreate({
                                         <h2 className="text-lg font-semibold">
                                             Choose your classes
                                         </h2>
-                                        <p className="mt-1 text-sm text-slate-500">
-                                            Select one or more classes from the
-                                            QAT catalogue.
-                                        </p>
                                     </div>
                                     <label className={selectAllClass}>
                                         <input
@@ -681,11 +705,6 @@ export default function QatCreate({
                                         <h2 className="text-lg font-semibold">
                                             Select books & chapters
                                         </h2>
-                                        <p className="mt-1 text-sm text-slate-500">
-                                            Each selected class contains its
-                                            books. Select a book to see its
-                                            chapters.
-                                        </p>
                                     </div>
                                     <label className={selectAllClass}>
                                         <input
@@ -893,10 +912,6 @@ export default function QatCreate({
                                     <h2 className="text-lg font-semibold">
                                         Choose your syllabus
                                     </h2>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        Use your selected chapters or the QAT
-                                        chapters assigned to a month.
-                                    </p>
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <button
@@ -1072,11 +1087,6 @@ export default function QatCreate({
                                             ? 'Choose question distribution'
                                             : 'Pick questions manually'}
                                     </h2>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        A paper uses one target class and book.
-                                        Questions stay within the selected
-                                        syllabus.
-                                    </p>
                                 </div>
                                 <div className="grid gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:grid-cols-2">
                                     <label className="space-y-1 text-xs font-semibold text-slate-600">
@@ -1280,180 +1290,236 @@ export default function QatCreate({
                                         )}
                                     </div>
                                 )}
-                                {!poolBusy && pool && mode === 'manual' && (
-                                    <div className="space-y-3">
-                                        <div className="grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)]">
-                                            <select
-                                                className={inputClass}
-                                                aria-label="Filter question type"
-                                                value={typeFilter}
-                                                onChange={(event) => {
-                                                    setTypeFilter(
-                                                        event.target.value,
-                                                    );
-                                                    setQuestionPage(1);
-                                                }}
-                                            >
-                                                <option value="">
-                                                    All question types
-                                                </option>
-                                                {pool.types.map((type) => (
-                                                    <option
-                                                        key={type.id}
-                                                        value={type.id}
-                                                    >
-                                                        {type.name} (
-                                                        {type.total})
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <div className="relative">
-                                                <SearchIcon className="absolute left-3 top-2.5 size-4 text-slate-400" />
-                                                <input
-                                                    className={`${inputClass} pl-9`}
-                                                    value={questionSearch}
-                                                    onChange={(event) => {
-                                                        setQuestionSearch(
-                                                            event.target.value,
-                                                        );
-                                                        setQuestionPage(1);
-                                                    }}
-                                                    placeholder="Search questions"
-                                                />
-                                            </div>
-                                        </div>
-                                        {pool.questions.data.map((question) => (
-                                            <label
-                                                key={question.id}
-                                                className={`block cursor-pointer rounded-xl border p-4 ${manual[question.id] ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}
-                                            >
-                                                <div className="flex items-start gap-3">
+                                {pool &&
+                                    mode === 'manual' &&
+                                    (!poolBusy || selectedOnly) && (
+                                        <div className="space-y-3">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <div className="relative w-full sm:w-72">
+                                                    <SearchIcon className="absolute left-3 top-2.5 size-4 text-slate-400" />
                                                     <input
-                                                        type="checkbox"
-                                                        className="mt-1 size-4 shrink-0 accent-brand-600"
-                                                        checked={
-                                                            !!manual[
-                                                                question.id
-                                                            ]
+                                                        className={`${inputClass} pl-9`}
+                                                        value={questionSearch}
+                                                        disabled={selectedOnly}
+                                                        onChange={(event) =>
+                                                            setQuestionSearch(
+                                                                event.target
+                                                                    .value,
+                                                            )
                                                         }
-                                                        onChange={() =>
-                                                            setManual(
-                                                                (current) => {
-                                                                    const next =
-                                                                        {
-                                                                            ...current,
-                                                                        };
-
-                                                                    if (
-                                                                        next[
+                                                        placeholder="Search questions"
+                                                    />
+                                                </div>
+                                                <select
+                                                    className={`${inputClass} sm:w-52`}
+                                                    aria-label="Filter question type"
+                                                    value={typeFilter}
+                                                    disabled={selectedOnly}
+                                                    onChange={(event) =>
+                                                        setTypeFilter(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                >
+                                                    <option value="">
+                                                        All question types
+                                                    </option>
+                                                    {pool.types.map((type) => (
+                                                        <option
+                                                            key={type.id}
+                                                            value={type.id}
+                                                        >
+                                                            {type.name} (
+                                                            {type.total})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm transition-colors hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-500/50 sm:ml-auto">
+                                                    <label
+                                                        htmlFor="qat-selected-only"
+                                                        className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200"
+                                                    >
+                                                        Selected only
+                                                    </label>
+                                                    <Switch
+                                                        id="qat-selected-only"
+                                                        aria-label="Selected only"
+                                                        checked={selectedOnly}
+                                                        onCheckedChange={
+                                                            setSelectedOnly
+                                                        }
+                                                        className="data-[state=checked]:bg-brand-600"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="max-h-[60vh] space-y-3 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-slate-50/30 p-2 dark:border-slate-700 dark:bg-slate-900/30">
+                                                {listedQuestions.map(
+                                                    (question) => (
+                                                        <div
+                                                            key={question.id}
+                                                            className={`rounded-xl border p-4 ${manual[question.id] ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}
+                                                        >
+                                                            <label className="flex cursor-pointer items-start gap-3">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="mt-1 size-4 shrink-0 accent-brand-600"
+                                                                    checked={
+                                                                        !!manual[
                                                                             question
                                                                                 .id
                                                                         ]
-                                                                    ) {
-                                                                        delete next[
-                                                                            question
-                                                                                .id
-                                                                        ];
-                                                                    } else {
-                                                                        next[
-                                                                            question.id
-                                                                        ] = {
-                                                                            question,
-                                                                            marks: question.is_objective
-                                                                                ? 1
-                                                                                : 2,
-                                                                        };
                                                                     }
+                                                                    onChange={() =>
+                                                                        setManual(
+                                                                            (
+                                                                                current,
+                                                                            ) => {
+                                                                                const next =
+                                                                                    {
+                                                                                        ...current,
+                                                                                    };
 
-                                                                    return next;
-                                                                },
-                                                            )
-                                                        }
-                                                    />
-                                                    <div className="min-w-0 flex-1">
-                                                        <QatQuestionStatement
-                                                            question={question}
-                                                        />
-                                                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                                                            <span className="rounded-md bg-brand-50 px-1.5 py-0.5 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
-                                                                {
-                                                                    question.type_name
-                                                                }
-                                                            </span>
-                                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                                {
-                                                                    question.chapter_name
-                                                                }
-                                                            </span>
-                                                            {question.topic_name && (
-                                                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                                    {
-                                                                        question.topic_name
+                                                                                if (
+                                                                                    next[
+                                                                                        question
+                                                                                            .id
+                                                                                    ]
+                                                                                ) {
+                                                                                    delete next[
+                                                                                        question
+                                                                                            .id
+                                                                                    ];
+                                                                                } else {
+                                                                                    next[
+                                                                                        question.id
+                                                                                    ] =
+                                                                                        {
+                                                                                            question,
+                                                                                            marks: question.is_objective
+                                                                                                ? 1
+                                                                                                : 2,
+                                                                                        };
+                                                                                }
+
+                                                                                return next;
+                                                                            },
+                                                                        )
                                                                     }
-                                                                </span>
-                                                            )}
-                                                            {question.source_label && (
-                                                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
-                                                                    {
-                                                                        question.source_label
-                                                                    }
-                                                                </span>
+                                                                />
+                                                                <div className="min-w-0 flex-1">
+                                                                    <QatQuestionStatement
+                                                                        question={
+                                                                            question
+                                                                        }
+                                                                    />
+                                                                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                                                                        <span className="rounded-md border border-brand-300 bg-brand-100 px-1.5 py-0.5 text-brand-800 shadow-sm dark:border-brand-500/50 dark:bg-brand-500/20 dark:text-brand-200">
+                                                                            {
+                                                                                question.type_name
+                                                                            }
+                                                                        </span>
+                                                                        <span
+                                                                            className={
+                                                                                questionMetaBadgeClass
+                                                                            }
+                                                                        >
+                                                                            Chapter:{' '}
+                                                                            {
+                                                                                question.chapter_name
+                                                                            }
+                                                                        </span>
+                                                                        {question.topic_name && (
+                                                                            <span
+                                                                                className={
+                                                                                    questionMetaBadgeClass
+                                                                                }
+                                                                            >
+                                                                                Topic:{' '}
+                                                                                {
+                                                                                    question.topic_name
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                        {question.source_label && (
+                                                                            <span
+                                                                                className={
+                                                                                    questionMetaBadgeClass
+                                                                                }
+                                                                            >
+                                                                                Source:{' '}
+                                                                                {
+                                                                                    question.source_label
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </label>
+                                                            {manual[
+                                                                question.id
+                                                            ] && (
+                                                                <div className="mt-2 flex items-center gap-2 pl-7">
+                                                                    <label
+                                                                        htmlFor={`qat-marks-${question.id}`}
+                                                                        className="text-xs font-semibold text-slate-600 dark:text-slate-300"
+                                                                    >
+                                                                        Marks:
+                                                                    </label>
+                                                                    <input
+                                                                        id={`qat-marks-${question.id}`}
+                                                                        type="number"
+                                                                        min="0.5"
+                                                                        max="20"
+                                                                        step="0.5"
+                                                                        className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                                                        value={
+                                                                            manual[
+                                                                                question
+                                                                                    .id
+                                                                            ]
+                                                                                .marks
+                                                                        }
+                                                                        onChange={(
+                                                                            event,
+                                                                        ) =>
+                                                                            setManual(
+                                                                                (
+                                                                                    current,
+                                                                                ) => ({
+                                                                                    ...current,
+                                                                                    [question.id]:
+                                                                                        {
+                                                                                            question,
+                                                                                            marks:
+                                                                                                Number(
+                                                                                                    event
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                ) ||
+                                                                                                1,
+                                                                                        },
+                                                                                }),
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
                                                             )}
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        ))}
-                                        {!pool.questions.data.length && (
-                                            <EmptyState
-                                                icon={FileTextIcon}
-                                                title="No matching questions"
-                                            />
-                                        )}
-                                        {pool.questions.last_page > 1 && (
-                                            <div className="flex items-center justify-between">
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setQuestionPage(
-                                                            (page) =>
-                                                                Math.max(
-                                                                    1,
-                                                                    page - 1,
-                                                                ),
-                                                        )
-                                                    }
-                                                    disabled={questionPage <= 1}
-                                                >
-                                                    Previous page
-                                                </Button>
-                                                <span className="text-xs text-slate-500">
-                                                    Page{' '}
-                                                    {
-                                                        pool.questions
-                                                            .current_page
-                                                    }{' '}
-                                                    of{' '}
-                                                    {pool.questions.last_page}
-                                                </span>
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setQuestionPage(
-                                                            (page) => page + 1,
-                                                        )
-                                                    }
-                                                    disabled={
-                                                        questionPage >=
-                                                        pool.questions.last_page
-                                                    }
-                                                >
-                                                    Next page
-                                                </Button>
+                                                    ),
+                                                )}
+                                                {!listedQuestions.length && (
+                                                    <EmptyState
+                                                        icon={FileTextIcon}
+                                                        title={
+                                                            selectedOnly
+                                                                ? 'No selected questions'
+                                                                : 'No matching questions'
+                                                        }
+                                                    />
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                )}
+                                        </div>
+                                    )}
                             </>
                         )}
 
@@ -1461,20 +1527,16 @@ export default function QatCreate({
                             <>
                                 <div>
                                     <h2 className="text-lg font-semibold">
-                                        Review marks & generate
+                                        Review paper
                                     </h2>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        Review the fixed QAT paper layout before
-                                        saving.
-                                    </p>
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
                                         <small className="text-slate-500">
-                                            Eligible chapters
+                                            Subjects
                                         </small>
                                         <strong className="mt-1 block text-xl">
-                                            {targetCoverage.length}
+                                            {selectedSubjects.length}
                                         </strong>
                                     </div>
                                     <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
@@ -1522,133 +1584,82 @@ export default function QatCreate({
                                         />
                                     </label>
                                 </div>
-                                {mode === 'auto' ? (
-                                    <>
-                                        <div className="grid gap-3 sm:grid-cols-2">
-                                            <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                                Paper variants
-                                                <select
-                                                    className={inputClass}
-                                                    value={variants}
-                                                    onChange={(event) =>
-                                                        setVariants(
-                                                            Number(
-                                                                event.target
-                                                                    .value,
-                                                            ),
-                                                        )
-                                                    }
-                                                >
-                                                    {[1, 2, 3, 4].map(
-                                                        (count) => (
-                                                            <option
-                                                                key={count}
-                                                                value={count}
-                                                            >
-                                                                {count}
-                                                            </option>
+                                {mode === 'auto' && (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <label className="space-y-1 text-xs font-semibold text-slate-600">
+                                            Paper variants
+                                            <select
+                                                className={inputClass}
+                                                value={variants}
+                                                onChange={(event) =>
+                                                    setVariants(
+                                                        Number(
+                                                            event.target.value,
                                                         ),
-                                                    )}
-                                                </select>
-                                            </label>
-                                            <label className="flex items-end gap-2 pb-2 text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={allowRepeat}
-                                                    onChange={(event) =>
-                                                        setAllowRepeat(
-                                                            event.target
-                                                                .checked,
-                                                        )
-                                                    }
-                                                    className="size-4 accent-brand-600"
-                                                />{' '}
-                                                Allow repeats between variants
-                                            </label>
-                                        </div>
-                                        <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
-                                            {autoRows.map((type) => (
-                                                <div
-                                                    key={type.id}
-                                                    className="flex justify-between gap-3 p-3 text-sm"
-                                                >
-                                                    <span>{type.name}</span>
-                                                    <strong>
-                                                        {
-                                                            sections[type.id]
-                                                                .quantity
-                                                        }{' '}
-                                                        ×{' '}
-                                                        {
-                                                            sections[type.id]
-                                                                .marks
-                                                        }{' '}
-                                                        ={' '}
-                                                        {sections[type.id]
-                                                            .quantity *
-                                                            sections[type.id]
-                                                                .marks}
-                                                    </strong>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {selectedManual.map(
-                                            ({ question, marks }) => (
-                                                <div
-                                                    key={question.id}
-                                                    className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-                                                >
-                                                    <div className="min-w-0 flex-1">
-                                                        <strong className="block truncate text-sm">
-                                                            {question.type_name}
-                                                        </strong>
-                                                        <span className="text-xs text-slate-500">
-                                                            {
-                                                                question.chapter_name
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                    <label className="w-24 text-xs text-slate-500">
-                                                        Marks
-                                                        <input
-                                                            type="number"
-                                                            min="0.5"
-                                                            max="20"
-                                                            step="0.5"
-                                                            className={
-                                                                inputClass
-                                                            }
-                                                            value={marks}
-                                                            onChange={(event) =>
-                                                                setManual(
-                                                                    (
-                                                                        current,
-                                                                    ) => ({
-                                                                        ...current,
-                                                                        [question.id]:
-                                                                            {
-                                                                                question,
-                                                                                marks:
-                                                                                    Number(
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
-                                                                                    ) ||
-                                                                                    1,
-                                                                            },
-                                                                    }),
-                                                                )
-                                                            }
-                                                        />
-                                                    </label>
-                                                </div>
-                                            ),
-                                        )}
+                                                    )
+                                                }
+                                            >
+                                                {[1, 2, 3, 4].map((count) => (
+                                                    <option
+                                                        key={count}
+                                                        value={count}
+                                                    >
+                                                        {count}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        <label className="flex items-end gap-2 pb-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={allowRepeat}
+                                                onChange={(event) =>
+                                                    setAllowRepeat(
+                                                        event.target.checked,
+                                                    )
+                                                }
+                                                className="size-4 accent-brand-600"
+                                            />
+                                            Allow repeats between variants
+                                        </label>
                                     </div>
                                 )}
+                                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <div className="grid grid-cols-[minmax(0,1fr)_90px_90px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
+                                        <span>Question type</span>
+                                        <span className="text-right">
+                                            Questions
+                                        </span>
+                                        <span className="text-right">
+                                            Marks
+                                        </span>
+                                    </div>
+                                    {reviewRows.map((row) => (
+                                        <div
+                                            key={row.id}
+                                            className="grid grid-cols-[minmax(0,1fr)_90px_90px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
+                                        >
+                                            <span className="truncate">
+                                                {row.name}
+                                            </span>
+                                            <strong className="text-right">
+                                                {row.count}
+                                            </strong>
+                                            <strong className="text-right">
+                                                {row.marks}
+                                            </strong>
+                                        </div>
+                                    ))}
+                                    <div className="grid grid-cols-[minmax(0,1fr)_90px_90px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
+                                        <span>Total</span>
+                                        <span className="text-right">
+                                            {totalQuestions}
+                                        </span>
+                                        <span className="text-right">
+                                            {totalMarks}
+                                        </span>
+                                    </div>
+                                </div>
                                 {saveError && (
                                     <p
                                         role="alert"
