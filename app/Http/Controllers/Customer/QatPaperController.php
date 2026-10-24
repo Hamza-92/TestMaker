@@ -35,16 +35,19 @@ class QatPaperController extends Controller
             $request->user(), (int) $data['subject_id'], $data['syllabus'],
             $data['chapter_ids'] ?? [], $data['months'] ?? [],
         );
-        $query = $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access);
-        $types = (clone $query)
+        $query = $builder->withTypeOrder(
+            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access),
+            $subject,
+        );
+        $types = $builder->orderByType((clone $query)
             ->select('question.question_type_id as id', 'type.name', 'type.is_objective')
             ->selectRaw('count(*) as total')
-            ->groupBy('question.question_type_id', 'type.name', 'type.is_objective')
-            ->orderBy('type.name')->get();
+            ->groupBy('question.question_type_id', 'type.id', 'type.name', 'type.is_objective', 'type_order.sort_order'))
+            ->get();
         $questions = ($data['include_questions'] ?? true)
-            ? (clone $query)
+            ? $builder->orderByType((clone $query)
                 ->when(isset($data['type_id']), fn ($query) => $query->where('question.question_type_id', $data['type_id']))
-                ->when(filled($data['q'] ?? null), fn ($query) => $query->where('question.question_data', 'like', '%'.$data['q'].'%'))
+                ->when(filled($data['q'] ?? null), fn ($query) => $query->where('question.question_data', 'like', '%'.$data['q'].'%')))
                 ->orderBy('question.id')
                 ->get($builder->questionColumns())
                 ->map(fn ($question) => $builder->presentQuestion($question))
@@ -167,6 +170,13 @@ class QatPaperController extends Controller
                     ])->values()->all(),
                 ])->values()->all();
         }
+
+        $typeRanks = $builder->typeRanks($subject, $pool->pluck('question_type_id')->unique()->all());
+        foreach ($prepared as &$paperSections) {
+            usort($paperSections, fn ($left, $right) => ($typeRanks[$left['question_type_id']] ?? PHP_INT_MAX)
+                <=> ($typeRanks[$right['question_type_id']] ?? PHP_INT_MAX));
+        }
+        unset($paperSections);
 
         $papers = DB::transaction(function () use ($user, $subject, $data, $classIds, $chapters, $prepared): array {
             $result = [];

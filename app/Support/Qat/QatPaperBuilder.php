@@ -6,6 +6,7 @@ use App\Models\Question;
 use App\Models\User;
 use App\Support\AppUserAccess;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -80,6 +81,38 @@ final class QatPaperBuilder
                 $query->whereNull('question.qat_topic_id')->orWhere('topic.status', true);
             })
             ->when($topicIds !== null, fn (Builder $query) => $query->whereIn('topic.source_topic_id', $topicIds));
+    }
+
+    public function withTypeOrder(Builder $query, object $subject): Builder
+    {
+        return $query->leftJoin('question_type_orders as type_order', function (JoinClause $join) use ($subject): void {
+            $join->on('type_order.question_type_id', '=', 'type.id')
+                ->where('type_order.pattern_id', $subject->source_pattern_id)
+                ->where('type_order.class_id', $subject->source_class_id)
+                ->where('type_order.subject_id', $subject->subject_id);
+        });
+    }
+
+    public function orderByType(Builder $query): Builder
+    {
+        return $query->orderByDesc('type.is_objective')
+            ->orderByRaw('type_order.sort_order IS NULL')
+            ->orderBy('type_order.sort_order')
+            ->orderBy('type.id');
+    }
+
+    public function typeRanks(object $subject, array $typeIds): array
+    {
+        if ($typeIds === []) {
+            return [];
+        }
+
+        $query = $this->withTypeOrder(
+            DB::table('question_types as type')->whereIn('type.id', $typeIds),
+            $subject,
+        );
+
+        return array_flip($this->orderByType($query)->pluck('type.id')->map(fn ($id) => (int) $id)->all());
     }
 
     public function questionColumns(): array

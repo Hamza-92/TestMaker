@@ -146,4 +146,77 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     ])->assertOk()->assertJsonPath('questions.total', 0)
         ->assertJsonCount(0, 'questions.data')
         ->assertJsonPath('types.0.total', 36);
+
+    $sourcePatternId = DB::table('patterns')->insertGetId(['name' => 'QAT source', 'created_at' => now(), 'updated_at' => now()]);
+    $sourceClassId = DB::table('classes')->insertGetId(['name' => 'QAT source class', 'created_at' => now(), 'updated_at' => now()]);
+    $sourceSubjectId = DB::table('subjects')->insertGetId([
+        'name_eng' => 'QAT source subject', 'subject_type' => 'chapter-wise',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('qat_classes')->where('id', $classId)->update(['source_class_id' => $sourceClassId]);
+    DB::table('qat_subjects')->where('id', $subjectId)->update([
+        'class_id' => $sourceClassId, 'source_pattern_id' => $sourcePatternId, 'subject_id' => $sourceSubjectId,
+    ]);
+    $firstObjective = QuestionType::create([
+        'name' => 'First objective', 'heading_en' => 'First objective',
+        'have_exercise' => false, 'have_statement' => true,
+        'have_description' => false, 'have_answer' => false,
+        'is_single' => true, 'is_objective' => true, 'column_per_row' => 1, 'status' => 1,
+    ]);
+    $subjective = QuestionType::create([
+        'name' => 'Short answer', 'heading_en' => 'Short answer',
+        'have_exercise' => false, 'have_statement' => true,
+        'have_description' => false, 'have_answer' => false,
+        'is_single' => true, 'is_objective' => false, 'column_per_row' => 1, 'status' => 1,
+    ]);
+    foreach ([[$firstObjective->id, 1], [$type->id, 2], [$subjective->id, 1]] as [$typeId, $order]) {
+        DB::table('question_type_orders')->insert([
+            'pattern_id' => $sourcePatternId, 'class_id' => $sourceClassId,
+            'subject_id' => $sourceSubjectId, 'question_type_id' => $typeId, 'sort_order' => $order,
+        ]);
+    }
+    foreach ([[$firstObjective->id, 20001], [$subjective->id, 20002]] as [$typeId, $sourceQuestionId]) {
+        DB::table('qat_questions')->insert([
+            'qat_chapter_id' => $mayId, 'source_question_id' => $sourceQuestionId,
+            'question_type_id' => $typeId, 'status' => true,
+            'question_data' => json_encode(['statement_en' => 'Ordered question '.$sourceQuestionId]),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+    $firstObjectiveQuestionId = DB::table('qat_questions')->where('source_question_id', 20001)->value('id');
+    $subjectiveQuestionId = DB::table('qat_questions')->where('source_question_id', 20002)->value('id');
+    $this->actingAs($school)->postJson(route('customer.qat.questions'), [
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
+    ])->assertOk()
+        ->assertJsonPath('types.0.id', $firstObjective->id)
+        ->assertJsonPath('types.1.id', $type->id)
+        ->assertJsonPath('types.2.id', $subjective->id)
+        ->assertJsonPath('questions.data.0.id', $firstObjectiveQuestionId)
+        ->assertJsonPath('questions.data.37.id', $subjectiveQuestionId);
+
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Ordered manual QAT', 'mode' => 'manual', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5], 'minutes' => 40,
+        'manual_questions' => [
+            ['id' => $subjectiveQuestionId, 'marks' => 3],
+            ['id' => $mayQuestionId, 'marks' => 1],
+            ['id' => $firstObjectiveQuestionId, 'marks' => 1],
+        ],
+    ])->assertCreated();
+    $orderedPaper = QatPaper::query()->where('name', 'Ordered manual QAT')->sole();
+    expect(collect($orderedPaper->paper_data['sections'])->pluck('question_type_id')->all())
+        ->toBe([$firstObjective->id, $type->id, $subjective->id]);
+
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Ordered auto QAT', 'mode' => 'auto', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5], 'minutes' => 40,
+        'sections' => [
+            ['question_type_id' => $subjective->id, 'quantity' => 1, 'marks' => 3],
+            ['question_type_id' => $type->id, 'quantity' => 1, 'marks' => 1],
+            ['question_type_id' => $firstObjective->id, 'quantity' => 1, 'marks' => 1],
+        ],
+    ])->assertCreated();
+    $orderedAutoPaper = QatPaper::query()->where('name', 'Ordered auto QAT')->sole();
+    expect(collect($orderedAutoPaper->paper_data['sections'])->pluck('question_type_id')->all())
+        ->toBe([$firstObjective->id, $type->id, $subjective->id]);
 });

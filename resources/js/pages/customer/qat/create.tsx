@@ -199,7 +199,16 @@ export default function QatCreate({
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
     const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
-    const selectedManual = Object.values(manual);
+    const typeRanks = new Map(
+        (pool?.types ?? []).map((type, index) => [type.id, index]),
+    );
+    const selectedManual = Object.values(manual).sort(
+        (left, right) =>
+            (typeRanks.get(left.question.question_type_id) ??
+                Number.MAX_SAFE_INTEGER) -
+            (typeRanks.get(right.question.question_type_id) ??
+                Number.MAX_SAFE_INTEGER),
+    );
     const searchTerm = questionSearch.trim().toLocaleLowerCase();
     const listedQuestions = selectedOnly
         ? selectedManual.map(({ question }) => question)
