@@ -1,6 +1,14 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeftIcon, PrinterIcon } from 'lucide-react';
-import { Badge, Button, Card, PageHeader } from '@/components/tm';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    ArrowLeftIcon,
+    CheckIcon,
+    DownloadIcon,
+    Loader2Icon,
+    PrinterIcon,
+    SaveIcon,
+} from 'lucide-react';
+import { useState } from 'react';
+import { Button, Card, PageHeader } from '@/components/tm';
 import { QatQuestionContent } from './question';
 import type { QatQuestion } from './question';
 
@@ -10,15 +18,15 @@ type PaperSection = {
     questions: (QatQuestion & { marks: number })[];
 };
 
-type SavedQatPaper = {
-    id: number;
+type QatPaperView = {
+    id: number | null;
     name: string;
     mode: 'auto' | 'manual';
     class_name: string;
     subject_name: string;
     total_marks: number;
     question_count: number;
-    created_at: string;
+    created_at?: string;
     paper_data: {
         academic_year: string;
         syllabus: 'custom' | 'qat';
@@ -29,12 +37,136 @@ type SavedQatPaper = {
     };
 };
 
-export default function QatPaper({ paper }: { paper: SavedQatPaper }) {
+function csrf(): string {
+    return (
+        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+            ?.content ?? ''
+    );
+}
+
+function formatDuration(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    if (hours === 0) {
+        return `${minutes} Minutes`;
+    }
+
+    return `${hours} ${hours === 1 ? 'Hour' : 'Hours'}${remainingMinutes ? ` ${remainingMinutes} Minutes` : ''}`;
+}
+
+export default function QatPaper({
+    paper: initialPaper,
+    variants = [],
+    previewId = null,
+}: {
+    paper: QatPaperView;
+    variants?: QatPaperView[];
+    previewId?: string | null;
+}) {
+    const [activeVariant, setActiveVariant] = useState(0);
+    const [saving, setSaving] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [actionError, setActionError] = useState('');
+    const paper = variants[activeVariant] ?? initialPaper;
+
+    async function savePaper() {
+        if (!previewId || saving) {
+            return;
+        }
+
+        setSaving(true);
+        setActionError('');
+
+        try {
+            const response = await fetch(
+                `/qa-tests/previews/${previewId}/save`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrf(),
+                    },
+                },
+            );
+
+            if (
+                !(response.headers.get('content-type') ?? '').includes(
+                    'application/json',
+                )
+            ) {
+                throw new Error(
+                    response.status === 419
+                        ? 'Your session expired. Refresh the page and try again.'
+                        : 'Could not save the paper. Refresh the page and try again.',
+                );
+            }
+
+            const body = await response.json();
+
+            if (!response.ok) {
+                throw new Error(body.message ?? 'Could not save the paper.');
+            }
+
+            router.visit(body.paper_url);
+        } catch (error) {
+            setActionError(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not save the paper.',
+            );
+            setSaving(false);
+        }
+    }
+
+    async function downloadPdf() {
+        if (downloading) {
+            return;
+        }
+
+        const sheet = document.getElementById('qat-print-sheet');
+
+        if (!sheet) {
+            return;
+        }
+
+        setDownloading(true);
+        setActionError('');
+
+        try {
+            const [{ downloadPaperPdf }, { DEFAULT_PAPER_SETTINGS }] =
+                await Promise.all([
+                    import('../papers/paper-layouts/download-paper-pdf'),
+                    import('../papers/paper-layouts/types'),
+                ]);
+            await downloadPaperPdf({
+                papers: [sheet],
+                settings: {
+                    ...DEFAULT_PAPER_SETTINGS,
+                    paperSize: 'A4',
+                    marginTop: 10,
+                    marginRight: 10,
+                    marginBottom: 10,
+                    marginLeft: 10,
+                },
+                name: paper.name,
+            });
+        } catch (error) {
+            setActionError(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not download the PDF.',
+            );
+        } finally {
+            setDownloading(false);
+        }
+    }
+
     return (
         <div className="w-full space-y-5">
             <Head title={paper.name} />
             <style>{`
-                @page { size: A4; margin: 12mm; }
+                @page { size: A4; margin: 10mm; }
                 @media print {
                     body * { visibility: hidden !important; }
                     #qat-print-sheet, #qat-print-sheet * { visibility: visible !important; }
@@ -43,76 +175,165 @@ export default function QatPaper({ paper }: { paper: SavedQatPaper }) {
                 }
             `}</style>
             <div className="print:hidden">
-                <Button asChild variant="ghost" size="sm" className="-ml-3">
-                    <Link href="/qa-tests">
-                        <ArrowLeftIcon /> QAT Tests
-                    </Link>
-                </Button>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
                 <PageHeader
                     title={paper.name}
                     meta={`${paper.question_count} questions · ${paper.total_marks} marks`}
                 />
-                <Button variant="primary" onClick={() => window.print()}>
-                    <PrinterIcon /> Print / Save PDF
+            </div>
+            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 print:hidden">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => window.print()}
+                >
+                    <PrinterIcon /> Print
+                </Button>
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void savePaper()}
+                    disabled={!previewId || saving}
+                >
+                    {saving ? (
+                        <Loader2Icon className="animate-spin" />
+                    ) : previewId ? (
+                        <SaveIcon />
+                    ) : (
+                        <CheckIcon />
+                    )}
+                    {saving ? 'Saving…' : previewId ? 'Save' : 'Saved'}
+                </Button>
+                <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => void downloadPdf()}
+                    disabled={downloading}
+                >
+                    {downloading ? (
+                        <Loader2Icon className="animate-spin" />
+                    ) : (
+                        <DownloadIcon />
+                    )}
+                    {downloading ? 'Preparing PDF…' : 'Download PDF'}
                 </Button>
             </div>
+            {actionError && (
+                <p
+                    role="alert"
+                    className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 print:hidden"
+                >
+                    {actionError}
+                </p>
+            )}
+            {variants.length > 1 && (
+                <div
+                    className="flex flex-wrap gap-2 print:hidden"
+                    aria-label="Paper variants"
+                >
+                    {variants.map((variant, index) => (
+                        <Button
+                            key={index}
+                            type="button"
+                            size="sm"
+                            variant={
+                                activeVariant === index
+                                    ? 'primary'
+                                    : 'secondary'
+                            }
+                            onClick={() => setActiveVariant(index)}
+                        >
+                            Paper{' '}
+                            {variant.paper_data.variant ??
+                                String.fromCharCode(65 + index)}
+                        </Button>
+                    ))}
+                </div>
+            )}
             <Card className="mx-auto max-w-[210mm] overflow-hidden p-0 print:overflow-visible">
                 <article
                     id="qat-print-sheet"
-                    className="min-h-[297mm] bg-white px-[13mm] py-[14mm] text-slate-900 print:min-h-0"
+                    className="min-h-[297mm] bg-white px-[10mm] py-[10mm] text-slate-900 print:min-h-0"
                 >
-                    <header className="border-b-2 border-slate-900 pb-3 text-center">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em]">
-                            Test Maker · QAT Practice
-                        </p>
-                        <h1 className="mt-1 text-xl font-bold">{paper.name}</h1>
-                        <p className="mt-1 text-xs text-slate-600">
-                            {paper.paper_data.academic_year}
-                        </p>
+                    <header className="break-inside-avoid">
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-end gap-2 pb-1 text-xs font-semibold">
+                            <span className="text-left">
+                                Total Time:{' '}
+                                {formatDuration(paper.paper_data.minutes)}
+                            </span>
+                            <h1 className="text-center font-bold">
+                                {paper.subject_name} ({paper.class_name})
+                            </h1>
+                            <span className="text-right">
+                                Total Marks: {paper.total_marks}
+                            </span>
+                        </div>
+                        <table
+                            role="presentation"
+                            className="w-full table-fixed border-collapse border border-slate-900 text-xs"
+                        >
+                            <tbody>
+                                <tr>
+                                    <td className="w-1/2 border border-slate-900 px-2 py-2">
+                                        <div className="flex items-end gap-2">
+                                            <span className="shrink-0">
+                                                Roll No:
+                                            </span>
+                                            <span
+                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                aria-hidden="true"
+                                            />
+                                            <span className="shrink-0">
+                                                Section:
+                                            </span>
+                                            <span
+                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
+                                    </td>
+                                    <td className="w-1/2 border border-slate-900 px-2 py-2">
+                                        <div className="flex items-end gap-2">
+                                            <span className="shrink-0">
+                                                Signature of Supervisor:
+                                            </span>
+                                            <span
+                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-slate-900 px-2 py-2">
+                                        <div className="flex items-end gap-2">
+                                            <span className="shrink-0">
+                                                Name:
+                                            </span>
+                                            <span
+                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
+                                    </td>
+                                    <td className="border border-slate-900 px-2 py-2">
+                                        <div className="flex items-end gap-2">
+                                            <span className="shrink-0">
+                                                Father&apos;s Name:
+                                            </span>
+                                            <span
+                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </header>
-                    <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2 border-b border-slate-300 pb-3 text-xs sm:grid-cols-4">
-                        <div>
-                            <strong>Class:</strong> {paper.class_name}
-                        </div>
-                        <div>
-                            <strong>Subject:</strong> {paper.subject_name}
-                        </div>
-                        <div>
-                            <strong>Time:</strong> {paper.paper_data.minutes}{' '}
-                            min
-                        </div>
-                        <div>
-                            <strong>Marks:</strong> {paper.total_marks}
-                        </div>
-                        <div className="col-span-2">
-                            <strong>Name:</strong> __________________________
-                        </div>
-                        <div className="col-span-2">
-                            <strong>Roll No:</strong> __________________
-                        </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs print:hidden">
-                        <Badge tone="info">
-                            {paper.mode === 'auto' ? 'Automatic' : 'Manual'}
-                        </Badge>
-                        <Badge tone="neutral">
-                            {paper.paper_data.syllabus === 'qat'
-                                ? 'QAT monthly syllabus'
-                                : 'Custom syllabus'}
-                        </Badge>
-                        {paper.paper_data.variant && (
-                            <Badge tone="neutral">
-                                Paper {paper.paper_data.variant}
-                            </Badge>
-                        )}
-                    </div>
-                    <p className="mt-4 text-xs">
-                        Instructions: Attempt all questions. Read each question
-                        carefully.
-                    </p>
-                    <div className="mt-5 space-y-6">
+                    <div className="mt-6 space-y-6">
                         {paper.paper_data.sections.map(
                             (section, sectionIndex) => (
                                 <section
@@ -179,6 +400,15 @@ export default function QatPaper({ paper }: { paper: SavedQatPaper }) {
                     </footer>
                 </article>
             </Card>
+            <div className="sticky bottom-0 z-20 -mx-4 border-y border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:-mx-6 md:px-6 print:hidden">
+                <div className="flex justify-end">
+                    <Button asChild variant="secondary">
+                        <Link href="/qa-tests">
+                            <ArrowLeftIcon /> Back
+                        </Link>
+                    </Button>
+                </div>
+            </div>
         </div>
     );
 }

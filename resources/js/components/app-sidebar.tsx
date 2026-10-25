@@ -146,6 +146,10 @@ export function AppSidebar() {
                               title: 'QAT Transfer',
                               href: '/superadmin/qat-transfer',
                           },
+                          {
+                              title: 'QAT Templates',
+                              href: '/superadmin/qat-templates',
+                          },
                       ],
                   },
                   {

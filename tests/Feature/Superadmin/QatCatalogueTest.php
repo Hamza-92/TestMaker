@@ -85,6 +85,29 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $qatChapterId = DB::table('qat_chapters')->value('id');
     $qatTopicId = DB::table('qat_topics')->value('id');
     $qatQuestionId = DB::table('qat_questions')->value('id');
+    $templatePayload = [
+        'qat_subject_id' => $qatSubjectId, 'name' => 'Monthly practice',
+        'category' => 'Practice', 'minutes' => 40, 'status' => true,
+        'sections' => [['question_type_id' => $type->id, 'quantity' => 1, 'marks' => 2]],
+    ];
+    $this->actingAs($admin)->get(route('superadmin.qat-templates.index'))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('superadmin/qat-templates')
+        ->has('templates.data', 0)
+        ->has('types', 1));
+    $this->actingAs($admin)->post(route('superadmin.qat-templates.store'), [
+        ...$templatePayload, 'sections' => [['question_type_id' => 999999, 'quantity' => 1, 'marks' => 2]],
+    ])->assertSessionHasErrors('sections');
+    $this->actingAs($admin)->post(route('superadmin.qat-templates.store'), $templatePayload)
+        ->assertRedirect();
+    $templateId = DB::table('qat_paper_templates')->value('id');
+    expect(json_decode(DB::table('qat_paper_templates')->value('sections'), true))
+        ->toBe($templatePayload['sections']);
+    $this->actingAs($admin)->put(route('superadmin.qat-templates.update', $templateId), [
+        ...$templatePayload, 'name' => 'Updated practice', 'status' => false,
+    ])->assertRedirect();
+    expect(DB::table('qat_paper_templates')->value('name'))->toBe('Updated practice')
+        ->and((int) DB::table('qat_paper_templates')->value('status'))->toBe(0);
     $this->actingAs($admin)->get(route('superadmin.qat-catalogue'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('superadmin/qat-catalogue')

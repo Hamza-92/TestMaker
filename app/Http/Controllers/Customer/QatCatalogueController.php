@@ -124,12 +124,23 @@ class QatCatalogueController extends Controller
             'academic_year' => $row->academic_year,
             'chapter_count' => $chapterCounts->get($row->qat_subject_id, 0),
         ])->values();
+        $templates = $mode === 'auto'
+            ? DB::table('qat_paper_templates')->whereIn('qat_subject_id', $subjects->pluck('id'))
+                ->where('status', true)->orderBy('name')
+                ->get(['id', 'qat_subject_id', 'name', 'category', 'minutes', 'sections'])
+                ->map(function ($template) {
+                    $template->sections = json_decode($template->sections, true) ?: [];
+
+                    return $template;
+                })
+            : collect();
 
         return Inertia::render('customer/qat/create', [
             'mode' => $mode,
             'classes' => $classes,
             'subjects' => $subjects,
             'chapters' => $chapters,
+            'templates' => $templates,
         ]);
     }
 

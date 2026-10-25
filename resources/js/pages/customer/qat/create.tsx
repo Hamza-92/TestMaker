@@ -47,7 +47,14 @@ type Pool = {
         total: number;
     };
 };
-type SectionChoice = { quantity: number; marks: number };
+type QatTemplate = {
+    id: number;
+    qat_subject_id: number;
+    name: string;
+    category: string | null;
+    minutes: number;
+    sections: { question_type_id: number; quantity: number; marks: number }[];
+};
 type ManualChoice = { question: QatQuestion; marks: number };
 
 const MONTHS = [
@@ -107,11 +114,13 @@ export default function QatCreate({
     classes,
     subjects,
     chapters,
+    templates,
 }: {
     mode: 'auto' | 'manual';
     classes: QatClass[];
     subjects: QatSubject[];
     chapters: QatChapter[];
+    templates: QatTemplate[];
 }) {
     const [step, setStep] = useState(0);
     const [classIds, setClassIds] = useState<number[]>([]);
@@ -129,7 +138,7 @@ export default function QatCreate({
     const [questionSearch, setQuestionSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
     const [selectedOnly, setSelectedOnly] = useState(false);
-    const [sections, setSections] = useState<Record<number, SectionChoice>>({});
+    const [templateId, setTemplateId] = useState<number | null>(null);
     const [manual, setManual] = useState<Record<number, ManualChoice>>({});
     const [name, setName] = useState('QAT Practice Paper');
     const [minutes, setMinutes] = useState(40);
@@ -196,6 +205,24 @@ export default function QatCreate({
     const targetCoverage = coverage.filter(
         (item) => item.qat_subject_id === targetSubject?.id,
     );
+    const availableTemplates = templates.filter(
+        (item) => item.qat_subject_id === targetSubject?.id,
+    );
+    const selectedTemplate =
+        availableTemplates.find((item) => item.id === templateId) ?? null;
+    const paperMinutes =
+        mode === 'auto' ? (selectedTemplate?.minutes ?? 0) : minutes;
+    const stepLabels =
+        mode === 'auto'
+            ? [
+                  'Classes',
+                  'Books & chapters',
+                  'Syllabus',
+                  'Template',
+                  'Review',
+                  'Preview',
+              ]
+            : STEPS;
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
     const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
@@ -230,9 +257,33 @@ export default function QatCreate({
                           .toLocaleLowerCase()
                           .includes(searchTerm)),
           );
-    const autoRows = (pool?.types ?? []).filter(
-        (type) => (sections[type.id]?.quantity ?? 0) > 0,
-    );
+    const autoRows = (selectedTemplate?.sections ?? [])
+        .map((section) => {
+            const type = pool?.types.find(
+                (item) => item.id === section.question_type_id,
+            );
+
+            return {
+                ...section,
+                id: section.question_type_id,
+                name: type?.name ?? `Question type ${section.question_type_id}`,
+                available: type?.total ?? 0,
+            };
+        })
+        .sort(
+            (left, right) =>
+                (typeRanks.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+                (typeRanks.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+        );
+    const templateHasEnoughQuestions =
+        autoRows.length > 0 &&
+        autoRows.every((row) => row.available >= row.quantity);
+    const variantsHaveEnoughQuestions =
+        autoRows.length > 0 &&
+        autoRows.every(
+            (row) =>
+                row.available >= row.quantity * (allowRepeat ? 1 : variants),
+        );
     const manualRows = [
         ...new Set(
             selectedManual.map(({ question }) => question.question_type_id),
@@ -254,23 +305,18 @@ export default function QatCreate({
             ? autoRows.map((type) => ({
                   id: type.id,
                   name: type.name,
-                  count: sections[type.id].quantity,
-                  marks: sections[type.id].quantity * sections[type.id].marks,
+                  count: type.quantity,
+                  marks: type.quantity * type.marks,
               }))
             : manualRows;
     const totalQuestions =
         mode === 'auto'
-            ? autoRows.reduce(
-                  (total, type) => total + sections[type.id].quantity,
-                  0,
-              )
+            ? autoRows.reduce((total, type) => total + type.quantity, 0)
             : selectedManual.length;
     const totalMarks =
         mode === 'auto'
             ? autoRows.reduce(
-                  (total, type) =>
-                      total +
-                      sections[type.id].quantity * sections[type.id].marks,
+                  (total, type) => total + type.quantity * type.marks,
                   0,
               )
             : selectedManual.reduce((total, item) => total + item.marks, 0);
@@ -279,7 +325,6 @@ export default function QatCreate({
         setPool(null);
         setPoolScopeKey('');
         setManual({});
-        setSections({});
         setSelectedOnly(false);
     }, [questionScopeKey]);
 
@@ -480,7 +525,6 @@ export default function QatCreate({
         setPool(null);
         setPoolScopeKey('');
         setManual({});
-        setSections({});
         setTypeFilter('');
         setQuestionSearch('');
     }
@@ -502,6 +546,7 @@ export default function QatCreate({
             return (
                 targetCoverage.length > 0 &&
                 totalQuestions > 0 &&
+                (mode !== 'auto' || templateHasEnoughQuestions) &&
                 !poolBusy &&
                 !poolError
             );
@@ -527,7 +572,12 @@ export default function QatCreate({
     }
 
     async function generate() {
-        if (!targetSubject || !nextAllowed()) {
+        if (
+            !targetSubject ||
+            !nextAllowed() ||
+            (mode === 'auto' &&
+                (!selectedTemplate || !templateHasEnoughQuestions))
+        ) {
             return;
         }
 
@@ -553,17 +603,10 @@ export default function QatCreate({
                             ? targetCoverage.map((item) => item.id)
                             : [],
                     months: syllabus === 'qat' ? months : [],
-                    minutes,
+                    minutes: paperMinutes,
+                    template_id: mode === 'auto' ? selectedTemplate?.id : null,
                     variants: mode === 'auto' ? variants : 1,
                     allow_repeat: mode === 'auto' && allowRepeat,
-                    sections:
-                        mode === 'auto'
-                            ? autoRows.map((type) => ({
-                                  question_type_id: type.id,
-                                  quantity: sections[type.id].quantity,
-                                  marks: sections[type.id].marks,
-                              }))
-                            : [],
                     manual_questions:
                         mode === 'manual'
                             ? selectedManual.map(({ question, marks }) => ({
@@ -579,7 +622,7 @@ export default function QatCreate({
                 throw new Error(firstError(body));
             }
 
-            router.visit(`/qa-tests/papers/${body.paper_id}`);
+            router.visit(body.preview_url);
         } catch (error) {
             setSaveError(
                 error instanceof Error
@@ -604,7 +647,7 @@ export default function QatCreate({
     return (
         <div className="w-full space-y-6">
             <Head
-                title={`${mode === 'auto' ? 'Auto' : 'Manual'} QAT paper · ${STEPS[step]}`}
+                title={`${mode === 'auto' ? 'Auto' : 'Manual'} QAT paper · ${stepLabels[step]}`}
             />
             <Button asChild variant="ghost" size="sm" className="-ml-3">
                 <Link href="/qa-tests">
@@ -626,7 +669,7 @@ export default function QatCreate({
                             className="overflow-x-auto py-2"
                         >
                             <ol className="flex min-w-[780px] items-start">
-                                {STEPS.map((label, index) => (
+                                {stepLabels.map((label, index) => (
                                     <li
                                         key={label}
                                         aria-current={
@@ -634,7 +677,7 @@ export default function QatCreate({
                                         }
                                         className="relative flex min-w-0 flex-1 flex-col items-center text-center"
                                     >
-                                        {index < STEPS.length - 1 && (
+                                        {index < stepLabels.length - 1 && (
                                             <span
                                                 aria-hidden="true"
                                                 className="absolute left-[calc(50%+16px)] top-3 h-px w-[calc(100%-32px)] bg-slate-200 dark:bg-slate-700"
@@ -1133,7 +1176,7 @@ export default function QatCreate({
                                 <div>
                                     <h2 className="text-lg font-semibold">
                                         {mode === 'auto'
-                                            ? 'Choose question distribution'
+                                            ? 'Choose a paper template'
                                             : 'Pick questions manually'}
                                     </h2>
                                 </div>
@@ -1202,12 +1245,6 @@ export default function QatCreate({
                                         </select>
                                     </label>
                                 </div>
-                                {mode === 'auto' && (
-                                    <p className="text-xs text-slate-500">
-                                        {targetCoverage.length} chapters
-                                        eligible for this paper.
-                                    </p>
-                                )}
                                 {poolError && (
                                     <p
                                         role="alert"
@@ -1223,118 +1260,160 @@ export default function QatCreate({
                                 )}
                                 {!poolBusy && pool && mode === 'auto' && (
                                     <div className="space-y-3">
-                                        <p className="text-sm text-slate-500">
-                                            Choose the number of questions and
-                                            marks for each available type. The
-                                            printed QAT layout stays fixed.
-                                        </p>
-                                        {pool.types.map((type) => (
-                                            <div
-                                                key={type.id}
-                                                className="grid items-end gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:grid-cols-[minmax(0,1fr)_90px_90px]"
-                                            >
-                                                <div>
-                                                    <strong className="text-sm">
-                                                        {type.name}
-                                                    </strong>
-                                                    <p className="text-xs text-slate-500">
-                                                        {type.total} available ·{' '}
-                                                        {type.is_objective
-                                                            ? 'Objective'
-                                                            : 'Subjective'}
-                                                    </p>
-                                                </div>
-                                                <label className="text-xs text-slate-500">
-                                                    Questions
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max={type.total}
-                                                        className={inputClass}
-                                                        value={
-                                                            sections[type.id]
-                                                                ?.quantity ?? 0
-                                                        }
-                                                        onChange={(event) =>
-                                                            setSections(
-                                                                (current) => ({
-                                                                    ...current,
-                                                                    [type.id]: {
-                                                                        quantity:
-                                                                            Math.max(
-                                                                                0,
-                                                                                Math.min(
-                                                                                    type.total,
-                                                                                    Number(
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
-                                                                                    ) ||
-                                                                                        0,
-                                                                                ),
-                                                                            ),
-                                                                        marks:
-                                                                            current[
-                                                                                type
-                                                                                    .id
-                                                                            ]
-                                                                                ?.marks ??
-                                                                            (type.is_objective
-                                                                                ? 1
-                                                                                : 2),
-                                                                    },
-                                                                }),
-                                                            )
-                                                        }
-                                                    />
-                                                </label>
-                                                <label className="text-xs text-slate-500">
-                                                    Marks each
-                                                    <input
-                                                        type="number"
-                                                        min="0.5"
-                                                        max="20"
-                                                        step="0.5"
-                                                        className={inputClass}
-                                                        value={
-                                                            sections[type.id]
-                                                                ?.marks ??
-                                                            (type.is_objective
-                                                                ? 1
-                                                                : 2)
-                                                        }
-                                                        onChange={(event) =>
-                                                            setSections(
-                                                                (current) => ({
-                                                                    ...current,
-                                                                    [type.id]: {
-                                                                        quantity:
-                                                                            current[
-                                                                                type
-                                                                                    .id
-                                                                            ]
-                                                                                ?.quantity ??
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            {availableTemplates.map(
+                                                (template) => {
+                                                    const rows =
+                                                        template.sections
+                                                            .map((section) => ({
+                                                                ...section,
+                                                                type: pool.types.find(
+                                                                    (type) =>
+                                                                        type.id ===
+                                                                        section.question_type_id,
+                                                                ),
+                                                            }))
+                                                            .sort(
+                                                                (left, right) =>
+                                                                    (typeRanks.get(
+                                                                        left.question_type_id,
+                                                                    ) ??
+                                                                        Number.MAX_SAFE_INTEGER) -
+                                                                    (typeRanks.get(
+                                                                        right.question_type_id,
+                                                                    ) ??
+                                                                        Number.MAX_SAFE_INTEGER),
+                                                            );
+                                                    const ready = rows.every(
+                                                        (row) =>
+                                                            (row.type?.total ??
+                                                                0) >=
+                                                            row.quantity,
+                                                    );
+
+                                                    return (
+                                                        <button
+                                                            key={template.id}
+                                                            type="button"
+                                                            aria-pressed={
+                                                                selectedTemplate?.id ===
+                                                                template.id
+                                                            }
+                                                            onClick={() =>
+                                                                setTemplateId(
+                                                                    template.id,
+                                                                )
+                                                            }
+                                                            className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selectedTemplate?.id === template.id ? 'border-brand-500 bg-brand-50 shadow-sm dark:bg-brand-500/10' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}
+                                                        >
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div>
+                                                                    {template.category && (
+                                                                        <Badge tone="info">
+                                                                            {
+                                                                                template.category
+                                                                            }
+                                                                        </Badge>
+                                                                    )}
+                                                                    <h3 className="mt-2 font-semibold">
+                                                                        {
+                                                                            template.name
+                                                                        }
+                                                                    </h3>
+                                                                    <p className="mt-1 text-xs text-slate-500">
+                                                                        {
+                                                                            template.minutes
+                                                                        }{' '}
+                                                                        min ·{' '}
+                                                                        {rows.reduce(
+                                                                            (
+                                                                                sum,
+                                                                                row,
+                                                                            ) =>
+                                                                                sum +
+                                                                                row.quantity,
                                                                             0,
-                                                                        marks:
-                                                                            Number(
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                            ) ||
-                                                                            1,
-                                                                    },
-                                                                }),
-                                                            )
-                                                        }
-                                                    />
-                                                </label>
-                                            </div>
-                                        ))}
-                                        {!pool.types.length && (
+                                                                        )}{' '}
+                                                                        questions
+                                                                    </p>
+                                                                </div>
+                                                                <span
+                                                                    className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selectedTemplate?.id === template.id ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300'}`}
+                                                                >
+                                                                    {selectedTemplate?.id ===
+                                                                        template.id && (
+                                                                        <CheckIcon className="size-3" />
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-xs dark:border-slate-700">
+                                                                {rows.map(
+                                                                    (row) => (
+                                                                        <div
+                                                                            key={
+                                                                                row.question_type_id
+                                                                            }
+                                                                            className="flex justify-between gap-2"
+                                                                        >
+                                                                            <span>
+                                                                                {row
+                                                                                    .type
+                                                                                    ?.name ??
+                                                                                    `Question type ${row.question_type_id}`}{' '}
+                                                                                ·{' '}
+                                                                                {
+                                                                                    row.quantity
+                                                                                }{' '}
+                                                                                ×{' '}
+                                                                                {
+                                                                                    row.marks
+                                                                                }
+                                                                            </span>
+                                                                            <strong>
+                                                                                {row.quantity *
+                                                                                    row.marks}
+                                                                            </strong>
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                            <div className="mt-3 flex justify-between text-sm font-semibold">
+                                                                <span>
+                                                                    Total marks
+                                                                </span>
+                                                                <span>
+                                                                    {rows.reduce(
+                                                                        (
+                                                                            sum,
+                                                                            row,
+                                                                        ) =>
+                                                                            sum +
+                                                                            row.quantity *
+                                                                                row.marks,
+                                                                        0,
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                            {!ready && (
+                                                                <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                                                                    Not enough
+                                                                    questions in
+                                                                    the selected
+                                                                    syllabus for
+                                                                    this
+                                                                    template.
+                                                                </p>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                        {!availableTemplates.length && (
                                             <EmptyState
                                                 icon={FileTextIcon}
-                                                title="No eligible questions"
-                                                hint="Choose different chapters or a QAT month."
+                                                title="No templates for this book"
+                                                hint="Ask your administrator to add an active QAT template."
                                             />
                                         )}
                                     </div>
@@ -1617,21 +1696,33 @@ export default function QatCreate({
                                             }
                                         />
                                     </label>
-                                    <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                        Duration (minutes)
-                                        <input
-                                            type="number"
-                                            min="10"
-                                            max="240"
-                                            className={inputClass}
-                                            value={minutes}
-                                            onChange={(event) =>
-                                                setMinutes(
-                                                    Number(event.target.value),
-                                                )
-                                            }
-                                        />
-                                    </label>
+                                    {mode === 'auto' ? (
+                                        <div className="space-y-1 text-xs font-semibold text-slate-600">
+                                            Duration
+                                            <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                                {paperMinutes} minutes ·{' '}
+                                                {selectedTemplate?.name}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <label className="space-y-1 text-xs font-semibold text-slate-600">
+                                            Duration (minutes)
+                                            <input
+                                                type="number"
+                                                min="10"
+                                                max="240"
+                                                className={inputClass}
+                                                value={minutes}
+                                                onChange={(event) =>
+                                                    setMinutes(
+                                                        Number(
+                                                            event.target.value,
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                        </label>
+                                    )}
                                 </div>
                                 {mode === 'auto' && (
                                     <div className="grid gap-3 sm:grid-cols-2">
@@ -1673,6 +1764,14 @@ export default function QatCreate({
                                         </label>
                                     </div>
                                 )}
+                                {mode === 'auto' &&
+                                    !variantsHaveEnoughQuestions && (
+                                        <p className="text-sm text-amber-700 dark:text-amber-400">
+                                            This syllabus does not have enough
+                                            questions for the selected number of
+                                            paper variants.
+                                        </p>
+                                    )}
                                 <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
                                     <div className="grid grid-cols-[minmax(0,1fr)_90px_90px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
                                         <span>Question type</span>
@@ -1748,8 +1847,10 @@ export default function QatCreate({
                                     disabled={
                                         saving ||
                                         !name.trim() ||
-                                        minutes < 10 ||
-                                        minutes > 240
+                                        paperMinutes < 10 ||
+                                        paperMinutes > 240 ||
+                                        (mode === 'auto' &&
+                                            !variantsHaveEnoughQuestions)
                                     }
                                 >
                                     {saving ? 'Generating…' : 'Generate paper'}{' '}

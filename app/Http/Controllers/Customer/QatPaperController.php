@@ -11,6 +11,7 @@ use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -84,7 +85,8 @@ class QatPaperController extends Controller
             'chapter_ids.*' => ['integer', 'distinct'],
             'months' => ['array', 'max:12'],
             'months.*' => ['integer', 'between:1,12', 'distinct'],
-            'minutes' => ['required', 'integer', 'between:10,240'],
+            'minutes' => ['nullable', 'integer', 'between:10,240'],
+            'template_id' => ['nullable', 'integer'],
             'variants' => ['nullable', 'integer', 'between:1,4'],
             'allow_repeat' => ['nullable', 'boolean'],
             'sections' => ['array', 'max:20'],
@@ -101,6 +103,20 @@ class QatPaperController extends Controller
             $user, (int) $data['subject_id'], $data['syllabus'],
             $data['chapter_ids'] ?? [], $data['months'] ?? [],
         );
+        $template = null;
+        if ($data['mode'] === 'auto') {
+            $template = DB::table('qat_paper_templates')
+                ->where('id', $data['template_id'] ?? 0)
+                ->where('qat_subject_id', $subject->id)
+                ->where('status', true)->first();
+            if (! $template) {
+                throw ValidationException::withMessages(['template_id' => 'Select an active template for this QAT book.']);
+            }
+            $data['sections'] = json_decode($template->sections, true) ?: [];
+            $data['minutes'] = (int) $template->minutes;
+        } elseif (empty($data['minutes'])) {
+            throw ValidationException::withMessages(['minutes' => 'Enter the paper duration.']);
+        }
         $classIds = array_values(array_unique(array_map('intval', $data['class_ids'])));
         if (! in_array((int) $subject->class_id, $classIds, true)) {
             throw ValidationException::withMessages(['class_ids' => 'The paper class must be selected.']);
@@ -178,40 +194,85 @@ class QatPaperController extends Controller
         }
         unset($paperSections);
 
-        $papers = DB::transaction(function () use ($user, $subject, $data, $classIds, $chapters, $prepared): array {
-            $result = [];
-            foreach ($prepared as $index => $sections) {
-                $name = trim($data['name']).(count($prepared) > 1 ? ' — Paper '.chr(65 + $index) : '');
-                $questions = collect($sections)->flatMap(fn ($section) => $section['questions']);
-                $result[] = QatPaper::create([
-                    'user_id' => $user->id,
-                    'name' => $name,
-                    'mode' => $data['mode'],
-                    'class_ids' => $classIds,
-                    'class_names' => $subject->class_name,
-                    'subject_name' => $subject->subject_name,
-                    'total_marks' => $questions->sum('marks'),
-                    'question_count' => $questions->count(),
-                    'paper_data' => [
-                        'class_id' => (int) $subject->class_id,
-                        'subject_id' => (int) $subject->id,
-                        'academic_year' => $subject->academic_year,
-                        'syllabus' => $data['syllabus'],
-                        'months' => $data['syllabus'] === 'qat' ? $data['months'] : [],
-                        'chapter_ids' => $chapters->pluck('id')->all(),
-                        'minutes' => (int) $data['minutes'],
-                        'variant' => count($prepared) > 1 ? chr(65 + $index) : null,
-                        'sections' => $sections,
-                    ],
-                ]);
-            }
+        $papers = [];
+        foreach ($prepared as $index => $sections) {
+            $name = trim($data['name']).(count($prepared) > 1 ? ' — Paper '.chr(65 + $index) : '');
+            $questions = collect($sections)->flatMap(fn ($section) => $section['questions']);
+            $papers[] = [
+                'id' => null,
+                'name' => $name,
+                'mode' => $data['mode'],
+                'class_ids' => $classIds,
+                'class_name' => $subject->class_name,
+                'subject_name' => $subject->subject_name,
+                'total_marks' => $questions->sum('marks'),
+                'question_count' => $questions->count(),
+                'paper_data' => [
+                    'class_id' => (int) $subject->class_id,
+                    'subject_id' => (int) $subject->id,
+                    'academic_year' => $subject->academic_year,
+                    'syllabus' => $data['syllabus'],
+                    'months' => $data['syllabus'] === 'qat' ? $data['months'] : [],
+                    'chapter_ids' => $chapters->pluck('id')->all(),
+                    'minutes' => (int) $data['minutes'],
+                    'template' => $template ? [
+                        'id' => (int) $template->id,
+                        'name' => $template->name,
+                        'category' => $template->category,
+                        'sections' => $data['sections'],
+                    ] : null,
+                    'variant' => count($prepared) > 1 ? chr(65 + $index) : null,
+                    'sections' => $sections,
+                ],
+            ];
+        }
 
-            return $result;
-        });
+        $preview = (string) Str::uuid();
+        $request->session()->put('qat_preview', [
+            'id' => $preview,
+            'user_id' => (int) $user->id,
+            'papers' => $papers,
+        ]);
 
         return response()->json([
-            'paper_id' => $papers[0]->id,
-            'paper_ids' => array_map(fn (QatPaper $paper) => $paper->id, $papers),
+            'preview_url' => route('customer.qat.previews.show', $preview),
+        ], 201);
+    }
+
+    public function preview(Request $request, string $preview): Response
+    {
+        $papers = $this->previewPapers($request, $preview);
+
+        return Inertia::render('customer/qat/paper', [
+            'paper' => $papers[0],
+            'variants' => $papers,
+            'previewId' => $preview,
+        ]);
+    }
+
+    public function savePreview(Request $request, string $preview): JsonResponse
+    {
+        $papers = $this->previewPapers($request, $preview);
+        $userId = (int) $request->user()->id;
+        $saved = DB::transaction(fn () => array_map(function (array $paper) use ($userId): QatPaper {
+            return QatPaper::create([
+                'user_id' => $userId,
+                'name' => $paper['name'],
+                'mode' => $paper['mode'],
+                'class_ids' => $paper['class_ids'],
+                'class_names' => $paper['class_name'],
+                'subject_name' => $paper['subject_name'],
+                'total_marks' => $paper['total_marks'],
+                'question_count' => $paper['question_count'],
+                'paper_data' => $paper['paper_data'],
+            ]);
+        }, $papers));
+        $request->session()->forget('qat_preview');
+
+        return response()->json([
+            'paper_id' => $saved[0]->id,
+            'paper_ids' => array_map(fn (QatPaper $paper) => $paper->id, $saved),
+            'paper_url' => route('customer.qat.papers.show', $saved[0]),
         ], 201);
     }
 
@@ -242,6 +303,15 @@ class QatPaperController extends Controller
         if ($data['syllabus'] === 'qat' && empty($data['months'])) {
             throw ValidationException::withMessages(['months' => 'Select at least one QAT month.']);
         }
+    }
+
+    private function previewPapers(Request $request, string $preview): array
+    {
+        $entry = $request->session()->get('qat_preview');
+        abort_unless(is_array($entry) && ($entry['id'] ?? null) === $preview, 404);
+        abort_unless((int) ($entry['user_id'] ?? 0) === (int) $request->user()->id, 403);
+
+        return $entry['papers'];
     }
 
     private function visibleUserIds(Request $request): array
