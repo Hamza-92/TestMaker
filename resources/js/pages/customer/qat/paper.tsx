@@ -9,6 +9,10 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
+import {
+    DEFAULT_PAPER_SETTINGS,
+    PAPER_URDU_FONT_METRICS,
+} from '../papers/paper-layouts/types';
 import { QatObjectiveQuestion, QatQuestionContent } from './question';
 import type { QatQuestion } from './question';
 
@@ -36,6 +40,10 @@ type QatPaperView = {
         sections: PaperSection[];
     };
 };
+
+const qatQuestionSize = DEFAULT_PAPER_SETTINGS.questionSize;
+const qatQuestionLineHeight = DEFAULT_PAPER_SETTINGS.questionLineHeight;
+const qatUrduMetrics = PAPER_URDU_FONT_METRICS[DEFAULT_PAPER_SETTINGS.urduFont];
 
 function csrf(): string {
     return (
@@ -216,8 +224,12 @@ export default function QatPaper({
             <style>{`
                 @page { size: A4; margin: 10mm; }
                 #qat-print-sheet { font-family: "Times New Roman", Times, serif; }
-                #qat-print-sheet [lang="ur"] { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
+                #qat-print-sheet .qat-objective-question, #qat-print-sheet .qat-question .space-y-2.text-sm { font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; }
+                #qat-print-sheet .qat-question [lang="ur"], #qat-print-sheet .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${qatQuestionSize * qatUrduMetrics.sizeScale}px !important; line-height: ${qatQuestionLineHeight * qatUrduMetrics.lineHeightScale} !important; }
+                #qat-print-sheet .qat-question [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
+                #qat-print-sheet .qat-question-number { font-family: "Times New Roman", Times, serif; font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; transform: none; }
                 #qat-print-sheet .paper-rich-text img, #qat-print-sheet .qat-objective-question img { max-width: 100%; height: auto; }
+                #qat-print-sheet .qat-objective-options .paper-rich-text img { display: inline-block; vertical-align: middle; break-inside: avoid; }
                 @media print {
                     body * { visibility: hidden !important; }
                     #qat-print-sheet, #qat-print-sheet * { visibility: visible !important; }

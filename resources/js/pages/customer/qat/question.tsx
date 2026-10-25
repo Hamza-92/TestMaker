@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { questionTextToHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
 
@@ -112,10 +112,16 @@ function renderDelimitedLatex(value: string): string {
     return root.innerHTML;
 }
 
-function QatRichText({ value }: { value: string }) {
+function QatRichText({
+    value,
+    inline = false,
+}: {
+    value: string;
+    inline?: boolean;
+}) {
     const content = useMemo(() => renderDelimitedLatex(value), [value]);
 
-    return <QuestionContent value={content} />;
+    return <QuestionContent value={content} inline={inline} />;
 }
 
 function ObjectiveOptions({
@@ -131,7 +137,7 @@ function ObjectiveOptions({
         <table
             role="presentation"
             dir={direction}
-            className="qat-objective-options w-full table-fixed border-collapse text-xs"
+            className="qat-objective-options w-full table-fixed border-collapse"
         >
             <tbody>
                 <tr>
@@ -141,32 +147,41 @@ function ObjectiveOptions({
                         const ur = field(option, 'text_ur');
 
                         return (
-                            <td
-                                key={index}
-                                className="min-w-0 border border-slate-700 px-1 py-1 align-middle"
-                            >
-                                <div className="flex items-start gap-1">
-                                    <span className="shrink-0 rounded-full border border-slate-700 px-1 font-bold leading-4">
+                            <Fragment key={index}>
+                                <td className="w-[4%] border border-slate-700 px-0.5 py-1 text-center align-middle">
+                                    <span className="inline-flex size-[1.4em] items-center justify-center rounded-full border border-slate-700 font-sans text-[0.9em] font-bold leading-none">
                                         {String.fromCharCode(65 + index)}
                                     </span>
-                                    <div className="min-w-0 flex-1 break-words">
+                                </td>
+                                <td className="w-[21%] min-w-0 border border-slate-700 px-1 py-1 align-middle">
+                                    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-1 break-words">
                                         {en && medium !== 'urdu' && (
-                                            <div dir="ltr" lang="en">
-                                                <QatRichText value={en} />
+                                            <div
+                                                dir="ltr"
+                                                lang="en"
+                                                className="w-max max-w-full shrink-0 text-left"
+                                            >
+                                                <QatRichText
+                                                    value={en}
+                                                    inline
+                                                />
                                             </div>
                                         )}
                                         {ur && medium !== 'english' && (
                                             <div
                                                 dir="rtl"
                                                 lang="ur"
-                                                className="text-right"
+                                                className="w-max max-w-full shrink-0 text-right"
                                             >
-                                                <QatRichText value={ur} />
+                                                <QatRichText
+                                                    value={ur}
+                                                    inline
+                                                />
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            </td>
+                                </td>
+                            </Fragment>
                         );
                     })}
                 </tr>
@@ -189,28 +204,41 @@ function ObjectiveLine({
     const bilingual = Boolean(en && ur);
     const direction = ur && !en ? 'rtl' : 'ltr';
     const medium = bilingual ? 'both' : ur ? 'urdu' : 'english';
-    const numberLabel = <span className="shrink-0 font-bold">{number}.</span>;
-    const statement = (
+    const englishStatement = en && (
         <div
-            className={bilingual ? 'grid min-w-0 grid-cols-2 gap-3' : 'min-w-0'}
+            dir="ltr"
+            lang="en"
+            className="flex min-w-0 items-start gap-1.5 text-left"
         >
-            {en && (
-                <div dir="ltr" lang="en" className="min-w-0 text-left">
-                    <QatRichText value={en} />
-                </div>
-            )}
-            {ur && (
-                <div dir="rtl" lang="ur" className="min-w-0 text-right">
-                    <QatRichText value={ur} />
-                </div>
-            )}
+            <span className="qat-question-number shrink-0 font-bold">
+                {number}.
+            </span>
+            <div className="min-w-0 flex-1">
+                <QatRichText value={en} />
+            </div>
+        </div>
+    );
+    const urduStatement = ur && (
+        <div
+            dir="rtl"
+            lang="ur"
+            className="flex min-w-0 items-start gap-1.5 text-right"
+        >
+            <span dir="ltr" className="qat-question-number shrink-0 font-bold">
+                {number}.
+            </span>
+            <div className="min-w-0 flex-1">
+                <QatRichText value={ur} />
+            </div>
         </div>
     );
 
     if (!en && !ur && options.length) {
         return (
             <div className="flex items-start gap-2">
-                {numberLabel}
+                <span className="qat-question-number shrink-0 font-bold">
+                    {number}.
+                </span>
                 <ObjectiveOptions
                     options={options}
                     direction="ltr"
@@ -223,9 +251,9 @@ function ObjectiveLine({
     if (bilingual || !options.length) {
         return (
             <div className="space-y-1.5">
-                <div className="flex items-start gap-2">
-                    {numberLabel}
-                    <div className="min-w-0 flex-1">{statement}</div>
+                <div className={bilingual ? 'grid grid-cols-2 gap-3' : ''}>
+                    {englishStatement}
+                    {urduStatement}
                 </div>
                 {options.length > 0 && (
                     <ObjectiveOptions
@@ -241,10 +269,9 @@ function ObjectiveLine({
     return (
         <div
             dir={direction}
-            className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1.5fr)] items-start gap-2"
+            className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-start gap-2"
         >
-            {numberLabel}
-            {statement}
+            {englishStatement || urduStatement}
             <ObjectiveOptions
                 options={options}
                 direction={direction}
@@ -293,7 +320,7 @@ export function QatObjectiveQuestion({
     const extraDetailUr = sameText(detailUr, primaryUr) ? '' : detailUr;
 
     return (
-        <div className="qat-objective-question space-y-2 text-sm leading-relaxed">
+        <div className="qat-objective-question space-y-2">
             <ObjectiveLine
                 number={String(number)}
                 en={primaryEn}
