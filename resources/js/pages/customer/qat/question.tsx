@@ -118,6 +118,220 @@ function QatRichText({ value }: { value: string }) {
     return <QuestionContent value={content} />;
 }
 
+function ObjectiveOptions({
+    options,
+    direction,
+    medium,
+}: {
+    options: Record<string, unknown>[];
+    direction: 'ltr' | 'rtl';
+    medium: 'english' | 'urdu' | 'both';
+}) {
+    return (
+        <table
+            role="presentation"
+            dir={direction}
+            className="qat-objective-options w-full table-fixed border-collapse text-xs"
+        >
+            <tbody>
+                <tr>
+                    {options.map((option, index) => {
+                        const en =
+                            field(option, 'text_en') || field(option, 'text');
+                        const ur = field(option, 'text_ur');
+
+                        return (
+                            <td
+                                key={index}
+                                className="min-w-0 border border-slate-700 px-1 py-1 align-middle"
+                            >
+                                <div className="flex items-start gap-1">
+                                    <span className="shrink-0 rounded-full border border-slate-700 px-1 font-bold leading-4">
+                                        {String.fromCharCode(65 + index)}
+                                    </span>
+                                    <div className="min-w-0 flex-1 break-words">
+                                        {en && medium !== 'urdu' && (
+                                            <div dir="ltr" lang="en">
+                                                <QatRichText value={en} />
+                                            </div>
+                                        )}
+                                        {ur && medium !== 'english' && (
+                                            <div
+                                                dir="rtl"
+                                                lang="ur"
+                                                className="text-right"
+                                            >
+                                                <QatRichText value={ur} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </td>
+                        );
+                    })}
+                </tr>
+            </tbody>
+        </table>
+    );
+}
+
+function ObjectiveLine({
+    number,
+    en,
+    ur,
+    options,
+}: {
+    number: string;
+    en: string;
+    ur: string;
+    options: Record<string, unknown>[];
+}) {
+    const bilingual = Boolean(en && ur);
+    const direction = ur && !en ? 'rtl' : 'ltr';
+    const medium = bilingual ? 'both' : ur ? 'urdu' : 'english';
+    const numberLabel = <span className="shrink-0 font-bold">{number}.</span>;
+    const statement = (
+        <div
+            className={bilingual ? 'grid min-w-0 grid-cols-2 gap-3' : 'min-w-0'}
+        >
+            {en && (
+                <div dir="ltr" lang="en" className="min-w-0 text-left">
+                    <QatRichText value={en} />
+                </div>
+            )}
+            {ur && (
+                <div dir="rtl" lang="ur" className="min-w-0 text-right">
+                    <QatRichText value={ur} />
+                </div>
+            )}
+        </div>
+    );
+
+    if (!en && !ur && options.length) {
+        return (
+            <div className="flex items-start gap-2">
+                {numberLabel}
+                <ObjectiveOptions
+                    options={options}
+                    direction="ltr"
+                    medium="both"
+                />
+            </div>
+        );
+    }
+
+    if (bilingual || !options.length) {
+        return (
+            <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                    {numberLabel}
+                    <div className="min-w-0 flex-1">{statement}</div>
+                </div>
+                {options.length > 0 && (
+                    <ObjectiveOptions
+                        options={options}
+                        direction="ltr"
+                        medium={medium}
+                    />
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <div
+            dir={direction}
+            className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1.5fr)] items-start gap-2"
+        >
+            {numberLabel}
+            {statement}
+            <ObjectiveOptions
+                options={options}
+                direction={direction}
+                medium={medium}
+            />
+        </div>
+    );
+}
+
+export function QatObjectiveQuestion({
+    question,
+    number,
+}: {
+    question: QatQuestion;
+    number: number;
+}) {
+    const content = question.content ?? {};
+    const items = records(content.items);
+    const options = question.options.length
+        ? question.options
+        : records(content.options);
+    const trueFalseOptions =
+        question.schema_key === 'objective_true_false'
+            ? [
+                  { text_en: 'True', text_ur: 'درست' },
+                  { text_en: 'False', text_ur: 'غلط' },
+              ]
+            : [];
+    const primaryEn =
+        question.statement_en ||
+        field(content, 'prompt_en') ||
+        field(content, 'intro_en') ||
+        field(content, 'passage_en');
+    const primaryUr =
+        question.statement_ur ||
+        field(content, 'prompt_ur') ||
+        field(content, 'intro_ur') ||
+        field(content, 'passage_ur');
+    const passageEn = field(content, 'passage_en');
+    const passageUr = field(content, 'passage_ur');
+    const extraPassageEn = sameText(passageEn, primaryEn) ? '' : passageEn;
+    const extraPassageUr = sameText(passageUr, primaryUr) ? '' : passageUr;
+    const detailEn = field(content, 'shared_en') || question.description_en;
+    const detailUr = field(content, 'shared_ur') || question.description_ur;
+    const extraDetailEn = sameText(detailEn, primaryEn) ? '' : detailEn;
+    const extraDetailUr = sameText(detailUr, primaryUr) ? '' : detailUr;
+
+    return (
+        <div className="qat-objective-question space-y-2 text-sm leading-relaxed">
+            <ObjectiveLine
+                number={String(number)}
+                en={primaryEn}
+                ur={primaryUr}
+                options={options.length ? options : trueFalseOptions}
+            />
+            {(extraPassageEn ||
+                extraPassageUr ||
+                extraDetailEn ||
+                extraDetailUr) && (
+                <div className="grid grid-cols-2 gap-3 pl-6">
+                    <div dir="ltr" lang="en">
+                        {extraPassageEn && (
+                            <QatRichText value={extraPassageEn} />
+                        )}
+                        {extraDetailEn && <QatRichText value={extraDetailEn} />}
+                    </div>
+                    <div dir="rtl" lang="ur" className="text-right">
+                        {extraPassageUr && (
+                            <QatRichText value={extraPassageUr} />
+                        )}
+                        {extraDetailUr && <QatRichText value={extraDetailUr} />}
+                    </div>
+                </div>
+            )}
+            {items.map((item, index) => (
+                <ObjectiveLine
+                    key={index}
+                    number={`${number}.${String.fromCharCode(97 + index)}`}
+                    en={field(item, 'prompt_en') || field(item, 'statement_en')}
+                    ur={field(item, 'prompt_ur') || field(item, 'statement_ur')}
+                    options={records(item.options)}
+                />
+            ))}
+        </div>
+    );
+}
+
 function LocalizedText({ en, ur }: { en?: string; ur?: string }) {
     if (!en && !ur) {
         return null;

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
-import { QatQuestionContent } from './question';
+import { QatObjectiveQuestion, QatQuestionContent } from './question';
 import type { QatQuestion } from './question';
 
 type PaperSection = {
@@ -55,6 +55,31 @@ function formatDuration(minutes: number): string {
     return `${hours} ${hours === 1 ? 'Hour' : 'Hours'}${remainingMinutes ? ` ${remainingMinutes} Minutes` : ''}`;
 }
 
+function romanSection(number: number): string {
+    const numerals: [number, string][] = [
+        [100, 'C'],
+        [90, 'XC'],
+        [50, 'L'],
+        [40, 'XL'],
+        [10, 'X'],
+        [9, 'IX'],
+        [5, 'V'],
+        [4, 'IV'],
+        [1, 'I'],
+    ];
+    let remaining = number;
+    let result = '';
+
+    for (const [value, numeral] of numerals) {
+        while (remaining >= value) {
+            result += numeral;
+            remaining -= value;
+        }
+    }
+
+    return result;
+}
+
 export default function QatPaper({
     paper: initialPaper,
     variants = [],
@@ -69,6 +94,29 @@ export default function QatPaper({
     const [downloading, setDownloading] = useState(false);
     const [actionError, setActionError] = useState('');
     const paper = variants[activeVariant] ?? initialPaper;
+    const objectiveSections = paper.paper_data.sections
+        .map((section) => ({
+            ...section,
+            questions: section.questions.filter(
+                (question) => question.is_objective,
+            ),
+        }))
+        .filter((section) => section.questions.length > 0);
+    const subjectiveSections = paper.paper_data.sections
+        .map((section) => ({
+            ...section,
+            questions: section.questions.filter(
+                (question) => !question.is_objective,
+            ),
+        }))
+        .filter((section) => section.questions.length > 0);
+    const objectiveQuestions = objectiveSections.flatMap(
+        (section) => section.questions,
+    );
+    const objectiveMarks = objectiveQuestions.reduce(
+        (total, question) => total + Number(question.marks),
+        0,
+    );
 
     async function savePaper() {
         if (!previewId || saving) {
@@ -167,6 +215,9 @@ export default function QatPaper({
             <Head title={paper.name} />
             <style>{`
                 @page { size: A4; margin: 10mm; }
+                #qat-print-sheet { font-family: "Times New Roman", Times, serif; }
+                #qat-print-sheet [lang="ur"] { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
+                #qat-print-sheet .paper-rich-text img, #qat-print-sheet .qat-objective-question img { max-width: 100%; height: auto; }
                 @media print {
                     body * { visibility: hidden !important; }
                     #qat-print-sheet, #qat-print-sheet * { visibility: visible !important; }
@@ -334,13 +385,86 @@ export default function QatPaper({
                         </table>
                     </header>
                     <div className="mt-6 space-y-6">
-                        {paper.paper_data.sections.map(
-                            (section, sectionIndex) => (
+                        {objectiveQuestions.length > 0 && (
+                            <section>
+                                <div className="flex items-center justify-between border-b border-slate-700 pb-1 text-sm font-bold">
+                                    <h2>Section I — Objective Questions</h2>
+                                    <span>{objectiveMarks} marks</span>
+                                </div>
+                                <div className="mt-3 space-y-4">
+                                    {objectiveSections.map(
+                                        (section, sectionIndex) => {
+                                            const preceding = objectiveSections
+                                                .slice(0, sectionIndex)
+                                                .reduce(
+                                                    (total, previous) =>
+                                                        total +
+                                                        previous.questions
+                                                            .length,
+                                                    0,
+                                                );
+
+                                            return (
+                                                <div
+                                                    key={`${section.question_type_id}-${sectionIndex}`}
+                                                    className="space-y-3"
+                                                >
+                                                    {objectiveSections.length >
+                                                        1 && (
+                                                        <h3 className="text-xs font-bold">
+                                                            {section.title}
+                                                        </h3>
+                                                    )}
+                                                    {section.questions.map(
+                                                        (question, index) => (
+                                                            <div
+                                                                key={
+                                                                    question.id
+                                                                }
+                                                                className="qat-question"
+                                                            >
+                                                                <QatObjectiveQuestion
+                                                                    question={
+                                                                        question
+                                                                    }
+                                                                    number={
+                                                                        preceding +
+                                                                        index +
+                                                                        1
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            </section>
+                        )}
+                        {subjectiveSections.map((section, sectionIndex) => {
+                            const preceding = subjectiveSections
+                                .slice(0, sectionIndex)
+                                .reduce(
+                                    (total, previous) =>
+                                        total + previous.questions.length,
+                                    objectiveQuestions.length,
+                                );
+                            const sectionNumber =
+                                sectionIndex +
+                                (objectiveQuestions.length ? 2 : 1);
+
+                            return (
                                 <section
                                     key={`${section.question_type_id}-${sectionIndex}`}
                                 >
                                     <div className="flex items-center justify-between border-b border-slate-700 pb-1 text-sm font-bold">
-                                        <h2>{section.title}</h2>
+                                        <h2>
+                                            Section{' '}
+                                            {romanSection(sectionNumber)} —{' '}
+                                            {section.title}
+                                        </h2>
                                         <span>
                                             {section.questions.reduce(
                                                 (total, question) =>
@@ -353,47 +477,27 @@ export default function QatPaper({
                                     </div>
                                     <div className="mt-3 space-y-5">
                                         {section.questions.map(
-                                            (question, questionIndex) => {
-                                                const number =
-                                                    paper.paper_data.sections
-                                                        .slice(0, sectionIndex)
-                                                        .reduce(
-                                                            (total, previous) =>
-                                                                total +
-                                                                previous
-                                                                    .questions
-                                                                    .length,
-                                                            0,
-                                                        ) +
-                                                    questionIndex +
-                                                    1;
-
-                                                return (
-                                                    <div
-                                                        key={question.id}
-                                                        className="qat-question flex items-start gap-3"
-                                                    >
-                                                        <span className="shrink-0 text-sm font-semibold">
-                                                            Q{number}.
-                                                        </span>
-                                                        <div className="min-w-0 flex-1">
-                                                            <QatQuestionContent
-                                                                question={
-                                                                    question
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <span className="shrink-0 text-xs font-semibold">
-                                                            [{question.marks}]
-                                                        </span>
+                                            (question, index) => (
+                                                <div
+                                                    key={question.id}
+                                                    className="qat-question flex items-start gap-3"
+                                                >
+                                                    <span className="shrink-0 text-sm font-semibold">
+                                                        Q{preceding + index + 1}
+                                                        .
+                                                    </span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <QatQuestionContent
+                                                            question={question}
+                                                        />
                                                     </div>
-                                                );
-                                            },
+                                                </div>
+                                            ),
                                         )}
                                     </div>
                                 </section>
-                            ),
-                        )}
+                            );
+                        })}
                     </div>
                     <footer className="mt-10 border-t border-slate-300 pt-2 text-center text-xs text-slate-500">
                         End of paper · QAT practice
