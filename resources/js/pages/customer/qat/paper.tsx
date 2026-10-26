@@ -44,6 +44,11 @@ type QatPaperView = {
     };
 };
 
+type SchoolDetails = {
+    name: string;
+    logo: string | null;
+};
+
 const qatQuestionSize = DEFAULT_PAPER_SETTINGS.questionSize;
 const qatQuestionLineHeight = DEFAULT_PAPER_SETTINGS.questionLineHeight;
 const qatUrduMetrics = PAPER_URDU_FONT_METRICS[DEFAULT_PAPER_SETTINGS.urduFont];
@@ -64,6 +69,20 @@ function formatDuration(minutes: number): string {
     }
 
     return `${hours} ${hours === 1 ? 'Hour' : 'Hours'}${remainingMinutes ? ` ${remainingMinutes} Minutes` : ''}`;
+}
+
+function storageAssetUrl(value: string | null): string {
+    const path = value?.trim() ?? '';
+
+    if (!path) {
+        return '';
+    }
+
+    if (/^(https?:|data:|blob:)/i.test(path) || path.startsWith('/')) {
+        return path;
+    }
+
+    return `/storage/${path}`;
 }
 
 function romanSection(number: number): string {
@@ -158,10 +177,12 @@ export default function QatPaper({
     paper: initialPaper,
     variants = [],
     previewId = null,
+    schoolDetails,
 }: {
     paper: QatPaperView;
     variants?: QatPaperView[];
     previewId?: string | null;
+    schoolDetails: SchoolDetails;
 }) {
     const [activeVariant, setActiveVariant] = useState(0);
     const [saving, setSaving] = useState(false);
@@ -169,6 +190,7 @@ export default function QatPaper({
     const [actionError, setActionError] = useState('');
     const paperVariants = variants.length ? variants : [initialPaper];
     const paper = paperVariants[activeVariant] ?? initialPaper;
+    const schoolLogoUrl = storageAssetUrl(schoolDetails.logo);
     const objectiveSections = paper.paper_data.sections
         .map((section) => ({
             ...section,
@@ -385,6 +407,18 @@ export default function QatPaper({
                     className="min-h-[297mm] bg-white px-[10mm] py-[10mm] text-slate-900 print:min-h-0"
                 >
                     <header className="break-inside-avoid">
+                        <div className="mb-3 flex items-center justify-center gap-3 text-center">
+                            {schoolLogoUrl && (
+                                <img
+                                    src={schoolLogoUrl}
+                                    alt=""
+                                    className="h-12 w-12 shrink-0 object-contain"
+                                />
+                            )}
+                            <div className="text-lg font-bold leading-tight">
+                                {schoolDetails.name}
+                            </div>
+                        </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-end gap-2 pb-1 text-xs font-semibold">
                             <span className="text-left">
                                 Total Time:{' '}

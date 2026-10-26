@@ -250,6 +250,7 @@ class QatPaperController extends Controller
             'paper' => $papers[0],
             'variants' => $papers,
             'previewId' => $preview,
+            'schoolDetails' => $this->schoolDetails($request),
         ]);
     }
 
@@ -311,7 +312,18 @@ class QatPaperController extends Controller
                 'created_at' => $qatPaper->created_at?->toISOString(),
                 'paper_data' => $paperData,
             ],
+            'schoolDetails' => $this->schoolDetails($request),
         ]);
+    }
+
+    private function schoolDetails(Request $request): array
+    {
+        $school = $request->user()->schoolOwner() ?? $request->user();
+
+        return [
+            'name' => $school->school_name ?: $school->name,
+            'logo' => $school->logo,
+        ];
     }
 
     private function validateSyllabus(array $data): void

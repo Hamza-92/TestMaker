@@ -1,4 +1,5 @@
 import { Fragment, useMemo } from 'react';
+import { containsUrduScript } from '@/pages/customer/papers/paper-layouts/questions/bilingual-question-row';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { questionTextToHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
 
@@ -364,22 +365,26 @@ function LocalizedText({
     ur,
     number,
     sideBySide = false,
+    shared,
 }: {
     en?: string;
     ur?: string;
     number?: string;
     sideBySide?: boolean;
+    shared?: string;
 }) {
-    if (!en && !ur) {
+    if (!en && !ur && !shared) {
         return null;
     }
 
     return (
         <div
             className={
-                sideBySide && en && ur
-                    ? 'grid min-w-0 flex-1 grid-cols-2 gap-3'
-                    : 'min-w-0 flex-1 space-y-1'
+                shared
+                    ? 'grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3'
+                    : sideBySide && en && ur
+                      ? 'grid min-w-0 flex-1 grid-cols-2 gap-3'
+                      : 'min-w-0 flex-1 space-y-1'
             }
         >
             {en && (
@@ -396,6 +401,16 @@ function LocalizedText({
                     <div className="min-w-0 flex-1">
                         <QatRichText value={en} />
                     </div>
+                </div>
+            )}
+            {shared && !en && <div />}
+            {shared && (
+                <div
+                    dir="auto"
+                    lang={containsUrduScript(shared) ? 'ur' : 'en'}
+                    className="min-w-0 max-w-[18rem] text-center"
+                >
+                    <QatRichText value={shared} inline />
                 </div>
             )}
             {ur && (
@@ -417,6 +432,7 @@ function LocalizedText({
                     </div>
                 </div>
             )}
+            {shared && !ur && <div />}
         </div>
     );
 }
@@ -494,6 +510,16 @@ export function QatQuestionContent({
         promptUr && !sameText(primaryUr, promptUr) ? promptUr : '';
     const detailEn = field(content, 'shared_en') || question.description_en;
     const detailUr = field(content, 'shared_ur') || question.description_ur;
+    const visibleDetailEn = sameText(detailEn, statementEn) ? '' : detailEn;
+    const visibleDetailUr = sameText(detailUr, statementUr) ? '' : detailUr;
+    const sharedStatement =
+        question.schema_key === 'subjective_same_statement' &&
+        (visibleDetailEn || visibleDetailUr) &&
+        (!visibleDetailEn ||
+            !visibleDetailUr ||
+            sameText(visibleDetailEn, visibleDetailUr))
+            ? visibleDetailEn || visibleDetailUr
+            : '';
 
     return (
         <div className="space-y-2 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
@@ -502,6 +528,7 @@ export function QatQuestionContent({
                 ur={statementUr}
                 number={number}
                 sideBySide
+                shared={sharedStatement}
             />
             {!statementEn && !statementUr && (
                 <span className="qat-question-number font-semibold">
@@ -516,11 +543,13 @@ export function QatQuestionContent({
                     <LocalizedText en={passageEn} ur={passageUr} sideBySide />
                 </div>
             )}
-            <LocalizedText
-                en={sameText(detailEn, statementEn) ? '' : detailEn}
-                ur={sameText(detailUr, statementUr) ? '' : detailUr}
-                sideBySide
-            />
+            {!sharedStatement && (
+                <LocalizedText
+                    en={visibleDetailEn}
+                    ur={visibleDetailUr}
+                    sideBySide
+                />
+            )}
             {options.length > 0 && (
                 <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
                     {options.map((option, index) => (

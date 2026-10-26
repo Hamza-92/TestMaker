@@ -13,6 +13,7 @@ uses(RefreshDatabase::class);
 
 test('QAT paper generation uses only selected monthly chapters and saves a printable paper', function () {
     $school = User::factory()->create(['user_type' => UserType::Customer->value, 'account_type' => 'paid']);
+    $school->update(['school_name' => 'Sample School', 'logo' => 'school-logos/sample.png']);
     $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value, 'created_by' => null]);
     Subscription::create([
         'user_id' => $school->id, 'name' => 'QAT plan', 'amount' => 1000,
@@ -102,6 +103,8 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertOk()->assertInertia(fn ($page) => $page
         ->component('customer/qat/paper')
         ->where('previewId', $previewId)
+        ->where('schoolDetails.name', 'Sample School')
+        ->where('schoolDetails.logo', 'school-logos/sample.png')
         ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
         ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں')
         ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
@@ -119,6 +122,8 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->and($paper->total_marks)->toBe(2.0);
     $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
         ->assertInertia(fn ($page) => $page->component('customer/qat/paper')
+            ->where('schoolDetails.name', 'Sample School')
+            ->where('schoolDetails.logo', 'school-logos/sample.png')
             ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
     $legacyData = $paper->paper_data;
     unset($legacyData['sections'][0]['heading_en'], $legacyData['sections'][0]['heading_ur']);
