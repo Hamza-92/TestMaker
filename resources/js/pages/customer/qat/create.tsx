@@ -36,6 +36,11 @@ type QatChapter = {
     name: string;
     months: number[];
 };
+type QatMonthSyllabus = {
+    qat_subject_id: number;
+    month: number;
+    description: string;
+};
 type PoolType = {
     id: number;
     name: string;
@@ -167,12 +172,14 @@ export default function QatCreate({
     classes,
     subjects,
     chapters,
+    monthSyllabi,
     templates,
 }: {
     mode: 'auto' | 'manual';
     classes: QatClass[];
     subjects: QatSubject[];
     chapters: QatChapter[];
+    monthSyllabi: QatMonthSyllabus[];
     templates: QatTemplate[];
 }) {
     const [step, setStep] = useState(0);
@@ -243,6 +250,30 @@ export default function QatCreate({
                 .flatMap((item) => item.months),
         ),
     ].sort((a, b) => a - b);
+    const selectedMonthDescriptions = months
+        .filter((month) => monthChoices.includes(month))
+        .map((month) => ({
+            month,
+            books: targetSubjects.flatMap((subject) => {
+                const description = monthSyllabi
+                    .find(
+                        (item) =>
+                            item.qat_subject_id === subject.id &&
+                            item.month === month,
+                    )
+                    ?.description.trim();
+
+                return description
+                    ? [
+                          {
+                              id: subject.id,
+                              name: `${subject.class_name} · ${subject.name}`,
+                              description,
+                          },
+                      ]
+                    : [];
+            }),
+        }));
     const coverage =
         syllabus === 'custom'
             ? selectedChapters
@@ -1293,6 +1324,68 @@ export default function QatCreate({
                                                 </button>
                                             ))}
                                         </div>
+                                        {selectedMonthDescriptions.length >
+                                            0 && (
+                                            <div
+                                                aria-live="polite"
+                                                className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-500/30 dark:bg-brand-500/5"
+                                            >
+                                                <h4 className="text-sm font-semibold">
+                                                    Monthly syllabus
+                                                    descriptions
+                                                </h4>
+                                                {selectedMonthDescriptions.map(
+                                                    ({ month, books }) => (
+                                                        <div
+                                                            key={month}
+                                                            className="space-y-2 border-t border-brand-100 pt-3 first:border-t-0 first:pt-0 dark:border-brand-500/20"
+                                                        >
+                                                            <h5 className="text-sm font-semibold text-brand-700 dark:text-brand-300">
+                                                                {
+                                                                    MONTHS[
+                                                                        month -
+                                                                            1
+                                                                    ]
+                                                                }
+                                                            </h5>
+                                                            {books.length ? (
+                                                                books.map(
+                                                                    (book) => (
+                                                                        <div
+                                                                            key={
+                                                                                book.id
+                                                                            }
+                                                                            className="text-sm text-slate-700 dark:text-slate-200"
+                                                                        >
+                                                                            <span className="font-medium">
+                                                                                {
+                                                                                    book.name
+                                                                                }
+
+                                                                                :{' '}
+                                                                            </span>
+                                                                            <span className="whitespace-pre-line">
+                                                                                {
+                                                                                    book.description
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                    ),
+                                                                )
+                                                            ) : (
+                                                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                                    No
+                                                                    description
+                                                                    has been
+                                                                    added for
+                                                                    this month.
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
                                         {!monthChoices.length && (
                                             <p className="text-sm text-amber-700">
                                                 No month mappings have been

@@ -115,6 +115,24 @@ class QatCatalogueTransfer
                 'updated_at' => $now,
             ]);
 
+            if (array_key_exists('description', $data)) {
+                $description = trim((string) $data['description']);
+                if ($description === '') {
+                    DB::table('qat_month_syllabi')
+                        ->where('qat_subject_id', $qatSubjectId)
+                        ->where('month', $month)
+                        ->delete();
+                } else {
+                    DB::table('qat_month_syllabi')->upsert([[
+                        'qat_subject_id' => $qatSubjectId,
+                        'month' => $month,
+                        'description' => $description,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]], ['qat_subject_id', 'month'], ['description', 'updated_at']);
+                }
+            }
+
             $report = ['chapters' => 0, 'topics' => 0, 'questions' => 0, 'month_assignments' => 0];
             foreach ($chapters as $chapter) {
                 $qatChapterId = DB::table('qat_chapters')

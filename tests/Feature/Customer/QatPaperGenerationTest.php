@@ -59,6 +59,11 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ['qat_chapter_id' => $aprilId, 'month' => 4],
         ['qat_chapter_id' => $mayId, 'month' => 5],
     ]);
+    DB::table('qat_month_syllabi')->insert([
+        'qat_subject_id' => $subjectId, 'month' => 5,
+        'description' => 'Prepare the May chapter and exercises.',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
     foreach ([$aprilId => 'April question', $mayId => 'May question'] as $chapterId => $statement) {
         DB::table('qat_questions')->insert([
             'qat_chapter_id' => $chapterId, 'source_question_id' => $chapterId,
@@ -77,6 +82,8 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertInertia(fn ($page) => $page
             ->has('chapters', 2)
             ->has('templates', 1)
+            ->has('monthSyllabi', 1)
+            ->where('monthSyllabi.0.description', 'Prepare the May chapter and exercises.')
             ->where('templates.0.id', $templateId)
             ->where('chapters.0.months.0', 4)
             ->where('chapters.1.months.0', 5));

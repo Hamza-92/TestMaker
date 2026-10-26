@@ -124,6 +124,13 @@ class QatCatalogueController extends Controller
             'academic_year' => $row->academic_year,
             'chapter_count' => $chapterCounts->get($row->qat_subject_id, 0),
         ])->values();
+        $visibleMonthKeys = $chapters->flatMap(fn (array $chapter) => collect($chapter['months'])
+            ->map(fn ($month) => $chapter['qat_subject_id'].':'.$month))->flip();
+        $monthSyllabi = DB::table('qat_month_syllabi')
+            ->whereIn('qat_subject_id', $subjects->pluck('id'))
+            ->get(['qat_subject_id', 'month', 'description'])
+            ->filter(fn ($syllabus) => $visibleMonthKeys->has($syllabus->qat_subject_id.':'.$syllabus->month))
+            ->values();
         $templates = $mode === 'auto'
             ? DB::table('qat_paper_templates')->whereIn('qat_subject_id', $subjects->pluck('id'))
                 ->where('status', true)->orderBy('name')
@@ -140,6 +147,7 @@ class QatCatalogueController extends Controller
             'classes' => $classes,
             'subjects' => $subjects,
             'chapters' => $chapters,
+            'monthSyllabi' => $monthSyllabi,
             'templates' => $templates,
         ]);
     }

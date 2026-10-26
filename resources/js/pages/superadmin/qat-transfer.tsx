@@ -1,6 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Badge,
     Button,
@@ -39,6 +39,7 @@ type Report = {
     questions: number;
     month_assignments: number;
 };
+type SyllabusDescriptionResponse = { description: string };
 const MONTHS = [
     'January',
     'February',
@@ -66,9 +67,14 @@ export default function QatTransfer({
     const [chapterSearch, setChapterSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState(false);
-    const { data, setData, post, processing, errors } = useForm({
+    const [descriptionLoadedKey, setDescriptionLoadedKey] = useState('');
+    const [descriptionErrorKey, setDescriptionErrorKey] = useState('');
+    const [descriptionReload, setDescriptionReload] = useState(0);
+    const editedDescriptionScope = useRef('');
+    const { data, setData, transform, post, processing, errors } = useForm({
         academic_year: '2026-27',
         month: 4,
+        description: '',
         source_pattern_id: 0,
         class_id: 0,
         subject_id: 0,
@@ -90,6 +96,7 @@ export default function QatTransfer({
     );
     const subjects =
         source?.classes.filter((item) => item.class_id === data.class_id) ?? [];
+    const descriptionScopeKey = `${data.academic_year}|${data.month}|${data.source_pattern_id}|${data.class_id}|${data.subject_id}`;
     const visibleChapters = useMemo(() => {
         const query = chapterSearch.trim().toLocaleLowerCase();
 
@@ -142,17 +149,80 @@ export default function QatTransfer({
         return () => controller.abort();
     }, [data.source_pattern_id, data.class_id, data.subject_id]);
 
+    useEffect(() => {
+        if (
+            !/^20\d{2}-\d{2}$/.test(data.academic_year) ||
+            !data.source_pattern_id ||
+            !data.class_id ||
+            !data.subject_id
+        ) {
+            return;
+        }
+
+        const controller = new AbortController();
+        const params = new URLSearchParams({
+            academic_year: data.academic_year,
+            month: String(data.month),
+            source_pattern_id: String(data.source_pattern_id),
+            class_id: String(data.class_id),
+            subject_id: String(data.subject_id),
+        });
+        fetch(`/superadmin/qat-transfer/syllabus-description?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Could not load the syllabus description.');
+                }
+
+                return response.json() as Promise<SyllabusDescriptionResponse>;
+            })
+            .then((result) => {
+                if (!controller.signal.aborted) {
+                    if (
+                        editedDescriptionScope.current !== descriptionScopeKey
+                    ) {
+                        setData('description', result.description ?? '');
+                    }
+
+                    setDescriptionLoadedKey(descriptionScopeKey);
+                    setDescriptionErrorKey('');
+                }
+            })
+            .catch((error: Error) => {
+                if (error.name !== 'AbortError') {
+                    setDescriptionErrorKey(descriptionScopeKey);
+                }
+            });
+
+        return () => controller.abort();
+    }, [
+        data.academic_year,
+        data.month,
+        data.source_pattern_id,
+        data.class_id,
+        data.subject_id,
+        descriptionScopeKey,
+        descriptionReload,
+        setData,
+    ]);
+
     const resetScope = (patternId: number, classId = 0, subjectId = 0) => {
         setChapters([]);
         setExpandedChapters([]);
         setChapterSearch('');
         setLoading(subjectId > 0);
         setLoadError(false);
+        setDescriptionLoadedKey('');
+        setDescriptionErrorKey('');
+        editedDescriptionScope.current = '';
         setData((current) => ({
             ...current,
             source_pattern_id: patternId,
             class_id: classId,
             subject_id: subjectId,
+            description: '',
             chapter_ids: [],
             question_ids: [],
         }));
@@ -250,6 +320,20 @@ export default function QatTransfer({
             <form
                 onSubmit={(event) => {
                     event.preventDefault();
+                    transform((values) => {
+                        if (
+                            descriptionLoadedKey === descriptionScopeKey ||
+                            editedDescriptionScope.current ===
+                                descriptionScopeKey
+                        ) {
+                            return values;
+                        }
+
+                        const payload: Partial<typeof values> = { ...values };
+                        delete payload.description;
+
+                        return payload;
+                    });
                     post('/superadmin/qat-transfer');
                 }}
             >
@@ -264,9 +348,16 @@ export default function QatTransfer({
                                 value={data.academic_year}
                                 pattern="20[0-9]{2}-[0-9]{2}"
                                 placeholder="2026-27"
-                                onChange={(event) =>
-                                    setData('academic_year', event.target.value)
-                                }
+                                onChange={(event) => {
+                                    setDescriptionLoadedKey('');
+                                    setDescriptionErrorKey('');
+                                    editedDescriptionScope.current = '';
+                                    setData((current) => ({
+                                        ...current,
+                                        academic_year: event.target.value,
+                                        description: '',
+                                    }));
+                                }}
                             />
                             {errors.academic_year && (
                                 <span className="text-red-600">
@@ -279,9 +370,16 @@ export default function QatTransfer({
                             <select
                                 className={selectClass}
                                 value={data.month}
-                                onChange={(event) =>
-                                    setData('month', Number(event.target.value))
-                                }
+                                onChange={(event) => {
+                                    setDescriptionLoadedKey('');
+                                    setDescriptionErrorKey('');
+                                    editedDescriptionScope.current = '';
+                                    setData((current) => ({
+                                        ...current,
+                                        month: Number(event.target.value),
+                                        description: '',
+                                    }));
+                                }}
                             >
                                 {MONTHS.map((month, index) => (
                                     <option key={month} value={index + 1}>
@@ -352,6 +450,46 @@ export default function QatTransfer({
                             </select>
                         </label>
                     </div>
+                    <label className="block space-y-1 text-sm">
+                        Syllabus description for {MONTHS[data.month - 1]}
+                        <textarea
+                            className="min-h-28 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                            rows={4}
+                            maxLength={5000}
+                            value={data.description}
+                            placeholder="Describe the topics covered by this month's syllabus"
+                            onChange={(event) => {
+                                editedDescriptionScope.current =
+                                    descriptionScopeKey;
+                                setData('description', event.target.value);
+                            }}
+                        />
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">
+                            Shown to customers when they select this month for
+                            this QAT book.
+                        </span>
+                        {errors.description && (
+                            <span className="block text-sm text-red-600">
+                                {errors.description}
+                            </span>
+                        )}
+                    </label>
+                    {descriptionErrorKey === descriptionScopeKey && (
+                        <div className="flex items-center gap-2 text-sm text-red-600">
+                            Could not load the existing description.
+                            <button
+                                type="button"
+                                className="font-semibold underline"
+                                onClick={() =>
+                                    setDescriptionReload(
+                                        (current) => current + 1,
+                                    )
+                                }
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
                     {errors.subject_id && (
                         <p className="text-sm text-red-600">
                             {errors.subject_id}

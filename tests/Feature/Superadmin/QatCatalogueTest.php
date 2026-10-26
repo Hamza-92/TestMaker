@@ -55,6 +55,7 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
     ]);
     $payload = [
         'academic_year' => '2026-27', 'month' => 4,
+        'description' => 'Plants and their functions.',
         'source_pattern_id' => $pattern->id, 'class_id' => $class->id,
         'subject_id' => $subject->id, 'chapter_ids' => [$chapter->id],
     ];
@@ -75,13 +76,34 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
         ...$payload, 'question_ids' => [$first->id],
     ])->assertSessionHasNoErrors();
     expect(DB::table('qat_questions')->pluck('source_question_id')->all())->toBe([$first->id]);
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', [
+        'academic_year' => $payload['academic_year'], 'month' => $payload['month'],
+        'source_pattern_id' => $pattern->id, 'class_id' => $class->id,
+        'subject_id' => $subject->id,
+    ]))->assertOk()->assertJsonPath('description', 'Plants and their functions.');
 
     $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
-        ...$payload, 'question_ids' => [$second->id],
+        ...$payload, 'description' => 'Updated monthly syllabus.', 'question_ids' => [$second->id],
     ])->assertSessionHasNoErrors();
     expect(DB::table('qat_questions')->orderBy('source_question_id')->pluck('source_question_id')->all())
         ->toBe([$first->id, $second->id])
-        ->and(DB::table('qat_chapter_months')->count())->toBe(1);
+        ->and(DB::table('qat_chapter_months')->count())->toBe(1)
+        ->and(DB::table('qat_month_syllabi')->value('description'))->toBe('Updated monthly syllabus.');
+
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'description' => null, 'question_ids' => [$first->id],
+    ])->assertSessionHasNoErrors();
+    expect(DB::table('qat_month_syllabi')->count())->toBe(0);
+
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'description' => 'Kept for older forms.', 'question_ids' => [$first->id],
+    ])->assertSessionHasNoErrors();
+    $withoutDescription = $payload;
+    unset($withoutDescription['description']);
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$withoutDescription, 'question_ids' => [$first->id],
+    ])->assertSessionHasNoErrors();
+    expect(DB::table('qat_month_syllabi')->value('description'))->toBe('Kept for older forms.');
 });
 
 test('QAT transfer copies one scope once and can assign it to another month', function () {

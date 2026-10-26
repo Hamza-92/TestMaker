@@ -12,6 +12,7 @@ use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -82,11 +83,35 @@ class QatCatalogueController extends Controller
         ]));
     }
 
+    public function syllabusDescription(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'academic_year' => ['required', 'regex:/^20\d{2}-\d{2}$/'],
+            'month' => ['required', 'integer', 'between:1,12'],
+            'source_pattern_id' => ['required', 'integer'],
+            'class_id' => ['required', 'integer'],
+            'subject_id' => ['required', 'integer'],
+        ]);
+
+        $description = DB::table('qat_month_syllabi as syllabus')
+            ->join('qat_subjects as subject', 'subject.id', '=', 'syllabus.qat_subject_id')
+            ->join('qat_catalogues as catalogue', 'catalogue.id', '=', 'subject.qat_catalogue_id')
+            ->where('catalogue.academic_year', $data['academic_year'])
+            ->where('subject.source_pattern_id', $data['source_pattern_id'])
+            ->where('subject.class_id', $data['class_id'])
+            ->where('subject.subject_id', $data['subject_id'])
+            ->where('syllabus.month', $data['month'])
+            ->value('syllabus.description');
+
+        return response()->json(['description' => $description ?? '']);
+    }
+
     public function store(Request $request, QatCatalogueTransfer $transfer): RedirectResponse
     {
         $data = $request->validate([
             'academic_year' => ['required', 'regex:/^20\d{2}-\d{2}$/'],
             'month' => ['required', 'integer', 'between:1,12'],
+            'description' => ['nullable', 'string', 'max:5000'],
             'source_pattern_id' => ['required', 'integer', 'exists:patterns,id'],
             'class_id' => ['required', 'integer', 'exists:classes,id'],
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
