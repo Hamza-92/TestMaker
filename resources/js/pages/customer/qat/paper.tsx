@@ -497,7 +497,7 @@ export default function QatPaper({
                                                                     question.id
                                                                 }
                                                                 data-paper-question
-                                                                className="qat-question"
+                                                                className="qat-question px-2"
                                                             >
                                                                 <QatObjectiveQuestion
                                                                     question={
@@ -520,13 +520,6 @@ export default function QatPaper({
                             </section>
                         )}
                         {subjectiveSections.map((section, sectionIndex) => {
-                            const preceding = subjectiveSections
-                                .slice(0, sectionIndex)
-                                .reduce(
-                                    (total, previous) =>
-                                        total + previous.questions.length,
-                                    objectiveQuestions.length,
-                                );
                             const sectionNumber =
                                 sectionIndex +
                                 (objectiveQuestions.length ? 2 : 1);
@@ -544,21 +537,19 @@ export default function QatPaper({
                                             1
                                         }
                                     />
-                                    <div className="mt-3 space-y-5">
+                                    <div className="mt-2 space-y-2">
                                         {section.questions.map(
                                             (question, index) => (
                                                 <div
                                                     key={question.id}
                                                     data-paper-question
-                                                    className="qat-question"
+                                                    className="qat-question px-2"
                                                 >
                                                     <QatQuestionContent
                                                         question={question}
-                                                        number={
-                                                            preceding +
-                                                            index +
-                                                            1
-                                                        }
+                                                        number={romanSection(
+                                                            index + 1,
+                                                        ).toLowerCase()}
                                                     />
                                                 </div>
                                             ),

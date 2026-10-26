@@ -367,7 +367,7 @@ function LocalizedText({
 }: {
     en?: string;
     ur?: string;
-    number?: number;
+    number?: string;
     sideBySide?: boolean;
 }) {
     if (!en && !ur) {
@@ -390,7 +390,7 @@ function LocalizedText({
                 >
                     {number !== undefined && (
                         <span className="qat-question-number shrink-0 font-semibold">
-                            Q{number}.
+                            {number}.
                         </span>
                     )}
                     <div className="min-w-0 flex-1">
@@ -409,7 +409,7 @@ function LocalizedText({
                             dir="ltr"
                             className="qat-question-number shrink-0 font-semibold"
                         >
-                            Q{number}.
+                            {number}.
                         </span>
                     )}
                     <div className="min-w-0 flex-1">
@@ -460,7 +460,7 @@ export function QatQuestionContent({
     number,
 }: {
     question: QatQuestion;
-    number: number;
+    number: string;
 }) {
     const content = question.content ?? {};
     const promptEn = field(content, 'prompt_en');
@@ -476,6 +476,18 @@ export function QatQuestionContent({
     const pairs = records(content.pairs);
     const primaryEn = question.statement_en || promptEn || introEn;
     const primaryUr = question.statement_ur || promptUr || introUr;
+    const singleItem = items.length === 1 ? (items[0] ?? null) : null;
+    const promoteSingleItem =
+        singleItem !== null &&
+        sameText(primaryEn, '') &&
+        sameText(primaryUr, '') &&
+        records(singleItem.options).length === 0;
+    const statementEn = promoteSingleItem
+        ? field(singleItem, 'prompt_en') || field(singleItem, 'statement_en')
+        : primaryEn;
+    const statementUr = promoteSingleItem
+        ? field(singleItem, 'prompt_ur') || field(singleItem, 'statement_ur')
+        : primaryUr;
     const secondaryEn =
         promptEn && !sameText(primaryEn, promptEn) ? promptEn : '';
     const secondaryUr =
@@ -486,14 +498,14 @@ export function QatQuestionContent({
     return (
         <div className="space-y-2 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
             <LocalizedText
-                en={primaryEn}
-                ur={primaryUr}
+                en={statementEn}
+                ur={statementUr}
                 number={number}
                 sideBySide
             />
-            {!primaryEn && !primaryUr && (
+            {!statementEn && !statementUr && (
                 <span className="qat-question-number font-semibold">
-                    Q{number}.
+                    {number}.
                 </span>
             )}
             {(secondaryEn || secondaryUr) && (
@@ -505,8 +517,8 @@ export function QatQuestionContent({
                 </div>
             )}
             <LocalizedText
-                en={sameText(detailEn, primaryEn) ? '' : detailEn}
-                ur={sameText(detailUr, primaryUr) ? '' : detailUr}
+                en={sameText(detailEn, statementEn) ? '' : detailEn}
+                ur={sameText(detailUr, statementUr) ? '' : detailUr}
                 sideBySide
             />
             {options.length > 0 && (
@@ -527,7 +539,7 @@ export function QatQuestionContent({
                     ))}
                 </div>
             )}
-            {items.length > 0 && (
+            {items.length > 0 && !promoteSingleItem && (
                 <ol className="list-[lower-alpha] space-y-2 pl-5">
                     {items.map((item, index) => (
                         <li key={index}>
