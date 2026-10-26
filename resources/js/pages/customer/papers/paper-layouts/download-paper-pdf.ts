@@ -573,9 +573,9 @@ export async function downloadPaperPdf({
                     Object.assign(pageWatermark.style, {
                         top: '0',
                         right: '0',
-                        bottom: '0',
+                        bottom: 'auto',
                         left: '0',
-                        height: 'auto',
+                        height: `${height}px`,
                     });
                     page.append(pageWatermark);
                 }

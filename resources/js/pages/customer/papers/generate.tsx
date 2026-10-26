@@ -7445,7 +7445,8 @@ export default function GeneratePaper({
     }
 
     function savePaperSectionEdit(values: {
-        title: string;
+        titleEnglish: string;
+        titleUrdu: string;
         requiredQuestions: number;
         marksEach: number;
     }) {
@@ -7472,8 +7473,14 @@ export default function GeneratePaper({
                           return {
                               ...section,
                               title: isEditedSection
-                                  ? values.title
+                                  ? values.titleEnglish || values.titleUrdu
                                   : section.title,
+                              titleEnglish: isEditedSection
+                                  ? values.titleEnglish || null
+                                  : section.titleEnglish,
+                              titleUrdu: isEditedSection
+                                  ? values.titleUrdu || null
+                                  : section.titleUrdu,
                               requiredQuestions: Math.min(
                                   values.requiredQuestions,
                                   section.questions.length,
@@ -15614,6 +15621,8 @@ export function GeneratedPaperView({
                         type={settings.watermarkType}
                         schoolName={paper.header.schoolName}
                         logoUrl={activeWatermarkLogoUrl}
+                        textSize={settings.watermarkTextSize}
+                        logoSize={settings.watermarkLogoSize}
                         opacity={watermarkOpacity}
                         pageHeightMm={pageDims.height}
                         marginTopMm={settings.marginTop}
@@ -15739,6 +15748,8 @@ export function GeneratedPaperView({
                                             variantPaper.header.schoolName
                                         }
                                         logoUrl={activeWatermarkLogoUrl}
+                                        textSize={settings.watermarkTextSize}
+                                        logoSize={settings.watermarkLogoSize}
                                         opacity={watermarkOpacity}
                                         pageHeightMm={pageDims.height}
                                         marginTopMm={settings.marginTop}

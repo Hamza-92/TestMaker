@@ -7,6 +7,8 @@ interface PaperWatermarkProps {
     type: PaperWatermarkType;
     schoolName: string;
     logoUrl: string;
+    textSize: number;
+    logoSize: number;
     opacity: number;
     pageHeightMm: number;
     marginTopMm: number;
@@ -17,6 +19,8 @@ export function PaperWatermark({
     type,
     schoolName,
     logoUrl,
+    textSize,
+    logoSize,
     opacity,
     pageHeightMm,
     marginTopMm,
@@ -78,7 +82,7 @@ export function PaperWatermark({
                 <span
                     className="select-none text-center font-bold uppercase"
                     style={{
-                        fontSize: '3.5rem',
+                        fontSize: `${textSize}px`,
                         transform: 'rotate(-30deg)',
                         whiteSpace: 'nowrap',
                     }}
@@ -90,7 +94,8 @@ export function PaperWatermark({
                     src={logoUrl}
                     alt=""
                     draggable={false}
-                    className="max-h-[45%] max-w-[45%] select-none object-contain"
+                    className="select-none object-contain"
+                    style={{ width: `${logoSize}%`, height: `${logoSize}%` }}
                 />
             )}
         </div>

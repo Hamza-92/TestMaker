@@ -6,10 +6,34 @@ interface SectionEditModalProps {
     section: GeneratedPaperSection;
     onClose: () => void;
     onSave: (values: {
-        title: string;
+        titleEnglish: string;
+        titleUrdu: string;
         requiredQuestions: number;
         marksEach: number;
     }) => void;
+}
+
+function initialHeading(section: GeneratedPaperSection) {
+    const english = section.titleEnglish?.trim() || '';
+    const urdu = section.titleUrdu?.trim() || '';
+
+    if (english || urdu) {
+        return { english, urdu };
+    }
+
+    const separator = section.title.indexOf(' / ');
+
+    if (
+        separator >= 0 &&
+        /[\u0600-\u06ff]/i.test(section.title.slice(separator + 3))
+    ) {
+        return {
+            english: section.title.slice(0, separator).trim(),
+            urdu: section.title.slice(separator + 3).trim(),
+        };
+    }
+
+    return { english: section.title.trim(), urdu: '' };
 }
 
 export function SectionEditModal({
@@ -17,7 +41,12 @@ export function SectionEditModal({
     onClose,
     onSave,
 }: SectionEditModalProps) {
-    const [title, setTitle] = useState(section.title);
+    const [titleEnglish, setTitleEnglish] = useState(
+        () => initialHeading(section).english,
+    );
+    const [titleUrdu, setTitleUrdu] = useState(
+        () => initialHeading(section).urdu,
+    );
     const [requiredQuestions, setRequiredQuestions] = useState(
         String(section.requiredQuestions || ''),
     );
@@ -68,12 +97,28 @@ export function SectionEditModal({
                 <div className="space-y-4 p-5">
                     <label className="block">
                         <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                            Title
+                            English Heading
                         </span>
                         <input
                             autoComplete="off"
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
+                            value={titleEnglish}
+                            onChange={(event) =>
+                                setTitleEnglish(event.target.value)
+                            }
+                            className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                    </label>
+                    <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                            Urdu Heading
+                        </span>
+                        <input
+                            autoComplete="off"
+                            dir="rtl"
+                            value={titleUrdu}
+                            onChange={(event) =>
+                                setTitleUrdu(event.target.value)
+                            }
                             className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                         />
                     </label>
@@ -133,7 +178,8 @@ export function SectionEditModal({
                         type="button"
                         onClick={() =>
                             onSave({
-                                title,
+                                titleEnglish: titleEnglish.trim(),
+                                titleUrdu: titleUrdu.trim(),
                                 requiredQuestions: Math.min(
                                     Number(requiredQuestions) || 0,
                                     section.questions.length,
@@ -141,7 +187,8 @@ export function SectionEditModal({
                                 marksEach: Number(marksEach) || 0,
                             })
                         }
-                        className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
+                        disabled={!titleEnglish.trim() && !titleUrdu.trim()}
+                        className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400"
                     >
                         Update
                     </button>

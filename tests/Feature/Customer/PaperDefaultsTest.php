@@ -116,7 +116,7 @@ test('customers can save circled objective option labels', function () {
         ->toBeTrue();
 });
 
-test('school users can select the watermark type but cannot change its logo or opacity', function () {
+test('school users can adjust the watermark appearance but cannot replace its logo', function () {
     $customer = paperDefaultsCustomer();
     PaperDefault::create([
         'user_id' => $customer->id,
@@ -139,6 +139,8 @@ test('school users can select the watermark type but cannot change its logo or o
         'watermarkType' => 'text',
         'watermarkText' => 'Changed',
         'watermarkLogoUrl' => '/storage/replacement.png',
+        'watermarkTextSize' => 48,
+        'watermarkLogoSize' => 55,
         'watermarkOpacity' => 80,
     ];
     $this->actingAs($customer)->put(route('customer.settings.update'), $payload)
@@ -149,13 +151,18 @@ test('school users can select the watermark type but cannot change its logo or o
     expect($settings['questionSize'])->toBe(14)
         ->and($settings['watermarkType'])->toBe('text')
         ->and($settings['watermarkLogoUrl'])->toBe('/storage/approved-watermark.png')
-        ->and($settings['watermarkOpacity'])->toBe(25)
+        ->and($settings['watermarkTextSize'])->toBe(48)
+        ->and($settings['watermarkLogoSize'])->toBe(55)
+        ->and($settings['watermarkOpacity'])->toBe(80)
         ->and($settings)->not->toHaveKey('watermarkText');
 
     $this->actingAs($customer)->delete(route('customer.settings.reset'))->assertRedirect();
     $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
     expect($settings['watermarkType'])->toBe('text')
         ->and($settings['watermarkLogoUrl'])->toBe('/storage/approved-watermark.png')
+        ->and($settings['watermarkTextSize'])->toBe(48)
+        ->and($settings['watermarkLogoSize'])->toBe(55)
+        ->and($settings['watermarkOpacity'])->toBe(80)
         ->and($settings)->not->toHaveKey('questionSize');
 });
 
@@ -273,6 +280,9 @@ test('invalid paper defaults and structural assignment overrides are rejected', 
     ['settings.marginTop', 500, 'settings.marginTop'],
     ['settings.schoolNameSize', 29, 'settings.schoolNameSize'],
     ['settings.addressSize', 7, 'settings.addressSize'],
+    ['settings.watermarkTextSize', 97, 'settings.watermarkTextSize'],
+    ['settings.watermarkLogoSize', 9, 'settings.watermarkLogoSize'],
+    ['settings.watermarkOpacity', 101, 'settings.watermarkOpacity'],
     ['settings.paperLayout', 'federal-board', 'settings'],
     ['settings.objectiveLayout', 'federal-row', 'settings'],
     ['settings.watermarkLogoUrl', 'javascript:alert(1)', 'settings.watermarkLogoUrl'],

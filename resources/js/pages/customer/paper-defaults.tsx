@@ -134,7 +134,6 @@ export default function PaperDefaults({
             ...next,
             watermarkText: form.data.settings.watermarkText,
             watermarkLogoUrl: form.data.settings.watermarkLogoUrl,
-            watermarkOpacity: form.data.settings.watermarkOpacity,
         };
     }
 

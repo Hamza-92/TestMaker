@@ -14,6 +14,8 @@ class CustomerPaperDefaults
         'watermarkType',
         'watermarkText',
         'watermarkLogoUrl',
+        'watermarkTextSize',
+        'watermarkLogoSize',
         'watermarkOpacity',
     ];
 
@@ -37,7 +39,7 @@ class CustomerPaperDefaults
     public static function preserveWatermarkSettings(array $submitted, array $existing): array
     {
         foreach (self::WATERMARK_SETTING_KEYS as $key) {
-            if ($key !== 'watermarkType') {
+            if (! in_array($key, ['watermarkType', 'watermarkTextSize', 'watermarkLogoSize', 'watermarkOpacity'], true)) {
                 unset($submitted[$key]);
             }
         }
@@ -80,7 +82,8 @@ class CustomerPaperDefaults
             'questionBorderWidth' => [0, 6], 'sectionHeadingBorderWidth' => [0, 6],
             'marginTop' => [0, 50], 'marginRight' => [0, 50],
             'marginBottom' => [0, 50], 'marginLeft' => [0, 50],
-            'sectionSpacing' => [0, 20], 'orGroupGap' => [0, 10], 'watermarkOpacity' => [0, 100],
+            'sectionSpacing' => [0, 20], 'orGroupGap' => [0, 10],
+            'watermarkTextSize' => [16, 96], 'watermarkLogoSize' => [10, 80], 'watermarkOpacity' => [0, 100],
         ] as $key => [$min, $max]) {
             $settings[$key] = ['sometimes', 'numeric', "min:{$min}", "max:{$max}"];
         }

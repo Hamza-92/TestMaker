@@ -374,10 +374,14 @@ export interface PaperSettings {
     /** Default text colour for everything on the paper (header/heading/questions). */
     textColor: string;
     watermarkType: PaperWatermarkType;
-    /** Empty string = no watermark; otherwise this text shows faintly behind the content. */
+    /** Legacy custom text setting; paper text watermarks use the school name. */
     watermarkText: string;
     watermarkLogoUrl: string;
-    /** 0–100; lower = fainter. Only used when watermarkText is non-empty. */
+    /** Text watermark font size in px. */
+    watermarkTextSize: number;
+    /** Logo watermark size as a percentage of the printable page area. */
+    watermarkLogoSize: number;
+    /** 0–100; lower = fainter. Applies to text and logo watermarks. */
     watermarkOpacity: number;
     /** Toggle printed page numbers (print-only). */
     pageNumbersEnabled: boolean;
@@ -468,6 +472,8 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     watermarkType: 'logo',
     watermarkText: '',
     watermarkLogoUrl: '',
+    watermarkTextSize: 56,
+    watermarkLogoSize: 45,
     watermarkOpacity: 8,
     pageNumbersEnabled: false,
     pageNumberPosition: 'footer-center',
@@ -825,6 +831,16 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
                 : typeof source.watermarkLogoDataUrl === 'string'
                   ? source.watermarkLogoDataUrl
                   : DEFAULT_PAPER_SETTINGS.watermarkLogoUrl,
+        watermarkTextSize:
+            typeof source.watermarkTextSize === 'number' &&
+            Number.isFinite(source.watermarkTextSize)
+                ? Math.min(Math.max(Math.round(source.watermarkTextSize), 16), 96)
+                : DEFAULT_PAPER_SETTINGS.watermarkTextSize,
+        watermarkLogoSize:
+            typeof source.watermarkLogoSize === 'number' &&
+            Number.isFinite(source.watermarkLogoSize)
+                ? Math.min(Math.max(Math.round(source.watermarkLogoSize), 10), 80)
+                : DEFAULT_PAPER_SETTINGS.watermarkLogoSize,
         watermarkOpacity:
             typeof source.watermarkOpacity === 'number'
                 ? source.watermarkOpacity

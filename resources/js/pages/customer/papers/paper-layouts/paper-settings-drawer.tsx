@@ -240,6 +240,8 @@ const HEADER_PADDING_BOUNDS = { min: 0, max: 24 };
 const LINE_HEIGHT_BOUNDS = { min: 1, max: 3 };
 const BORDER_WIDTH_BOUNDS = { min: 0, max: 6 };
 const WATERMARK_OPACITY_BOUNDS = { min: 0, max: 100 };
+const WATERMARK_TEXT_SIZE_BOUNDS = { min: 16, max: 96 };
+const WATERMARK_LOGO_SIZE_BOUNDS = { min: 10, max: 80 };
 
 const DRAWER_WIDTH_STORAGE_KEY = 'paper-settings-drawer-width';
 const DEFAULT_DRAWER_WIDTH = 372;
@@ -710,13 +712,39 @@ export function PaperSettingsPanel({
                         />
                     )}
                 </div>
-                <div className={inline ? 'min-w-0' : 'mt-4'}>
+                <div
+                    className={
+                        inline
+                            ? 'grid grid-cols-2 gap-3 xl:col-span-2'
+                            : 'mt-4 grid grid-cols-2 gap-2'
+                    }
+                >
+                    {settings.watermarkType === 'text' ? (
+                        <LabeledStepper
+                            label="Text Size (px)"
+                            value={settings.watermarkTextSize}
+                            min={WATERMARK_TEXT_SIZE_BOUNDS.min}
+                            max={WATERMARK_TEXT_SIZE_BOUNDS.max}
+                            onChange={(value) =>
+                                onChange({ watermarkTextSize: value })
+                            }
+                        />
+                    ) : (
+                        <LabeledStepper
+                            label="Logo Size (%)"
+                            value={settings.watermarkLogoSize}
+                            min={WATERMARK_LOGO_SIZE_BOUNDS.min}
+                            max={WATERMARK_LOGO_SIZE_BOUNDS.max}
+                            onChange={(value) =>
+                                onChange({ watermarkLogoSize: value })
+                            }
+                        />
+                    )}
                     <LabeledStepper
                         label="Opacity"
                         value={settings.watermarkOpacity}
                         min={WATERMARK_OPACITY_BOUNDS.min}
                         max={WATERMARK_OPACITY_BOUNDS.max}
-                        disabled={!canEditWatermark}
                         onChange={(v) => onChange({ watermarkOpacity: v })}
                     />
                 </div>
