@@ -4,11 +4,13 @@ import {
     ArrowRightIcon,
     BookOpenIcon,
     CheckIcon,
+    ChevronDownIcon,
+    ChevronRightIcon,
     FileTextIcon,
     GraduationCapIcon,
     SearchIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { Switch } from '@/components/ui/switch';
 import { QatQuestionStatement } from './question';
@@ -109,6 +111,57 @@ function firstError(body: unknown): string {
     return 'The request could not be completed.';
 }
 
+function StepCardHeader({
+    index,
+    label,
+    summary,
+    active,
+    available,
+    onClick,
+}: {
+    index: number;
+    label: string;
+    summary: string;
+    active: boolean;
+    available: boolean;
+    onClick?: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            aria-expanded={active}
+            disabled={active || !available}
+            onClick={onClick}
+            className={`flex w-full items-center gap-3 text-left ${active ? 'border-b border-slate-200 pb-4 dark:border-slate-700' : 'px-5 py-4 transition-colors'} ${!active && available ? 'hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-500 dark:hover:bg-slate-800/60' : ''}`}
+        >
+            <span
+                className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${active ? 'bg-brand-600 text-white' : available ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}
+            >
+                {!active && available ? (
+                    <CheckIcon className="size-4" />
+                ) : (
+                    index + 1
+                )}
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {label}
+                </span>
+                {!active && (
+                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                        {summary}
+                    </span>
+                )}
+            </span>
+            {active ? (
+                <ChevronDownIcon className="size-4 shrink-0 text-brand-600" />
+            ) : (
+                <ChevronRightIcon className="size-4 shrink-0 text-slate-400" />
+            )}
+        </button>
+    );
+}
+
 export default function QatCreate({
     mode,
     classes,
@@ -123,6 +176,8 @@ export default function QatCreate({
     templates: QatTemplate[];
 }) {
     const [step, setStep] = useState(0);
+    const [furthestStep, setFurthestStep] = useState(0);
+    const hasMounted = useRef(false);
     const [classIds, setClassIds] = useState<number[]>([]);
     const [subjectIds, setSubjectIds] = useState<number[]>([]);
     const [chapterIds, setChapterIds] = useState<number[]>([]);
@@ -322,6 +377,33 @@ export default function QatCreate({
                   0,
               )
             : selectedManual.reduce((total, item) => total + item.marks, 0);
+    const stepSummaries = [
+        `${selectedClasses.length} ${selectedClasses.length === 1 ? 'class' : 'classes'} selected`,
+        `${selectedSubjects.length} books · ${selectedChapters.length} chapters`,
+        syllabus === 'qat'
+            ? `QAT monthly · ${months.length} ${months.length === 1 ? 'month' : 'months'}`
+            : `Custom · ${coverage.length} chapters`,
+        mode === 'auto'
+            ? (selectedTemplate?.name ?? 'Choose a template')
+            : `${selectedManual.length} questions selected`,
+        `${totalQuestions} questions · ${totalMarks} marks`,
+    ];
+
+    useEffect(() => {
+        if (!hasMounted.current) {
+            hasMounted.current = true;
+
+            return;
+        }
+
+        const frame = window.requestAnimationFrame(() => {
+            document
+                .getElementById(`qat-step-${step}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [step]);
 
     useEffect(() => {
         setPool(null);
@@ -574,6 +656,36 @@ export default function QatCreate({
         return true;
     }
 
+    function canOpenStep(index: number): boolean {
+        if (index === 0) {
+            return true;
+        }
+
+        if (index > furthestStep || index > 4) {
+            return false;
+        }
+
+        if (index === 1) {
+            return classIds.length > 0;
+        }
+
+        if (index === 2) {
+            return selectedSubjects.length > 0;
+        }
+
+        if (index === 3) {
+            return coverage.length > 0;
+        }
+
+        return (
+            targetCoverage.length > 0 &&
+            totalQuestions > 0 &&
+            (mode !== 'auto' || templateHasEnoughQuestions) &&
+            !poolBusy &&
+            !poolError
+        );
+    }
+
     function nextStep() {
         if (!nextAllowed()) {
             return;
@@ -587,7 +699,9 @@ export default function QatCreate({
             setTargetSubjectId(targetSubject.id);
         }
 
-        setStep((current) => current + 1);
+        const next = Math.min(step + 1, 4);
+        setFurthestStep((current) => Math.max(current, next));
+        setStep(next);
     }
 
     async function generate() {
@@ -706,18 +820,22 @@ export default function QatCreate({
                                             <button
                                                 type="button"
                                                 aria-label={`Go to ${label}`}
-                                                disabled={index >= step}
+                                                disabled={
+                                                    index === step ||
+                                                    !canOpenStep(index)
+                                                }
                                                 onClick={() => setStep(index)}
-                                                className={`relative z-10 flex size-6 items-center justify-center rounded-full text-xs font-semibold ${index === step ? 'cursor-default bg-brand-600 text-white' : index < step ? 'cursor-pointer bg-brand-100 text-brand-700 transition-all hover:bg-brand-200 hover:ring-4 hover:ring-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:bg-brand-500/20 dark:text-brand-300 dark:hover:bg-brand-500/30' : 'cursor-default bg-slate-100 text-slate-400 dark:bg-slate-800'}`}
+                                                className={`relative z-10 flex size-6 items-center justify-center rounded-full text-xs font-semibold ${index === step ? 'cursor-default bg-brand-600 text-white' : canOpenStep(index) ? 'cursor-pointer bg-brand-100 text-brand-700 transition-all hover:bg-brand-200 hover:ring-4 hover:ring-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:bg-brand-500/20 dark:text-brand-300 dark:hover:bg-brand-500/30' : 'cursor-default bg-slate-100 text-slate-400 dark:bg-slate-800'}`}
                                             >
-                                                {index < step ? (
+                                                {index !== step &&
+                                                canOpenStep(index) ? (
                                                     <CheckIcon className="size-3.5" />
                                                 ) : (
                                                     index + 1
                                                 )}
                                             </button>
                                             <span
-                                                className={`whitespace-nowrap text-[11px] font-medium ${index === step ? 'text-brand-700 dark:text-brand-300' : 'text-slate-400 dark:text-slate-500'}`}
+                                                className={`whitespace-nowrap text-[11px] font-medium ${index === step ? 'text-brand-700 dark:text-brand-300' : canOpenStep(index) ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}
                                             >
                                                 {label}
                                             </span>
@@ -727,7 +845,35 @@ export default function QatCreate({
                             </ol>
                         </nav>
                     </Card>
-                    <Card padding="lg" className="min-w-0 space-y-5">
+                    {stepLabels.slice(0, step).map((label, index) => (
+                        <Card
+                            key={label}
+                            id={`qat-step-${index}`}
+                            padding="none"
+                            className="min-w-0 scroll-mt-6 overflow-hidden"
+                        >
+                            <StepCardHeader
+                                index={index}
+                                label={label}
+                                summary={stepSummaries[index]}
+                                active={false}
+                                available={canOpenStep(index)}
+                                onClick={() => setStep(index)}
+                            />
+                        </Card>
+                    ))}
+                    <Card
+                        id={`qat-step-${step}`}
+                        padding="lg"
+                        className="min-w-0 scroll-mt-6 space-y-5"
+                    >
+                        <StepCardHeader
+                            index={step}
+                            label={stepLabels[step]}
+                            summary={stepSummaries[step]}
+                            active
+                            available
+                        />
                         {step === 0 && (
                             <>
                                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1891,6 +2037,27 @@ export default function QatCreate({
                             )}
                         </div>
                     </Card>
+                    {stepLabels.slice(step + 1, 5).map((label, offset) => {
+                        const index = step + offset + 1;
+
+                        return (
+                            <Card
+                                key={label}
+                                id={`qat-step-${index}`}
+                                padding="none"
+                                className="min-w-0 scroll-mt-6 overflow-hidden"
+                            >
+                                <StepCardHeader
+                                    index={index}
+                                    label={label}
+                                    summary={stepSummaries[index]}
+                                    active={false}
+                                    available={canOpenStep(index)}
+                                    onClick={() => setStep(index)}
+                                />
+                            </Card>
+                        );
+                    })}
                 </div>
                 <Card className="space-y-4 lg:sticky lg:top-6">
                     <div>
