@@ -1,8 +1,10 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { PencilIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
 import {
+    DeleteAction,
     EditModal,
     FilterBar,
     Input,
@@ -126,14 +128,26 @@ export default function QatCatalogue({
                                         <StatusBadge active={item.status} />
                                     </td>
                                     <td className={tdClass}>
-                                        <Button
-                                            type="button"
-                                            onClick={() => edit(item)}
-                                            variant="ghost"
-                                            size="sm"
-                                        >
-                                            Edit
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                type="button"
+                                                onClick={() => edit(item)}
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                title={`Edit ${item.name}`}
+                                                aria-label={`Edit ${item.name}`}
+                                            >
+                                                <PencilIcon
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
+                                            </Button>
+                                            <DeleteAction
+                                                url={`/superadmin/qat-catalogue/classes/${item.id}`}
+                                                label={`${item.name} (${item.academic_year})`}
+                                                consequence={`This removes the QAT class and its ${item.subject_count} books, chapters, questions, and templates. Saved papers remain available.`}
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

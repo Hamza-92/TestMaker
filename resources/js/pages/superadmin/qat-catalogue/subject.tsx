@@ -1,8 +1,10 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { FileQuestionIcon, PencilIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
 import {
+    DeleteAction,
     EditModal,
     FilterBar,
     Input,
@@ -185,26 +187,41 @@ export default function QatSubjectPage({
                                         <StatusBadge active={item.status} />
                                     </td>
                                     <td className={tdClass}>
-                                        <div className="flex gap-3">
+                                        <div className="flex items-center gap-1">
                                             <Button
                                                 type="button"
                                                 onClick={() => edit(item)}
                                                 variant="ghost"
-                                                size="sm"
+                                                size="icon-sm"
+                                                title={`Edit ${item.name}`}
+                                                aria-label={`Edit ${item.name}`}
                                             >
-                                                Edit
+                                                <PencilIcon
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
                                             </Button>
                                             <Button
                                                 asChild
                                                 variant="ghost"
-                                                size="sm"
+                                                size="icon-sm"
+                                                title={`Questions in ${item.name}`}
+                                                aria-label={`Questions in ${item.name}`}
                                             >
                                                 <Link
                                                     href={`${base}/chapters/${item.id}/questions`}
                                                 >
-                                                    Questions
+                                                    <FileQuestionIcon
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
                                                 </Link>
                                             </Button>
+                                            <DeleteAction
+                                                url={`${base}/chapters/${item.id}`}
+                                                label={item.name}
+                                                consequence="This removes the QAT chapter, its month assignments, topics, and questions. Saved papers remain available."
+                                            />
                                         </div>
                                     </td>
                                 </tr>

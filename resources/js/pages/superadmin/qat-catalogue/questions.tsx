@@ -1,10 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { PencilIcon } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
 const EditQuestionModal = lazy(
     () => import('../questions/edit-question-modal'),
 );
 import {
+    DeleteAction,
     FilterBar,
     Pager,
     StatusBadge,
@@ -162,14 +164,26 @@ export default function QatQuestionsPage({
                                         <StatusBadge active={item.status} />
                                     </td>
                                     <td className={tdClass}>
-                                        <Button
-                                            type="button"
-                                            onClick={() => setEditing(item)}
-                                            variant="ghost"
-                                            size="sm"
-                                        >
-                                            View / edit
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                type="button"
+                                                onClick={() => setEditing(item)}
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                title={`View or edit question #${item.id}`}
+                                                aria-label={`View or edit question #${item.id}`}
+                                            >
+                                                <PencilIcon
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
+                                            </Button>
+                                            <DeleteAction
+                                                url={`${base}/${item.id}`}
+                                                label={`question #${item.id}`}
+                                                consequence="This removes the question from the QAT catalogue. Saved papers remain available."
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

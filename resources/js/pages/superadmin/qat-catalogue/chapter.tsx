@@ -1,8 +1,10 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { PencilIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
 import {
+    DeleteAction,
     EditModal,
     FilterBar,
     Input,
@@ -179,14 +181,26 @@ export default function QatChapterPage({
                                         <StatusBadge active={item.status} />
                                     </td>
                                     <td className={tdClass}>
-                                        <Button
-                                            type="button"
-                                            onClick={() => edit(item)}
-                                            variant="ghost"
-                                            size="sm"
-                                        >
-                                            Edit
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                type="button"
+                                                onClick={() => edit(item)}
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                title={`Edit ${item.name}`}
+                                                aria-label={`Edit ${item.name}`}
+                                            >
+                                                <PencilIcon
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
+                                            </Button>
+                                            <DeleteAction
+                                                url={`${base}/topics/${item.id}`}
+                                                label={item.name}
+                                                consequence="This removes the QAT topic. Its questions stay in the chapter without a topic."
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

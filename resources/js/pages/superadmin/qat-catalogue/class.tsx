@@ -1,8 +1,10 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { PencilIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
 import {
+    DeleteAction,
     EditModal,
     FilterBar,
     Input,
@@ -132,14 +134,26 @@ export default function QatClassPage({
                                         <StatusBadge active={item.status} />
                                     </td>
                                     <td className={tdClass}>
-                                        <Button
-                                            type="button"
-                                            onClick={() => edit(item)}
-                                            variant="ghost"
-                                            size="sm"
-                                        >
-                                            Edit
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                type="button"
+                                                onClick={() => edit(item)}
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                title={`Edit ${item.subject_name}`}
+                                                aria-label={`Edit ${item.subject_name}`}
+                                            >
+                                                <PencilIcon
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
+                                            </Button>
+                                            <DeleteAction
+                                                url={`${base}/subjects/${item.id}`}
+                                                label={item.subject_name}
+                                                consequence="This removes the QAT book, its chapters and questions, and its paper templates. Saved papers remain available."
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

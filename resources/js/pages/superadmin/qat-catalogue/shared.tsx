@@ -1,5 +1,5 @@
 import { Link, router } from '@inertiajs/react';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
@@ -211,6 +211,72 @@ export function EditModal({
                 {children}
             </form>
         </Modal>
+    );
+}
+
+export function DeleteAction({
+    url,
+    label,
+    consequence,
+}: {
+    url: string;
+    label: string;
+    consequence: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const [busy, setBusy] = useState(false);
+
+    const remove = () => {
+        setBusy(true);
+        router.delete(url, {
+            preserveScroll: true,
+            onSuccess: () => setOpen(false),
+            onFinish: () => setBusy(false),
+        });
+    };
+
+    return (
+        <>
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title={`Delete ${label}`}
+                aria-label={`Delete ${label}`}
+                onClick={() => setOpen(true)}
+                className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
+            >
+                <Trash2Icon className="size-4" aria-hidden="true" />
+            </Button>
+            <Modal
+                open={open}
+                onOpenChange={(next) => !busy && setOpen(next)}
+                title={`Delete ${label}?`}
+                footer={
+                    <>
+                        <Button
+                            type="button"
+                            onClick={() => setOpen(false)}
+                            disabled={busy}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={remove}
+                            disabled={busy}
+                            className="bg-red-600 text-white hover:bg-red-700"
+                        >
+                            {busy ? 'Deleting…' : 'Delete'}
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                    {consequence}
+                </p>
+            </Modal>
+        </>
     );
 }
 

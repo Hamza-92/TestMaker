@@ -220,6 +220,19 @@ class QatDataController extends Controller
         return back();
     }
 
+    public function destroyClass(int $qatClass): RedirectResponse
+    {
+        $this->classRow($qatClass);
+
+        DB::transaction(function () use ($qatClass): void {
+            // The class relation is nullable, so remove its QAT subjects explicitly.
+            DB::table('qat_subjects')->where('qat_class_id', $qatClass)->delete();
+            DB::table('qat_classes')->where('id', $qatClass)->delete();
+        });
+
+        return back();
+    }
+
     public function updateSubject(Request $request, int $qatClass, int $qatSubject): RedirectResponse
     {
         $this->subjectRow($qatClass, $qatSubject);
@@ -228,6 +241,14 @@ class QatDataController extends Controller
             'status' => ['required', 'boolean'],
         ]);
         DB::table('qat_subjects')->where('id', $qatSubject)->update([...$data, 'updated_at' => now()]);
+
+        return back();
+    }
+
+    public function destroySubject(int $qatClass, int $qatSubject): RedirectResponse
+    {
+        $this->subjectRow($qatClass, $qatSubject);
+        DB::table('qat_subjects')->where('id', $qatSubject)->delete();
 
         return back();
     }
@@ -264,6 +285,15 @@ class QatDataController extends Controller
         return back();
     }
 
+    public function destroyChapter(int $qatClass, int $qatSubject, int $qatChapter): RedirectResponse
+    {
+        $this->subjectRow($qatClass, $qatSubject);
+        $this->chapterRow($qatSubject, $qatChapter);
+        DB::table('qat_chapters')->where('id', $qatChapter)->delete();
+
+        return back();
+    }
+
     public function updateTopic(Request $request, int $qatClass, int $qatSubject, int $qatChapter, int $qatTopic): RedirectResponse
     {
         $this->subjectRow($qatClass, $qatSubject);
@@ -278,6 +308,16 @@ class QatDataController extends Controller
         DB::table('qat_topics')->where('id', $qatTopic)->update([
             ...$data, 'name_ur' => $data['name_ur'] ?? null, 'updated_at' => now(),
         ]);
+
+        return back();
+    }
+
+    public function destroyTopic(int $qatClass, int $qatSubject, int $qatChapter, int $qatTopic): RedirectResponse
+    {
+        $this->subjectRow($qatClass, $qatSubject);
+        $this->chapterRow($qatSubject, $qatChapter);
+        $deleted = DB::table('qat_topics')->where('id', $qatTopic)->where('qat_chapter_id', $qatChapter)->delete();
+        abort_unless($deleted, 404);
 
         return back();
     }
@@ -392,6 +432,16 @@ class QatDataController extends Controller
         ]);
 
         return response()->json(['id' => $qatQuestion]);
+    }
+
+    public function destroyQuestion(int $qatClass, int $qatSubject, int $qatChapter, int $qatQuestion): RedirectResponse
+    {
+        $this->subjectRow($qatClass, $qatSubject);
+        $this->chapterRow($qatSubject, $qatChapter);
+        $this->questionRow($qatChapter, $qatQuestion);
+        DB::table('qat_questions')->where('id', $qatQuestion)->delete();
+
+        return back();
     }
 
     private function questionRow(int $qatChapter, int $qatQuestion): object
