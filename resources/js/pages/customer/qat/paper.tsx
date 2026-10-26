@@ -559,9 +559,6 @@ export default function QatPaper({
                             );
                         })}
                     </div>
-                    <footer className="mt-10 border-t border-slate-300 pt-2 text-center text-xs text-slate-500">
-                        End of paper · QAT practice
-                    </footer>
                 </article>
             </Card>
             <div className="sticky bottom-0 z-20 -mx-4 border-y border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:-mx-6 md:px-6 print:hidden">
