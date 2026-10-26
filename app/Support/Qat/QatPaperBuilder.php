@@ -150,6 +150,10 @@ final class QatPaperBuilder
         $data = json_decode((string) $question->question_data, true) ?: [];
         $content = $this->withoutAnswers((array) ($data['content'] ?? []));
         $options = $this->withoutAnswers((array) ($data['options'] ?? []));
+        $schemaKey = trim((string) ($data['schema_key'] ?? ''));
+        if ($schemaKey === '') {
+            $schemaKey = (string) ($data['question_type']['schema_key'] ?? '');
+        }
 
         return [
             'id' => (int) $question->id,
@@ -160,7 +164,7 @@ final class QatPaperBuilder
             'question_type_id' => (int) $question->question_type_id,
             'type_name' => (string) ($question->type_name ?: ($data['question_type']['name'] ?? 'Question')),
             'is_objective' => (bool) ($question->is_objective ?? $data['question_type']['is_objective'] ?? false),
-            'schema_key' => (string) ($data['schema_key'] ?? $data['question_type']['schema_key'] ?? ''),
+            'schema_key' => $schemaKey,
             'statement_en' => (string) ($data['statement_en'] ?? ''),
             'statement_ur' => (string) ($data['statement_ur'] ?? ''),
             'description_en' => (string) ($data['description_en'] ?? ''),
