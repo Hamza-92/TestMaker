@@ -49,6 +49,17 @@ function sameText(first: string, second: string): boolean {
     return normalize(first) === normalize(second);
 }
 
+function normalizeMathDescription(value: string): string {
+    return value
+        .replace(/[\u0660-\u0669]/g, (digit) =>
+            String(digit.charCodeAt(0) - 0x0660),
+        )
+        .replace(/[\u06f0-\u06f9]/g, (digit) =>
+            String(digit.charCodeAt(0) - 0x06f0),
+        )
+        .replace(/[\u060c\uff0c]/g, ',');
+}
+
 const LATEX_DELIMITERS =
     /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$/g;
 
@@ -522,13 +533,18 @@ export function QatQuestionContent({
     const detailUr = field(content, 'shared_ur') || question.description_ur;
     const visibleDetailEn = sameText(detailEn, statementEn) ? '' : detailEn;
     const visibleDetailUr = sameText(detailUr, statementUr) ? '' : detailUr;
+    const hasSharedStatement =
+        question.schema_key === 'subjective_same_statement' ||
+        'shared_en' in content ||
+        'shared_ur' in content;
     const sharedDescription =
         (visibleDetailEn || visibleDetailUr) &&
-        (!visibleDetailEn ||
+        (hasSharedStatement ||
+            !visibleDetailEn ||
             !visibleDetailUr ||
             bilingualPartsHaveSameVisibleText({
-                english: visibleDetailEn,
-                urdu: visibleDetailUr,
+                english: normalizeMathDescription(visibleDetailEn),
+                urdu: normalizeMathDescription(visibleDetailUr),
             }) ||
             visibleDetailEn.trim() === visibleDetailUr.trim())
             ? visibleDetailEn || visibleDetailUr
