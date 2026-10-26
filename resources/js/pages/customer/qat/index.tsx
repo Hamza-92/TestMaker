@@ -17,7 +17,6 @@ import {
     Card,
     cardVariants,
     EmptyState,
-    PageHeader,
     Pagination,
 } from '@/components/tm';
 import type { PageMeta } from '@/components/tm';
@@ -67,11 +66,19 @@ export default function QatIndex({
 
     return (
         <div className="w-full space-y-6">
-            <Head title="QAT Tests" />
-            <PageHeader
-                title="QAT Tests"
-                meta={`${papers.total} saved ${papers.total === 1 ? 'paper' : 'papers'}`}
-            />
+            <Head title="QAT practice papers on the PEF pattern" />
+            <header className="space-y-2">
+                <h1 className="text-xl font-semibold tracking-tight text-brand-600 dark:text-brand-400">
+                    QAT practice papers on the PEF pattern
+                </h1>
+                <p className="w-full text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                    Testmaker creates Quality Assurance Test (QAT) practice
+                    papers for PEF partner schools (NSP, FAS, EVS, PSRP, NSSE).
+                    It provides papers for Classes 3–7 based on the PEF pattern.
+                    Papers are available chapter-wise, with answer keys, in both
+                    English and Urdu.
+                </p>
+            </header>
 
             <div className="grid gap-4 md:grid-cols-2">
                 <Link
