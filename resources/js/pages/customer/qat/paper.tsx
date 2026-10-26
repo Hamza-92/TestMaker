@@ -167,7 +167,8 @@ export default function QatPaper({
     const [saving, setSaving] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [actionError, setActionError] = useState('');
-    const paper = variants[activeVariant] ?? initialPaper;
+    const paperVariants = variants.length ? variants : [initialPaper];
+    const paper = paperVariants[activeVariant] ?? initialPaper;
     const objectiveSections = paper.paper_data.sections
         .map((section) => ({
             ...section,
@@ -309,45 +310,66 @@ export default function QatPaper({
                     meta={`${paper.question_count} questions · ${paper.total_marks} marks`}
                 />
             </div>
-            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 print:hidden">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => window.print()}
+            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 print:hidden">
+                <div
+                    className="flex flex-wrap gap-1.5"
+                    role="group"
+                    aria-label="Paper variants"
                 >
-                    <PrinterIcon /> Print
-                </Button>
-                <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void savePaper()}
-                    disabled={!previewId || saving}
-                >
-                    {saving ? (
-                        <Loader2Icon className="animate-spin" />
-                    ) : previewId ? (
-                        <SaveIcon />
-                    ) : (
-                        <CheckIcon />
-                    )}
-                    {saving ? 'Saving…' : previewId ? 'Save' : 'Saved'}
-                </Button>
-                <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={() => void downloadPdf()}
-                    disabled={downloading}
-                >
-                    {downloading ? (
-                        <Loader2Icon className="animate-spin" />
-                    ) : (
-                        <DownloadIcon />
-                    )}
-                    {downloading ? 'Preparing PDF…' : 'Download PDF'}
-                </Button>
+                    {paperVariants.map((variant, index) => (
+                        <button
+                            key={index}
+                            type="button"
+                            aria-pressed={activeVariant === index}
+                            onClick={() => setActiveVariant(index)}
+                            className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${activeVariant === index ? 'border-slate-900 bg-slate-900 text-white dark:border-brand-500 dark:bg-brand-600' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-brand-500 dark:hover:text-brand-300'}`}
+                        >
+                            Paper{' '}
+                            {variant.paper_data.variant ??
+                                String.fromCharCode(65 + index)}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => window.print()}
+                    >
+                        <PrinterIcon /> Print
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void savePaper()}
+                        disabled={!previewId || saving}
+                    >
+                        {saving ? (
+                            <Loader2Icon className="animate-spin" />
+                        ) : previewId ? (
+                            <SaveIcon />
+                        ) : (
+                            <CheckIcon />
+                        )}
+                        {saving ? 'Saving…' : previewId ? 'Save' : 'Saved'}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => void downloadPdf()}
+                        disabled={downloading}
+                    >
+                        {downloading ? (
+                            <Loader2Icon className="animate-spin" />
+                        ) : (
+                            <DownloadIcon />
+                        )}
+                        {downloading ? 'Preparing PDF…' : 'Download PDF'}
+                    </Button>
+                </div>
             </div>
             {actionError && (
                 <p
@@ -356,30 +378,6 @@ export default function QatPaper({
                 >
                     {actionError}
                 </p>
-            )}
-            {variants.length > 1 && (
-                <div
-                    className="flex flex-wrap gap-2 print:hidden"
-                    aria-label="Paper variants"
-                >
-                    {variants.map((variant, index) => (
-                        <Button
-                            key={index}
-                            type="button"
-                            size="sm"
-                            variant={
-                                activeVariant === index
-                                    ? 'primary'
-                                    : 'secondary'
-                            }
-                            onClick={() => setActiveVariant(index)}
-                        >
-                            Paper{' '}
-                            {variant.paper_data.variant ??
-                                String.fromCharCode(65 + index)}
-                        </Button>
-                    ))}
-                </div>
             )}
             <Card className="mx-auto max-w-[210mm] overflow-hidden p-0 print:overflow-visible">
                 <article

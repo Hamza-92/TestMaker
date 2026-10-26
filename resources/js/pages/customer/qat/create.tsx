@@ -172,9 +172,11 @@ export default function QatCreate({
             chapterIds.includes(item.id) &&
             subjectIds.includes(item.qat_subject_id),
     );
-    const allSelectedSubjectIds = selectedSubjects.map((item) => item.id);
+    const selectableSubjectIds = subjects
+        .filter((item) => classIds.includes(item.qat_class_id))
+        .map((item) => item.id);
     const selectableChapterIds = chapters
-        .filter((item) => allSelectedSubjectIds.includes(item.qat_subject_id))
+        .filter((item) => selectableSubjectIds.includes(item.qat_subject_id))
         .map((item) => item.id);
     const selectedSubjectIds = targetSubjects.map((item) => item.id);
     const monthChoices = [
@@ -520,6 +522,23 @@ export default function QatCreate({
         );
     }
 
+    function toggleAllBooksAndChapters(checked: boolean) {
+        setSubjectIds((current) =>
+            checked
+                ? [...new Set([...current, ...selectableSubjectIds])]
+                : current.filter((id) => !selectableSubjectIds.includes(id)),
+        );
+        toggleChapterGroup(selectableChapterIds, checked);
+
+        if (
+            !checked &&
+            targetSubjectId !== null &&
+            selectableSubjectIds.includes(targetSubjectId)
+        ) {
+            setTargetSubjectId(null);
+        }
+    }
+
     function changeTarget(id: number) {
         setTargetSubjectId(id);
         setPool(null);
@@ -803,24 +822,27 @@ export default function QatCreate({
                                             type="checkbox"
                                             className="size-4 accent-brand-600"
                                             checked={
-                                                selectableChapterIds.length >
+                                                selectableSubjectIds.length >
                                                     0 &&
+                                                selectableSubjectIds.every(
+                                                    (id) =>
+                                                        subjectIds.includes(id),
+                                                ) &&
                                                 selectableChapterIds.every(
                                                     (id) =>
                                                         chapterIds.includes(id),
                                                 )
                                             }
                                             disabled={
-                                                !selectableChapterIds.length
+                                                !selectableSubjectIds.length
                                             }
                                             onChange={(event) =>
-                                                toggleChapterGroup(
-                                                    selectableChapterIds,
+                                                toggleAllBooksAndChapters(
                                                     event.target.checked,
                                                 )
                                             }
                                         />
-                                        Select all chapters
+                                        Select all books &amp; chapters
                                     </label>
                                 </div>
                                 <div className="space-y-4">
@@ -1726,29 +1748,31 @@ export default function QatCreate({
                                 </div>
                                 {mode === 'auto' && (
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                            Paper variants
-                                            <select
-                                                className={inputClass}
-                                                value={variants}
-                                                onChange={(event) =>
-                                                    setVariants(
-                                                        Number(
-                                                            event.target.value,
-                                                        ),
-                                                    )
-                                                }
-                                            >
+                                        <fieldset className="space-y-1">
+                                            <legend className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                Paper variants
+                                            </legend>
+                                            <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
                                                 {[1, 2, 3, 4].map((count) => (
-                                                    <option
+                                                    <button
                                                         key={count}
-                                                        value={count}
+                                                        type="button"
+                                                        aria-pressed={
+                                                            variants === count
+                                                        }
+                                                        onClick={() =>
+                                                            setVariants(count)
+                                                        }
+                                                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
                                                     >
-                                                        {count}
-                                                    </option>
+                                                        {count}{' '}
+                                                        {count === 1
+                                                            ? 'Paper'
+                                                            : 'Papers'}
+                                                    </button>
                                                 ))}
-                                            </select>
-                                        </label>
+                                            </div>
+                                        </fieldset>
                                         <label className="flex items-end gap-2 pb-2 text-sm">
                                             <input
                                                 type="checkbox"
