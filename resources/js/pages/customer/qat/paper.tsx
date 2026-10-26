@@ -412,7 +412,7 @@ export default function QatPaper({
                                 <img
                                     src={schoolLogoUrl}
                                     alt=""
-                                    className="h-12 w-12 shrink-0 object-contain"
+                                    className="h-8 w-8 shrink-0 object-contain"
                                 />
                             )}
                             <div className="text-lg font-bold leading-tight">
