@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
+use App\Models\Question;
 use App\Support\Qat\QatCatalogueTransfer;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,12 +47,39 @@ class QatCatalogueController extends Controller
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
         ]);
 
-        return response()->json(Chapter::query()
+        $chapters = Chapter::query()
             ->where('pattern_id', $data['source_pattern_id'])
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
             ->orderBy('sort_id')->orderBy('id')
-            ->get(['id', 'name', 'chapter_number', 'status']));
+            ->get(['id', 'name', 'chapter_number', 'status']);
+        $questions = Question::query()->with('questionType')
+            ->whereIn('chapter_id', $chapters->pluck('id'))
+            ->orderBy('sort_order')->orderBy('id')
+            ->get(['id', 'chapter_id', 'question_type_id', 'statement_en', 'statement_ur', 'content', 'status'])
+            ->groupBy('chapter_id');
+
+        return response()->json($chapters->map(fn (Chapter $chapter) => [
+            'id' => $chapter->id,
+            'name' => $chapter->name,
+            'chapter_number' => $chapter->chapter_number,
+            'status' => $chapter->status,
+            'questions' => $questions->get($chapter->id, collect())->map(function (Question $question) {
+                $statement = $question->statement_en ?: $question->statement_ur;
+                if (! $statement && $question->questionType) {
+                    $statement = QuestionTypeSchemaRegistry::summarize(
+                        $question->questionType, (array) ($question->content ?? [])
+                    );
+                }
+
+                return [
+                    'id' => $question->id,
+                    'type' => $question->questionType?->name ?? 'Question',
+                    'summary' => Str::limit(trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($statement ?: 'Question #'.$question->id))) ?? ''), 180),
+                    'status' => $question->status,
+                ];
+            })->values(),
+        ]));
     }
 
     public function store(Request $request, QatCatalogueTransfer $transfer): RedirectResponse
@@ -62,6 +92,8 @@ class QatCatalogueController extends Controller
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
             'chapter_ids' => ['required', 'array', 'min:1'],
             'chapter_ids.*' => ['required', 'integer', 'distinct', 'exists:chapters,id'],
+            'question_ids' => ['sometimes', 'array'],
+            'question_ids.*' => ['required', 'integer', 'distinct', 'exists:questions,id'],
         ]);
 
         $report = $transfer->copy($data);

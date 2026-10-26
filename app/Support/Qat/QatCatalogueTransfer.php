@@ -46,6 +46,19 @@ class QatCatalogueTransfer
                 ]);
             }
 
+            $selectedQuestions = isset($data['question_ids'])
+                ? array_fill_keys($data['question_ids'], true)
+                : null;
+            if ($selectedQuestions !== null) {
+                $availableQuestionIds = Question::query()->whereIn('chapter_id', $chapters->pluck('id'))
+                    ->pluck('id')->all();
+                if (array_diff(array_keys($selectedQuestions), $availableQuestionIds)) {
+                    throw ValidationException::withMessages([
+                        'question_ids' => 'Select questions from the chosen chapters only.',
+                    ]);
+                }
+            }
+
             $now = now();
             $catalogueId = DB::table('qat_catalogues')->where('academic_year', $data['academic_year'])->value('id');
             if ($catalogueId === null) {
@@ -151,8 +164,11 @@ class QatCatalogueTransfer
                 }
 
                 Question::query()->with(['options', 'questionType'])->where('chapter_id', $chapter->id)
-                    ->orderBy('id')->chunk(200, function ($questions) use ($qatChapterId, $topicIds, $now, &$report): void {
+                    ->orderBy('id')->chunk(200, function ($questions) use ($qatChapterId, $topicIds, $selectedQuestions, $now, &$report): void {
                         foreach ($questions as $question) {
+                            if ($selectedQuestions !== null && ! isset($selectedQuestions[$question->id])) {
+                                continue;
+                            }
                             $report['questions'] += DB::table('qat_questions')->insertOrIgnore([
                                 'qat_chapter_id' => $qatChapterId,
                                 'qat_topic_id' => $question->topic_id ? ($topicIds[$question->topic_id] ?? null) : null,

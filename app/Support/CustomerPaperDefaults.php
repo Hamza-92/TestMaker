@@ -70,7 +70,8 @@ class CustomerPaperDefaults
     {
         $settings = [];
         foreach ([
-            'headerSize' => [10, 28], 'headingSize' => [10, 28], 'questionSize' => [10, 24],
+            'headerSize' => [10, 28], 'schoolNameSize' => [8, 28], 'addressSize' => [8, 24],
+            'headingSize' => [10, 28], 'questionSize' => [10, 24],
             'sectionHeadingSize' => [10, 28],
             'headerLineHeight' => [1, 3], 'headingLineHeight' => [1, 3],
             'questionLineHeight' => [1, 3], 'sectionHeadingLineHeight' => [1, 3],

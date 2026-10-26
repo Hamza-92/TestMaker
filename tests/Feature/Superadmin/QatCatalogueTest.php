@@ -20,6 +20,70 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
+test('QAT transfer lists source questions and copies only the selected ones', function () {
+    $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value, 'created_by' => null]);
+    $pattern = Pattern::create(['name' => 'Selective source', 'status' => 1]);
+    $class = SchoolClass::create(['name' => 'Class 6', 'status' => 1]);
+    $subject = Subject::create(['name_eng' => 'Science', 'subject_type' => 'chapter-wise', 'status' => 1]);
+    DB::table('pattern_classes')->insert(['pattern_id' => $pattern->id, 'class_id' => $class->id]);
+    ClassSubject::create(['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id]);
+    $chapter = Chapter::create([
+        'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+        'name' => 'Plants', 'status' => 1,
+    ]);
+    $otherChapter = Chapter::create([
+        'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+        'name' => 'Animals', 'status' => 1,
+    ]);
+    $type = QuestionType::create([
+        'name' => 'MCQ', 'heading_en' => 'Choose the answer',
+        'have_exercise' => false, 'have_statement' => true,
+        'have_description' => false, 'have_answer' => false, 'is_single' => true,
+        'is_objective' => true, 'column_per_row' => 1, 'status' => 1,
+    ]);
+    $first = Question::create([
+        'question_type_id' => $type->id, 'chapter_id' => $chapter->id,
+        'statement_en' => 'What do leaves do?', 'status' => 1,
+    ]);
+    $second = Question::create([
+        'question_type_id' => $type->id, 'chapter_id' => $chapter->id,
+        'statement_en' => 'What do roots do?', 'status' => 1,
+    ]);
+    $unrelated = Question::create([
+        'question_type_id' => $type->id, 'chapter_id' => $otherChapter->id,
+        'statement_en' => 'What do animals eat?', 'status' => 1,
+    ]);
+    $payload = [
+        'academic_year' => '2026-27', 'month' => 4,
+        'source_pattern_id' => $pattern->id, 'class_id' => $class->id,
+        'subject_id' => $subject->id, 'chapter_ids' => [$chapter->id],
+    ];
+
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.chapters', [
+        'source_pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+    ]))->assertOk()
+        ->assertJsonPath('0.questions.0.id', $first->id)
+        ->assertJsonPath('0.questions.0.summary', 'What do leaves do?')
+        ->assertJsonPath('0.questions.1.id', $second->id);
+
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'question_ids' => [$first->id, $unrelated->id],
+    ])->assertSessionHasErrors('question_ids');
+    expect(DB::table('qat_catalogues')->count())->toBe(0);
+
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'question_ids' => [$first->id],
+    ])->assertSessionHasNoErrors();
+    expect(DB::table('qat_questions')->pluck('source_question_id')->all())->toBe([$first->id]);
+
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'question_ids' => [$second->id],
+    ])->assertSessionHasNoErrors();
+    expect(DB::table('qat_questions')->orderBy('source_question_id')->pluck('source_question_id')->all())
+        ->toBe([$first->id, $second->id])
+        ->and(DB::table('qat_chapter_months')->count())->toBe(1);
+});
+
 test('QAT transfer copies one scope once and can assign it to another month', function () {
     $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value, 'created_by' => null]);
     $pattern = Pattern::create(['name' => 'Source Pattern', 'status' => 1]);

@@ -3295,12 +3295,16 @@ function storageAssetUrl(value: unknown): string {
 function SchoolIdentity({
     schoolName,
     address,
+    schoolNameSize,
+    addressSize,
     editable,
     onSchoolNameChange,
     onAddressChange,
 }: {
     schoolName: string;
     address: string;
+    schoolNameSize: number;
+    addressSize: number;
     editable: boolean;
     onSchoolNameChange?: (value: string) => void;
     onAddressChange?: (value: string) => void;
@@ -3328,12 +3332,18 @@ function SchoolIdentity({
             dir="auto"
         >
             {visibleSchoolName !== '' && (
-                <div className="text-[14px] leading-tight font-bold">
+                <div
+                    className="leading-tight font-bold"
+                    style={{ fontSize: `${schoolNameSize}px` }}
+                >
                     {visibleSchoolName}
                 </div>
             )}
             {visibleAddress !== '' && (
-                <div className="mt-0.5 whitespace-pre-line text-[11px] leading-tight font-normal">
+                <div
+                    className="mt-0.5 whitespace-pre-line leading-tight font-normal"
+                    style={{ fontSize: `${addressSize}px` }}
+                >
                     ({visibleAddress})
                 </div>
             )}
@@ -15613,6 +15623,8 @@ export function GeneratedPaperView({
                         <SchoolIdentity
                             schoolName={paper.header.schoolName}
                             address={effectiveSchoolAddress}
+                            schoolNameSize={settings.schoolNameSize}
+                            addressSize={settings.addressSize}
                             editable={false}
                             onSchoolNameChange={(value) =>
                                 onHeaderChange('schoolName', value)
@@ -15738,6 +15750,8 @@ export function GeneratedPaperView({
                                                 variantPaper.header.schoolName
                                             }
                                             address={effectiveSchoolAddress}
+                                            schoolNameSize={settings.schoolNameSize}
+                                            addressSize={settings.addressSize}
                                             editable={false}
                                         />
                                         <PaperHeader

@@ -137,6 +137,8 @@ const URDU_FONT_OPTIONS: Array<FontOption<PaperUrduFont>> = [
 
 const SIZE_BOUNDS = {
     header: { min: 10, max: 28 },
+    schoolName: { min: 8, max: 28 },
+    address: { min: 8, max: 24 },
     heading: { min: 10, max: 28 },
     question: { min: 10, max: 24 },
 };
@@ -746,6 +748,22 @@ export function PaperSettingsPanel({
                         onChange({ headerLineHeight: v })
                     }
                 />
+                <div className={inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'}>
+                    <LabeledStepper
+                        label="School Name Size"
+                        value={settings.schoolNameSize}
+                        min={SIZE_BOUNDS.schoolName.min}
+                        max={SIZE_BOUNDS.schoolName.max}
+                        onChange={(value) => onChange({ schoolNameSize: value })}
+                    />
+                    <LabeledStepper
+                        label="Address Size"
+                        value={settings.addressSize}
+                        min={SIZE_BOUNDS.address.min}
+                        max={SIZE_BOUNDS.address.max}
+                        onChange={(value) => onChange({ addressSize: value })}
+                    />
+                </div>
                 <div
                     className={
                         inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'

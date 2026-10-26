@@ -67,6 +67,21 @@ test('customers can save an Arabic paper font', function (string $font) {
         ->toBe($font);
 })->with(['noto-naskh-arabic', 'amiri', 'noto-sans-arabic', 'noto-kufi-arabic']);
 
+test('customers can save school name and address font sizes', function () {
+    $customer = paperDefaultsCustomer();
+    $payload = paperDefaultsPayload();
+    $payload['settings']['schoolNameSize'] = 18;
+    $payload['settings']['addressSize'] = 13;
+
+    $this->actingAs($customer)->put(route('customer.settings.update'), $payload)
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $settings = PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings;
+    expect($settings['schoolNameSize'])->toBe(18)
+        ->and($settings['addressSize'])->toBe(13);
+});
+
 test('customers can save print copies, page separation, side by side layout, and orientation', function () {
     $customer = paperDefaultsCustomer();
     $payload = paperDefaultsPayload();
@@ -256,6 +271,8 @@ test('invalid paper defaults and structural assignment overrides are rejected', 
     expect(PaperDefault::count())->toBe(0);
 })->with([
     ['settings.marginTop', 500, 'settings.marginTop'],
+    ['settings.schoolNameSize', 29, 'settings.schoolNameSize'],
+    ['settings.addressSize', 7, 'settings.addressSize'],
     ['settings.paperLayout', 'federal-board', 'settings'],
     ['settings.objectiveLayout', 'federal-row', 'settings'],
     ['settings.watermarkLogoUrl', 'javascript:alert(1)', 'settings.watermarkLogoUrl'],

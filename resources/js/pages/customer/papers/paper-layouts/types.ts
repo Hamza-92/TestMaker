@@ -306,6 +306,10 @@ export interface PaperSettings {
     urduFont: PaperUrduFont;
     /** Paper header font size in px (the school/exam/class/subject fields at the top). */
     headerSize: number;
+    /** School name above the header, in px. */
+    schoolNameSize: number;
+    /** School address above the header, in px. */
+    addressSize: number;
     /** Paper header line-height (unitless multiplier). */
     headerLineHeight: number;
     /** Horizontal inner spacing applied to paper-header cells, in px. */
@@ -423,6 +427,8 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     englishFont: 'times-new-roman',
     urduFont: 'jameel-noori',
     headerSize: 12,
+    schoolNameSize: 14,
+    addressSize: 11,
     headerLineHeight: 1,
     headerPaddingX: 4,
     headerPaddingY: 0,
@@ -640,6 +646,14 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
             typeof source.headerSize === 'number'
                 ? source.headerSize
                 : DEFAULT_PAPER_SETTINGS.headerSize,
+        schoolNameSize:
+            typeof source.schoolNameSize === 'number'
+                ? source.schoolNameSize
+                : DEFAULT_PAPER_SETTINGS.schoolNameSize,
+        addressSize:
+            typeof source.addressSize === 'number'
+                ? source.addressSize
+                : DEFAULT_PAPER_SETTINGS.addressSize,
         headerLineHeight:
             typeof source.headerLineHeight === 'number'
                 ? source.headerLineHeight
