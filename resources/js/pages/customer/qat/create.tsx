@@ -1330,10 +1330,6 @@ export default function QatCreate({
                                                 aria-live="polite"
                                                 className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-500/30 dark:bg-brand-500/5"
                                             >
-                                                <h4 className="text-sm font-semibold">
-                                                    Monthly syllabus
-                                                    descriptions
-                                                </h4>
                                                 {selectedMonthDescriptions.map(
                                                     ({ month, books }) => (
                                                         <div
@@ -1346,7 +1342,8 @@ export default function QatCreate({
                                                                         month -
                                                                             1
                                                                     ]
-                                                                }
+                                                                }{' '}
+                                                                Syllabus
                                                             </h5>
                                                             {books.length ? (
                                                                 books.map(
