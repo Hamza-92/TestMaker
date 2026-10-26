@@ -150,8 +150,15 @@ function ObjectiveOptions({
                         return (
                             <Fragment key={index}>
                                 <td className="w-[4%] border border-slate-700 px-0.5 py-1 text-center align-middle">
-                                    <span className="inline-flex size-[1.4em] items-center justify-center rounded-full border border-slate-700 font-sans text-[0.9em] font-bold leading-none">
-                                        {String.fromCharCode(65 + index)}
+                                    <span
+                                        className="inline-grid size-[1.45em] place-items-center rounded-full border border-slate-700 align-middle text-[0.9em] font-bold leading-none"
+                                        style={{
+                                            fontFamily: 'Arial, sans-serif',
+                                        }}
+                                    >
+                                        <span className="translate-y-[0.08em]">
+                                            {String.fromCharCode(65 + index)}
+                                        </span>
                                     </span>
                                 </td>
                                 <td className="w-[21%] min-w-0 border border-slate-700 px-1 py-1 align-middle">
