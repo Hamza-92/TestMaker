@@ -3,6 +3,7 @@
 use App\Enums\UserType;
 use App\Models\QatPaper;
 use App\Models\QuestionType;
+use App\Models\QuestionTypeHeading;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         'allow_qat_tests' => true,
     ]);
     $type = QuestionType::create([
-        'name' => 'QAT MCQ', 'heading_en' => 'Choose the answer',
+        'name' => 'QAT MCQ', 'heading_en' => 'Choose the answer', 'heading_ur' => 'درست جواب منتخب کریں',
         'have_exercise' => false, 'have_statement' => true,
         'have_description' => false, 'have_answer' => false,
         'is_single' => true, 'is_objective' => true, 'column_per_row' => 1, 'status' => 1,
@@ -101,6 +102,8 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertOk()->assertInertia(fn ($page) => $page
         ->component('customer/qat/paper')
         ->where('previewId', $previewId)
+        ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
+        ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں')
         ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
     $this->actingAs($school)->get(route('customer.qat.index'))
         ->assertOk()->assertInertia(fn ($page) => $page->has('papers.data', 0));
@@ -117,6 +120,13 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
         ->assertInertia(fn ($page) => $page->component('customer/qat/paper')
             ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
+    $legacyData = $paper->paper_data;
+    unset($legacyData['sections'][0]['heading_en'], $legacyData['sections'][0]['heading_ur']);
+    $paper->update(['paper_data' => $legacyData]);
+    $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
+            ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں'));
     $otherSchool = User::factory()->create(['user_type' => UserType::Customer->value, 'account_type' => 'paid']);
     Subscription::create([
         'user_id' => $otherSchool->id, 'name' => 'Other QAT plan', 'amount' => 1000,
@@ -211,6 +221,14 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         'have_description' => false, 'have_answer' => false,
         'is_single' => true, 'is_objective' => false, 'column_per_row' => 1, 'status' => 1,
     ]);
+    QuestionTypeHeading::create([
+        'question_type_id' => $firstObjective->id,
+        'pattern_id' => $sourcePatternId,
+        'class_id' => $sourceClassId,
+        'subject_id' => $sourceSubjectId,
+        'scope_key' => QuestionTypeHeading::scopeKey($sourcePatternId, $sourceClassId, $sourceSubjectId),
+        'heading_en' => 'Answer the first objective questions',
+    ]);
     foreach ([[$firstObjective->id, 1], [$type->id, 2], [$subjective->id, 1]] as [$typeId, $order]) {
         DB::table('question_type_orders')->insert([
             'pattern_id' => $sourcePatternId, 'class_id' => $sourceClassId,
@@ -248,6 +266,8 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     $orderedPaper = QatPaper::query()->where('name', 'Ordered manual QAT')->sole();
     expect(collect($orderedPaper->paper_data['sections'])->pluck('question_type_id')->all())
         ->toBe([$firstObjective->id, $type->id, $subjective->id]);
+    expect($orderedPaper->paper_data['sections'][0]['heading_en'])
+        ->toBe('Answer the first objective questions');
 
     $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Missing template', 'mode' => 'auto', 'class_ids' => [$classId],

@@ -5,6 +5,7 @@ namespace App\Support\Qat;
 use App\Models\Question;
 use App\Models\User;
 use App\Support\AppUserAccess;
+use App\Support\Questions\QuestionTypeHeadingResolver;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
@@ -113,6 +114,26 @@ final class QatPaperBuilder
         );
 
         return array_flip($this->orderByType($query)->pluck('type.id')->map(fn ($id) => (int) $id)->all());
+    }
+
+    public function typeHeadings(object $subject, array $typeIds): array
+    {
+        if ($typeIds === []) {
+            return [];
+        }
+
+        $types = DB::table('question_types')->whereIn('id', $typeIds)
+            ->get(['id', 'name', 'name_ur', 'heading_en', 'heading_ur']);
+
+        return QuestionTypeHeadingResolver::apply(
+            $types,
+            (int) $subject->source_pattern_id,
+            (int) $subject->source_class_id,
+            (int) $subject->subject_id,
+        )->mapWithKeys(fn ($type) => [(int) $type->id => [
+            'heading_en' => trim((string) ($type->heading_en ?: $type->name)),
+            'heading_ur' => trim((string) ($type->heading_ur ?: $type->name_ur)),
+        ]])->all();
     }
 
     public function questionColumns(): array

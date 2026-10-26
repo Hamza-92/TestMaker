@@ -359,17 +359,62 @@ export function QatObjectiveQuestion({
     );
 }
 
-function LocalizedText({ en, ur }: { en?: string; ur?: string }) {
+function LocalizedText({
+    en,
+    ur,
+    number,
+    sideBySide = false,
+}: {
+    en?: string;
+    ur?: string;
+    number?: number;
+    sideBySide?: boolean;
+}) {
     if (!en && !ur) {
         return null;
     }
 
     return (
-        <div className="space-y-1">
-            {en && <QatRichText value={en} />}
+        <div
+            className={
+                sideBySide && en && ur
+                    ? 'grid min-w-0 flex-1 grid-cols-2 gap-3'
+                    : 'min-w-0 flex-1 space-y-1'
+            }
+        >
+            {en && (
+                <div
+                    dir="ltr"
+                    lang="en"
+                    className="flex min-w-0 items-start gap-1.5 text-left"
+                >
+                    {number !== undefined && (
+                        <span className="qat-question-number shrink-0 font-semibold">
+                            Q{number}.
+                        </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                        <QatRichText value={en} />
+                    </div>
+                </div>
+            )}
             {ur && (
-                <div dir="rtl" lang="ur" className="text-right">
-                    <QatRichText value={ur} />
+                <div
+                    dir="rtl"
+                    lang="ur"
+                    className="flex min-w-0 items-start gap-1.5 text-right"
+                >
+                    {number !== undefined && (
+                        <span
+                            dir="ltr"
+                            className="qat-question-number shrink-0 font-semibold"
+                        >
+                            Q{number}.
+                        </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                        <QatRichText value={ur} />
+                    </div>
                 </div>
             )}
         </div>
@@ -410,7 +455,13 @@ export function QatQuestionStatement({ question }: { question: QatQuestion }) {
     );
 }
 
-export function QatQuestionContent({ question }: { question: QatQuestion }) {
+export function QatQuestionContent({
+    question,
+    number,
+}: {
+    question: QatQuestion;
+    number: number;
+}) {
     const content = question.content ?? {};
     const promptEn = field(content, 'prompt_en');
     const promptUr = field(content, 'prompt_ur');
@@ -434,18 +485,29 @@ export function QatQuestionContent({ question }: { question: QatQuestion }) {
 
     return (
         <div className="space-y-2 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-            <LocalizedText en={primaryEn} ur={primaryUr} />
+            <LocalizedText
+                en={primaryEn}
+                ur={primaryUr}
+                number={number}
+                sideBySide
+            />
+            {!primaryEn && !primaryUr && (
+                <span className="qat-question-number font-semibold">
+                    Q{number}.
+                </span>
+            )}
             {(secondaryEn || secondaryUr) && (
-                <LocalizedText en={secondaryEn} ur={secondaryUr} />
+                <LocalizedText en={secondaryEn} ur={secondaryUr} sideBySide />
             )}
             {(passageEn || passageUr) && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
-                    <LocalizedText en={passageEn} ur={passageUr} />
+                    <LocalizedText en={passageEn} ur={passageUr} sideBySide />
                 </div>
             )}
             <LocalizedText
                 en={sameText(detailEn, primaryEn) ? '' : detailEn}
                 ur={sameText(detailUr, primaryUr) ? '' : detailUr}
+                sideBySide
             />
             {options.length > 0 && (
                 <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
@@ -478,6 +540,7 @@ export function QatQuestionContent({ question }: { question: QatQuestion }) {
                                     field(item, 'prompt_ur') ||
                                     field(item, 'statement_ur')
                                 }
+                                sideBySide
                             />
                             {records(item.options).length > 0 && (
                                 <div className="mt-1 grid gap-1 sm:grid-cols-2">

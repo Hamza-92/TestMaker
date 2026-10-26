@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
+import { QuestionContent } from '../papers/paper-layouts/questions/question-content';
 import {
     DEFAULT_PAPER_SETTINGS,
     PAPER_URDU_FONT_METRICS,
@@ -19,6 +20,8 @@ import type { QatQuestion } from './question';
 type PaperSection = {
     question_type_id: number;
     title: string;
+    heading_en?: string | null;
+    heading_ur?: string | null;
     questions: (QatQuestion & { marks: number })[];
 };
 
@@ -88,6 +91,69 @@ function romanSection(number: number): string {
     return result;
 }
 
+function QatSectionHeading({ number }: { number: number }) {
+    return (
+        <h2
+            data-paper-heading
+            data-paper-section-heading
+            className="qat-section-heading break-after-avoid text-center text-sm font-bold"
+        >
+            Section {romanSection(number)}
+        </h2>
+    );
+}
+
+function QatTypeHeading({
+    section,
+    number,
+}: {
+    section: PaperSection;
+    number: number;
+}) {
+    const english = section.heading_en?.trim() || section.title;
+    const urdu = section.heading_ur?.trim() || '';
+    const count = section.questions.length;
+    const marks = Number(
+        section.questions
+            .reduce((total, question) => total + Number(question.marks), 0)
+            .toFixed(2),
+    );
+    const marksEach = Number(section.questions[0]?.marks ?? 0);
+    const sameMarks = section.questions.every(
+        (question) => Number(question.marks) === marksEach,
+    );
+    const marksLabel = sameMarks
+        ? `(${count}x${marksEach}=${marks})`
+        : `(${marks} Marks)`;
+
+    return (
+        <div
+            data-paper-heading
+            className={
+                urdu
+                    ? 'qat-type-heading grid break-after-avoid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 px-2 py-1 text-xs font-bold'
+                    : 'qat-type-heading flex break-after-avoid items-start justify-between gap-3 px-2 py-1 text-xs font-bold'
+            }
+        >
+            <div dir="ltr" lang="en" className="min-w-0 text-left">
+                <span className="whitespace-nowrap">Q.{number}:-</span>{' '}
+                <QuestionContent value={english} inline />
+            </div>
+            <span dir="ltr" className="shrink-0 whitespace-nowrap">
+                {marksLabel}
+            </span>
+            {urdu && (
+                <div dir="rtl" lang="ur" className="min-w-0 text-right">
+                    <span className="whitespace-nowrap">
+                        سوال نمبر {number}:-
+                    </span>{' '}
+                    <QuestionContent value={urdu} inline />
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function QatPaper({
     paper: initialPaper,
     variants = [],
@@ -120,10 +186,6 @@ export default function QatPaper({
         .filter((section) => section.questions.length > 0);
     const objectiveQuestions = objectiveSections.flatMap(
         (section) => section.questions,
-    );
-    const objectiveMarks = objectiveQuestions.reduce(
-        (total, question) => total + Number(question.marks),
-        0,
     );
 
     async function savePaper() {
@@ -228,6 +290,10 @@ export default function QatPaper({
                 #qat-print-sheet .qat-question [lang="ur"], #qat-print-sheet .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${qatQuestionSize * qatUrduMetrics.sizeScale}px !important; line-height: ${qatQuestionLineHeight * qatUrduMetrics.lineHeightScale} !important; }
                 #qat-print-sheet .qat-question [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
                 #qat-print-sheet .qat-question-number { font-family: "Times New Roman", Times, serif; font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; transform: none; }
+                #qat-print-sheet .qat-section-heading { font-size: ${DEFAULT_PAPER_SETTINGS.sectionHeadingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.sectionHeadingLineHeight}; }
+                #qat-print-sheet .qat-type-heading { font-size: ${DEFAULT_PAPER_SETTINGS.headingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight}; }
+                #qat-print-sheet .qat-type-heading [lang="ur"], #qat-print-sheet .qat-type-heading [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${DEFAULT_PAPER_SETTINGS.headingSize * qatUrduMetrics.sizeScale}px !important; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight * qatUrduMetrics.lineHeightScale} !important; }
+                #qat-print-sheet .qat-type-heading [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
                 #qat-print-sheet .paper-rich-text img, #qat-print-sheet .qat-objective-question img { max-width: 100%; height: auto; }
                 #qat-print-sheet .qat-objective-options .paper-rich-text img { display: inline-block; vertical-align: middle; break-inside: avoid; }
                 @media print {
@@ -399,11 +465,8 @@ export default function QatPaper({
                     <div className="mt-6 space-y-6">
                         {objectiveQuestions.length > 0 && (
                             <section>
-                                <div className="flex items-center justify-between border-b border-slate-700 pb-1 text-sm font-bold">
-                                    <h2>Section I — Objective Questions</h2>
-                                    <span>{objectiveMarks} marks</span>
-                                </div>
-                                <div className="mt-3 space-y-4">
+                                <QatSectionHeading number={1} />
+                                <div className="mt-2 space-y-4">
                                     {objectiveSections.map(
                                         (section, sectionIndex) => {
                                             const preceding = objectiveSections
@@ -421,18 +484,19 @@ export default function QatPaper({
                                                     key={`${section.question_type_id}-${sectionIndex}`}
                                                     className="space-y-3"
                                                 >
-                                                    {objectiveSections.length >
-                                                        1 && (
-                                                        <h3 className="text-xs font-bold">
-                                                            {section.title}
-                                                        </h3>
-                                                    )}
+                                                    <QatTypeHeading
+                                                        section={section}
+                                                        number={
+                                                            sectionIndex + 1
+                                                        }
+                                                    />
                                                     {section.questions.map(
                                                         (question, index) => (
                                                             <div
                                                                 key={
                                                                     question.id
                                                                 }
+                                                                data-paper-question
                                                                 className="qat-question"
                                                             >
                                                                 <QatObjectiveQuestion
@@ -471,38 +535,31 @@ export default function QatPaper({
                                 <section
                                     key={`${section.question_type_id}-${sectionIndex}`}
                                 >
-                                    <div className="flex items-center justify-between border-b border-slate-700 pb-1 text-sm font-bold">
-                                        <h2>
-                                            Section{' '}
-                                            {romanSection(sectionNumber)} —{' '}
-                                            {section.title}
-                                        </h2>
-                                        <span>
-                                            {section.questions.reduce(
-                                                (total, question) =>
-                                                    total +
-                                                    Number(question.marks),
-                                                0,
-                                            )}{' '}
-                                            marks
-                                        </span>
-                                    </div>
+                                    <QatSectionHeading number={sectionNumber} />
+                                    <QatTypeHeading
+                                        section={section}
+                                        number={
+                                            objectiveSections.length +
+                                            sectionIndex +
+                                            1
+                                        }
+                                    />
                                     <div className="mt-3 space-y-5">
                                         {section.questions.map(
                                             (question, index) => (
                                                 <div
                                                     key={question.id}
-                                                    className="qat-question flex items-start gap-3"
+                                                    data-paper-question
+                                                    className="qat-question"
                                                 >
-                                                    <span className="shrink-0 text-sm font-semibold">
-                                                        Q{preceding + index + 1}
-                                                        .
-                                                    </span>
-                                                    <div className="min-w-0 flex-1">
-                                                        <QatQuestionContent
-                                                            question={question}
-                                                        />
-                                                    </div>
+                                                    <QatQuestionContent
+                                                        question={question}
+                                                        number={
+                                                            preceding +
+                                                            index +
+                                                            1
+                                                        }
+                                                    />
                                                 </div>
                                             ),
                                         )}

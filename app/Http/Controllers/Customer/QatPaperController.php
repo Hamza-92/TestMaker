@@ -135,6 +135,7 @@ class QatPaperController extends Controller
 
         $pool = $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access)
             ->get($builder->questionColumns())->keyBy('id');
+        $typeHeadings = $builder->typeHeadings($subject, $pool->pluck('question_type_id')->unique()->all());
         $variants = $data['mode'] === 'auto' ? (int) ($data['variants'] ?? 1) : 1;
         $prepared = [];
         if ($data['mode'] === 'auto') {
@@ -160,6 +161,7 @@ class QatPaperController extends Controller
                     $paperSections[] = [
                         'question_type_id' => $typeId,
                         'title' => $picked->first()->type_name ?: 'Question type '.$typeId,
+                        ...($typeHeadings[$typeId] ?? []),
                         'questions' => $picked->map(fn ($row) => [
                             ...$builder->presentQuestion($row), 'marks' => (float) $section['marks'],
                         ])->values()->all(),
@@ -180,6 +182,7 @@ class QatPaperController extends Controller
                 ->map(fn ($items, $typeId) => [
                     'question_type_id' => (int) $typeId,
                     'title' => $pool->get($items->first()['id'])->type_name ?: 'Question type '.$typeId,
+                    ...($typeHeadings[(int) $typeId] ?? []),
                     'questions' => $items->map(fn ($item) => [
                         ...$builder->presentQuestion($pool->get($item['id'])),
                         'marks' => (float) $item['marks'],
@@ -276,9 +279,25 @@ class QatPaperController extends Controller
         ], 201);
     }
 
-    public function show(Request $request, QatPaper $qatPaper): Response
+    public function show(Request $request, QatPaper $qatPaper, QatPaperBuilder $builder): Response
     {
         abort_unless(in_array((int) $qatPaper->user_id, $this->visibleUserIds($request), true), 403);
+
+        $paperData = $qatPaper->paper_data;
+        $sections = $paperData['sections'] ?? [];
+        if (collect($sections)->contains(fn ($section) => ! array_key_exists('heading_en', $section) || ! array_key_exists('heading_ur', $section))) {
+            $subject = DB::table('qat_subjects')->where('id', $paperData['subject_id'] ?? 0)
+                ->first(['source_pattern_id', 'subject_id', 'class_id']);
+            if ($subject !== null) {
+                $subject->source_class_id = $subject->class_id;
+                $headings = $builder->typeHeadings($subject, array_column($sections, 'question_type_id'));
+                $paperData['sections'] = array_map(fn ($section) => [
+                    ...$section,
+                    'heading_en' => $section['heading_en'] ?? $headings[(int) $section['question_type_id']]['heading_en'] ?? null,
+                    'heading_ur' => $section['heading_ur'] ?? $headings[(int) $section['question_type_id']]['heading_ur'] ?? null,
+                ], $sections);
+            }
+        }
 
         return Inertia::render('customer/qat/paper', [
             'paper' => [
@@ -290,7 +309,7 @@ class QatPaperController extends Controller
                 'total_marks' => $qatPaper->total_marks,
                 'question_count' => $qatPaper->question_count,
                 'created_at' => $qatPaper->created_at?->toISOString(),
-                'paper_data' => $qatPaper->paper_data,
+                'paper_data' => $paperData,
             ],
         ]);
     }
