@@ -1,5 +1,8 @@
 import { Fragment, useMemo } from 'react';
-import { containsUrduScript } from '@/pages/customer/papers/paper-layouts/questions/bilingual-question-row';
+import {
+    bilingualPartsHaveSameVisibleText,
+    containsUrduScript,
+} from '@/pages/customer/papers/paper-layouts/questions/bilingual-question-row';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { questionTextToHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
 
@@ -519,12 +522,15 @@ export function QatQuestionContent({
     const detailUr = field(content, 'shared_ur') || question.description_ur;
     const visibleDetailEn = sameText(detailEn, statementEn) ? '' : detailEn;
     const visibleDetailUr = sameText(detailUr, statementUr) ? '' : detailUr;
-    const sharedStatement =
-        question.schema_key === 'subjective_same_statement' &&
+    const sharedDescription =
         (visibleDetailEn || visibleDetailUr) &&
         (!visibleDetailEn ||
             !visibleDetailUr ||
-            sameText(visibleDetailEn, visibleDetailUr))
+            bilingualPartsHaveSameVisibleText({
+                english: visibleDetailEn,
+                urdu: visibleDetailUr,
+            }) ||
+            visibleDetailEn.trim() === visibleDetailUr.trim())
             ? visibleDetailEn || visibleDetailUr
             : '';
 
@@ -535,7 +541,7 @@ export function QatQuestionContent({
                 ur={statementUr}
                 number={number}
                 sideBySide
-                shared={sharedStatement}
+                shared={sharedDescription}
             />
             {!statementEn && !statementUr && (
                 <span className="qat-question-number font-semibold">
@@ -550,7 +556,7 @@ export function QatQuestionContent({
                     <LocalizedText en={passageEn} ur={passageUr} sideBySide />
                 </div>
             )}
-            {!sharedStatement && (
+            {!sharedDescription && (
                 <LocalizedText
                     en={visibleDetailEn}
                     ur={visibleDetailUr}
