@@ -174,7 +174,7 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $templatePayload = [
         'qat_subject_id' => $qatSubjectId, 'name' => 'Monthly practice',
         'category' => 'Practice', 'minutes' => 40, 'status' => true,
-        'sections' => [['question_type_id' => $type->id, 'quantity' => 1, 'marks' => 2]],
+        'sections' => [['question_type_id' => $type->id, 'quantity' => 2, 'required_questions' => 1, 'marks' => 2]],
     ];
     $this->actingAs($admin)->get(route('superadmin.qat-templates.index'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
@@ -184,6 +184,10 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $this->actingAs($admin)->post(route('superadmin.qat-templates.store'), [
         ...$templatePayload, 'sections' => [['question_type_id' => 999999, 'quantity' => 1, 'marks' => 2]],
     ])->assertSessionHasErrors('sections');
+    $this->actingAs($admin)->post(route('superadmin.qat-templates.store'), [
+        ...$templatePayload,
+        'sections' => [['question_type_id' => $type->id, 'quantity' => 2, 'required_questions' => 3, 'marks' => 2]],
+    ])->assertSessionHasErrors('sections.0.required_questions');
     $this->actingAs($admin)->post(route('superadmin.qat-templates.store'), $templatePayload)
         ->assertRedirect();
     $templateId = DB::table('qat_paper_templates')->value('id');

@@ -211,6 +211,24 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertJsonCount(0, 'questions.data')
         ->assertJsonPath('types.0.total', 36);
 
+    DB::table('qat_paper_templates')->where('id', $templateId)->update([
+        'sections' => json_encode([[
+            'question_type_id' => $type->id, 'quantity' => 3,
+            'required_questions' => 2, 'marks' => 2,
+        ]]),
+    ]);
+    $choiceGeneration = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'QAT with choices', 'mode' => 'auto', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
+        'template_id' => $templateId,
+    ])->assertCreated();
+    $this->actingAs($school)->get($choiceGeneration->json('preview_url'))
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('paper.question_count', 3)
+        ->where('paper.total_marks', 4)
+        ->where('paper.paper_data.sections.0.required_questions', 2)
+        ->has('paper.paper_data.sections.0.questions', 3));
+
     $sourcePatternId = DB::table('patterns')->insertGetId(['name' => 'QAT source', 'created_at' => now(), 'updated_at' => now()]);
     $sourceClassId = DB::table('classes')->insertGetId(['name' => 'QAT source class', 'created_at' => now(), 'updated_at' => now()]);
     $sourceSubjectId = DB::table('subjects')->insertGetId([

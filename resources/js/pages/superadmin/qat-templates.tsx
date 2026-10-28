@@ -15,7 +15,12 @@ import {
 } from './qat-catalogue/shared';
 import type { Filters, Page } from './qat-catalogue/shared';
 
-type Section = { question_type_id: number; quantity: number; marks: number };
+type Section = {
+    question_type_id: number;
+    quantity: number;
+    required_questions?: number;
+    marks: number;
+};
 type Template = {
     id: number;
     qat_subject_id: number;
@@ -82,9 +87,16 @@ export default function QatTemplates({
         (sum, section) => sum + Number(section.quantity || 0),
         0,
     );
+    const requiredQuestions = data.sections.reduce(
+        (sum, section) =>
+            sum + Number(section.required_questions ?? section.quantity ?? 0),
+        0,
+    );
     const totalMarks = data.sections.reduce(
         (sum, section) =>
-            sum + Number(section.quantity || 0) * Number(section.marks || 0),
+            sum +
+            Number(section.required_questions ?? section.quantity ?? 0) *
+                Number(section.marks || 0),
         0,
     );
 
@@ -109,9 +121,22 @@ export default function QatTemplates({
     function updateSection(index: number, change: Partial<Section>) {
         setData(
             'sections',
-            data.sections.map((section, position) =>
-                position === index ? { ...section, ...change } : section,
-            ),
+            data.sections.map((section, position) => {
+                if (position !== index) {
+                    return section;
+                }
+
+                const next = { ...section, ...change };
+
+                if (
+                    change.quantity !== undefined &&
+                    (next.required_questions ?? next.quantity) > next.quantity
+                ) {
+                    next.required_questions = next.quantity;
+                }
+
+                return next;
+            }),
         );
     }
 
@@ -189,10 +214,21 @@ export default function QatTemplates({
                                             (sum, row) => sum + row.quantity,
                                             0,
                                         )}{' '}
-                                        questions ·{' '}
+                                        total ·{' '}
                                         {item.sections.reduce(
                                             (sum, row) =>
-                                                sum + row.quantity * row.marks,
+                                                sum +
+                                                (row.required_questions ??
+                                                    row.quantity),
+                                            0,
+                                        )}{' '}
+                                        required ·{' '}
+                                        {item.sections.reduce(
+                                            (sum, row) =>
+                                                sum +
+                                                (row.required_questions ??
+                                                    row.quantity) *
+                                                    row.marks,
                                             0,
                                         )}{' '}
                                         marks
@@ -233,6 +269,7 @@ export default function QatTemplates({
                 open={open}
                 onOpenChange={setOpen}
                 title={editing ? 'Edit QAT template' : 'Create QAT template'}
+                className="max-w-4xl"
                 footer={
                     <>
                         <Button type="button" onClick={() => setOpen(false)}>
@@ -372,8 +409,8 @@ export default function QatTemplates({
                                     Paper sections
                                 </h3>
                                 <p className="text-xs text-slate-500">
-                                    {totalQuestions} questions · {totalMarks}{' '}
-                                    marks
+                                    {totalQuestions} total · {requiredQuestions}{' '}
+                                    required · {totalMarks} marks
                                 </p>
                             </div>
                             <Button
@@ -405,6 +442,7 @@ export default function QatTemplates({
                                             {
                                                 question_type_id: next.id,
                                                 quantity: 1,
+                                                required_questions: 1,
                                                 marks: next.is_objective
                                                     ? 1
                                                     : 2,
@@ -419,9 +457,9 @@ export default function QatTemplates({
                         {data.sections.map((section, index) => (
                             <div
                                 key={index}
-                                className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_36px] gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700 sm:grid-cols-[minmax(0,1fr)_88px_88px_36px]"
+                                className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700 sm:grid-cols-[minmax(0,1fr)_100px_100px_100px_36px] sm:items-end"
                             >
-                                <label className="col-span-3 min-w-0 text-xs text-slate-500 sm:col-span-1">
+                                <label className="col-span-2 min-w-0 text-xs text-slate-500 sm:col-span-1">
                                     Question type
                                     <select
                                         className={selectClass}
@@ -451,7 +489,7 @@ export default function QatTemplates({
                                     </select>
                                 </label>
                                 <label className="text-xs text-slate-500">
-                                    Questions
+                                    Total
                                     <input
                                         type="number"
                                         min={1}
@@ -468,7 +506,27 @@ export default function QatTemplates({
                                     />
                                 </label>
                                 <label className="text-xs text-slate-500">
-                                    Marks each
+                                    Required
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={section.quantity}
+                                        className={selectClass}
+                                        value={
+                                            section.required_questions ??
+                                            section.quantity
+                                        }
+                                        onChange={(event) =>
+                                            updateSection(index, {
+                                                required_questions: Number(
+                                                    event.target.value,
+                                                ),
+                                            })
+                                        }
+                                    />
+                                </label>
+                                <label className="text-xs text-slate-500">
+                                    Marks
                                     <input
                                         type="number"
                                         min={0.5}
@@ -489,7 +547,7 @@ export default function QatTemplates({
                                     type="button"
                                     size="icon-sm"
                                     variant="ghost"
-                                    className="self-end"
+                                    className="self-end justify-self-end"
                                     aria-label={`Remove section ${index + 1}`}
                                     title="Remove section"
                                     onClick={() =>
@@ -515,6 +573,18 @@ export default function QatTemplates({
                             <span className="text-sm text-red-600">
                                 {errors.sections}
                             </span>
+                        )}
+                        {data.sections.map((_, index) =>
+                            errors[`sections.${index}.required_questions`] ? (
+                                <p key={index} className="text-sm text-red-600">
+                                    Section {index + 1}:{' '}
+                                    {
+                                        errors[
+                                            `sections.${index}.required_questions`
+                                        ]
+                                    }
+                                </p>
+                            ) : null,
                         )}
                     </div>
                 </form>

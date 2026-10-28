@@ -149,6 +149,10 @@ class QatPaperController extends Controller
                 foreach ($sections as $section) {
                     $typeId = (int) $section['question_type_id'];
                     $quantity = (int) $section['quantity'];
+                    $required = (int) ($section['required_questions'] ?? $quantity);
+                    if ($required < 1 || $required > $quantity) {
+                        throw ValidationException::withMessages(['sections' => 'The required question count must be between 1 and the total for each section.']);
+                    }
                     $options = $pool->filter(fn ($row) => (int) $row->question_type_id === $typeId)->shuffle();
                     if (! ($data['allow_repeat'] ?? false)) {
                         $options = $options->reject(fn ($row) => in_array((int) $row->id, $used, true));
@@ -162,6 +166,7 @@ class QatPaperController extends Controller
                         'question_type_id' => $typeId,
                         'title' => $picked->first()->type_name ?: 'Question type '.$typeId,
                         ...($typeHeadings[$typeId] ?? []),
+                        'required_questions' => $required,
                         'questions' => $picked->map(fn ($row) => [
                             ...$builder->presentQuestion($row), 'marks' => (float) $section['marks'],
                         ])->values()->all(),
@@ -208,7 +213,9 @@ class QatPaperController extends Controller
                 'class_ids' => $classIds,
                 'class_name' => $subject->class_name,
                 'subject_name' => $subject->subject_name,
-                'total_marks' => $questions->sum('marks'),
+                'total_marks' => $data['mode'] === 'auto'
+                    ? collect($sections)->sum(fn ($section) => (int) $section['required_questions'] * (float) ($section['questions'][0]['marks'] ?? 0))
+                    : $questions->sum('marks'),
                 'question_count' => $questions->count(),
                 'paper_data' => [
                     'class_id' => (int) $subject->class_id,

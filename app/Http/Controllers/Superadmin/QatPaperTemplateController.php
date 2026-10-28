@@ -96,8 +96,18 @@ class QatPaperTemplateController extends Controller
             'sections' => ['required', 'array', 'min:1', 'max:20'],
             'sections.*.question_type_id' => ['required', 'integer', 'distinct'],
             'sections.*.quantity' => ['required', 'integer', 'between:1,100'],
+            'sections.*.required_questions' => ['sometimes', 'required', 'integer', 'between:1,100'],
             'sections.*.marks' => ['required', 'numeric', 'between:0.5,20'],
         ]);
+        foreach ($data['sections'] as $index => &$section) {
+            $section['required_questions'] ??= $section['quantity'];
+            if ($section['required_questions'] > $section['quantity']) {
+                throw ValidationException::withMessages([
+                    "sections.$index.required_questions" => 'Required questions cannot exceed total questions.',
+                ]);
+            }
+        }
+        unset($section);
         $subject = DB::table('qat_subjects as subject')
             ->join('qat_classes as class', 'class.id', '=', 'subject.qat_class_id')
             ->where('subject.id', $data['qat_subject_id'])

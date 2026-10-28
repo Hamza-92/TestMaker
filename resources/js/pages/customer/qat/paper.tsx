@@ -22,6 +22,7 @@ type PaperSection = {
     title: string;
     heading_en?: string | null;
     heading_ur?: string | null;
+    required_questions?: number;
     questions: (QatQuestion & { marks: number })[];
 };
 
@@ -132,17 +133,22 @@ function QatTypeHeading({
     const english = section.heading_en?.trim() || section.title;
     const urdu = section.heading_ur?.trim() || '';
     const count = section.questions.length;
-    const marks = Number(
-        section.questions
-            .reduce((total, question) => total + Number(question.marks), 0)
-            .toFixed(2),
-    );
+    const required = Math.min(section.required_questions ?? count, count);
     const marksEach = Number(section.questions[0]?.marks ?? 0);
     const sameMarks = section.questions.every(
         (question) => Number(question.marks) === marksEach,
     );
+    const marks = Number(
+        (sameMarks
+            ? required * marksEach
+            : section.questions.reduce(
+                  (total, question) => total + Number(question.marks),
+                  0,
+              )
+        ).toFixed(2),
+    );
     const marksLabel = sameMarks
-        ? `(${count}x${marksEach}=${marks})`
+        ? `(${required}x${marksEach}=${marks})`
         : `(${marks} Marks)`;
 
     return (
@@ -158,9 +164,21 @@ function QatTypeHeading({
                 <span className="whitespace-nowrap">Q.{number}:-</span>{' '}
                 <QuestionContent value={english} inline />
             </div>
-            <span dir="ltr" className="shrink-0 whitespace-nowrap">
-                {marksLabel}
-            </span>
+            <div className="shrink-0 text-center">
+                <span dir="ltr" className="block whitespace-nowrap">
+                    {marksLabel}
+                </span>
+                {required < count && (
+                    <span className="block text-[0.85em] font-medium">
+                        Attempt any {required} of {count}
+                        {urdu && (
+                            <span lang="ur" dir="rtl" className="block">
+                                {count} میں سے کوئی {required} حل کریں
+                            </span>
+                        )}
+                    </span>
+                )}
+            </div>
             {urdu && (
                 <div dir="rtl" lang="ur" className="min-w-0 text-right">
                     <span className="whitespace-nowrap">

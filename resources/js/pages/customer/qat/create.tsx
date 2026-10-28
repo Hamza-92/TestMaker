@@ -60,7 +60,12 @@ type QatTemplate = {
     name: string;
     category: string | null;
     minutes: number;
-    sections: { question_type_id: number; quantity: number; marks: number }[];
+    sections: {
+        question_type_id: number;
+        quantity: number;
+        required_questions?: number;
+        marks: number;
+    }[];
 };
 type ManualChoice = { question: QatQuestion; marks: number };
 
@@ -394,9 +399,11 @@ export default function QatCreate({
                   id: type.id,
                   name: type.name,
                   count: type.quantity,
-                  marks: type.quantity * type.marks,
+                  required: type.required_questions ?? type.quantity,
+                  marks:
+                      (type.required_questions ?? type.quantity) * type.marks,
               }))
-            : manualRows;
+            : manualRows.map((row) => ({ ...row, required: row.count }));
     const totalQuestions =
         mode === 'auto'
             ? autoRows.reduce((total, type) => total + type.quantity, 0)
@@ -404,7 +411,9 @@ export default function QatCreate({
     const totalMarks =
         mode === 'auto'
             ? autoRows.reduce(
-                  (total, type) => total + type.quantity * type.marks,
+                  (total, type) =>
+                      total +
+                      (type.required_questions ?? type.quantity) * type.marks,
                   0,
               )
             : selectedManual.reduce((total, item) => total + item.marks, 0);
@@ -1592,6 +1601,7 @@ export default function QatCreate({
                                                                                 row.quantity,
                                                                             0,
                                                                         )}{' '}
+                                                                        total
                                                                         questions
                                                                     </p>
                                                                 </div>
@@ -1622,13 +1632,19 @@ export default function QatCreate({
                                                                                 {
                                                                                     row.quantity
                                                                                 }{' '}
+                                                                                total
+                                                                                ·{' '}
+                                                                                {row.required_questions ??
+                                                                                    row.quantity}{' '}
+                                                                                required
                                                                                 ×{' '}
                                                                                 {
                                                                                     row.marks
                                                                                 }
                                                                             </span>
                                                                             <strong>
-                                                                                {row.quantity *
+                                                                                {(row.required_questions ??
+                                                                                    row.quantity) *
                                                                                     row.marks}
                                                                             </strong>
                                                                         </div>
@@ -1646,7 +1662,8 @@ export default function QatCreate({
                                                                             row,
                                                                         ) =>
                                                                             sum +
-                                                                            row.quantity *
+                                                                            (row.required_questions ??
+                                                                                row.quantity) *
                                                                                 row.marks,
                                                                         0,
                                                                     )}
@@ -2033,10 +2050,13 @@ export default function QatCreate({
                                         </p>
                                     )}
                                 <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <div className="grid grid-cols-[minmax(0,1fr)_90px_90px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
+                                    <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
                                         <span>Question type</span>
                                         <span className="text-right">
-                                            Questions
+                                            Total
+                                        </span>
+                                        <span className="text-right">
+                                            Required
                                         </span>
                                         <span className="text-right">
                                             Marks
@@ -2045,7 +2065,7 @@ export default function QatCreate({
                                     {reviewRows.map((row) => (
                                         <div
                                             key={row.id}
-                                            className="grid grid-cols-[minmax(0,1fr)_90px_90px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
+                                            className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
                                         >
                                             <span className="truncate">
                                                 {row.name}
@@ -2054,14 +2074,24 @@ export default function QatCreate({
                                                 {row.count}
                                             </strong>
                                             <strong className="text-right">
+                                                {row.required}
+                                            </strong>
+                                            <strong className="text-right">
                                                 {row.marks}
                                             </strong>
                                         </div>
                                     ))}
-                                    <div className="grid grid-cols-[minmax(0,1fr)_90px_90px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
+                                    <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
                                         <span>Total</span>
                                         <span className="text-right">
                                             {totalQuestions}
+                                        </span>
+                                        <span className="text-right">
+                                            {reviewRows.reduce(
+                                                (sum, row) =>
+                                                    sum + row.required,
+                                                0,
+                                            )}
                                         </span>
                                         <span className="text-right">
                                             {totalMarks}
