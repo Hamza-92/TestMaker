@@ -60,6 +60,42 @@ function normalizeMathDescription(value: string): string {
         .replace(/[\u060c\uff0c]/g, ',');
 }
 
+function reversedNumericProduct(first: string, second: string): boolean {
+    const factors = (value: string) => {
+        let visible = value;
+
+        if (typeof document !== 'undefined') {
+            const element = document.createElement('div');
+            element.innerHTML = value;
+            visible = element.textContent ?? '';
+        }
+
+        const parts = normalizeMathDescription(visible)
+            .normalize('NFKC')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/&(?:amp;)?(?:nbsp|#160);/gi, ' ')
+            .replace(/&(?:amp;)?(?:times|#215|#xD7);/gi, '×')
+            .replace(/[\u200b-\u200f\u2066-\u2069\ufeff\s]/g, '')
+            .split('×');
+
+        return parts.length > 1 && parts.every((part) => /^\d+$/.test(part))
+            ? parts
+            : null;
+    };
+    const englishFactors = factors(first);
+    const urduFactors = factors(second);
+
+    return Boolean(
+        englishFactors &&
+        urduFactors &&
+        englishFactors.length === urduFactors.length &&
+        englishFactors.every(
+            (factor, index) =>
+                factor === urduFactors[urduFactors.length - index - 1],
+        ),
+    );
+}
+
 const LATEX_DELIMITERS =
     /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$/g;
 
@@ -164,10 +200,11 @@ function ObjectiveOptions({
                             medium === 'both' &&
                             en &&
                             ur &&
-                            bilingualPartsHaveSameVisibleText({
-                                english: en,
-                                urdu: ur,
-                            }) &&
+                            (bilingualPartsHaveSameVisibleText({
+                                english: normalizeMathDescription(en),
+                                urdu: normalizeMathDescription(ur),
+                            }) ||
+                                reversedNumericProduct(en, ur)) &&
                             (!/<(?:img|svg|math|iframe|video)\b/i.test(
                                 `${en}${ur}`,
                             ) ||
