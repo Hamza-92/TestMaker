@@ -150,8 +150,8 @@ function QatTypeHeading({
             data-paper-heading
             className={
                 urdu
-                    ? 'qat-type-heading grid break-after-avoid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 px-2 py-1 text-xs font-bold'
-                    : 'qat-type-heading flex break-after-avoid items-start justify-between gap-3 px-2 py-1 text-xs font-bold'
+                    ? 'qat-type-heading grid break-after-avoid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
+                    : 'qat-type-heading flex break-after-avoid items-center justify-between gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
             }
         >
             <div dir="ltr" lang="en" className="min-w-0 text-left">
@@ -314,9 +314,8 @@ export default function QatPaper({
                 #qat-print-sheet .qat-question [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
                 #qat-print-sheet .qat-question-number { font-family: "Times New Roman", Times, serif; font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; transform: none; }
                 #qat-print-sheet .qat-section-heading { font-size: ${DEFAULT_PAPER_SETTINGS.sectionHeadingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.sectionHeadingLineHeight}; }
-                #qat-print-sheet .qat-type-heading { font-size: ${DEFAULT_PAPER_SETTINGS.headingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight}; }
+                #qat-print-sheet .qat-type-heading { font-size: ${DEFAULT_PAPER_SETTINGS.headingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 #qat-print-sheet .qat-type-heading [lang="ur"], #qat-print-sheet .qat-type-heading [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${DEFAULT_PAPER_SETTINGS.headingSize * qatUrduMetrics.sizeScale}px !important; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight * qatUrduMetrics.lineHeightScale} !important; }
-                #qat-print-sheet .qat-type-heading [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
                 #qat-print-sheet .paper-rich-text img, #qat-print-sheet .qat-objective-question img { max-width: 100%; height: auto; }
                 #qat-print-sheet .qat-objective-options .paper-rich-text img { display: inline-block; vertical-align: middle; break-inside: avoid; }
                 @media print {

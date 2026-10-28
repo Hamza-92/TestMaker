@@ -160,6 +160,20 @@ function ObjectiveOptions({
                         const en =
                             field(option, 'text_en') || field(option, 'text');
                         const ur = field(option, 'text_ur');
+                        const sharedOption =
+                            medium === 'both' &&
+                            en &&
+                            ur &&
+                            bilingualPartsHaveSameVisibleText({
+                                english: en,
+                                urdu: ur,
+                            }) &&
+                            (!/<(?:img|svg|math|iframe|video)\b/i.test(
+                                `${en}${ur}`,
+                            ) ||
+                                en.trim() === ur.trim());
+                        const sharedOptionIsUrdu =
+                            sharedOption && containsUrduScript(en);
 
                         return (
                             <Fragment key={index}>
@@ -176,12 +190,22 @@ function ObjectiveOptions({
                                     </span>
                                 </td>
                                 <td className="w-[21%] min-w-0 border border-slate-700 px-1 py-1 align-middle">
-                                    <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-1 break-words">
+                                    <div
+                                        className={`flex min-w-0 flex-wrap items-baseline gap-x-1 break-words ${sharedOptionIsUrdu ? 'justify-end' : 'justify-between'}`}
+                                    >
                                         {en && medium !== 'urdu' && (
                                             <div
-                                                dir="ltr"
-                                                lang="en"
-                                                className="w-max max-w-full shrink-0 text-left"
+                                                dir={
+                                                    sharedOptionIsUrdu
+                                                        ? 'rtl'
+                                                        : 'ltr'
+                                                }
+                                                lang={
+                                                    sharedOptionIsUrdu
+                                                        ? 'ur'
+                                                        : 'en'
+                                                }
+                                                className={`w-max max-w-full shrink-0 ${sharedOptionIsUrdu ? 'text-right' : 'text-left'}`}
                                             >
                                                 <QatRichText
                                                     value={en}
@@ -189,18 +213,20 @@ function ObjectiveOptions({
                                                 />
                                             </div>
                                         )}
-                                        {ur && medium !== 'english' && (
-                                            <div
-                                                dir="rtl"
-                                                lang="ur"
-                                                className="w-max max-w-full shrink-0 text-right"
-                                            >
-                                                <QatRichText
-                                                    value={ur}
-                                                    inline
-                                                />
-                                            </div>
-                                        )}
+                                        {ur &&
+                                            medium !== 'english' &&
+                                            !sharedOption && (
+                                                <div
+                                                    dir="rtl"
+                                                    lang="ur"
+                                                    className="w-max max-w-full shrink-0 text-right"
+                                                >
+                                                    <QatRichText
+                                                        value={ur}
+                                                        inline
+                                                    />
+                                                </div>
+                                            )}
                                     </div>
                                 </td>
                             </Fragment>
