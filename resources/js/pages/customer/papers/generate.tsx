@@ -3423,6 +3423,7 @@ function PaperHeader({
     paddingX,
     paddingY,
     onChange,
+    onChapterNumbersChange,
 }: {
     template: PaperHeaderTemplate;
     header: Parameters<typeof ClassicExamHeader>[0]['header'];
@@ -3433,6 +3434,7 @@ function PaperHeader({
     paddingX: number;
     paddingY: number;
     onChange: Parameters<typeof ClassicExamHeader>[0]['onChange'];
+    onChapterNumbersChange?: (value: string) => void;
 }) {
     const onEditableChange = (
         field: keyof GeneratedPaperHeader,
@@ -3503,6 +3505,7 @@ function PaperHeader({
             paddingX={paddingX}
             paddingY={paddingY}
             onChange={onEditableChange}
+            onChapterNumbersChange={onChapterNumbersChange}
         />
     );
 }
@@ -6554,7 +6557,10 @@ export default function GeneratePaper({
         }
     }
 
-    async function savePaperToServer(values: SavePaperValues) {
+    async function savePaperToServer(
+        values: SavePaperValues,
+        quickSave = false,
+    ) {
         if (!generatedPaper || isSavingPaper) {
             return;
         }
@@ -6655,14 +6661,38 @@ export default function GeneratePaper({
             setIsDirty(false);
             setIsSavePaperModalOpen(false);
             clearDraft();
+            toast.success('Paper saved');
         } catch (error) {
-            setSavePaperError(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to save paper.',
-            );
+            const message =
+                error instanceof Error ? error.message : 'Failed to save paper.';
+
+            setSavePaperError(message);
+
+            if (quickSave) {
+                toast.error(message);
+            }
         } finally {
             setIsSavingPaper(false);
+        }
+    }
+
+    function prefilledSavePaperValues(paper: GeneratedPaper): SavePaperValues {
+        return {
+            name: savedPaperName || defaultPaperName(),
+            examType: paper.header.exam,
+            section: paper.header.section,
+            date: paper.header.date,
+            timeAllowed: paper.header.duration,
+            examMarks: String(
+                paperTotalMarks(paper) || paper.header.marks || '',
+            ),
+            passingMarks: String(paper.header.passingMarks || ''),
+        };
+    }
+
+    function quickSavePaper() {
+        if (generatedPaper) {
+            void savePaperToServer(prefilledSavePaperValues(generatedPaper), true);
         }
     }
 
@@ -6981,6 +7011,12 @@ export default function GeneratePaper({
                       },
                   }
                 : current,
+        );
+    }
+
+    function updatePaperChapterNumbers(value: string) {
+        setGeneratedPaper((current) =>
+            current ? { ...current, chapterNumbersText: value } : current,
         );
     }
 
@@ -9013,6 +9049,7 @@ export default function GeneratePaper({
                         onOpenSavePaperModal={() =>
                             setIsSavePaperModalOpen(true)
                         }
+                        onQuickSavePaper={quickSavePaper}
                         onOpenSaveAsTemplate={() => {
                             setSaveTemplateError(null);
                             setIsSaveAsTemplateOpen(true);
@@ -9022,6 +9059,7 @@ export default function GeneratePaper({
                         onSaveDraftAndBack={() => void saveDraftAndBack()}
                         onDiscardAndBack={discardAndBack}
                         onHeaderChange={updatePaperHeader}
+                        onChapterNumbersChange={updatePaperChapterNumbers}
                         settings={{
                             ...DEFAULT_PAPER_SETTINGS,
                             ...(generatedPaper.settings ?? {}),
@@ -9078,21 +9116,7 @@ export default function GeneratePaper({
 
                     {isSavePaperModalOpen && generatedPaper && (
                         <SavePaperModal
-                            initial={{
-                                name: savedPaperName || defaultPaperName(),
-                                examType: generatedPaper.header.exam,
-                                section: generatedPaper.header.section,
-                                date: generatedPaper.header.date,
-                                timeAllowed: generatedPaper.header.duration,
-                                examMarks: String(
-                                    paperTotalMarks(generatedPaper) ||
-                                        generatedPaper.header.marks ||
-                                        '',
-                                ),
-                                passingMarks: String(
-                                    generatedPaper.header.passingMarks || '',
-                                ),
-                            }}
+                            initial={prefilledSavePaperValues(generatedPaper)}
                             isUpdate={savedPaperId !== null}
                             isSaving={isSavingPaper}
                             error={savePaperError}
@@ -13990,12 +14014,14 @@ export function GeneratedPaperView({
     isSavingPaper,
     isSavingDraft,
     onOpenSavePaperModal,
+    onQuickSavePaper,
     onOpenSaveAsTemplate,
     onSaveDraft,
     onGoBack,
     onSaveDraftAndBack,
     onDiscardAndBack,
     onHeaderChange,
+    onChapterNumbersChange,
     settings,
     onSettingsChange,
     onBubbleSheetMediumChange,
@@ -14055,12 +14081,14 @@ export function GeneratedPaperView({
     isSavingPaper: boolean;
     isSavingDraft: boolean;
     onOpenSavePaperModal: () => void;
+    onQuickSavePaper?: () => void;
     onOpenSaveAsTemplate: () => void;
     onSaveDraft: () => void;
     onGoBack: () => void;
     onSaveDraftAndBack: () => void;
     onDiscardAndBack: () => void;
     onHeaderChange: (field: keyof GeneratedPaperHeader, value: string) => void;
+    onChapterNumbersChange?: (value: string) => void;
     settings: PaperSettings;
     onSettingsChange: (patch: Partial<PaperSettings>) => void;
     onBubbleSheetMediumChange: (medium: ContentMedium) => void;
@@ -15561,6 +15589,16 @@ export function GeneratedPaperView({
                                 </button>
                                 <button
                                     type="button"
+                                    onClick={onQuickSavePaper}
+                                    disabled={isSavingPaper || isSavingDraft}
+                                    title="Save with the prefilled paper details"
+                                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
+                                >
+                                    <SaveIcon className="size-3.5" />
+                                    Auto Save Paper
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={onOpenSaveAsTemplate}
                                     title="Save as template"
                                     className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -15645,9 +15683,10 @@ export function GeneratedPaperView({
                         <PaperHeader
                             template={settings.headerTemplate}
                             chapterNumbers={
-                                paper.selectedChapterNumbers === undefined
+                                paper.chapterNumbersText ??
+                                (paper.selectedChapterNumbers === undefined
                                     ? fallbackChapterNumbers
-                                    : paperChapterNumbers(paper)
+                                    : paperChapterNumbers(paper))
                             }
                             header={{
                                 ...paper.header,
@@ -15660,6 +15699,17 @@ export function GeneratedPaperView({
                             address={effectiveSchoolAddress}
                             showAddress={effectiveSchoolAddress.trim() !== ''}
                             onChange={answersTitle ? () => {} : onHeaderChange}
+                            onChapterNumbersChange={
+                                !answersTitle &&
+                                !previewOnly &&
+                                onChapterNumbersChange &&
+                                (paper.chapterNumbersText !== undefined ||
+                                    (paper.selectedChapterNumbers?.length ??
+                                        0) > 0 ||
+                                    fallbackChapterNumbers !== '')
+                                    ? onChapterNumbersChange
+                                    : undefined
+                            }
                             paddingX={settings.headerPaddingX}
                             paddingY={settings.headerPaddingY}
                         />
@@ -15768,12 +15818,13 @@ export function GeneratedPaperView({
                                         <PaperHeader
                                             template={settings.headerTemplate}
                                             chapterNumbers={
-                                                variantPaper.selectedChapterNumbers ===
+                                                variantPaper.chapterNumbersText ??
+                                                (variantPaper.selectedChapterNumbers ===
                                                 undefined
                                                     ? fallbackChapterNumbers
                                                     : paperChapterNumbers(
                                                           variantPaper,
-                                                      )
+                                                      ))
                                             }
                                             header={{
                                                 ...variantPaper.header,

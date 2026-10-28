@@ -13,6 +13,7 @@ interface ClassicExamHeaderProps {
     paddingX: number;
     paddingY: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
+    onChapterNumbersChange?: (value: string) => void;
 }
 
 const leftFields: Array<[keyof GeneratedPaperHeader, string]> = [
@@ -38,6 +39,7 @@ export function ClassicExamHeader({
     paddingX,
     paddingY,
     onChange,
+    onChapterNumbersChange,
 }: ClassicExamHeaderProps) {
     return (
         <div
@@ -65,7 +67,7 @@ export function ClassicExamHeader({
                                     <td
                                         rowSpan={
                                             leftFields.length +
-                                            (chapterNumbers ? 1 : 0)
+                                            (chapterNumbers || onChapterNumbersChange ? 1 : 0)
                                         }
                                         data-paper-header-cell
                                         className="p-3 align-middle"
@@ -114,7 +116,7 @@ export function ClassicExamHeader({
                             </tr>
                         );
                     })}
-                    {chapterNumbers && (
+                    {(chapterNumbers || onChapterNumbersChange) && (
                         <tr>
                             <th
                                 scope="row"
@@ -127,7 +129,12 @@ export function ClassicExamHeader({
                                 colSpan={3}
                                 className="break-words px-2 py-1 text-sm font-normal"
                             >
-                                {chapterNumbers}
+                                <RichTextField
+                                    value={chapterNumbers}
+                                    onChange={onChapterNumbersChange ?? (() => {})}
+                                    ariaLabel="Chapters"
+                                    readOnly={!onChapterNumbersChange}
+                                />
                             </td>
                         </tr>
                     )}

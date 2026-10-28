@@ -945,6 +945,8 @@ export interface GeneratedPaper {
     sectioning?: GeneratedPaperSectioning;
     /** Chapter numbers selected during paper setup, including chapters with no printed questions. */
     selectedChapterNumbers?: number[];
+    /** Editable display value for the classic header; selection stays unchanged. */
+    chapterNumbersText?: string;
 }
 
 export function paperChapterNumbers(paper: GeneratedPaper): string {
