@@ -155,7 +155,8 @@ function HeaderValueCell({
     header: GeneratedPaperHeader;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
 }) {
-    const readOnly = field !== 'date' && field !== 'duration';
+    const readOnly =
+        field !== 'date' && field !== 'duration' && field !== 'exam';
 
     return (
         <td className="p-0 align-middle">

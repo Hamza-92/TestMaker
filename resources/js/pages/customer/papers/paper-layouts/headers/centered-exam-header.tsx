@@ -170,7 +170,8 @@ function UnderlineField({
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     className?: string;
 }) {
-    const readOnly = field !== 'date' && field !== 'duration';
+    const readOnly =
+        field !== 'date' && field !== 'duration' && field !== 'type';
 
     return (
         <div className={`flex items-center gap-1 ${className}`}>

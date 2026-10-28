@@ -81,6 +81,7 @@ import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
 import { CenteredExamHeader } from './paper-layouts/headers/centered-exam-header';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
+import { formatPaperHeaderDate } from './paper-layouts/headers/paper-header-date';
 import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { preferredPaperSettings } from './paper-layouts/paper-preferences';
 import type { PaperPreferences } from './paper-layouts/paper-preferences';
@@ -3440,7 +3441,12 @@ function PaperHeader({
         field: keyof GeneratedPaperHeader,
         value: string,
     ) => {
-        if (field === 'date' || field === 'duration') {
+        if (
+            field === 'date' ||
+            field === 'duration' ||
+            field === 'exam' ||
+            field === 'type'
+        ) {
             onChange(field, value);
         }
     };
@@ -14505,6 +14511,7 @@ export function GeneratedPaperView({
     }
 
     function sectionPageBreak(
+        targetPaper: GeneratedPaper,
         logicalSections: GeneratedPaperSection[],
         logicalIndex: number,
     ): ReactNode {
@@ -14522,12 +14529,51 @@ export function GeneratedPaperView({
         }
 
         return (
-            <div
-                data-paper-section-page-break
-                aria-hidden="true"
-                className="h-0 shrink-0"
-                style={{ marginBottom: `-${settings.sectionSpacing}mm` }}
-            />
+            <>
+                <div
+                    data-paper-section-page-break
+                    aria-hidden="true"
+                    className="h-0 shrink-0"
+                    style={{ marginBottom: `-${settings.sectionSpacing}mm` }}
+                />
+                <div
+                    data-paper-continuation-header
+                    className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-y border-black px-1 py-1 leading-snug break-inside-avoid"
+                    style={{ fontSize: `${Math.min(settings.headerSize, 12)}px` }}
+                >
+                    <span className="min-w-0">
+                        <strong>Class: </strong>
+                        <QuestionContent
+                            as="span"
+                            inline
+                            value={targetPaper.header.className}
+                        />
+                    </span>
+                    <span className="min-w-0 break-words">
+                        <strong>Subject: </strong>
+                        <QuestionContent
+                            as="span"
+                            inline
+                            value={targetPaper.header.subject}
+                        />
+                    </span>
+                    <span>
+                        <strong>Marks: </strong>
+                        {paperTotalMarks(targetPaper)}
+                    </span>
+                    <span>
+                        <strong>Time: </strong>
+                        {targetPaper.header.duration}
+                    </span>
+                    <span className="inline-flex shrink-0 items-baseline gap-1 whitespace-nowrap">
+                        <strong>Date: </strong>
+                        <span className="inline-block min-w-[30mm] border-b border-black text-center">
+                            {formatPaperHeaderDate(targetPaper.header.date) ||
+                                '\u00a0'}
+                        </span>
+                    </span>
+                </div>
+            </>
         );
     }
 
@@ -14612,7 +14658,11 @@ export function GeneratedPaperView({
             ) : null;
             const canMoveUp = logicalIndex > 0;
             const canMoveDown = logicalIndex < logicalSections.length - 1;
-            const pageBreak = sectionPageBreak(logicalSections, logicalIndex);
+            const pageBreak = sectionPageBreak(
+                targetPaper,
+                logicalSections,
+                logicalIndex,
+            );
 
             if (
                 section.category === 'Objective Questions' ||
@@ -14724,7 +14774,11 @@ export function GeneratedPaperView({
                 (candidate) => candidate.id === section.id,
             );
             const previousLogicalSection = logicalSections[logicalIndex - 1];
-            const pageBreak = sectionPageBreak(logicalSections, logicalIndex);
+            const pageBreak = sectionPageBreak(
+                targetPaper,
+                logicalSections,
+                logicalIndex,
+            );
             const showPaperSectionHeading = Boolean(
                 targetPaper.sectioning?.active &&
                 settings.showSections &&

@@ -254,14 +254,14 @@ function measure(root: HTMLElement) {
     };
     const blocks = Array.from(
         root.querySelectorAll(
-            '[data-paper-question], tr, [data-paper-header-frame], [data-bubble-sheet] > div > div',
+            '[data-paper-question], tr, [data-paper-header-frame], [data-paper-continuation-header], [data-bubble-sheet] > div > div',
         ),
     )
         .map(interval)
         .filter((rect) => rect.bottom > rect.top);
     // Keep a heading with the beginning of its following question.
     root.querySelectorAll(
-        '[data-paper-heading], [data-paper-federal-section-heading]',
+        '[data-paper-heading], [data-paper-federal-section-heading], [data-paper-continuation-header]',
     ).forEach((heading) => {
         const rect = interval(heading);
         const following = blocks.find((block) => block.top >= rect.bottom - 1);

@@ -70,8 +70,6 @@ export function FormalExamHeader({
                             autoComplete="off"
                             value={header.exam}
                             onChange={(e) => onChange('exam', e.target.value)}
-                            readOnly
-                            tabIndex={-1}
                             className="bg-transparent text-center font-normal outline-none"
                             placeholder="Exam / Year"
                         />
@@ -168,7 +166,8 @@ function LabeledCell({
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     divider?: boolean;
 }) {
-    const readOnly = field !== 'date' && field !== 'duration';
+    const readOnly =
+        field !== 'date' && field !== 'duration' && field !== 'exam';
 
     return (
         <div

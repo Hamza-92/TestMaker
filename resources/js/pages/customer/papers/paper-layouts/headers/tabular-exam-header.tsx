@@ -158,7 +158,8 @@ function InlineField({
     divider?: boolean;
     emptyZero?: boolean;
 }) {
-    const readOnly = field !== 'date' && field !== 'duration';
+    const readOnly =
+        field !== 'date' && field !== 'duration' && field !== 'type';
     const raw = header[field];
     const displayValue =
         emptyZero && (raw === 0 || raw === '0')

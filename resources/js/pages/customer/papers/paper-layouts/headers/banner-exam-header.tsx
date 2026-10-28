@@ -54,8 +54,6 @@ export function BannerExamHeader({
                         autoComplete="off"
                         value={header.exam}
                         onChange={(e) => onChange('exam', e.target.value)}
-                        readOnly
-                        tabIndex={-1}
                         className="w-full bg-transparent text-center text-sm font-normal text-slate-500 outline-none"
                         placeholder="Exam / Year"
                     />
@@ -155,7 +153,8 @@ function InlineField({
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     divider?: boolean;
 }) {
-    const readOnly = field !== 'date' && field !== 'duration';
+    const readOnly =
+        field !== 'date' && field !== 'duration' && field !== 'exam';
 
     return (
         <div
