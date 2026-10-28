@@ -39,6 +39,7 @@ interface Customer {
 
 interface Props {
     customer: Customer;
+    planNames: string[];
     patterns: AccessPattern[];
     classes: AccessClass[];
     subjects: AccessSubject[];
@@ -187,7 +188,7 @@ function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function AddCustomerSubscription({ customer, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
+export default function AddCustomerSubscription({ customer, planNames, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
     const today = new Date().toISOString().slice(0, 10);
     const receiptRef = useRef<HTMLInputElement>(null);
     const [receiptName, setReceiptName] = useState<string | null>(null);
@@ -278,11 +279,16 @@ export default function AddCustomerSubscription({ customer, patterns, classes, s
 
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             <Field label="Plan Name" required error={errors.name}>
-                                <InputWithIcon
-                                    icon={<FileTextIcon />}
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                />
+                                <Select value={data.name} onValueChange={(value) => setData('name', value)}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select plan name" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {planNames.map((name) => (
+                                            <SelectItem key={name} value={name}>{name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </Field>
 
                             <Field label="Amount" required error={errors.amount}>

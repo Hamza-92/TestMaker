@@ -69,7 +69,7 @@ it('creates a subscription without auto-creating a payment record', function () 
     $response = $this
         ->actingAs($admin)
         ->post(route('superadmin.customers.subscriptions.store', $customer), [
-            'name' => 'Starter Plan',
+            'name' => 'Primary',
             'amount' => '1200',
             'allowed_questions' => 250,
             'started_at' => '2026-04-18',
@@ -87,13 +87,42 @@ it('creates a subscription without auto-creating a payment record', function () 
     expect($subscription->payment_due_date)->toBeNull();
 });
 
+it('accepts only the listed plan names for new subscriptions and renames', function () {
+    $admin = makeSuperAdmin();
+    $customer = makeCustomer();
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.customers.subscriptions.store', $customer), [
+            'name' => 'Custom Plan',
+            'amount' => 1000,
+            'started_at' => '2026-04-18',
+            'duration' => 30,
+            'status' => 'active',
+        ])
+        ->assertSessionHasErrors('name');
+
+    $subscription = makeSubscription($customer, $admin);
+
+    $this->actingAs($admin)
+        ->put(route('superadmin.customers.subscriptions.update', [$customer, $subscription]), [
+            'name' => 'Custom Plan',
+            'amount' => 1000,
+            'started_at' => $subscription->started_at->toDateString(),
+            'expired_at' => $subscription->expired_at->toDateString(),
+            'status' => 'active',
+        ])
+        ->assertSessionHasErrors('name');
+
+    expect($subscription->fresh()->name)->toBe('Starter Plan');
+});
+
 it('stores commission on the subscription even without a payment', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
 
     $this->actingAs($admin)
         ->post(route('superadmin.customers.subscriptions.store', $customer), [
-            'name' => 'Starter Plan',
+            'name' => 'Primary',
             'amount' => 1200,
             'commission_amount' => 150,
             'started_at' => '2026-04-18',
@@ -113,7 +142,7 @@ it('keeps commission on the subscription when an initial payment is recorded', f
 
     $this->actingAs($admin)
         ->post(route('superadmin.customers.subscriptions.store', $customer), [
-            'name' => 'Starter Plan',
+            'name' => 'Primary',
             'amount' => 1200,
             'commission_amount' => 150,
             'started_at' => '2026-04-18',

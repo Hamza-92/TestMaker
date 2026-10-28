@@ -25,6 +25,15 @@ use Inertia\Inertia;
 
 class CustomerSubscriptionController extends Controller
 {
+    private const PLAN_NAMES = [
+        'Primary',
+        'Elementary',
+        'Secondary',
+        'Heigher Secondary',
+        'Secondart and Inter',
+        'WorkBooks',
+    ];
+
     public function show(User $customer, Subscription $subscription)
     {
         CustomerAccess::ensureVisible(auth()->user(), $customer);
@@ -247,6 +256,7 @@ class CustomerSubscriptionController extends Controller
 
         return Inertia::render('superadmin/customers/subscriptions/edit', [
             'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
+            'planNames' => self::PLAN_NAMES,
             'subscription' => [
                 'id' => $subscription->id,
                 'name' => $subscription->name,
@@ -281,7 +291,7 @@ class CustomerSubscriptionController extends Controller
         $resources = $this->accessResources();
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', Rule::in([...self::PLAN_NAMES, $subscription->name])],
             'amount' => ['required', 'numeric', 'min:0'],
             'commission_amount' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'is_question_based' => ['boolean'],
@@ -408,6 +418,7 @@ class CustomerSubscriptionController extends Controller
 
         return Inertia::render('superadmin/customers/subscriptions/add', [
             'customer' => $customer->only(['id', 'name', 'email', 'school_name']),
+            'planNames' => self::PLAN_NAMES,
             'patterns' => $resources['patterns'],
             'classes' => $resources['classes'],
             'subjects' => $resources['subjects'],
@@ -428,7 +439,7 @@ class CustomerSubscriptionController extends Controller
         $resources = $this->accessResources();
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', Rule::in(self::PLAN_NAMES)],
             'amount' => ['required', 'integer', 'min:0'],
             'commission_amount' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'is_question_based' => ['boolean'],

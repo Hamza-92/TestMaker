@@ -55,6 +55,7 @@ interface SubscriptionData {
 interface Props {
     customer: Customer;
     subscription: SubscriptionData;
+    planNames: string[];
     patterns: AccessPattern[];
     classes: AccessClass[];
     subjects: AccessSubject[];
@@ -196,7 +197,7 @@ function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function EditCustomerSubscription({ customer, subscription, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
+export default function EditCustomerSubscription({ customer, subscription, planNames, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
     const { data, setData, put, processing, errors } = useForm<FormData>({
         name: subscription.name,
         amount: subscription.amount,
@@ -265,11 +266,19 @@ export default function EditCustomerSubscription({ customer, subscription, patte
 
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             <Field label="Plan Name" required error={errors.name}>
-                                <InputWithIcon
-                                    icon={<FileTextIcon />}
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                />
+                                <Select value={data.name} onValueChange={(value) => setData('name', value)}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select plan name" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {subscription.name && !planNames.includes(subscription.name) && (
+                                            <SelectItem value={subscription.name}>{subscription.name}</SelectItem>
+                                        )}
+                                        {planNames.map((name) => (
+                                            <SelectItem key={name} value={name}>{name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </Field>
 
                             <Field label="Amount" required error={errors.amount}>

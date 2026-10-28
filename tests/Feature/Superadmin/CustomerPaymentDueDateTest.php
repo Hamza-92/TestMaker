@@ -34,7 +34,7 @@ test('paid subscriptions may omit a due date but provided dates must be before e
     $admin = User::factory()->create(['user_type' => UserType::SuperAdmin]);
     $customer = User::factory()->create(['user_type' => UserType::Customer, 'account_type' => 'paid']);
     $payload = [
-        'name' => 'School Plan',
+        'name' => 'Primary',
         'amount' => 1000,
         'started_at' => now()->toDateString(),
         'expired_at' => now()->addMonth()->toDateString(),
@@ -148,7 +148,7 @@ test('editing a subscription does not require a payment due date', function () {
     [$admin, $customer, $subscription] = paymentDueFixture(now('Asia/Karachi')->addWeek()->toDateString());
 
     $this->actingAs($admin)->put(route('superadmin.customers.subscriptions.update', [$customer, $subscription]), [
-        'name' => 'Updated School Plan',
+        'name' => 'Elementary',
         'amount' => 1000,
         'started_at' => $subscription->started_at->toDateString(),
         'expired_at' => $subscription->expired_at->toDateString(),
@@ -156,7 +156,7 @@ test('editing a subscription does not require a payment due date', function () {
         'status' => 'active',
     ])->assertSessionHasNoErrors();
 
-    expect($subscription->fresh()->name)->toBe('Updated School Plan')
+    expect($subscription->fresh()->name)->toBe('Elementary')
         ->and($subscription->fresh()->payment_due_date)->toBeNull();
 });
 
