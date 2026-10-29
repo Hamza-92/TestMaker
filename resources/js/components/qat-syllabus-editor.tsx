@@ -1,13 +1,31 @@
 import { Editor } from '@tinymce/tinymce-react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/tm';
 import { questionTextToEditorHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
-import 'tinymce/tinymce';
-import 'tinymce/icons/default';
-import 'tinymce/models/dom';
-import 'tinymce/themes/silver';
-import 'tinymce/plugins/directionality';
-import 'tinymce/plugins/link';
-import 'tinymce/plugins/lists';
-import 'tinymce/plugins/table';
+
+let editorLoadPromise: Promise<void> | null = null;
+
+function loadEditor() {
+    editorLoadPromise ??= import('tinymce/tinymce')
+        .then(async () => {
+            await Promise.all([
+                import('tinymce/icons/default'),
+                import('tinymce/models/dom'),
+                import('tinymce/themes/silver'),
+                import('tinymce/plugins/directionality'),
+                import('tinymce/plugins/link'),
+                import('tinymce/plugins/lists'),
+                import('tinymce/plugins/table'),
+            ]);
+        })
+        .catch((error: unknown) => {
+            editorLoadPromise = null;
+
+            throw error;
+        });
+
+    return editorLoadPromise;
+}
 
 export default function QatSyllabusEditor({
     value,
@@ -16,6 +34,63 @@ export default function QatSyllabusEditor({
     value: string;
     onChange: (value: string) => void;
 }) {
+    const [editorStatus, setEditorStatus] = useState<
+        'loading' | 'ready' | 'error'
+    >('loading');
+    const [loadAttempt, setLoadAttempt] = useState(0);
+
+    useEffect(() => {
+        let cancelled = false;
+        void loadEditor().then(
+            () => {
+                if (!cancelled) {
+                    setEditorStatus('ready');
+                }
+            },
+            () => {
+                if (!cancelled) {
+                    setEditorStatus('error');
+                }
+            },
+        );
+
+        return () => {
+            cancelled = true;
+        };
+    }, [loadAttempt]);
+
+    if (editorStatus === 'error') {
+        return (
+            <div
+                role="alert"
+                className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+            >
+                Could not load the syllabus editor.
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                        setEditorStatus('loading');
+                        setLoadAttempt((attempt) => attempt + 1);
+                    }}
+                >
+                    Retry
+                </Button>
+            </div>
+        );
+    }
+
+    if (editorStatus === 'loading') {
+        return (
+            <div
+                role="status"
+                aria-label="Loading syllabus editor"
+                className="h-80 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800"
+            />
+        );
+    }
+
     return (
         <Editor
             id="qat-syllabus-description"
