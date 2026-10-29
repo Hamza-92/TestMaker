@@ -119,6 +119,15 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertJsonMissingPath('questions.data.0.objective_answers')
         ->assertJsonMissingPath('questions.data.0.options.0.is_correct');
 
+    $this->actingAs($school)->postJson(route('customer.qat.questions'), [
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [4, 5],
+    ])->assertUnprocessable()->assertJsonValidationErrors('months');
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Multiple months', 'mode' => 'auto', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [4, 5],
+        'template_id' => $templateId,
+    ])->assertUnprocessable()->assertJsonValidationErrors('months');
+
     $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Multiple classes', 'mode' => 'auto', 'class_ids' => [$classId, $classId],
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
@@ -215,7 +224,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
 
     $variantSave = $saveGenerated([
         'name' => 'Two variants', 'mode' => 'auto', 'class_ids' => [$classId],
-        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [4, 5],
+        'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId, $mayId],
         'template_id' => $templateId, 'variants' => 2,
     ]);
     expect($variantSave['paper_ids'])->toHaveCount(2);

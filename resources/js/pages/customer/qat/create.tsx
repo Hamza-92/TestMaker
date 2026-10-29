@@ -221,7 +221,6 @@ export default function QatCreate({
                     ? [
                           {
                               id: subject.id,
-                              name: `${subject.class_name} · ${subject.name}`,
                               description,
                           },
                       ]
@@ -936,7 +935,7 @@ export default function QatCreate({
                                     </strong>
                                     <span className="mt-1 block text-xs text-slate-500">
                                         Use chapters mapped to selected
-                                        preparation months.
+                                        preparation month.
                                     </span>
                                 </button>
                             </div>
@@ -961,54 +960,23 @@ export default function QatCreate({
                                     </label>
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <h3 className="text-sm font-semibold">
-                                            Preparation months
+                                            Preparation month
                                         </h3>
-                                        <label className={selectAllClass}>
-                                            <input
-                                                type="checkbox"
-                                                className="size-4 accent-brand-600"
-                                                checked={
-                                                    monthChoices.length > 0 &&
-                                                    monthChoices.every(
-                                                        (month) =>
-                                                            months.includes(
-                                                                month,
-                                                            ),
-                                                    )
-                                                }
-                                                disabled={!monthChoices.length}
-                                                onChange={(event) =>
-                                                    setMonths(
-                                                        event.target.checked
-                                                            ? monthChoices
-                                                            : [],
-                                                    )
-                                                }
-                                            />
-                                            Select all months
-                                        </label>
                                     </div>
-                                    <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                                    <div
+                                        className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4"
+                                        role="group"
+                                        aria-label="Preparation month"
+                                    >
                                         {monthChoices.map((month) => (
                                             <button
                                                 type="button"
                                                 key={month}
+                                                aria-pressed={months.includes(
+                                                    month,
+                                                )}
                                                 onClick={() =>
-                                                    setMonths((current) =>
-                                                        current.includes(month)
-                                                            ? current.filter(
-                                                                  (item) =>
-                                                                      item !==
-                                                                      month,
-                                                              )
-                                                            : [
-                                                                  ...current,
-                                                                  month,
-                                                              ].sort(
-                                                                  (a, b) =>
-                                                                      a - b,
-                                                              ),
-                                                    )
+                                                    setMonths([month])
                                                 }
                                                 className={`rounded-lg border px-3 py-2 text-sm ${months.includes(month) ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
                                             >
@@ -1040,13 +1008,6 @@ export default function QatCreate({
                                                                         }
                                                                         className="min-w-0 space-y-1 text-sm text-slate-700 dark:text-slate-200"
                                                                     >
-                                                                        <span className="block font-medium">
-                                                                            {
-                                                                                book.name
-                                                                            }
-
-                                                                            :{' '}
-                                                                        </span>
                                                                         <div
                                                                             dir="auto"
                                                                             className="max-w-full overflow-x-auto"
