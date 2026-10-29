@@ -168,16 +168,6 @@ function QatTypeHeading({
                 <span dir="ltr" className="block whitespace-nowrap">
                     {marksLabel}
                 </span>
-                {required < count && (
-                    <span className="block text-[0.85em] font-medium">
-                        Attempt any {required} of {count}
-                        {urdu && (
-                            <span lang="ur" dir="rtl" className="block">
-                                {count} میں سے کوئی {required} حل کریں
-                            </span>
-                        )}
-                    </span>
-                )}
             </div>
             {urdu && (
                 <div dir="rtl" lang="ur" className="min-w-0 text-right">
