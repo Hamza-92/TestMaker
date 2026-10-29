@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { Switch } from '@/components/ui/switch';
+import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { QatQuestionStatement } from './question';
 import type { QatQuestion } from './question';
 
@@ -1037,20 +1038,26 @@ export default function QatCreate({
                                                                         key={
                                                                             book.id
                                                                         }
-                                                                        className="text-sm text-slate-700 dark:text-slate-200"
+                                                                        className="min-w-0 space-y-1 text-sm text-slate-700 dark:text-slate-200"
                                                                     >
-                                                                        <span className="font-medium">
+                                                                        <span className="block font-medium">
                                                                             {
                                                                                 book.name
                                                                             }
 
                                                                             :{' '}
                                                                         </span>
-                                                                        <span className="whitespace-pre-line">
-                                                                            {
-                                                                                book.description
-                                                                            }
-                                                                        </span>
+                                                                        <div
+                                                                            dir="auto"
+                                                                            className="max-w-full overflow-x-auto"
+                                                                        >
+                                                                            <QuestionContent
+                                                                                value={
+                                                                                    book.description
+                                                                                }
+                                                                                className="break-words [&_h2]:text-lg [&_h2]:font-semibold [&_p+p]:mt-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 dark:[&_td]:border-slate-600 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2 [&_th]:font-semibold dark:[&_th]:border-slate-600"
+                                                                            />
+                                                                        </div>
                                                                     </div>
                                                                 ),
                                                             )
@@ -1933,44 +1940,28 @@ export default function QatCreate({
                                 )}
                             </dl>
 
-                            {targetSubject && targetCoverage.length > 0 && (
-                                <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {syllabus === 'qat'
-                                            ? months
-                                                  .filter((month) =>
-                                                      monthChoices.includes(
-                                                          month,
-                                                      ),
-                                                  )
-                                                  .map((month) => (
-                                                      <span
-                                                          key={month}
-                                                          className="rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
-                                                      >
-                                                          {MONTHS[month - 1]}
-                                                      </span>
-                                                  ))
-                                            : targetCoverage
-                                                  .slice(0, 3)
-                                                  .map((chapter) => (
-                                                      <span
-                                                          key={chapter.id}
-                                                          className="max-w-full truncate rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
-                                                      >
-                                                          {chapter.name}
-                                                      </span>
-                                                  ))}
-                                        {syllabus === 'custom' &&
-                                            targetCoverage.length > 3 && (
-                                                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                                    +{targetCoverage.length - 3}{' '}
-                                                    more
-                                                </span>
-                                            )}
+                            {targetSubject &&
+                                syllabus === 'qat' &&
+                                targetCoverage.length > 0 && (
+                                    <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {months
+                                                .filter((month) =>
+                                                    monthChoices.includes(
+                                                        month,
+                                                    ),
+                                                )
+                                                .map((month) => (
+                                                    <span
+                                                        key={month}
+                                                        className="rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
+                                                    >
+                                                        {MONTHS[month - 1]}
+                                                    </span>
+                                                ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
                             <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
                                 <div className="flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3 dark:bg-brand-500/10">

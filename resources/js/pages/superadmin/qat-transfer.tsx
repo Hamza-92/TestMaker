@@ -1,6 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Badge,
     Button,
@@ -10,6 +10,10 @@ import {
     SearchInput,
 } from '@/components/tm';
 import { selectClass } from './qat-catalogue/shared';
+
+const QatSyllabusEditor = lazy(
+    () => import('@/components/qat-syllabus-editor'),
+);
 
 type Source = {
     id: number;
@@ -450,20 +454,35 @@ export default function QatTransfer({
                             </select>
                         </label>
                     </div>
-                    <label className="block space-y-1 text-sm">
-                        Syllabus description for {MONTHS[data.month - 1]}
-                        <textarea
-                            className="min-h-28 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                            rows={4}
-                            maxLength={5000}
-                            value={data.description}
-                            placeholder="Describe the topics covered by this month's syllabus"
-                            onChange={(event) => {
-                                editedDescriptionScope.current =
-                                    descriptionScopeKey;
-                                setData('description', event.target.value);
-                            }}
-                        />
+                    <div
+                        className="space-y-2 text-sm"
+                        role="group"
+                        aria-labelledby="qat-syllabus-label"
+                    >
+                        <label
+                            id="qat-syllabus-label"
+                            htmlFor="qat-syllabus-description"
+                        >
+                            Syllabus description for {MONTHS[data.month - 1]}
+                        </label>
+                        <Suspense
+                            fallback={
+                                <div
+                                    className="h-80 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800"
+                                    aria-label="Loading syllabus editor"
+                                />
+                            }
+                        >
+                            <QatSyllabusEditor
+                                key={descriptionScopeKey}
+                                value={data.description}
+                                onChange={(value) => {
+                                    editedDescriptionScope.current =
+                                        descriptionScopeKey;
+                                    setData('description', value);
+                                }}
+                            />
+                        </Suspense>
                         <span className="block text-xs text-slate-500 dark:text-slate-400">
                             Shown to customers when they select this month for
                             this QAT book.
@@ -473,7 +492,7 @@ export default function QatTransfer({
                                 {errors.description}
                             </span>
                         )}
-                    </label>
+                    </div>
                     {descriptionErrorKey === descriptionScopeKey && (
                         <div className="flex items-center gap-2 text-sm text-red-600">
                             Could not load the existing description.

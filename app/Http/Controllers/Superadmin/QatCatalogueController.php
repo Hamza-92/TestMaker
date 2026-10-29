@@ -111,7 +111,7 @@ class QatCatalogueController extends Controller
         $data = $request->validate([
             'academic_year' => ['required', 'regex:/^20\d{2}-\d{2}$/'],
             'month' => ['required', 'integer', 'between:1,12'],
-            'description' => ['nullable', 'string', 'max:5000'],
+            'description' => ['nullable', 'string', 'max:15000'],
             'source_pattern_id' => ['required', 'integer', 'exists:patterns,id'],
             'class_id' => ['required', 'integer', 'exists:classes,id'],
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],

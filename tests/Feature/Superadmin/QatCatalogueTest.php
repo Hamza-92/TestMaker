@@ -82,13 +82,22 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
         'subject_id' => $subject->id,
     ]))->assertOk()->assertJsonPath('description', 'Plants and their functions.');
 
+    $richDescription = '<h3>April syllabus</h3><p><strong>Plants</strong> and their functions.</p><table><tbody>'.str_repeat('<tr><td>Chapter 1</td><td>Plants and growth</td></tr>', 110).'</tbody></table>';
     $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
-        ...$payload, 'description' => 'Updated monthly syllabus.', 'question_ids' => [$second->id],
+        ...$payload, 'description' => $richDescription, 'question_ids' => [$second->id],
     ])->assertSessionHasNoErrors();
     expect(DB::table('qat_questions')->orderBy('source_question_id')->pluck('source_question_id')->all())
         ->toBe([$first->id, $second->id])
         ->and(DB::table('qat_chapter_months')->count())->toBe(1)
-        ->and(DB::table('qat_month_syllabi')->value('description'))->toBe('Updated monthly syllabus.');
+        ->and(DB::table('qat_month_syllabi')->value('description'))->toBe($richDescription);
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', [
+        'academic_year' => $payload['academic_year'], 'month' => $payload['month'],
+        'source_pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+    ]))->assertOk()->assertJsonPath('description', $richDescription);
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'description' => str_repeat('x', 15001), 'question_ids' => [$second->id],
+    ])->assertSessionHasErrors('description');
+    expect(DB::table('qat_month_syllabi')->value('description'))->toBe($richDescription);
 
     $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
         ...$payload, 'description' => null, 'question_ids' => [$first->id],
