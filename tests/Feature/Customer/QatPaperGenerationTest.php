@@ -6,10 +6,31 @@ use App\Models\QuestionType;
 use App\Models\QuestionTypeHeading;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\Qat\QatPaperBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
+
+test('QAT paper answer keys support true false and multipart objective options', function () {
+    $builder = app(QatPaperBuilder::class);
+    $question = (object) [
+        'id' => 1, 'chapter_id' => 1, 'chapter_name' => 'Chapter', 'topic_name' => null,
+        'question_type_id' => 1, 'type_name' => 'Objective', 'is_objective' => true,
+        'question_data' => json_encode(['content' => ['correct_boolean' => 'false']]),
+    ];
+    $presented = $builder->presentQuestion($question, true);
+    expect($presented['objective_answers']['options'])->toBe([1])
+        ->and($presented['content'])->not->toHaveKey('correct_boolean');
+
+    $question->question_data = json_encode(['content' => ['items' => [
+        ['options' => [['text_en' => 'A', 'is_correct' => false], ['text_en' => 'B', 'is_correct' => true]]],
+        ['options' => [['text_en' => 'C', 'is_correct' => true]]],
+    ]]]);
+    $presented = $builder->presentQuestion($question, true);
+    expect($presented['objective_answers']['items'])->toBe([[1], [0]])
+        ->and($presented['content']['items'][0]['options'][1])->not->toHaveKey('is_correct');
+});
 
 test('QAT paper generation uses only selected monthly chapters and saves a printable paper', function () {
     $school = User::factory()->create(['user_type' => UserType::Customer->value, 'account_type' => 'paid']);
@@ -95,6 +116,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertJsonPath('questions.data.0.chapter_name', 'May chapter')
         ->assertJsonPath('questions.data.0.source_label', 'Exercise')
         ->assertJsonMissingPath('questions.data.0.answer_en')
+        ->assertJsonMissingPath('questions.data.0.objective_answers')
         ->assertJsonMissingPath('questions.data.0.options.0.is_correct');
 
     $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
@@ -106,9 +128,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     $generation = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Monthly QAT', 'mode' => 'auto', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
-        'minutes' => 200, 'template_id' => $templateId, 'sections' => [[
-            'question_type_id' => $type->id, 'quantity' => 1, 'marks' => 1,
-        ]],
+        'template_id' => $templateId,
     ])->assertCreated();
     $previewId = basename($generation->json('preview_url'));
     expect(QatPaper::query()->count())->toBe(0);
@@ -118,6 +138,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->where('previewId', $previewId)
         ->where('schoolDetails.name', 'Sample School')
         ->where('schoolDetails.logo', 'school-logos/sample.png')
+        ->where('paper.paper_data.sections.0.questions.0.objective_answers.options', [0])
         ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
         ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں')
         ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
@@ -140,11 +161,18 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
             ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
     $legacyData = $paper->paper_data;
     unset($legacyData['sections'][0]['heading_en'], $legacyData['sections'][0]['heading_ur']);
+    unset($legacyData['sections'][0]['questions'][0]['objective_answers']);
     $paper->update(['paper_data' => $legacyData]);
+    $originalQuestionData = DB::table('qat_questions')->where('id', $mayQuestionId)->value('question_data');
+    $updatedQuestionData = json_decode($originalQuestionData, true);
+    array_unshift($updatedQuestionData['options'], ['text_en' => 'New option', 'is_correct' => false]);
+    DB::table('qat_questions')->where('id', $mayQuestionId)->update(['question_data' => json_encode($updatedQuestionData)]);
     $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
         ->assertInertia(fn ($page) => $page
+            ->where('paper.paper_data.sections.0.questions.0.objective_answers.options', [0])
             ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
             ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں'));
+    DB::table('qat_questions')->where('id', $mayQuestionId)->update(['question_data' => $originalQuestionData]);
     $otherSchool = User::factory()->create(['user_type' => UserType::Customer->value, 'account_type' => 'paid']);
     Subscription::create([
         'user_id' => $otherSchool->id, 'name' => 'Other QAT plan', 'amount' => 1000,
@@ -232,8 +260,32 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertOk()->assertInertia(fn ($page) => $page
         ->where('paper.question_count', 3)
         ->where('paper.total_marks', 4)
+        ->where('paper.paper_data.is_pef_pattern', true)
         ->where('paper.paper_data.sections.0.required_questions', 2)
         ->has('paper.paper_data.sections.0.questions', 3));
+
+    $customPayload = [
+        'name' => 'Edited QAT template', 'mode' => 'auto', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
+        'template_id' => $templateId, 'minutes' => 50,
+        'sections' => [['question_type_id' => $type->id, 'quantity' => 4, 'required_questions' => 3, 'marks' => 1.5]],
+    ];
+    $customGeneration = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), $customPayload)->assertCreated();
+    $this->actingAs($school)->get($customGeneration->json('preview_url'))->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('paper.question_count', 4)->where('paper.total_marks', 4.5)
+            ->where('paper.paper_data.minutes', 50)->where('paper.paper_data.is_pef_pattern', false)
+            ->where('paper.paper_data.sections.0.required_questions', 3));
+    $customPayload['template_id'] = null;
+    $customGeneration = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), $customPayload)->assertCreated();
+    $this->actingAs($school)->get($customGeneration->json('preview_url'))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('paper.paper_data.template', null)->where('paper.paper_data.is_pef_pattern', false));
+    $customPayload['sections'][0]['required_questions'] = 5;
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), $customPayload)
+        ->assertUnprocessable()->assertJsonValidationErrors('sections');
+    $customPayload['sections'] = [];
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), $customPayload)
+        ->assertUnprocessable()->assertJsonValidationErrors('sections');
 
     $sourcePatternId = DB::table('patterns')->insertGetId(['name' => 'QAT source', 'created_at' => now(), 'updated_at' => now()]);
     $sourceClassId = DB::table('classes')->insertGetId(['name' => 'QAT source class', 'created_at' => now(), 'updated_at' => now()]);
@@ -308,7 +360,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Missing template', 'mode' => 'auto', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
-    ])->assertUnprocessable()->assertJsonValidationErrors('template_id');
+    ])->assertUnprocessable()->assertJsonValidationErrors('minutes');
     DB::table('qat_paper_templates')->where('id', $templateId)->update([
         'sections' => json_encode([
             ['question_type_id' => $subjective->id, 'quantity' => 1, 'marks' => 3],

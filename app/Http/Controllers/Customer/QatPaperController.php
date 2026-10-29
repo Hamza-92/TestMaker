@@ -92,6 +92,7 @@ class QatPaperController extends Controller
             'sections' => ['array', 'max:20'],
             'sections.*.question_type_id' => ['required', 'integer', 'distinct'],
             'sections.*.quantity' => ['required', 'integer', 'between:1,100'],
+            'sections.*.required_questions' => ['sometimes', 'required', 'integer', 'between:1,100'],
             'sections.*.marks' => ['required', 'numeric', 'between:0.5,20'],
             'manual_questions' => ['array', 'max:100'],
             'manual_questions.*.id' => ['required', 'integer', 'distinct'],
@@ -104,17 +105,30 @@ class QatPaperController extends Controller
             $data['chapter_ids'] ?? [], $data['months'] ?? [],
         );
         $template = null;
+        $templateSections = [];
+        $isPefPattern = false;
         if ($data['mode'] === 'auto') {
-            $template = DB::table('qat_paper_templates')
-                ->where('id', $data['template_id'] ?? 0)
-                ->where('qat_subject_id', $subject->id)
-                ->where('status', true)->first();
-            if (! $template) {
-                throw ValidationException::withMessages(['template_id' => 'Select an active template for this QAT book.']);
+            if (! empty($data['template_id'])) {
+                $template = DB::table('qat_paper_templates')
+                    ->where('id', $data['template_id'] ?? 0)
+                    ->where('qat_subject_id', $subject->id)
+                    ->where('status', true)->first();
+                if (! $template) {
+                    throw ValidationException::withMessages(['template_id' => 'Select an active template for this QAT book.']);
+                }
+                $templateSections = json_decode($template->sections, true) ?: [];
             }
-            $data['sections'] = json_decode($template->sections, true) ?: [];
-            $data['minutes'] = (int) $template->minutes;
-        } elseif (empty($data['minutes'])) {
+            $data['sections'] = $data['sections'] ?? $templateSections;
+            $data['minutes'] = $data['minutes'] ?? $template?->minutes;
+            $normalize = fn (array $sections) => collect($sections)->map(fn ($section) => [
+                'question_type_id' => (int) $section['question_type_id'],
+                'quantity' => (int) $section['quantity'],
+                'required_questions' => (int) ($section['required_questions'] ?? $section['quantity']),
+                'marks' => (float) $section['marks'],
+            ])->sortBy('question_type_id')->values()->all();
+            $isPefPattern = $template !== null && (int) $data['minutes'] === (int) $template->minutes && $normalize($data['sections']) === $normalize($templateSections);
+        }
+        if (empty($data['minutes'])) {
             throw ValidationException::withMessages(['minutes' => 'Enter the paper duration.']);
         }
         $classIds = array_values(array_unique(array_map('intval', $data['class_ids'])));
@@ -168,7 +182,7 @@ class QatPaperController extends Controller
                         ...($typeHeadings[$typeId] ?? []),
                         'required_questions' => $required,
                         'questions' => $picked->map(fn ($row) => [
-                            ...$builder->presentQuestion($row), 'marks' => (float) $section['marks'],
+                            ...$builder->presentQuestion($row, true), 'marks' => (float) $section['marks'],
                         ])->values()->all(),
                     ];
                 }
@@ -189,7 +203,7 @@ class QatPaperController extends Controller
                     'title' => $pool->get($items->first()['id'])->type_name ?: 'Question type '.$typeId,
                     ...($typeHeadings[(int) $typeId] ?? []),
                     'questions' => $items->map(fn ($item) => [
-                        ...$builder->presentQuestion($pool->get($item['id'])),
+                        ...$builder->presentQuestion($pool->get($item['id']), true),
                         'marks' => (float) $item['marks'],
                     ])->values()->all(),
                 ])->values()->all();
@@ -213,9 +227,9 @@ class QatPaperController extends Controller
                 'class_ids' => $classIds,
                 'class_name' => $subject->class_name,
                 'subject_name' => $subject->subject_name,
-                'total_marks' => $data['mode'] === 'auto'
+                'total_marks' => round($data['mode'] === 'auto'
                     ? collect($sections)->sum(fn ($section) => (int) $section['required_questions'] * (float) ($section['questions'][0]['marks'] ?? 0))
-                    : $questions->sum('marks'),
+                    : $questions->sum('marks'), 2),
                 'question_count' => $questions->count(),
                 'paper_data' => [
                     'class_id' => (int) $subject->class_id,
@@ -225,11 +239,12 @@ class QatPaperController extends Controller
                     'months' => $data['syllabus'] === 'qat' ? $data['months'] : [],
                     'chapter_ids' => $chapters->pluck('id')->all(),
                     'minutes' => (int) $data['minutes'],
+                    'is_pef_pattern' => $isPefPattern,
                     'template' => $template ? [
                         'id' => (int) $template->id,
                         'name' => $template->name,
                         'category' => $template->category,
-                        'sections' => $data['sections'],
+                        'sections' => $templateSections,
                     ] : null,
                     'variant' => count($prepared) > 1 ? chr(65 + $index) : null,
                     'sections' => $sections,
@@ -249,9 +264,10 @@ class QatPaperController extends Controller
         ], 201);
     }
 
-    public function preview(Request $request, string $preview): Response
+    public function preview(Request $request, string $preview, QatPaperBuilder $builder): Response
     {
         $papers = $this->previewPapers($request, $preview);
+        $papers = array_map(fn ($paper) => [...$paper, 'paper_data' => $builder->withObjectiveAnswers($paper['paper_data'])], $papers);
 
         return Inertia::render('customer/qat/paper', [
             'paper' => $papers[0],
@@ -317,7 +333,7 @@ class QatPaperController extends Controller
                 'total_marks' => $qatPaper->total_marks,
                 'question_count' => $qatPaper->question_count,
                 'created_at' => $qatPaper->created_at?->toISOString(),
-                'paper_data' => $paperData,
+                'paper_data' => $builder->withObjectiveAnswers($paperData),
             ],
             'schoolDetails' => $this->schoolDetails($request),
         ]);

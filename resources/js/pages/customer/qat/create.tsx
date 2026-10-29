@@ -66,6 +66,24 @@ type QatTemplate = {
     }[];
 };
 type ManualChoice = { question: QatQuestion; marks: number };
+type AutoSection = {
+    question_type_id: number;
+    quantity: number;
+    required_questions: number;
+    marks: number;
+};
+
+function normalizedSections(sections: QatTemplate['sections']) {
+    return sections
+        .filter((row) => row.quantity > 0)
+        .map((row) => ({
+            question_type_id: row.question_type_id,
+            quantity: row.quantity,
+            required_questions: row.required_questions ?? row.quantity,
+            marks: row.marks,
+        }))
+        .sort((a, b) => a.question_type_id - b.question_type_id);
+}
 
 const MONTHS = [
     'January',
@@ -141,6 +159,7 @@ export default function QatCreate({
     const [typeFilter, setTypeFilter] = useState('');
     const [selectedOnly, setSelectedOnly] = useState(false);
     const [templateId, setTemplateId] = useState<number | null>(null);
+    const [autoSections, setAutoSections] = useState<AutoSection[]>([]);
     const [manual, setManual] = useState<Record<number, ManualChoice>>({});
     const [name, setName] = useState('QAT Practice Paper');
     const [minutes, setMinutes] = useState(40);
@@ -226,8 +245,7 @@ export default function QatCreate({
     );
     const selectedTemplate =
         availableTemplates.find((item) => item.id === templateId) ?? null;
-    const paperMinutes =
-        mode === 'auto' ? (selectedTemplate?.minutes ?? 0) : minutes;
+    const paperMinutes = minutes;
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
     const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
@@ -262,7 +280,22 @@ export default function QatCreate({
                           .toLocaleLowerCase()
                           .includes(searchTerm)),
           );
-    const autoRows = (selectedTemplate?.sections ?? [])
+    const autoRows = [
+        ...autoSections,
+        ...(pool?.types ?? [])
+            .filter(
+                (type) =>
+                    !autoSections.some(
+                        (row) => row.question_type_id === type.id,
+                    ),
+            )
+            .map((type) => ({
+                question_type_id: type.id,
+                quantity: 0,
+                required_questions: 0,
+                marks: type.is_objective ? 1 : 2,
+            })),
+    ]
         .map((section) => {
             const type = pool?.types.find(
                 (item) => item.id === section.question_type_id,
@@ -280,12 +313,32 @@ export default function QatCreate({
                 (typeRanks.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
                 (typeRanks.get(right.id) ?? Number.MAX_SAFE_INTEGER),
         );
+    const activeAutoRows = autoRows.filter((row) => row.quantity > 0);
+    const isPefPattern =
+        selectedTemplate !== null &&
+        minutes === selectedTemplate.minutes &&
+        JSON.stringify(normalizedSections(autoRows)) ===
+            JSON.stringify(normalizedSections(selectedTemplate.sections));
     const templateHasEnoughQuestions =
-        autoRows.length > 0 &&
-        autoRows.every((row) => row.available >= row.quantity);
-    const variantsHaveEnoughQuestions =
-        autoRows.length > 0 &&
+        activeAutoRows.length > 0 &&
         autoRows.every(
+            (row) => Number.isInteger(row.quantity) && row.quantity >= 0,
+        ) &&
+        activeAutoRows.every(
+            (row) =>
+                row.available >= row.quantity &&
+                Number.isInteger(row.quantity) &&
+                row.quantity <= 100 &&
+                Number.isInteger(row.required_questions) &&
+                row.required_questions >= 1 &&
+                row.required_questions <= row.quantity &&
+                row.marks >= 0.5 &&
+                row.marks <= 20,
+        ) &&
+        activeAutoRows.reduce((sum, row) => sum + row.quantity, 0) <= 100;
+    const variantsHaveEnoughQuestions =
+        activeAutoRows.length > 0 &&
+        activeAutoRows.every(
             (row) =>
                 row.available >= row.quantity * (allowRepeat ? 1 : variants),
         );
@@ -312,23 +365,29 @@ export default function QatCreate({
                   name: type.name,
                   count: type.quantity,
                   required: type.required_questions ?? type.quantity,
-                  marks:
-                      (type.required_questions ?? type.quantity) * type.marks,
+                  marks: Number(
+                      (
+                          (type.required_questions ?? type.quantity) *
+                          type.marks
+                      ).toFixed(2),
+                  ),
               }))
             : manualRows.map((row) => ({ ...row, required: row.count }));
     const totalQuestions =
         mode === 'auto'
             ? autoRows.reduce((total, type) => total + type.quantity, 0)
             : selectedManual.length;
-    const totalMarks =
-        mode === 'auto'
+    const totalMarks = Number(
+        (mode === 'auto'
             ? autoRows.reduce(
                   (total, type) =>
                       total +
                       (type.required_questions ?? type.quantity) * type.marks,
                   0,
               )
-            : selectedManual.reduce((total, item) => total + item.marks, 0);
+            : selectedManual.reduce((total, item) => total + item.marks, 0)
+        ).toFixed(2),
+    );
     useEffect(() => {
         setPool(null);
         setPoolScopeKey('');
@@ -424,6 +483,45 @@ export default function QatCreate({
         poolScopeKey,
     ]);
 
+    function updateAutoSection(
+        id: number,
+        field: 'quantity' | 'required_questions' | 'marks',
+        value: number,
+    ) {
+        const rows = autoRows.map((row) => ({
+            question_type_id: row.id,
+            quantity: row.quantity,
+            required_questions: row.required_questions,
+            marks: row.marks,
+        }));
+        setAutoSections(
+            rows.map((row) => {
+                if (row.question_type_id !== id) {
+                    return row;
+                }
+
+                if (field === 'quantity') {
+                    return {
+                        ...row,
+                        quantity: value,
+                        required_questions:
+                            row.quantity === 0
+                                ? value
+                                : Math.min(row.required_questions, value),
+                    };
+                }
+
+                return {
+                    ...row,
+                    [field]:
+                        field === 'marks'
+                            ? value / Math.max(row.required_questions, 1)
+                            : value,
+                };
+            }),
+        );
+    }
+
     function toggleClass(id: number) {
         if (classIds[0] === id) {
             return;
@@ -434,6 +532,7 @@ export default function QatCreate({
         setChapterIds([]);
         setMonths([]);
         setTemplateId(null);
+        setAutoSections([]);
         setTypeFilter('');
         setQuestionSearch('');
     }
@@ -447,6 +546,7 @@ export default function QatCreate({
         setChapterIds([]);
         setMonths([]);
         setTemplateId(null);
+        setAutoSections([]);
         setTypeFilter('');
         setQuestionSearch('');
     }
@@ -476,9 +576,7 @@ export default function QatCreate({
         !poolError &&
         poolScopeKey === questionScopeKey &&
         (mode !== 'auto' ||
-            (selectedTemplate !== null &&
-                templateHasEnoughQuestions &&
-                variantsHaveEnoughQuestions)) &&
+            (templateHasEnoughQuestions && variantsHaveEnoughQuestions)) &&
         name.trim().length > 0 &&
         paperMinutes >= 10 &&
         paperMinutes <= 240;
@@ -512,6 +610,10 @@ export default function QatCreate({
                     months: syllabus === 'qat' ? months : [],
                     minutes: paperMinutes,
                     template_id: mode === 'auto' ? selectedTemplate?.id : null,
+                    sections:
+                        mode === 'auto'
+                            ? normalizedSections(activeAutoRows)
+                            : [],
                     variants: mode === 'auto' ? variants : 1,
                     allow_repeat: mode === 'auto' && allowRepeat,
                     manual_questions:
@@ -1076,11 +1178,19 @@ export default function QatCreate({
                                                                 selectedTemplate?.id ===
                                                                 template.id
                                                             }
-                                                            onClick={() =>
+                                                            onClick={() => {
                                                                 setTemplateId(
                                                                     template.id,
-                                                                )
-                                                            }
+                                                                );
+                                                                setAutoSections(
+                                                                    normalizedSections(
+                                                                        template.sections,
+                                                                    ),
+                                                                );
+                                                                setMinutes(
+                                                                    template.minutes,
+                                                                );
+                                                            }}
                                                             className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selectedTemplate?.id === template.id ? 'border-brand-500 bg-brand-50 shadow-sm dark:bg-brand-500/10' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}
                                                         >
                                                             <div className="flex items-start justify-between gap-3">
@@ -1198,7 +1308,6 @@ export default function QatCreate({
                                             <EmptyState
                                                 icon={FileTextIcon}
                                                 title="No templates for this book"
-                                                hint="Ask your administrator to add an active QAT template."
                                             />
                                         )}
                                     </div>
@@ -1431,12 +1540,27 @@ export default function QatCreate({
                     )}
 
                     {poolScopeKey === questionScopeKey &&
-                        totalQuestions > 0 && (
+                        (mode === 'auto' || totalQuestions > 0) && (
                             <>
-                                <div>
-                                    <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-6 dark:border-slate-700">
+                                    <h2 className="text-lg font-semibold">
                                         Review paper
                                     </h2>
+                                    {mode === 'auto' && (
+                                        <div className="flex items-center gap-3">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setTemplateId(null);
+                                                    setAutoSections([]);
+                                                    setMinutes(40);
+                                                }}
+                                            >
+                                                Clear
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
@@ -1476,33 +1600,21 @@ export default function QatCreate({
                                             }
                                         />
                                     </label>
-                                    {mode === 'auto' ? (
-                                        <div className="space-y-1 text-xs font-semibold text-slate-600">
-                                            Duration
-                                            <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                                                {paperMinutes} minutes ·{' '}
-                                                {selectedTemplate?.name}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                            Duration (minutes)
-                                            <input
-                                                type="number"
-                                                min="10"
-                                                max="240"
-                                                className={inputClass}
-                                                value={minutes}
-                                                onChange={(event) =>
-                                                    setMinutes(
-                                                        Number(
-                                                            event.target.value,
-                                                        ),
-                                                    )
-                                                }
-                                            />
-                                        </label>
-                                    )}
+                                    <label className="space-y-1 text-xs font-semibold text-slate-600">
+                                        Duration (minutes)
+                                        <input
+                                            type="number"
+                                            min="10"
+                                            max="240"
+                                            className={inputClass}
+                                            value={minutes}
+                                            onChange={(event) =>
+                                                setMinutes(
+                                                    Number(event.target.value),
+                                                )
+                                            }
+                                        />
+                                    </label>
                                 </div>
                                 {mode === 'auto' && (
                                     <div className="grid gap-3 sm:grid-cols-2">
@@ -1547,6 +1659,7 @@ export default function QatCreate({
                                     </div>
                                 )}
                                 {mode === 'auto' &&
+                                    totalQuestions > 0 &&
                                     !variantsHaveEnoughQuestions && (
                                         <p className="text-sm text-amber-700 dark:text-amber-400">
                                             This syllabus does not have enough
@@ -1554,53 +1667,155 @@ export default function QatCreate({
                                             paper variants.
                                         </p>
                                     )}
-                                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
-                                        <span>Question type</span>
-                                        <span className="text-right">
-                                            Total
-                                        </span>
-                                        <span className="text-right">
-                                            Required
-                                        </span>
-                                        <span className="text-right">
-                                            Marks
-                                        </span>
-                                    </div>
-                                    {reviewRows.map((row) => (
-                                        <div
-                                            key={row.id}
-                                            className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
-                                        >
-                                            <span className="truncate">
-                                                {row.name}
+                                <div className="space-y-2">
+                                    {mode === 'auto' && (
+                                        <h3 className="text-right text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                            {isPefPattern
+                                                ? 'PEF Pattern'
+                                                : 'Non PEF Pattern'}
+                                        </h3>
+                                    )}
+                                    <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
+                                            <span>Question type</span>
+                                            <span className="text-right">
+                                                Total
                                             </span>
-                                            <strong className="text-right">
-                                                {row.count}
-                                            </strong>
-                                            <strong className="text-right">
-                                                {row.required}
-                                            </strong>
-                                            <strong className="text-right">
-                                                {row.marks}
-                                            </strong>
+                                            <span className="text-right">
+                                                Required
+                                            </span>
+                                            <span className="text-right">
+                                                Marks
+                                            </span>
                                         </div>
-                                    ))}
-                                    <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
-                                        <span>Total</span>
-                                        <span className="text-right">
-                                            {totalQuestions}
-                                        </span>
-                                        <span className="text-right">
-                                            {reviewRows.reduce(
-                                                (sum, row) =>
-                                                    sum + row.required,
-                                                0,
-                                            )}
-                                        </span>
-                                        <span className="text-right">
-                                            {totalMarks}
-                                        </span>
+                                        {reviewRows.map((row) => (
+                                            <div
+                                                key={row.id}
+                                                className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
+                                            >
+                                                <span className="truncate">
+                                                    {row.name}
+                                                </span>
+                                                {mode === 'auto' ? (
+                                                    <>
+                                                        <input
+                                                            aria-label={`${row.name} total`}
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            step="1"
+                                                            className={`${inputClass} px-2 text-right`}
+                                                            value={
+                                                                row.count || ''
+                                                            }
+                                                            placeholder="0"
+                                                            onChange={(event) =>
+                                                                updateAutoSection(
+                                                                    row.id,
+                                                                    'quantity',
+                                                                    Number(
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    ),
+                                                                )
+                                                            }
+                                                        />
+                                                        <input
+                                                            aria-label={`${row.name} required`}
+                                                            type="number"
+                                                            min={
+                                                                row.count > 0
+                                                                    ? 1
+                                                                    : 0
+                                                            }
+                                                            max={row.count}
+                                                            step="1"
+                                                            disabled={
+                                                                row.count === 0
+                                                            }
+                                                            className={`${inputClass} px-2 text-right disabled:opacity-50`}
+                                                            value={
+                                                                row.required ||
+                                                                ''
+                                                            }
+                                                            placeholder="0"
+                                                            onChange={(event) =>
+                                                                updateAutoSection(
+                                                                    row.id,
+                                                                    'required_questions',
+                                                                    Number(
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    ),
+                                                                )
+                                                            }
+                                                        />
+                                                        <input
+                                                            aria-label={`${row.name} marks`}
+                                                            type="number"
+                                                            min={
+                                                                row.required *
+                                                                0.5
+                                                            }
+                                                            max={
+                                                                row.required *
+                                                                20
+                                                            }
+                                                            step="0.5"
+                                                            disabled={
+                                                                row.count === 0
+                                                            }
+                                                            className={`${inputClass} px-2 text-right disabled:opacity-50`}
+                                                            value={
+                                                                row.marks || ''
+                                                            }
+                                                            placeholder="0"
+                                                            onChange={(event) =>
+                                                                updateAutoSection(
+                                                                    row.id,
+                                                                    'marks',
+                                                                    Number(
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    ),
+                                                                )
+                                                            }
+                                                        />
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <strong className="text-right">
+                                                            {row.count}
+                                                        </strong>
+                                                        <strong className="text-right">
+                                                            {row.required}
+                                                        </strong>
+                                                        <strong className="text-right">
+                                                            {row.marks}
+                                                        </strong>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
+                                            <span>Total</span>
+                                            <span className="text-right">
+                                                {totalQuestions}
+                                            </span>
+                                            <span className="text-right">
+                                                {reviewRows.reduce(
+                                                    (sum, row) =>
+                                                        sum + row.required,
+                                                    0,
+                                                )}
+                                            </span>
+                                            <span className="text-right">
+                                                {totalMarks}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 {saveError && (
@@ -1700,9 +1915,7 @@ export default function QatCreate({
                                         Duration
                                     </dt>
                                     <dd className="font-semibold text-slate-900 dark:text-slate-100">
-                                        {mode === 'auto' && !selectedTemplate
-                                            ? '—'
-                                            : `${paperMinutes} min`}
+                                        {`${paperMinutes} min`}
                                     </dd>
                                 </div>
                                 {mode === 'auto' && (

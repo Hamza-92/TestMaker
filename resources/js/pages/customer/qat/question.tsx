@@ -23,6 +23,7 @@ export type QatQuestion = {
     content: Record<string, unknown>;
     options: Record<string, unknown>[];
     marks?: number;
+    objective_answers?: { options: number[]; items: number[][] };
 };
 
 function field(data: Record<string, unknown>, key: string): string {
@@ -179,10 +180,12 @@ function ObjectiveOptions({
     options,
     direction,
     medium,
+    correctOptions = [],
 }: {
     options: Record<string, unknown>[];
     direction: 'ltr' | 'rtl';
     medium: 'english' | 'urdu' | 'both';
+    correctOptions?: number[];
 }) {
     return (
         <table
@@ -214,7 +217,13 @@ function ObjectiveOptions({
 
                         return (
                             <Fragment key={index}>
-                                <td className="w-[4%] border border-slate-700 px-0.5 py-1 text-center align-middle">
+                                <td
+                                    data-qat-correct-option={
+                                        correctOptions.includes(index) ||
+                                        undefined
+                                    }
+                                    className="w-[4%] border border-slate-700 px-0.5 py-1 text-center align-middle"
+                                >
                                     <span
                                         className="inline-grid size-[1.45em] place-items-center rounded-full border border-slate-700 align-middle text-[0.9em] font-bold leading-none"
                                         style={{
@@ -226,7 +235,13 @@ function ObjectiveOptions({
                                         </span>
                                     </span>
                                 </td>
-                                <td className="w-[21%] min-w-0 border border-slate-700 px-1 py-1 align-middle">
+                                <td
+                                    data-qat-correct-option={
+                                        correctOptions.includes(index) ||
+                                        undefined
+                                    }
+                                    className="w-[21%] min-w-0 border border-slate-700 px-1 py-1 align-middle"
+                                >
                                     <div
                                         className={`flex min-w-0 flex-wrap items-baseline gap-x-1 break-words ${sharedOptionIsUrdu ? 'justify-end' : 'justify-between'}`}
                                     >
@@ -280,11 +295,13 @@ function ObjectiveLine({
     en,
     ur,
     options,
+    correctOptions,
 }: {
     number: string;
     en: string;
     ur: string;
     options: Record<string, unknown>[];
+    correctOptions?: number[];
 }) {
     const bilingual = Boolean(en && ur);
     const direction = ur && !en ? 'rtl' : 'ltr';
@@ -328,6 +345,7 @@ function ObjectiveLine({
                     options={options}
                     direction="ltr"
                     medium="both"
+                    correctOptions={correctOptions}
                 />
             </div>
         );
@@ -345,6 +363,7 @@ function ObjectiveLine({
                         options={options}
                         direction="ltr"
                         medium={medium}
+                        correctOptions={correctOptions}
                     />
                 )}
             </div>
@@ -361,6 +380,7 @@ function ObjectiveLine({
                 options={options}
                 direction={direction}
                 medium={medium}
+                correctOptions={correctOptions}
             />
         </div>
     );
@@ -369,9 +389,11 @@ function ObjectiveLine({
 export function QatObjectiveQuestion({
     question,
     number,
+    showAnswers = false,
 }: {
     question: QatQuestion;
     number: number;
+    showAnswers?: boolean;
 }) {
     const content = question.content ?? {};
     const items = records(content.items);
@@ -411,6 +433,9 @@ export function QatObjectiveQuestion({
                 en={primaryEn}
                 ur={primaryUr}
                 options={options.length ? options : trueFalseOptions}
+                correctOptions={
+                    showAnswers ? question.objective_answers?.options : []
+                }
             />
             {(extraPassageEn ||
                 extraPassageUr ||
@@ -438,6 +463,11 @@ export function QatObjectiveQuestion({
                     en={field(item, 'prompt_en') || field(item, 'statement_en')}
                     ur={field(item, 'prompt_ur') || field(item, 'statement_ur')}
                     options={records(item.options)}
+                    correctOptions={
+                        showAnswers
+                            ? question.objective_answers?.items[index]
+                            : []
+                    }
                 />
             ))}
         </div>

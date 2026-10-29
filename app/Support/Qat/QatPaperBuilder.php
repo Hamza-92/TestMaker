@@ -145,7 +145,7 @@ final class QatPaperBuilder
         ];
     }
 
-    public function presentQuestion(object $question): array
+    public function presentQuestion(object $question, bool $includeAnswers = false): array
     {
         $data = json_decode((string) $question->question_data, true) ?: [];
         $content = $this->withoutAnswers((array) ($data['content'] ?? []));
@@ -171,6 +171,62 @@ final class QatPaperBuilder
             'description_ur' => (string) ($data['description_ur'] ?? ''),
             'content' => $content,
             'options' => $options,
+            ...($includeAnswers && (bool) $question->is_objective ? ['objective_answers' => $this->objectiveAnswers($data)] : []),
+        ];
+    }
+
+    public function withObjectiveAnswers(array $paperData): array
+    {
+        $ids = collect($paperData['sections'] ?? [])->flatMap(fn ($section) => $section['questions'] ?? [])
+            ->filter(fn ($question) => ($question['is_objective'] ?? false) && ! array_key_exists('objective_answers', $question))
+            ->pluck('id')->all();
+        if ($ids === []) {
+            return $paperData;
+        }
+        $answers = DB::table('qat_questions as question')
+            ->join('qat_chapters as chapter', 'chapter.id', '=', 'question.qat_chapter_id')
+            ->where('chapter.qat_subject_id', $paperData['subject_id'] ?? 0)
+            ->whereIn('question.id', $ids)->get(['question.id', 'question.question_data'])
+            ->mapWithKeys(fn ($question) => [(int) $question->id => json_decode($question->question_data, true) ?: []]);
+        foreach ($paperData['sections'] as &$section) {
+            foreach ($section['questions'] as &$question) {
+                if (($question['is_objective'] ?? false) && ! array_key_exists('objective_answers', $question)) {
+                    $question['objective_answers'] = $this->objectiveAnswers($answers->get($question['id'], []), $question);
+                }
+            }
+            unset($question);
+        }
+        unset($section);
+
+        return $paperData;
+    }
+
+    private function objectiveAnswers(array $data, ?array $snapshot = null): array
+    {
+        $content = (array) ($data['content'] ?? []);
+        $correct = function (array $options, ?array $savedOptions = null): array {
+            $indices = [];
+            foreach (array_values($options) as $index => $option) {
+                if (! filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                    continue;
+                }
+                $position = $savedOptions === null ? $index : array_search($this->withoutAnswers($option), array_values($savedOptions));
+                if ($position !== false) {
+                    $indices[] = $position;
+                }
+            }
+
+            return $indices;
+        };
+        $options = $correct(($data['options'] ?? []) ?: ($content['options'] ?? []), $snapshot === null ? null : (($snapshot['options'] ?? []) ?: ($snapshot['content']['options'] ?? [])));
+        $boolean = $content['correct_boolean'] ?? null;
+        if ($options === [] && in_array($boolean, ['true', 'false', true, false], true)) {
+            $options = [in_array($boolean, ['true', true], true) ? 0 : 1];
+        }
+
+        return [
+            'options' => $options,
+            'items' => collect($content['items'] ?? [])->map(fn ($item, $index) => $correct($item['options'] ?? [], $snapshot === null ? null : ($snapshot['content']['items'][$index]['options'] ?? [])))->values()->all(),
         ];
     }
 

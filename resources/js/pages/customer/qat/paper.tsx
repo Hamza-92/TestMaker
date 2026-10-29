@@ -3,12 +3,14 @@ import {
     ArrowLeftIcon,
     CheckIcon,
     DownloadIcon,
+    KeyRoundIcon,
     Loader2Icon,
     PrinterIcon,
     SaveIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button, Card, PageHeader } from '@/components/tm';
+import { Switch } from '@/components/ui/switch';
 import { QuestionContent } from '../papers/paper-layouts/questions/question-content';
 import {
     DEFAULT_PAPER_SETTINGS,
@@ -16,6 +18,9 @@ import {
 } from '../papers/paper-layouts/types';
 import { QatObjectiveQuestion, QatQuestionContent } from './question';
 import type { QatQuestion } from './question';
+
+const toolbarHoverClass =
+    'hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300';
 
 type PaperSection = {
     question_type_id: number;
@@ -195,6 +200,7 @@ export default function QatPaper({
     const [activeVariant, setActiveVariant] = useState(0);
     const [saving, setSaving] = useState(false);
     const [downloading, setDownloading] = useState(false);
+    const [showAnswers, setShowAnswers] = useState(false);
     const [actionError, setActionError] = useState('');
     const paperVariants = variants.length ? variants : [initialPaper];
     const paper = paperVariants[activeVariant] ?? initialPaper;
@@ -326,6 +332,7 @@ export default function QatPaper({
                 #qat-print-sheet .qat-type-heading [lang="ur"], #qat-print-sheet .qat-type-heading [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${DEFAULT_PAPER_SETTINGS.headingSize * qatUrduMetrics.sizeScale}px !important; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight * qatUrduMetrics.lineHeightScale} !important; }
                 #qat-print-sheet .paper-rich-text img, #qat-print-sheet .qat-objective-question img { max-width: 100%; height: auto; }
                 #qat-print-sheet .qat-objective-options .paper-rich-text img { display: inline-block; vertical-align: middle; break-inside: avoid; }
+                [data-qat-correct-option] { background-color: #dcfce7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 @media print {
                     body * { visibility: hidden !important; }
                     #qat-print-sheet, #qat-print-sheet * { visibility: visible !important; }
@@ -351,7 +358,7 @@ export default function QatPaper({
                             type="button"
                             aria-pressed={activeVariant === index}
                             onClick={() => setActiveVariant(index)}
-                            className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${activeVariant === index ? 'border-slate-900 bg-slate-900 text-white dark:border-brand-500 dark:bg-brand-600' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-brand-500 dark:hover:text-brand-300'}`}
+                            className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${toolbarHoverClass} ${activeVariant === index ? 'border-slate-900 bg-slate-900 text-white dark:border-brand-500 dark:bg-brand-600' : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
                         >
                             Paper{' '}
                             {variant.paper_data.variant ??
@@ -360,11 +367,24 @@ export default function QatPaper({
                     ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    <label
+                        htmlFor="qat-answer-key"
+                        className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition-colors dark:border-slate-700 dark:text-slate-200 ${toolbarHoverClass}`}
+                    >
+                        <KeyRoundIcon className="size-4" />
+                        Answer key
+                        <Switch
+                            id="qat-answer-key"
+                            checked={showAnswers}
+                            onCheckedChange={setShowAnswers}
+                        />
+                    </label>
                     <Button
                         type="button"
                         variant="secondary"
                         size="sm"
                         onClick={() => window.print()}
+                        className={toolbarHoverClass}
                     >
                         <PrinterIcon /> Print
                     </Button>
@@ -374,6 +394,7 @@ export default function QatPaper({
                         size="sm"
                         onClick={() => void savePaper()}
                         disabled={!previewId || saving}
+                        className={toolbarHoverClass}
                     >
                         {saving ? (
                             <Loader2Icon className="animate-spin" />
@@ -390,6 +411,7 @@ export default function QatPaper({
                         size="sm"
                         onClick={() => void downloadPdf()}
                         disabled={downloading}
+                        className={`border border-transparent ${toolbarHoverClass}`}
                     >
                         {downloading ? (
                             <Loader2Icon className="animate-spin" />
@@ -539,6 +561,9 @@ export default function QatPaper({
                                                                 className="qat-question px-2"
                                                             >
                                                                 <QatObjectiveQuestion
+                                                                    showAnswers={
+                                                                        showAnswers
+                                                                    }
                                                                     question={
                                                                         question
                                                                     }
