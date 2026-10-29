@@ -97,6 +97,12 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertJsonMissingPath('questions.data.0.answer_en')
         ->assertJsonMissingPath('questions.data.0.options.0.is_correct');
 
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Multiple classes', 'mode' => 'auto', 'class_ids' => [$classId, $classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
+        'template_id' => $templateId,
+    ])->assertUnprocessable()->assertJsonValidationErrors('class_ids');
+
     $generation = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Monthly QAT', 'mode' => 'auto', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],

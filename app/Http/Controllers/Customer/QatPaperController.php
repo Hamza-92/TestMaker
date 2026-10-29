@@ -77,7 +77,7 @@ class QatPaperController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'mode' => ['required', 'in:auto,manual'],
-            'class_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'class_ids' => ['required', 'array', 'size:1'],
             'class_ids.*' => ['required', 'integer', 'distinct'],
             'subject_id' => ['required', 'integer'],
             'syllabus' => ['required', 'in:custom,qat'],

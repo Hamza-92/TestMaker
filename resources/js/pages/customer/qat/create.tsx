@@ -4,13 +4,11 @@ import {
     ArrowRightIcon,
     BookOpenIcon,
     CheckIcon,
-    ChevronDownIcon,
-    ChevronRightIcon,
     FileTextIcon,
     GraduationCapIcon,
     SearchIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { Switch } from '@/components/ui/switch';
 import { QatQuestionStatement } from './question';
@@ -83,14 +81,6 @@ const MONTHS = [
     'November',
     'December',
 ];
-const STEPS = [
-    'Classes',
-    'Books & chapters',
-    'Syllabus',
-    'Questions',
-    'Review',
-    'Preview',
-];
 const inputClass =
     'h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
 const selectAllClass =
@@ -121,57 +111,6 @@ function firstError(body: unknown): string {
     return 'The request could not be completed.';
 }
 
-function StepCardHeader({
-    index,
-    label,
-    summary,
-    active,
-    available,
-    onClick,
-}: {
-    index: number;
-    label: string;
-    summary: string;
-    active: boolean;
-    available: boolean;
-    onClick?: () => void;
-}) {
-    return (
-        <button
-            type="button"
-            aria-expanded={active}
-            disabled={active || !available}
-            onClick={onClick}
-            className={`flex w-full items-center gap-3 text-left ${active ? 'border-b border-slate-200 pb-4 dark:border-slate-700' : 'px-5 py-4 transition-colors'} ${!active && available ? 'hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-500 dark:hover:bg-slate-800/60' : ''}`}
-        >
-            <span
-                className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${active ? 'bg-brand-600 text-white' : available ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}
-            >
-                {!active && available ? (
-                    <CheckIcon className="size-4" />
-                ) : (
-                    index + 1
-                )}
-            </span>
-            <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {label}
-                </span>
-                {!active && (
-                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
-                        {summary}
-                    </span>
-                )}
-            </span>
-            {active ? (
-                <ChevronDownIcon className="size-4 shrink-0 text-brand-600" />
-            ) : (
-                <ChevronRightIcon className="size-4 shrink-0 text-slate-400" />
-            )}
-        </button>
-    );
-}
-
 export default function QatCreate({
     mode,
     classes,
@@ -187,9 +126,6 @@ export default function QatCreate({
     monthSyllabi: QatMonthSyllabus[];
     templates: QatTemplate[];
 }) {
-    const [step, setStep] = useState(0);
-    const [furthestStep, setFurthestStep] = useState(0);
-    const hasMounted = useRef(false);
     const [classIds, setClassIds] = useState<number[]>([]);
     const [subjectIds, setSubjectIds] = useState<number[]>([]);
     const [chapterIds, setChapterIds] = useState<number[]>([]);
@@ -197,7 +133,6 @@ export default function QatCreate({
     const [syllabus, setSyllabus] = useState<'custom' | 'qat'>('custom');
     const [qatYear, setQatYear] = useState('');
     const [months, setMonths] = useState<number[]>([]);
-    const [targetSubjectId, setTargetSubjectId] = useState<number | null>(null);
     const [pool, setPool] = useState<Pool | null>(null);
     const [poolScopeKey, setPoolScopeKey] = useState('');
     const [poolBusy, setPoolBusy] = useState(false);
@@ -239,12 +174,6 @@ export default function QatCreate({
             chapterIds.includes(item.id) &&
             subjectIds.includes(item.qat_subject_id),
     );
-    const selectableSubjectIds = subjects
-        .filter((item) => classIds.includes(item.qat_class_id))
-        .map((item) => item.id);
-    const selectableChapterIds = chapters
-        .filter((item) => selectableSubjectIds.includes(item.qat_subject_id))
-        .map((item) => item.id);
     const selectedSubjectIds = targetSubjects.map((item) => item.id);
     const monthChoices = [
         ...new Set(
@@ -287,14 +216,8 @@ export default function QatCreate({
                       selectedSubjectIds.includes(item.qat_subject_id) &&
                       item.months.some((month) => months.includes(month)),
               );
-    const targetSubject =
-        targetSubjects.find((item) => item.id === targetSubjectId) ??
-        targetSubjects[0] ??
-        null;
+    const targetSubject = targetSubjects[0] ?? null;
     const resolvedSubjectId = targetSubject?.id ?? null;
-    const targetClass = classes.find(
-        (item) => item.id === targetSubject?.qat_class_id,
-    );
     const targetCoverage = coverage.filter(
         (item) => item.qat_subject_id === targetSubject?.id,
     );
@@ -305,17 +228,6 @@ export default function QatCreate({
         availableTemplates.find((item) => item.id === templateId) ?? null;
     const paperMinutes =
         mode === 'auto' ? (selectedTemplate?.minutes ?? 0) : minutes;
-    const stepLabels =
-        mode === 'auto'
-            ? [
-                  'Classes',
-                  'Books & chapters',
-                  'Syllabus',
-                  'Template',
-                  'Review',
-                  'Preview',
-              ]
-            : STEPS;
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
     const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
@@ -417,34 +329,6 @@ export default function QatCreate({
                   0,
               )
             : selectedManual.reduce((total, item) => total + item.marks, 0);
-    const stepSummaries = [
-        `${selectedClasses.length} ${selectedClasses.length === 1 ? 'class' : 'classes'} selected`,
-        `${selectedSubjects.length} books · ${selectedChapters.length} chapters`,
-        syllabus === 'qat'
-            ? `QAT monthly · ${months.length} ${months.length === 1 ? 'month' : 'months'}`
-            : `Custom · ${coverage.length} chapters`,
-        mode === 'auto'
-            ? (selectedTemplate?.name ?? 'Choose a template')
-            : `${selectedManual.length} questions selected`,
-        `${totalQuestions} questions · ${totalMarks} marks`,
-    ];
-
-    useEffect(() => {
-        if (!hasMounted.current) {
-            hasMounted.current = true;
-
-            return;
-        }
-
-        const frame = window.requestAnimationFrame(() => {
-            document
-                .getElementById(`qat-step-${step}`)
-                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-
-        return () => window.cancelAnimationFrame(frame);
-    }, [step]);
-
     useEffect(() => {
         setPool(null);
         setPoolScopeKey('');
@@ -454,7 +338,6 @@ export default function QatCreate({
 
     useEffect(() => {
         if (
-            step < 3 ||
             !resolvedSubjectId ||
             targetChapterKey === '' ||
             poolScopeKey === questionScopeKey
@@ -532,7 +415,6 @@ export default function QatCreate({
             window.clearTimeout(timer);
         };
     }, [
-        step,
         resolvedSubjectId,
         targetChapterKey,
         syllabus,
@@ -543,89 +425,30 @@ export default function QatCreate({
     ]);
 
     function toggleClass(id: number) {
-        if (classIds.includes(id)) {
-            const removed = subjects
-                .filter((item) => item.qat_class_id === id)
-                .map((item) => item.id);
-            setSubjectIds((current) =>
-                current.filter((item) => !removed.includes(item)),
-            );
-            setChapterIds((current) =>
-                current.filter(
-                    (item) =>
-                        !removed.includes(
-                            chapters.find((chapter) => chapter.id === item)
-                                ?.qat_subject_id ?? -1,
-                        ),
-                ),
-            );
-
-            if (removed.includes(targetSubjectId ?? -1)) {
-                setTargetSubjectId(null);
-            }
-        }
-
-        setClassIds((current) =>
-            current.includes(id)
-                ? current.filter((item) => item !== id)
-                : [...current, id],
-        );
-    }
-
-    function toggleVisibleClasses(checked: boolean) {
-        const visibleIds = visibleClasses.map((item) => item.id);
-
-        if (checked) {
-            setClassIds((current) => [...new Set([...current, ...visibleIds])]);
-
+        if (classIds[0] === id) {
             return;
         }
 
-        const removedSubjects = subjects
-            .filter((item) => visibleIds.includes(item.qat_class_id))
-            .map((item) => item.id);
-
-        setClassIds((current) =>
-            current.filter((id) => !visibleIds.includes(id)),
-        );
-        setSubjectIds((current) =>
-            current.filter((id) => !removedSubjects.includes(id)),
-        );
-        setChapterIds((current) =>
-            current.filter(
-                (id) =>
-                    !removedSubjects.includes(
-                        chapters.find((chapter) => chapter.id === id)
-                            ?.qat_subject_id ?? -1,
-                    ),
-            ),
-        );
-
-        if (removedSubjects.includes(targetSubjectId ?? -1)) {
-            setTargetSubjectId(null);
-        }
+        setClassIds([id]);
+        setSubjectIds([]);
+        setChapterIds([]);
+        setMonths([]);
+        setTemplateId(null);
+        setTypeFilter('');
+        setQuestionSearch('');
     }
 
     function toggleSubject(id: number) {
-        if (subjectIds.includes(id)) {
-            setChapterIds((current) =>
-                current.filter(
-                    (item) =>
-                        chapters.find((chapter) => chapter.id === item)
-                            ?.qat_subject_id !== id,
-                ),
-            );
-
-            if (targetSubjectId === id) {
-                setTargetSubjectId(null);
-            }
+        if (subjectIds[0] === id) {
+            return;
         }
 
-        setSubjectIds((current) =>
-            current.includes(id)
-                ? current.filter((item) => item !== id)
-                : [...current, id],
-        );
+        setSubjectIds([id]);
+        setChapterIds([]);
+        setMonths([]);
+        setTemplateId(null);
+        setTypeFilter('');
+        setQuestionSearch('');
     }
 
     function toggleChapter(id: number) {
@@ -644,113 +467,24 @@ export default function QatCreate({
         );
     }
 
-    function toggleAllBooksAndChapters(checked: boolean) {
-        setSubjectIds((current) =>
-            checked
-                ? [...new Set([...current, ...selectableSubjectIds])]
-                : current.filter((id) => !selectableSubjectIds.includes(id)),
-        );
-        toggleChapterGroup(selectableChapterIds, checked);
-
-        if (
-            !checked &&
-            targetSubjectId !== null &&
-            selectableSubjectIds.includes(targetSubjectId)
-        ) {
-            setTargetSubjectId(null);
-        }
-    }
-
-    function changeTarget(id: number) {
-        setTargetSubjectId(id);
-        setPool(null);
-        setPoolScopeKey('');
-        setManual({});
-        setTypeFilter('');
-        setQuestionSearch('');
-    }
-
-    function nextAllowed(): boolean {
-        if (step === 0) {
-            return classIds.length > 0;
-        }
-
-        if (step === 1) {
-            return selectedSubjects.length > 0;
-        }
-
-        if (step === 2) {
-            return coverage.length > 0;
-        }
-
-        if (step === 3) {
-            return (
-                targetCoverage.length > 0 &&
-                totalQuestions > 0 &&
-                (mode !== 'auto' || templateHasEnoughQuestions) &&
-                !poolBusy &&
-                !poolError
-            );
-        }
-
-        return true;
-    }
-
-    function canOpenStep(index: number): boolean {
-        if (index === 0) {
-            return true;
-        }
-
-        if (index > furthestStep || index > 4) {
-            return false;
-        }
-
-        if (index === 1) {
-            return classIds.length > 0;
-        }
-
-        if (index === 2) {
-            return selectedSubjects.length > 0;
-        }
-
-        if (index === 3) {
-            return coverage.length > 0;
-        }
-
-        return (
-            targetCoverage.length > 0 &&
-            totalQuestions > 0 &&
-            (mode !== 'auto' || templateHasEnoughQuestions) &&
-            !poolBusy &&
-            !poolError
-        );
-    }
-
-    function nextStep() {
-        if (!nextAllowed()) {
-            return;
-        }
-
-        if (
-            step === 2 &&
-            targetSubject &&
-            targetSubjectId !== targetSubject.id
-        ) {
-            setTargetSubjectId(targetSubject.id);
-        }
-
-        const next = Math.min(step + 1, 4);
-        setFurthestStep((current) => Math.max(current, next));
-        setStep(next);
-    }
+    const canGenerate =
+        classIds.length === 1 &&
+        subjectIds.length === 1 &&
+        targetCoverage.length > 0 &&
+        totalQuestions > 0 &&
+        !poolBusy &&
+        !poolError &&
+        poolScopeKey === questionScopeKey &&
+        (mode !== 'auto' ||
+            (selectedTemplate !== null &&
+                templateHasEnoughQuestions &&
+                variantsHaveEnoughQuestions)) &&
+        name.trim().length > 0 &&
+        paperMinutes >= 10 &&
+        paperMinutes <= 240;
 
     async function generate() {
-        if (
-            !targetSubject ||
-            !nextAllowed() ||
-            (mode === 'auto' &&
-                (!selectedTemplate || !templateHasEnoughQuestions))
-        ) {
+        if (!targetSubject || !canGenerate || saving) {
             return;
         }
 
@@ -819,9 +553,7 @@ export default function QatCreate({
 
     return (
         <div className="w-full space-y-6">
-            <Head
-                title={`${mode === 'auto' ? 'Auto' : 'Manual'} QAT paper · ${stepLabels[step]}`}
-            />
+            <Head title={`${mode === 'auto' ? 'Auto' : 'Manual'} QAT paper`} />
             <Button asChild variant="ghost" size="sm" className="-ml-3">
                 <Link href="/qa-tests">
                     <ArrowLeftIcon /> QAT Tests
@@ -834,1408 +566,995 @@ export default function QatCreate({
                         : 'Manual paper generation'
                 }
             />
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <div className="min-w-0 space-y-5">
-                    <Card padding="lg" className="min-w-0">
-                        <nav
-                            aria-label="Paper generation steps"
-                            className="overflow-x-auto py-2"
-                        >
-                            <ol className="flex min-w-[780px] items-start">
-                                {stepLabels.map((label, index) => (
-                                    <li
-                                        key={label}
-                                        aria-current={
-                                            index === step ? 'step' : undefined
-                                        }
-                                        className="relative flex min-w-0 flex-1 flex-col items-center text-center"
-                                    >
-                                        {index < stepLabels.length - 1 && (
-                                            <span
-                                                aria-hidden="true"
-                                                className="absolute left-[calc(50%+16px)] top-3 h-px w-[calc(100%-32px)] bg-slate-200 dark:bg-slate-700"
-                                            />
-                                        )}
-                                        <span className="flex w-32 flex-col items-center gap-1">
-                                            <button
-                                                type="button"
-                                                aria-label={`Go to ${label}`}
-                                                disabled={
-                                                    index === step ||
-                                                    !canOpenStep(index)
-                                                }
-                                                onClick={() => setStep(index)}
-                                                className={`relative z-10 flex size-6 items-center justify-center rounded-full text-xs font-semibold ${index === step ? 'cursor-default bg-brand-600 text-white' : canOpenStep(index) ? 'cursor-pointer bg-brand-100 text-brand-700 transition-all hover:bg-brand-200 hover:ring-4 hover:ring-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:bg-brand-500/20 dark:text-brand-300 dark:hover:bg-brand-500/30' : 'cursor-default bg-slate-100 text-slate-400 dark:bg-slate-800'}`}
-                                            >
-                                                {index !== step &&
-                                                canOpenStep(index) ? (
-                                                    <CheckIcon className="size-3.5" />
-                                                ) : (
-                                                    index + 1
-                                                )}
-                                            </button>
-                                            <span
-                                                className={`whitespace-nowrap text-[11px] font-medium ${index === step ? 'text-brand-700 dark:text-brand-300' : canOpenStep(index) ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}
-                                            >
-                                                {label}
-                                            </span>
-                                        </span>
-                                    </li>
-                                ))}
-                            </ol>
-                        </nav>
-                    </Card>
-                    {stepLabels.slice(0, step).map((label, index) => (
-                        <Card
-                            key={label}
-                            id={`qat-step-${index}`}
-                            padding="none"
-                            className="min-w-0 scroll-mt-6 overflow-hidden"
-                        >
-                            <StepCardHeader
-                                index={index}
-                                label={label}
-                                summary={stepSummaries[index]}
-                                active={false}
-                                available={canOpenStep(index)}
-                                onClick={() => setStep(index)}
-                            />
-                        </Card>
-                    ))}
-                    <Card
-                        id={`qat-step-${step}`}
-                        padding="lg"
-                        className="min-w-0 scroll-mt-6 space-y-5"
-                    >
-                        <StepCardHeader
-                            index={step}
-                            label={stepLabels[step]}
-                            summary={stepSummaries[step]}
-                            active
-                            available
+            <Card padding="lg" className="min-w-0 space-y-6">
+                <section className="space-y-3">
+                    <h2 className="text-lg font-semibold">Choose your class</h2>
+                    <div className="relative w-full sm:max-w-xs">
+                        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                            className={`${inputClass} pl-9`}
+                            aria-label="Search classes"
+                            placeholder="Search classes"
+                            value={classSearch}
+                            onChange={(event) =>
+                                setClassSearch(event.target.value)
+                            }
                         />
-                        {step === 0 && (
-                            <>
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <h2 className="text-lg font-semibold">
-                                            Choose your classes
-                                        </h2>
-                                    </div>
-                                    <label className={selectAllClass}>
-                                        <input
-                                            type="checkbox"
-                                            className="size-4 accent-brand-600"
-                                            checked={
-                                                visibleClasses.length > 0 &&
-                                                visibleClasses.every((item) =>
-                                                    classIds.includes(item.id),
-                                                )
-                                            }
-                                            disabled={!visibleClasses.length}
-                                            onChange={(event) =>
-                                                toggleVisibleClasses(
-                                                    event.target.checked,
-                                                )
-                                            }
-                                        />
-                                        Select all
-                                    </label>
-                                </div>
-                                <div className="relative w-full sm:max-w-xs">
-                                    <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                    {visibleClasses.length ? (
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            {visibleClasses.map((item) => (
+                                <label
+                                    key={item.id}
+                                    className={`tm-lift flex h-20 cursor-pointer items-center gap-2 rounded-xl border p-3 ${classIds.includes(item.id) ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                >
                                     <input
-                                        className={`${inputClass} pl-9`}
-                                        aria-label="Search classes"
-                                        placeholder="Search classes"
-                                        value={classSearch}
-                                        onChange={(event) =>
-                                            setClassSearch(event.target.value)
-                                        }
+                                        type="radio"
+                                        name="qat-class"
+                                        className="size-4 accent-brand-600"
+                                        checked={classIds.includes(item.id)}
+                                        onChange={() => toggleClass(item.id)}
                                     />
-                                </div>
-                                {visibleClasses.length ? (
-                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                        {visibleClasses.map((item) => (
-                                            <label
-                                                key={item.id}
-                                                className={`tm-lift flex h-20 cursor-pointer items-center gap-2 rounded-xl border p-3 ${classIds.includes(item.id) ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    className="size-4 accent-brand-600"
-                                                    checked={classIds.includes(
-                                                        item.id,
-                                                    )}
-                                                    onChange={() =>
-                                                        toggleClass(item.id)
-                                                    }
-                                                />
-                                                <span className="min-w-0">
-                                                    <strong className="block truncate text-sm">
-                                                        {item.name}
-                                                    </strong>
-                                                    <small className="text-slate-500">
-                                                        {item.subject_count}{' '}
-                                                        {item.subject_count ===
-                                                        1
-                                                            ? 'book'
-                                                            : 'books'}
-                                                    </small>
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <EmptyState
-                                        icon={GraduationCapIcon}
-                                        title="No classes available"
-                                    />
-                                )}
-                            </>
-                        )}
-
-                        {step === 1 && (
-                            <>
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <h2 className="text-lg font-semibold">
-                                            Select books & chapters
-                                        </h2>
-                                    </div>
-                                    <label className={selectAllClass}>
-                                        <input
-                                            type="checkbox"
-                                            className="size-4 accent-brand-600"
-                                            checked={
-                                                selectableSubjectIds.length >
-                                                    0 &&
-                                                selectableSubjectIds.every(
-                                                    (id) =>
-                                                        subjectIds.includes(id),
-                                                ) &&
-                                                selectableChapterIds.every(
-                                                    (id) =>
-                                                        chapterIds.includes(id),
-                                                )
-                                            }
-                                            disabled={
-                                                !selectableSubjectIds.length
-                                            }
-                                            onChange={(event) =>
-                                                toggleAllBooksAndChapters(
-                                                    event.target.checked,
-                                                )
-                                            }
-                                        />
-                                        Select all books &amp; chapters
-                                    </label>
-                                </div>
-                                <div className="space-y-4">
-                                    {selectedClasses.map((klass) => {
-                                        const books = subjects.filter(
-                                            (item) =>
-                                                item.qat_class_id === klass.id,
-                                        );
-
-                                        return (
-                                            <section
-                                                key={klass.id}
-                                                className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"
-                                            >
-                                                <div className="flex items-center justify-between bg-slate-50 px-4 py-3 dark:bg-slate-800/50">
-                                                    <h3 className="flex items-center gap-2 text-sm font-semibold">
-                                                        <GraduationCapIcon className="size-4 text-brand-600" />{' '}
-                                                        {klass.name}
-                                                    </h3>
-                                                    <span className="text-xs text-slate-500">
-                                                        {books.length} books
-                                                    </span>
-                                                </div>
-                                                {books.map((book) => {
-                                                    const bookChapters =
-                                                        chapters.filter(
-                                                            (item) =>
-                                                                item.qat_subject_id ===
-                                                                book.id,
-                                                        );
-                                                    const checked =
-                                                        subjectIds.includes(
-                                                            book.id,
-                                                        );
-
-                                                    return (
-                                                        <div
-                                                            key={book.id}
-                                                            className="border-t border-slate-200 px-4 py-4 dark:border-slate-700"
-                                                        >
-                                                            <label className="flex cursor-pointer items-center gap-3">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="size-4 accent-brand-600"
-                                                                    checked={
-                                                                        checked
-                                                                    }
-                                                                    onChange={() =>
-                                                                        toggleSubject(
-                                                                            book.id,
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <BookOpenIcon className="size-4 text-brand-600" />
-                                                                <span className="min-w-0 flex-1">
-                                                                    <strong className="block text-sm">
-                                                                        {
-                                                                            book.name
-                                                                        }
-                                                                    </strong>
-                                                                    <small className="text-slate-500">
-                                                                        {
-                                                                            bookChapters.length
-                                                                        }{' '}
-                                                                        chapters
-                                                                    </small>
-                                                                </span>
-                                                                <Badge tone="neutral">
-                                                                    {
-                                                                        bookChapters.filter(
-                                                                            (
-                                                                                item,
-                                                                            ) =>
-                                                                                chapterIds.includes(
-                                                                                    item.id,
-                                                                                ),
-                                                                        ).length
-                                                                    }
-                                                                    /
-                                                                    {
-                                                                        bookChapters.length
-                                                                    }
-                                                                </Badge>
-                                                            </label>
-                                                            {checked && (
-                                                                <div className="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/40">
-                                                                    <div className="mb-3 flex items-center justify-between">
-                                                                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                                            Chapters
-                                                                        </span>
-                                                                        <label
-                                                                            className={
-                                                                                selectAllClass
-                                                                            }
-                                                                        >
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                className="size-4 accent-brand-600"
-                                                                                checked={
-                                                                                    bookChapters.length >
-                                                                                        0 &&
-                                                                                    bookChapters.every(
-                                                                                        (
-                                                                                            item,
-                                                                                        ) =>
-                                                                                            chapterIds.includes(
-                                                                                                item.id,
-                                                                                            ),
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    !bookChapters.length
-                                                                                }
-                                                                                onChange={(
-                                                                                    event,
-                                                                                ) =>
-                                                                                    toggleChapterGroup(
-                                                                                        bookChapters.map(
-                                                                                            (
-                                                                                                item,
-                                                                                            ) =>
-                                                                                                item.id,
-                                                                                        ),
-                                                                                        event
-                                                                                            .target
-                                                                                            .checked,
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                            Select
-                                                                            all
-                                                                        </label>
-                                                                    </div>
-                                                                    <div className="grid gap-2 sm:grid-cols-2">
-                                                                        {bookChapters.map(
-                                                                            (
-                                                                                chapter,
-                                                                            ) => (
-                                                                                <label
-                                                                                    key={
-                                                                                        chapter.id
-                                                                                    }
-                                                                                    className="flex cursor-pointer items-center gap-2 rounded-md p-1.5 text-sm hover:bg-white dark:hover:bg-slate-800"
-                                                                                >
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        className="size-4 accent-brand-600"
-                                                                                        checked={chapterIds.includes(
-                                                                                            chapter.id,
-                                                                                        )}
-                                                                                        onChange={() =>
-                                                                                            toggleChapter(
-                                                                                                chapter.id,
-                                                                                            )
-                                                                                        }
-                                                                                    />
-                                                                                    <span className="truncate">
-                                                                                        {
-                                                                                            chapter.name
-                                                                                        }
-                                                                                    </span>
-                                                                                </label>
-                                                                            ),
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </section>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-
-                        {step === 2 && (
-                            <>
-                                <div>
-                                    <h2 className="text-lg font-semibold">
-                                        Choose your syllabus
-                                    </h2>
-                                </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSyllabus('custom')}
-                                        className={`rounded-xl border p-4 text-left ${syllabus === 'custom' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                    >
-                                        <strong className="block text-sm">
-                                            Custom syllabus
+                                    <span className="min-w-0">
+                                        <strong className="block truncate text-sm">
+                                            {item.name}
                                         </strong>
-                                        <span className="mt-1 block text-xs text-slate-500">
-                                            Use the chapters chosen in the
-                                            previous step.
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSyllabus('qat')}
-                                        className={`rounded-xl border p-4 text-left ${syllabus === 'qat' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                        <small className="text-slate-500">
+                                            {item.subject_count}{' '}
+                                            {item.subject_count === 1
+                                                ? 'book'
+                                                : 'books'}
+                                        </small>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    ) : (
+                        <EmptyState
+                            icon={GraduationCapIcon}
+                            title="No classes available"
+                        />
+                    )}
+                </section>
+
+                {selectedClasses.length > 0 && (
+                    <>
+                        <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
+                            Select a book &amp; its chapters
+                        </h2>
+                        <div className="space-y-4">
+                            {selectedClasses.map((klass) => {
+                                const books = subjects.filter(
+                                    (item) => item.qat_class_id === klass.id,
+                                );
+
+                                return (
+                                    <section
+                                        key={klass.id}
+                                        className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"
                                     >
-                                        <strong className="block text-sm">
-                                            QAT monthly syllabus
-                                        </strong>
-                                        <span className="mt-1 block text-xs text-slate-500">
-                                            Use chapters mapped to selected
-                                            preparation months.
-                                        </span>
-                                    </button>
-                                </div>
-                                {syllabus === 'qat' && (
-                                    <div className="space-y-3">
-                                        <label className="block max-w-xs space-y-1 text-xs font-semibold text-slate-600">
-                                            Academic year
-                                            <select
-                                                className={inputClass}
-                                                value={activeYear}
-                                                onChange={(event) => {
-                                                    setQatYear(
-                                                        event.target.value,
-                                                    );
-                                                    setMonths([]);
-                                                }}
-                                            >
-                                                {availableYears.map((year) => (
-                                                    <option
-                                                        key={year}
-                                                        value={year}
-                                                    >
-                                                        {year}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div>
-                                                <h3 className="text-sm font-semibold">
-                                                    Preparation months
-                                                </h3>
-                                                <p className="text-xs text-slate-500">
-                                                    Only months mapped to your
-                                                    chosen books are available.
-                                                </p>
-                                            </div>
-                                            <label className={selectAllClass}>
-                                                <input
-                                                    type="checkbox"
-                                                    className="size-4 accent-brand-600"
-                                                    checked={
-                                                        monthChoices.length >
-                                                            0 &&
-                                                        monthChoices.every(
-                                                            (month) =>
-                                                                months.includes(
-                                                                    month,
-                                                                ),
-                                                        )
-                                                    }
-                                                    disabled={
-                                                        !monthChoices.length
-                                                    }
-                                                    onChange={(event) =>
-                                                        setMonths(
-                                                            event.target.checked
-                                                                ? monthChoices
-                                                                : [],
-                                                        )
-                                                    }
-                                                />
-                                                Select all months
-                                            </label>
+                                        <div className="flex items-center justify-between bg-slate-50 px-4 py-3 dark:bg-slate-800/50">
+                                            <h3 className="flex items-center gap-2 text-sm font-semibold">
+                                                <GraduationCapIcon className="size-4 text-brand-600" />{' '}
+                                                {klass.name}
+                                            </h3>
+                                            <span className="text-xs text-slate-500">
+                                                {books.length} books
+                                            </span>
                                         </div>
-                                        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                                            {monthChoices.map((month) => (
-                                                <button
-                                                    type="button"
-                                                    key={month}
-                                                    onClick={() =>
-                                                        setMonths((current) =>
-                                                            current.includes(
-                                                                month,
-                                                            )
-                                                                ? current.filter(
-                                                                      (item) =>
-                                                                          item !==
-                                                                          month,
-                                                                  )
-                                                                : [
-                                                                      ...current,
-                                                                      month,
-                                                                  ].sort(
-                                                                      (a, b) =>
-                                                                          a - b,
-                                                                  ),
-                                                        )
-                                                    }
-                                                    className={`rounded-lg border px-3 py-2 text-sm ${months.includes(month) ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                                >
-                                                    {MONTHS[month - 1]}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {selectedMonthDescriptions.length >
-                                            0 && (
-                                            <div
-                                                aria-live="polite"
-                                                className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-500/30 dark:bg-brand-500/5"
-                                            >
-                                                {selectedMonthDescriptions.map(
-                                                    ({ month, books }) => (
-                                                        <div
-                                                            key={month}
-                                                            className="space-y-2 border-t border-brand-100 pt-3 first:border-t-0 first:pt-0 dark:border-brand-500/20"
-                                                        >
-                                                            <h5 className="text-sm font-semibold text-brand-700 dark:text-brand-300">
-                                                                {
-                                                                    MONTHS[
-                                                                        month -
-                                                                            1
-                                                                    ]
-                                                                }{' '}
-                                                                Syllabus
-                                                            </h5>
-                                                            {books.length ? (
-                                                                books.map(
-                                                                    (book) => (
-                                                                        <div
-                                                                            key={
-                                                                                book.id
-                                                                            }
-                                                                            className="text-sm text-slate-700 dark:text-slate-200"
-                                                                        >
-                                                                            <span className="font-medium">
-                                                                                {
-                                                                                    book.name
-                                                                                }
-
-                                                                                :{' '}
-                                                                            </span>
-                                                                            <span className="whitespace-pre-line">
-                                                                                {
-                                                                                    book.description
-                                                                                }
-                                                                            </span>
-                                                                        </div>
-                                                                    ),
-                                                                )
-                                                            ) : (
-                                                                <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                                    No
-                                                                    description
-                                                                    has been
-                                                                    added for
-                                                                    this month.
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    ),
-                                                )}
-                                            </div>
-                                        )}
-                                        {!monthChoices.length && (
-                                            <p className="text-sm text-amber-700">
-                                                No month mappings have been
-                                                added for these books.
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-sm font-semibold">
-                                            Current syllabus coverage
-                                        </h3>
-                                        <Badge tone="info">
-                                            {coverage.length} chapters
-                                        </Badge>
-                                    </div>
-                                    {coverage.length ? (
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            {coverage.map((chapter) => (
-                                                <Badge
-                                                    key={chapter.id}
-                                                    tone="neutral"
-                                                >
-                                                    {
-                                                        selectedSubjects.find(
-                                                            (subject) =>
-                                                                subject.id ===
-                                                                chapter.qat_subject_id,
-                                                        )?.name
-                                                    }{' '}
-                                                    · {chapter.name}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="mt-3 text-sm text-slate-500">
-                                            {syllabus === 'qat'
-                                                ? 'Select a month with mapped chapters.'
-                                                : 'Return to Books & chapters and select chapters.'}
-                                        </p>
-                                    )}
-                                </div>
-                            </>
-                        )}
-
-                        {step === 3 && (
-                            <>
-                                <div>
-                                    <h2 className="text-lg font-semibold">
-                                        {mode === 'auto'
-                                            ? 'Choose a paper template'
-                                            : 'Pick questions manually'}
-                                    </h2>
-                                </div>
-                                <div className="grid gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:grid-cols-2">
-                                    <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                        Target class
-                                        <select
-                                            className={inputClass}
-                                            value={targetClass?.id ?? ''}
-                                            onChange={(event) =>
-                                                changeTarget(
-                                                    targetSubjects.find(
-                                                        (item) =>
-                                                            item.qat_class_id ===
-                                                            Number(
-                                                                event.target
-                                                                    .value,
-                                                            ),
-                                                    )?.id ?? 0,
-                                                )
-                                            }
-                                        >
-                                            {selectedClasses
-                                                .filter((item) =>
-                                                    targetSubjects.some(
-                                                        (subject) =>
-                                                            subject.qat_class_id ===
-                                                            item.id,
-                                                    ),
-                                                )
-                                                .map((item) => (
-                                                    <option
-                                                        key={item.id}
-                                                        value={item.id}
-                                                    >
-                                                        {item.name}
-                                                    </option>
-                                                ))}
-                                        </select>
-                                    </label>
-                                    <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                        Book / subject
-                                        <select
-                                            className={inputClass}
-                                            value={targetSubject?.id ?? ''}
-                                            onChange={(event) =>
-                                                changeTarget(
-                                                    Number(event.target.value),
-                                                )
-                                            }
-                                        >
-                                            {targetSubjects
-                                                .filter(
+                                        {books.map((book) => {
+                                            const bookChapters =
+                                                chapters.filter(
                                                     (item) =>
-                                                        item.qat_class_id ===
-                                                        targetClass?.id,
-                                                )
-                                                .map((item) => (
-                                                    <option
-                                                        key={item.id}
-                                                        value={item.id}
-                                                    >
-                                                        {item.name}
-                                                    </option>
-                                                ))}
-                                        </select>
-                                    </label>
-                                </div>
-                                {poolError && (
-                                    <p
-                                        role="alert"
-                                        className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
-                                    >
-                                        {poolError}
-                                    </p>
-                                )}
-                                {poolBusy && (
-                                    <p className="text-sm text-slate-500">
-                                        Loading QAT questions…
-                                    </p>
-                                )}
-                                {!poolBusy && pool && mode === 'auto' && (
-                                    <div className="space-y-3">
-                                        <div className="grid gap-3 md:grid-cols-2">
-                                            {availableTemplates.map(
-                                                (template) => {
-                                                    const rows =
-                                                        template.sections
-                                                            .map((section) => ({
-                                                                ...section,
-                                                                type: pool.types.find(
-                                                                    (type) =>
-                                                                        type.id ===
-                                                                        section.question_type_id,
-                                                                ),
-                                                            }))
-                                                            .sort(
-                                                                (left, right) =>
-                                                                    (typeRanks.get(
-                                                                        left.question_type_id,
-                                                                    ) ??
-                                                                        Number.MAX_SAFE_INTEGER) -
-                                                                    (typeRanks.get(
-                                                                        right.question_type_id,
-                                                                    ) ??
-                                                                        Number.MAX_SAFE_INTEGER),
-                                                            );
-                                                    const ready = rows.every(
-                                                        (row) =>
-                                                            (row.type?.total ??
-                                                                0) >=
-                                                            row.quantity,
-                                                    );
+                                                        item.qat_subject_id ===
+                                                        book.id,
+                                                );
+                                            const checked = subjectIds.includes(
+                                                book.id,
+                                            );
 
-                                                    return (
-                                                        <button
-                                                            key={template.id}
-                                                            type="button"
-                                                            aria-pressed={
-                                                                selectedTemplate?.id ===
-                                                                template.id
-                                                            }
-                                                            onClick={() =>
-                                                                setTemplateId(
-                                                                    template.id,
+                                            return (
+                                                <div
+                                                    key={book.id}
+                                                    className="border-t border-slate-200 px-4 py-4 dark:border-slate-700"
+                                                >
+                                                    <label className="flex cursor-pointer items-center gap-3">
+                                                        <input
+                                                            type="radio"
+                                                            name="qat-subject"
+                                                            className="size-4 accent-brand-600"
+                                                            checked={checked}
+                                                            onChange={() =>
+                                                                toggleSubject(
+                                                                    book.id,
                                                                 )
                                                             }
-                                                            className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selectedTemplate?.id === template.id ? 'border-brand-500 bg-brand-50 shadow-sm dark:bg-brand-500/10' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}
-                                                        >
-                                                            <div className="flex items-start justify-between gap-3">
-                                                                <div>
-                                                                    {template.category && (
-                                                                        <Badge tone="info">
-                                                                            {
-                                                                                template.category
-                                                                            }
-                                                                        </Badge>
-                                                                    )}
-                                                                    <h3 className="mt-2 font-semibold">
-                                                                        {
-                                                                            template.name
-                                                                        }
-                                                                    </h3>
-                                                                    <p className="mt-1 text-xs text-slate-500">
-                                                                        {
-                                                                            template.minutes
-                                                                        }{' '}
-                                                                        min ·{' '}
-                                                                        {rows.reduce(
-                                                                            (
-                                                                                sum,
-                                                                                row,
-                                                                            ) =>
-                                                                                sum +
-                                                                                row.quantity,
-                                                                            0,
-                                                                        )}{' '}
-                                                                        total
-                                                                        questions
-                                                                    </p>
-                                                                </div>
-                                                                <span
-                                                                    className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selectedTemplate?.id === template.id ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300'}`}
-                                                                >
-                                                                    {selectedTemplate?.id ===
-                                                                        template.id && (
-                                                                        <CheckIcon className="size-3" />
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                            <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-xs dark:border-slate-700">
-                                                                {rows.map(
-                                                                    (row) => (
-                                                                        <div
-                                                                            key={
-                                                                                row.question_type_id
-                                                                            }
-                                                                            className="flex justify-between gap-2"
-                                                                        >
-                                                                            <span>
-                                                                                {row
-                                                                                    .type
-                                                                                    ?.name ??
-                                                                                    `Question type ${row.question_type_id}`}{' '}
-                                                                                ·{' '}
-                                                                                {
-                                                                                    row.quantity
-                                                                                }{' '}
-                                                                                total
-                                                                                ·{' '}
-                                                                                {row.required_questions ??
-                                                                                    row.quantity}{' '}
-                                                                                required
-                                                                                ×{' '}
-                                                                                {
-                                                                                    row.marks
-                                                                                }
-                                                                            </span>
-                                                                            <strong>
-                                                                                {(row.required_questions ??
-                                                                                    row.quantity) *
-                                                                                    row.marks}
-                                                                            </strong>
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-3 flex justify-between text-sm font-semibold">
-                                                                <span>
-                                                                    Total marks
-                                                                </span>
-                                                                <span>
-                                                                    {rows.reduce(
-                                                                        (
-                                                                            sum,
-                                                                            row,
-                                                                        ) =>
-                                                                            sum +
-                                                                            (row.required_questions ??
-                                                                                row.quantity) *
-                                                                                row.marks,
-                                                                        0,
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                            {!ready && (
-                                                                <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                                                                    Not enough
-                                                                    questions in
-                                                                    the selected
-                                                                    syllabus for
-                                                                    this
-                                                                    template.
-                                                                </p>
-                                                            )}
-                                                        </button>
-                                                    );
-                                                },
-                                            )}
-                                        </div>
-                                        {!availableTemplates.length && (
-                                            <EmptyState
-                                                icon={FileTextIcon}
-                                                title="No templates for this book"
-                                                hint="Ask your administrator to add an active QAT template."
-                                            />
-                                        )}
-                                    </div>
-                                )}
-                                {pool &&
-                                    mode === 'manual' &&
-                                    (!poolBusy || selectedOnly) && (
-                                        <div className="space-y-3">
-                                            <div className="flex flex-wrap items-center gap-3">
-                                                <div className="relative w-full sm:w-72">
-                                                    <SearchIcon className="absolute left-3 top-2.5 size-4 text-slate-400" />
-                                                    <input
-                                                        className={`${inputClass} pl-9`}
-                                                        value={questionSearch}
-                                                        disabled={selectedOnly}
-                                                        onChange={(event) =>
-                                                            setQuestionSearch(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                        placeholder="Search questions"
-                                                    />
-                                                </div>
-                                                <select
-                                                    className={`${inputClass} sm:w-52`}
-                                                    aria-label="Filter question type"
-                                                    value={typeFilter}
-                                                    disabled={selectedOnly}
-                                                    onChange={(event) =>
-                                                        setTypeFilter(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                >
-                                                    <option value="">
-                                                        All question types
-                                                    </option>
-                                                    {pool.types.map((type) => (
-                                                        <option
-                                                            key={type.id}
-                                                            value={type.id}
-                                                        >
-                                                            {type.name} (
-                                                            {type.total})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm transition-colors hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-500/50 sm:ml-auto">
-                                                    <label
-                                                        htmlFor="qat-selected-only"
-                                                        className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200"
-                                                    >
-                                                        Selected only
+                                                        />
+                                                        <BookOpenIcon className="size-4 text-brand-600" />
+                                                        <span className="min-w-0 flex-1">
+                                                            <strong className="block text-sm">
+                                                                {book.name}
+                                                            </strong>
+                                                            <small className="text-slate-500">
+                                                                {
+                                                                    bookChapters.length
+                                                                }{' '}
+                                                                chapters
+                                                            </small>
+                                                        </span>
+                                                        <Badge tone="neutral">
+                                                            {
+                                                                bookChapters.filter(
+                                                                    (item) =>
+                                                                        chapterIds.includes(
+                                                                            item.id,
+                                                                        ),
+                                                                ).length
+                                                            }
+                                                            /
+                                                            {
+                                                                bookChapters.length
+                                                            }
+                                                        </Badge>
                                                     </label>
-                                                    <Switch
-                                                        id="qat-selected-only"
-                                                        aria-label="Selected only"
-                                                        checked={selectedOnly}
-                                                        onCheckedChange={
-                                                            setSelectedOnly
-                                                        }
-                                                        className="data-[state=checked]:bg-brand-600"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="max-h-[60vh] space-y-3 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-slate-50/30 p-2 dark:border-slate-700 dark:bg-slate-900/30">
-                                                {listedQuestions.map(
-                                                    (question) => (
-                                                        <div
-                                                            key={question.id}
-                                                            className={`rounded-xl border p-4 ${manual[question.id] ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}
-                                                        >
-                                                            <label className="flex cursor-pointer items-start gap-3">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="mt-1 size-4 shrink-0 accent-brand-600"
-                                                                    checked={
-                                                                        !!manual[
-                                                                            question
-                                                                                .id
-                                                                        ]
+                                                    {checked && (
+                                                        <div className="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/40">
+                                                            <div className="mb-3 flex items-center justify-between">
+                                                                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                                    Chapters
+                                                                </span>
+                                                                <label
+                                                                    className={
+                                                                        selectAllClass
                                                                     }
-                                                                    onChange={() =>
-                                                                        setManual(
-                                                                            (
-                                                                                current,
-                                                                            ) => {
-                                                                                const next =
-                                                                                    {
-                                                                                        ...current,
-                                                                                    };
-
-                                                                                if (
-                                                                                    next[
-                                                                                        question
-                                                                                            .id
-                                                                                    ]
-                                                                                ) {
-                                                                                    delete next[
-                                                                                        question
-                                                                                            .id
-                                                                                    ];
-                                                                                } else {
-                                                                                    next[
-                                                                                        question.id
-                                                                                    ] =
-                                                                                        {
-                                                                                            question,
-                                                                                            marks: question.is_objective
-                                                                                                ? 1
-                                                                                                : 2,
-                                                                                        };
-                                                                                }
-
-                                                                                return next;
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <div className="min-w-0 flex-1">
-                                                                    <QatQuestionStatement
-                                                                        question={
-                                                                            question
-                                                                        }
-                                                                    />
-                                                                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                                                                        <span className="rounded-md border border-brand-300 bg-brand-100 px-1.5 py-0.5 text-brand-800 shadow-sm dark:border-brand-500/50 dark:bg-brand-500/20 dark:text-brand-200">
-                                                                            {
-                                                                                question.type_name
-                                                                            }
-                                                                        </span>
-                                                                        <span
-                                                                            className={
-                                                                                questionMetaBadgeClass
-                                                                            }
-                                                                        >
-                                                                            Chapter:{' '}
-                                                                            {
-                                                                                question.chapter_name
-                                                                            }
-                                                                        </span>
-                                                                        {question.topic_name && (
-                                                                            <span
-                                                                                className={
-                                                                                    questionMetaBadgeClass
-                                                                                }
-                                                                            >
-                                                                                Topic:{' '}
-                                                                                {
-                                                                                    question.topic_name
-                                                                                }
-                                                                            </span>
-                                                                        )}
-                                                                        {question.source_label && (
-                                                                            <span
-                                                                                className={
-                                                                                    questionMetaBadgeClass
-                                                                                }
-                                                                            >
-                                                                                Source:{' '}
-                                                                                {
-                                                                                    question.source_label
-                                                                                }
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </label>
-                                                            {manual[
-                                                                question.id
-                                                            ] && (
-                                                                <div className="mt-2 flex items-center gap-2 pl-7">
-                                                                    <label
-                                                                        htmlFor={`qat-marks-${question.id}`}
-                                                                        className="text-xs font-semibold text-slate-600 dark:text-slate-300"
-                                                                    >
-                                                                        Marks:
-                                                                    </label>
+                                                                >
                                                                     <input
-                                                                        id={`qat-marks-${question.id}`}
-                                                                        type="number"
-                                                                        min="0.5"
-                                                                        max="20"
-                                                                        step="0.5"
-                                                                        className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                                                                        value={
-                                                                            manual[
-                                                                                question
-                                                                                    .id
-                                                                            ]
-                                                                                .marks
+                                                                        type="checkbox"
+                                                                        className="size-4 accent-brand-600"
+                                                                        checked={
+                                                                            bookChapters.length >
+                                                                                0 &&
+                                                                            bookChapters.every(
+                                                                                (
+                                                                                    item,
+                                                                                ) =>
+                                                                                    chapterIds.includes(
+                                                                                        item.id,
+                                                                                    ),
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            !bookChapters.length
                                                                         }
                                                                         onChange={(
                                                                             event,
                                                                         ) =>
-                                                                            setManual(
-                                                                                (
-                                                                                    current,
-                                                                                ) => ({
-                                                                                    ...current,
-                                                                                    [question.id]:
-                                                                                        {
-                                                                                            question,
-                                                                                            marks:
-                                                                                                Number(
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                ) ||
-                                                                                                1,
-                                                                                        },
-                                                                                }),
+                                                                            toggleChapterGroup(
+                                                                                bookChapters.map(
+                                                                                    (
+                                                                                        item,
+                                                                                    ) =>
+                                                                                        item.id,
+                                                                                ),
+                                                                                event
+                                                                                    .target
+                                                                                    .checked,
                                                                             )
                                                                         }
                                                                     />
-                                                                </div>
-                                                            )}
+                                                                    Select all
+                                                                </label>
+                                                            </div>
+                                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                                {bookChapters.map(
+                                                                    (
+                                                                        chapter,
+                                                                    ) => (
+                                                                        <label
+                                                                            key={
+                                                                                chapter.id
+                                                                            }
+                                                                            className="flex cursor-pointer items-center gap-2 rounded-md p-1.5 text-sm hover:bg-white dark:hover:bg-slate-800"
+                                                                        >
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="size-4 accent-brand-600"
+                                                                                checked={chapterIds.includes(
+                                                                                    chapter.id,
+                                                                                )}
+                                                                                onChange={() =>
+                                                                                    toggleChapter(
+                                                                                        chapter.id,
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                            <span className="truncate">
+                                                                                {
+                                                                                    chapter.name
+                                                                                }
+                                                                            </span>
+                                                                        </label>
+                                                                    ),
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    ),
-                                                )}
-                                                {!listedQuestions.length && (
-                                                    <EmptyState
-                                                        icon={FileTextIcon}
-                                                        title={
-                                                            selectedOnly
-                                                                ? 'No selected questions'
-                                                                : 'No matching questions'
-                                                        }
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                            </>
-                        )}
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </section>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
 
-                        {step === 4 && (
-                            <>
-                                <div>
-                                    <h2 className="text-lg font-semibold">
-                                        Review paper
-                                    </h2>
-                                </div>
-                                <div className="grid gap-3 sm:grid-cols-3">
-                                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-                                        <small className="text-slate-500">
-                                            Subjects
-                                        </small>
-                                        <strong className="mt-1 block text-xl">
-                                            {selectedSubjects.length}
-                                        </strong>
+                {selectedSubjects.length > 0 && (
+                    <>
+                        <div>
+                            <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
+                                Choose your syllabus
+                            </h2>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setSyllabus('custom')}
+                                className={`rounded-xl border p-4 text-left ${syllabus === 'custom' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                            >
+                                <strong className="block text-sm">
+                                    Custom syllabus
+                                </strong>
+                                <span className="mt-1 block text-xs text-slate-500">
+                                    Use the chapters selected above.
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSyllabus('qat')}
+                                className={`rounded-xl border p-4 text-left ${syllabus === 'qat' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                            >
+                                <strong className="block text-sm">
+                                    QAT monthly syllabus
+                                </strong>
+                                <span className="mt-1 block text-xs text-slate-500">
+                                    Use chapters mapped to selected preparation
+                                    months.
+                                </span>
+                            </button>
+                        </div>
+                        {syllabus === 'qat' && (
+                            <div className="space-y-3">
+                                <label className="block max-w-xs space-y-1 text-xs font-semibold text-slate-600">
+                                    Academic year
+                                    <select
+                                        className={inputClass}
+                                        value={activeYear}
+                                        onChange={(event) => {
+                                            setQatYear(event.target.value);
+                                            setMonths([]);
+                                        }}
+                                    >
+                                        {availableYears.map((year) => (
+                                            <option key={year} value={year}>
+                                                {year}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <h3 className="text-sm font-semibold">
+                                            Preparation months
+                                        </h3>
+                                        <p className="text-xs text-slate-500">
+                                            Only months mapped to your chosen
+                                            books are available.
+                                        </p>
                                     </div>
-                                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-                                        <small className="text-slate-500">
-                                            Questions
-                                        </small>
-                                        <strong className="mt-1 block text-xl">
-                                            {totalQuestions}
-                                        </strong>
-                                    </div>
-                                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-                                        <small className="text-slate-500">
-                                            Total marks
-                                        </small>
-                                        <strong className="mt-1 block text-xl">
-                                            {totalMarks}
-                                        </strong>
-                                    </div>
-                                </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                        Paper name
+                                    <label className={selectAllClass}>
                                         <input
-                                            className={inputClass}
-                                            value={name}
-                                            maxLength={150}
+                                            type="checkbox"
+                                            className="size-4 accent-brand-600"
+                                            checked={
+                                                monthChoices.length > 0 &&
+                                                monthChoices.every((month) =>
+                                                    months.includes(month),
+                                                )
+                                            }
+                                            disabled={!monthChoices.length}
                                             onChange={(event) =>
-                                                setName(event.target.value)
+                                                setMonths(
+                                                    event.target.checked
+                                                        ? monthChoices
+                                                        : [],
+                                                )
                                             }
                                         />
+                                        Select all months
                                     </label>
-                                    {mode === 'auto' ? (
-                                        <div className="space-y-1 text-xs font-semibold text-slate-600">
-                                            Duration
-                                            <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                                                {paperMinutes} minutes ·{' '}
-                                                {selectedTemplate?.name}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                            Duration (minutes)
-                                            <input
-                                                type="number"
-                                                min="10"
-                                                max="240"
-                                                className={inputClass}
-                                                value={minutes}
-                                                onChange={(event) =>
-                                                    setMinutes(
-                                                        Number(
-                                                            event.target.value,
-                                                        ),
-                                                    )
-                                                }
-                                            />
-                                        </label>
-                                    )}
                                 </div>
-                                {mode === 'auto' && (
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <fieldset className="space-y-1">
-                                            <legend className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                                Paper variants
-                                            </legend>
-                                            <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-                                                {[1, 2, 3, 4].map((count) => (
-                                                    <button
-                                                        key={count}
-                                                        type="button"
-                                                        aria-pressed={
-                                                            variants === count
-                                                        }
-                                                        onClick={() =>
-                                                            setVariants(count)
-                                                        }
-                                                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
-                                                    >
-                                                        {count}{' '}
-                                                        {count === 1
-                                                            ? 'Paper'
-                                                            : 'Papers'}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </fieldset>
-                                        <label className="flex items-end gap-2 pb-2 text-sm">
-                                            <input
-                                                type="checkbox"
-                                                checked={allowRepeat}
-                                                onChange={(event) =>
-                                                    setAllowRepeat(
-                                                        event.target.checked,
-                                                    )
-                                                }
-                                                className="size-4 accent-brand-600"
-                                            />
-                                            Allow repeats between variants
-                                        </label>
+                                <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                                    {monthChoices.map((month) => (
+                                        <button
+                                            type="button"
+                                            key={month}
+                                            onClick={() =>
+                                                setMonths((current) =>
+                                                    current.includes(month)
+                                                        ? current.filter(
+                                                              (item) =>
+                                                                  item !==
+                                                                  month,
+                                                          )
+                                                        : [
+                                                              ...current,
+                                                              month,
+                                                          ].sort(
+                                                              (a, b) => a - b,
+                                                          ),
+                                                )
+                                            }
+                                            className={`rounded-lg border px-3 py-2 text-sm ${months.includes(month) ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                        >
+                                            {MONTHS[month - 1]}
+                                        </button>
+                                    ))}
+                                </div>
+                                {selectedMonthDescriptions.length > 0 && (
+                                    <div
+                                        aria-live="polite"
+                                        className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-500/30 dark:bg-brand-500/5"
+                                    >
+                                        {selectedMonthDescriptions.map(
+                                            ({ month, books }) => (
+                                                <div
+                                                    key={month}
+                                                    className="space-y-2 border-t border-brand-100 pt-3 first:border-t-0 first:pt-0 dark:border-brand-500/20"
+                                                >
+                                                    <h5 className="text-sm font-semibold text-brand-700 dark:text-brand-300">
+                                                        {MONTHS[month - 1]}{' '}
+                                                        Syllabus
+                                                    </h5>
+                                                    {books.length ? (
+                                                        books.map((book) => (
+                                                            <div
+                                                                key={book.id}
+                                                                className="text-sm text-slate-700 dark:text-slate-200"
+                                                            >
+                                                                <span className="font-medium">
+                                                                    {book.name}
+                                                                    :{' '}
+                                                                </span>
+                                                                <span className="whitespace-pre-line">
+                                                                    {
+                                                                        book.description
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                            No description has
+                                                            been added for this
+                                                            month.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 )}
-                                {mode === 'auto' &&
-                                    !variantsHaveEnoughQuestions && (
-                                        <p className="text-sm text-amber-700 dark:text-amber-400">
-                                            This syllabus does not have enough
-                                            questions for the selected number of
-                                            paper variants.
-                                        </p>
-                                    )}
-                                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
-                                        <span>Question type</span>
-                                        <span className="text-right">
-                                            Total
-                                        </span>
-                                        <span className="text-right">
-                                            Required
-                                        </span>
-                                        <span className="text-right">
-                                            Marks
-                                        </span>
-                                    </div>
-                                    {reviewRows.map((row) => (
-                                        <div
-                                            key={row.id}
-                                            className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
-                                        >
-                                            <span className="truncate">
-                                                {row.name}
-                                            </span>
-                                            <strong className="text-right">
-                                                {row.count}
-                                            </strong>
-                                            <strong className="text-right">
-                                                {row.required}
-                                            </strong>
-                                            <strong className="text-right">
-                                                {row.marks}
-                                            </strong>
-                                        </div>
-                                    ))}
-                                    <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
-                                        <span>Total</span>
-                                        <span className="text-right">
-                                            {totalQuestions}
-                                        </span>
-                                        <span className="text-right">
-                                            {reviewRows.reduce(
-                                                (sum, row) =>
-                                                    sum + row.required,
-                                                0,
-                                            )}
-                                        </span>
-                                        <span className="text-right">
-                                            {totalMarks}
-                                        </span>
-                                    </div>
-                                </div>
-                                {saveError && (
-                                    <p
-                                        role="alert"
-                                        className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
-                                    >
-                                        {saveError}
+                                {!monthChoices.length && (
+                                    <p className="text-sm text-amber-700">
+                                        No month mappings have been added for
+                                        these books.
                                     </p>
                                 )}
-                            </>
+                            </div>
                         )}
-
-                        <div className="flex items-center justify-between border-t border-slate-200 pt-5 dark:border-slate-700">
-                            <Button
-                                variant="secondary"
-                                asChild={step === 0}
-                                onClick={
-                                    step === 0
-                                        ? undefined
-                                        : () =>
-                                              setStep((current) => current - 1)
-                                }
-                            >
-                                {step === 0 ? (
-                                    <Link href="/qa-tests">
-                                        <ArrowLeftIcon /> Previous
-                                    </Link>
-                                ) : (
-                                    <>
-                                        <ArrowLeftIcon /> Previous
-                                    </>
-                                )}
-                            </Button>
-                            {step === 4 ? (
-                                <Button
-                                    variant="primary"
-                                    onClick={generate}
-                                    disabled={
-                                        saving ||
-                                        !name.trim() ||
-                                        paperMinutes < 10 ||
-                                        paperMinutes > 240 ||
-                                        (mode === 'auto' &&
-                                            !variantsHaveEnoughQuestions)
-                                    }
-                                >
-                                    {saving ? 'Generating…' : 'Generate paper'}{' '}
-                                    <ArrowRightIcon />
-                                </Button>
+                        <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold">
+                                    Current syllabus coverage
+                                </h3>
+                                <Badge tone="info">
+                                    {coverage.length} chapters
+                                </Badge>
+                            </div>
+                            {coverage.length ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {coverage.map((chapter) => (
+                                        <Badge key={chapter.id} tone="neutral">
+                                            {
+                                                selectedSubjects.find(
+                                                    (subject) =>
+                                                        subject.id ===
+                                                        chapter.qat_subject_id,
+                                                )?.name
+                                            }{' '}
+                                            · {chapter.name}
+                                        </Badge>
+                                    ))}
+                                </div>
                             ) : (
-                                <Button
-                                    variant="primary"
-                                    onClick={nextStep}
-                                    disabled={!nextAllowed()}
-                                >
-                                    Next <ArrowRightIcon />
-                                </Button>
+                                <p className="mt-3 text-sm text-slate-500">
+                                    {syllabus === 'qat'
+                                        ? 'Select a month with mapped chapters.'
+                                        : 'Select chapters from the book above.'}
+                                </p>
                             )}
                         </div>
-                    </Card>
-                    {stepLabels.slice(step + 1, 5).map((label, offset) => {
-                        const index = step + offset + 1;
+                    </>
+                )}
 
-                        return (
-                            <Card
-                                key={label}
-                                id={`qat-step-${index}`}
-                                padding="none"
-                                className="min-w-0 scroll-mt-6 overflow-hidden"
+                {coverage.length > 0 && (
+                    <>
+                        <div>
+                            <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
+                                {mode === 'auto'
+                                    ? 'Choose a paper template'
+                                    : 'Pick questions manually'}
+                            </h2>
+                        </div>
+                        {poolError && (
+                            <p
+                                role="alert"
+                                className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
                             >
-                                <StepCardHeader
-                                    index={index}
-                                    label={label}
-                                    summary={stepSummaries[index]}
-                                    active={false}
-                                    available={canOpenStep(index)}
-                                    onClick={() => setStep(index)}
+                                {poolError}
+                            </p>
+                        )}
+                        {poolBusy && (
+                            <p className="text-sm text-slate-500">
+                                Loading QAT questions…
+                            </p>
+                        )}
+                        {!poolBusy &&
+                            poolScopeKey === questionScopeKey &&
+                            pool &&
+                            mode === 'auto' && (
+                                <div className="space-y-3">
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        {availableTemplates.map((template) => {
+                                            const rows = template.sections
+                                                .map((section) => ({
+                                                    ...section,
+                                                    type: pool.types.find(
+                                                        (type) =>
+                                                            type.id ===
+                                                            section.question_type_id,
+                                                    ),
+                                                }))
+                                                .sort(
+                                                    (left, right) =>
+                                                        (typeRanks.get(
+                                                            left.question_type_id,
+                                                        ) ??
+                                                            Number.MAX_SAFE_INTEGER) -
+                                                        (typeRanks.get(
+                                                            right.question_type_id,
+                                                        ) ??
+                                                            Number.MAX_SAFE_INTEGER),
+                                                );
+                                            const ready = rows.every(
+                                                (row) =>
+                                                    (row.type?.total ?? 0) >=
+                                                    row.quantity,
+                                            );
+
+                                            return (
+                                                <button
+                                                    key={template.id}
+                                                    type="button"
+                                                    aria-pressed={
+                                                        selectedTemplate?.id ===
+                                                        template.id
+                                                    }
+                                                    onClick={() =>
+                                                        setTemplateId(
+                                                            template.id,
+                                                        )
+                                                    }
+                                                    className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selectedTemplate?.id === template.id ? 'border-brand-500 bg-brand-50 shadow-sm dark:bg-brand-500/10' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            {template.category && (
+                                                                <Badge tone="info">
+                                                                    {
+                                                                        template.category
+                                                                    }
+                                                                </Badge>
+                                                            )}
+                                                            <h3 className="mt-2 font-semibold">
+                                                                {template.name}
+                                                            </h3>
+                                                            <p className="mt-1 text-xs text-slate-500">
+                                                                {
+                                                                    template.minutes
+                                                                }{' '}
+                                                                min ·{' '}
+                                                                {rows.reduce(
+                                                                    (
+                                                                        sum,
+                                                                        row,
+                                                                    ) =>
+                                                                        sum +
+                                                                        row.quantity,
+                                                                    0,
+                                                                )}{' '}
+                                                                total questions
+                                                            </p>
+                                                        </div>
+                                                        <span
+                                                            className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selectedTemplate?.id === template.id ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300'}`}
+                                                        >
+                                                            {selectedTemplate?.id ===
+                                                                template.id && (
+                                                                <CheckIcon className="size-3" />
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-xs dark:border-slate-700">
+                                                        {rows.map((row) => (
+                                                            <div
+                                                                key={
+                                                                    row.question_type_id
+                                                                }
+                                                                className="flex justify-between gap-2"
+                                                            >
+                                                                <span>
+                                                                    {row.type
+                                                                        ?.name ??
+                                                                        `Question type ${row.question_type_id}`}{' '}
+                                                                    ·{' '}
+                                                                    {
+                                                                        row.quantity
+                                                                    }{' '}
+                                                                    total ·{' '}
+                                                                    {row.required_questions ??
+                                                                        row.quantity}{' '}
+                                                                    required ×{' '}
+                                                                    {row.marks}
+                                                                </span>
+                                                                <strong>
+                                                                    {(row.required_questions ??
+                                                                        row.quantity) *
+                                                                        row.marks}
+                                                                </strong>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="mt-3 flex justify-between text-sm font-semibold">
+                                                        <span>Total marks</span>
+                                                        <span>
+                                                            {rows.reduce(
+                                                                (sum, row) =>
+                                                                    sum +
+                                                                    (row.required_questions ??
+                                                                        row.quantity) *
+                                                                        row.marks,
+                                                                0,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    {!ready && (
+                                                        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                                                            Not enough questions
+                                                            in the selected
+                                                            syllabus for this
+                                                            template.
+                                                        </p>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {!availableTemplates.length && (
+                                        <EmptyState
+                                            icon={FileTextIcon}
+                                            title="No templates for this book"
+                                            hint="Ask your administrator to add an active QAT template."
+                                        />
+                                    )}
+                                </div>
+                            )}
+                        {pool &&
+                            poolScopeKey === questionScopeKey &&
+                            mode === 'manual' &&
+                            (!poolBusy || selectedOnly) && (
+                                <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <div className="relative w-full sm:w-72">
+                                            <SearchIcon className="absolute left-3 top-2.5 size-4 text-slate-400" />
+                                            <input
+                                                className={`${inputClass} pl-9`}
+                                                value={questionSearch}
+                                                disabled={selectedOnly}
+                                                onChange={(event) =>
+                                                    setQuestionSearch(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Search questions"
+                                            />
+                                        </div>
+                                        <select
+                                            className={`${inputClass} sm:w-52`}
+                                            aria-label="Filter question type"
+                                            value={typeFilter}
+                                            disabled={selectedOnly}
+                                            onChange={(event) =>
+                                                setTypeFilter(
+                                                    event.target.value,
+                                                )
+                                            }
+                                        >
+                                            <option value="">
+                                                All question types
+                                            </option>
+                                            {pool.types.map((type) => (
+                                                <option
+                                                    key={type.id}
+                                                    value={type.id}
+                                                >
+                                                    {type.name} ({type.total})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm transition-colors hover:border-brand-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-500/50 sm:ml-auto">
+                                            <label
+                                                htmlFor="qat-selected-only"
+                                                className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200"
+                                            >
+                                                Selected only
+                                            </label>
+                                            <Switch
+                                                id="qat-selected-only"
+                                                aria-label="Selected only"
+                                                checked={selectedOnly}
+                                                onCheckedChange={
+                                                    setSelectedOnly
+                                                }
+                                                className="data-[state=checked]:bg-brand-600"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="max-h-[60vh] space-y-3 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-slate-50/30 p-2 dark:border-slate-700 dark:bg-slate-900/30">
+                                        {listedQuestions.map((question) => (
+                                            <div
+                                                key={question.id}
+                                                className={`rounded-xl border p-4 ${manual[question.id] ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}
+                                            >
+                                                <label className="flex cursor-pointer items-start gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="mt-1 size-4 shrink-0 accent-brand-600"
+                                                        checked={
+                                                            !!manual[
+                                                                question.id
+                                                            ]
+                                                        }
+                                                        onChange={() =>
+                                                            setManual(
+                                                                (current) => {
+                                                                    const next =
+                                                                        {
+                                                                            ...current,
+                                                                        };
+
+                                                                    if (
+                                                                        next[
+                                                                            question
+                                                                                .id
+                                                                        ]
+                                                                    ) {
+                                                                        delete next[
+                                                                            question
+                                                                                .id
+                                                                        ];
+                                                                    } else {
+                                                                        next[
+                                                                            question.id
+                                                                        ] = {
+                                                                            question,
+                                                                            marks: question.is_objective
+                                                                                ? 1
+                                                                                : 2,
+                                                                        };
+                                                                    }
+
+                                                                    return next;
+                                                                },
+                                                            )
+                                                        }
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                        <QatQuestionStatement
+                                                            question={question}
+                                                        />
+                                                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                                                            <span className="rounded-md border border-brand-300 bg-brand-100 px-1.5 py-0.5 text-brand-800 shadow-sm dark:border-brand-500/50 dark:bg-brand-500/20 dark:text-brand-200">
+                                                                {
+                                                                    question.type_name
+                                                                }
+                                                            </span>
+                                                            <span
+                                                                className={
+                                                                    questionMetaBadgeClass
+                                                                }
+                                                            >
+                                                                Chapter:{' '}
+                                                                {
+                                                                    question.chapter_name
+                                                                }
+                                                            </span>
+                                                            {question.topic_name && (
+                                                                <span
+                                                                    className={
+                                                                        questionMetaBadgeClass
+                                                                    }
+                                                                >
+                                                                    Topic:{' '}
+                                                                    {
+                                                                        question.topic_name
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                            {question.source_label && (
+                                                                <span
+                                                                    className={
+                                                                        questionMetaBadgeClass
+                                                                    }
+                                                                >
+                                                                    Source:{' '}
+                                                                    {
+                                                                        question.source_label
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                                {manual[question.id] && (
+                                                    <div className="mt-2 flex items-center gap-2 pl-7">
+                                                        <label
+                                                            htmlFor={`qat-marks-${question.id}`}
+                                                            className="text-xs font-semibold text-slate-600 dark:text-slate-300"
+                                                        >
+                                                            Marks:
+                                                        </label>
+                                                        <input
+                                                            id={`qat-marks-${question.id}`}
+                                                            type="number"
+                                                            min="0.5"
+                                                            max="20"
+                                                            step="0.5"
+                                                            className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                                            value={
+                                                                manual[
+                                                                    question.id
+                                                                ].marks
+                                                            }
+                                                            onChange={(event) =>
+                                                                setManual(
+                                                                    (
+                                                                        current,
+                                                                    ) => ({
+                                                                        ...current,
+                                                                        [question.id]:
+                                                                            {
+                                                                                question,
+                                                                                marks:
+                                                                                    Number(
+                                                                                        event
+                                                                                            .target
+                                                                                            .value,
+                                                                                    ) ||
+                                                                                    1,
+                                                                            },
+                                                                    }),
+                                                                )
+                                                            }
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {!listedQuestions.length && (
+                                            <EmptyState
+                                                icon={FileTextIcon}
+                                                title={
+                                                    selectedOnly
+                                                        ? 'No selected questions'
+                                                        : 'No matching questions'
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                    </>
+                )}
+
+                {poolScopeKey === questionScopeKey && totalQuestions > 0 && (
+                    <>
+                        <div>
+                            <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
+                                Review paper
+                            </h2>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
+                                <small className="text-slate-500">
+                                    Subjects
+                                </small>
+                                <strong className="mt-1 block text-xl">
+                                    {selectedSubjects.length}
+                                </strong>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
+                                <small className="text-slate-500">
+                                    Questions
+                                </small>
+                                <strong className="mt-1 block text-xl">
+                                    {totalQuestions}
+                                </strong>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
+                                <small className="text-slate-500">
+                                    Total marks
+                                </small>
+                                <strong className="mt-1 block text-xl">
+                                    {totalMarks}
+                                </strong>
+                            </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <label className="space-y-1 text-xs font-semibold text-slate-600">
+                                Paper name
+                                <input
+                                    className={inputClass}
+                                    value={name}
+                                    maxLength={150}
+                                    onChange={(event) =>
+                                        setName(event.target.value)
+                                    }
                                 />
-                            </Card>
-                        );
-                    })}
-                </div>
-                <Card className="space-y-4 lg:sticky lg:top-6">
-                    <div>
-                        <h2 className="text-sm font-semibold">Paper summary</h2>
-                        <p className="mt-1 text-xs text-slate-500">
-                            Step {step + 1} of 6
-                        </p>
-                    </div>
-                    <div className="space-y-3 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-slate-500">Mode</span>
-                            <strong>
-                                {mode === 'auto' ? 'Auto' : 'Manual'}
-                            </strong>
+                            </label>
+                            {mode === 'auto' ? (
+                                <div className="space-y-1 text-xs font-semibold text-slate-600">
+                                    Duration
+                                    <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                        {paperMinutes} minutes ·{' '}
+                                        {selectedTemplate?.name}
+                                    </div>
+                                </div>
+                            ) : (
+                                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                                    Duration (minutes)
+                                    <input
+                                        type="number"
+                                        min="10"
+                                        max="240"
+                                        className={inputClass}
+                                        value={minutes}
+                                        onChange={(event) =>
+                                            setMinutes(
+                                                Number(event.target.value),
+                                            )
+                                        }
+                                    />
+                                </label>
+                            )}
                         </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-500">Classes</span>
-                            <strong>{selectedClasses.length}</strong>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-500">Books</span>
-                            <strong>{selectedSubjects.length}</strong>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-500">Chapters</span>
-                            <strong>{coverage.length}</strong>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-500">Syllabus</span>
-                            <strong>
-                                {syllabus === 'qat' ? 'QAT monthly' : 'Custom'}
-                            </strong>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-500">Questions</span>
-                            <strong>{totalQuestions}</strong>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-500">Marks</span>
-                            <strong>{totalMarks}</strong>
-                        </div>
-                    </div>
-                    {selectedClasses.length > 0 && (
-                        <div className="flex flex-wrap gap-1 border-t border-slate-200 pt-3 dark:border-slate-700">
-                            {selectedClasses.map((item) => (
-                                <Badge key={item.id} tone="info">
-                                    {item.name}
-                                </Badge>
+                        {mode === 'auto' && (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <fieldset className="space-y-1">
+                                    <legend className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                        Paper variants
+                                    </legend>
+                                    <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+                                        {[1, 2, 3, 4].map((count) => (
+                                            <button
+                                                key={count}
+                                                type="button"
+                                                aria-pressed={
+                                                    variants === count
+                                                }
+                                                onClick={() =>
+                                                    setVariants(count)
+                                                }
+                                                className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
+                                            >
+                                                {count}{' '}
+                                                {count === 1
+                                                    ? 'Paper'
+                                                    : 'Papers'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </fieldset>
+                                <label className="flex items-end gap-2 pb-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={allowRepeat}
+                                        onChange={(event) =>
+                                            setAllowRepeat(event.target.checked)
+                                        }
+                                        className="size-4 accent-brand-600"
+                                    />
+                                    Allow repeats between variants
+                                </label>
+                            </div>
+                        )}
+                        {mode === 'auto' && !variantsHaveEnoughQuestions && (
+                            <p className="text-sm text-amber-700 dark:text-amber-400">
+                                This syllabus does not have enough questions for
+                                the selected number of paper variants.
+                            </p>
+                        )}
+                        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
+                                <span>Question type</span>
+                                <span className="text-right">Total</span>
+                                <span className="text-right">Required</span>
+                                <span className="text-right">Marks</span>
+                            </div>
+                            {reviewRows.map((row) => (
+                                <div
+                                    key={row.id}
+                                    className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
+                                >
+                                    <span className="truncate">{row.name}</span>
+                                    <strong className="text-right">
+                                        {row.count}
+                                    </strong>
+                                    <strong className="text-right">
+                                        {row.required}
+                                    </strong>
+                                    <strong className="text-right">
+                                        {row.marks}
+                                    </strong>
+                                </div>
                             ))}
+                            <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
+                                <span>Total</span>
+                                <span className="text-right">
+                                    {totalQuestions}
+                                </span>
+                                <span className="text-right">
+                                    {reviewRows.reduce(
+                                        (sum, row) => sum + row.required,
+                                        0,
+                                    )}
+                                </span>
+                                <span className="text-right">{totalMarks}</span>
+                            </div>
                         </div>
-                    )}
-                    {targetSubject && step >= 3 && (
-                        <p className="text-xs text-slate-500">
-                            Target: {targetClass?.name} · {targetSubject.name}
-                        </p>
-                    )}
-                </Card>
-            </div>
+                        {saveError && (
+                            <p
+                                role="alert"
+                                className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
+                            >
+                                {saveError}
+                            </p>
+                        )}
+                    </>
+                )}
+
+                <div className="flex justify-end border-t border-slate-200 pt-5 dark:border-slate-700">
+                    <Button
+                        variant="primary"
+                        onClick={generate}
+                        disabled={saving || !canGenerate}
+                    >
+                        {saving ? 'Generating…' : 'Generate paper'}
+                        <ArrowRightIcon />
+                    </Button>
+                </div>
+            </Card>
         </div>
     );
 }
