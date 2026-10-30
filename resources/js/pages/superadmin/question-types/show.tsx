@@ -33,6 +33,7 @@ interface QuestionTypeData {
     is_single: boolean;
     is_objective: boolean;
     question_text_rtl: boolean;
+    column_per_row: number;
     schema_key: string;
     schema: {
         key: string;
@@ -278,6 +279,12 @@ export default function ShowQuestionType({
                                         : 'Left to right'}
                                 </span>
                             </InfoRow>
+
+                            {!questionType.is_objective && (
+                                <InfoRow label="Default columns on paper">
+                                    <span>{questionType.column_per_row}</span>
+                                </InfoRow>
+                            )}
 
                             {answerMode && (
                                 <InfoRow label="Answer Mode">

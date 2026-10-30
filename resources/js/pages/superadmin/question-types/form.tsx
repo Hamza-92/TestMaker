@@ -46,9 +46,10 @@ export interface QuestionTypeFormData {
     is_objective: boolean;
     options_only: boolean;
     question_text_rtl: boolean;
+    column_per_row: number;
     schema_key: string;
     status: string;
-    [key: string]: boolean | string;
+    [key: string]: boolean | number | string;
 }
 
 interface QuestionTypeFormProps {
@@ -237,6 +238,33 @@ export function QuestionTypeForm({
                             form.setData('question_text_rtl', checked)
                         }
                     />
+                    {!form.data.is_objective ? (
+                        <Field
+                            label="Default columns on paper"
+                            error={form.errors.column_per_row}
+                        >
+                            <Select
+                                value={String(form.data.column_per_row)}
+                                onValueChange={(value) =>
+                                    form.setData('column_per_row', Number(value))
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {[1, 2, 3, 4, 5].map((columns) => (
+                                        <SelectItem
+                                            key={columns}
+                                            value={String(columns)}
+                                        >
+                                            {columns}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </Field>
+                    ) : null}
                 </div>
             ) : null}
         </>

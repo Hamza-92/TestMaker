@@ -141,6 +141,7 @@ it('creates a question type and normalizes dependent fields', function () {
             'is_single' => false,
             'is_objective' => false,
             'question_text_rtl' => true,
+            'column_per_row' => 3,
             'schema_key' => 'subjective_standard',
             'status' => true,
         ]);
@@ -156,7 +157,42 @@ it('creates a question type and normalizes dependent fields', function () {
         ->and($questionType->description_label)->toBe('Guidance')
         ->and($questionType->objective_type_id)->toBeNull()
         ->and($questionType->question_text_rtl)->toBeTrue()
-        ->and($questionType->column_per_row)->toBe(1);
+        ->and($questionType->column_per_row)->toBe(3);
+});
+
+it('edits the subjective paper column default within the supported range', function () {
+    $admin = makeQuestionTypeSuperAdmin();
+    $questionType = makeQuestionType($admin, ['column_per_row' => 2]);
+
+    $this->actingAs($admin)
+        ->get(route('superadmin.question-types.edit', $questionType))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('superadmin/question-types/edit')
+            ->where('questionType.column_per_row', 2),
+        );
+
+    $payload = [
+        'name' => $questionType->name,
+        'heading_en' => $questionType->heading_en,
+        'have_answer' => true,
+        'is_single' => false,
+        'is_objective' => false,
+        'schema_key' => 'subjective_standard',
+        'status' => true,
+        'column_per_row' => 4,
+    ];
+
+    $this->put(route('superadmin.question-types.update', $questionType), $payload)
+        ->assertSessionHasNoErrors();
+
+    expect($questionType->fresh()->column_per_row)->toBe(4);
+
+    $this->put(route('superadmin.question-types.update', $questionType), [
+        ...$payload,
+        'column_per_row' => 6,
+    ])->assertSessionHasErrors('column_per_row');
+
+    expect($questionType->fresh()->column_per_row)->toBe(4);
 });
 
 it('updates a question type', function () {

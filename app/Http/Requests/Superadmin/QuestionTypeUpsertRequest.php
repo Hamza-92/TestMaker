@@ -39,6 +39,7 @@ class QuestionTypeUpsertRequest extends FormRequest
             'is_objective' => ['required', 'boolean'],
             'options_only' => ['sometimes', 'boolean'],
             'question_text_rtl' => ['sometimes', 'boolean'],
+            'column_per_row' => ['sometimes', 'integer', 'between:1,5'],
             'schema_key' => [
                 'required',
                 'string',

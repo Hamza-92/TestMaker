@@ -491,6 +491,7 @@ class QuestionTypeController extends Controller
                 'is_objective' => $questionType->is_objective,
                 'options_only' => $questionType->options_only,
                 'question_text_rtl' => $questionType->question_text_rtl,
+                'column_per_row' => $questionType->column_per_row,
                 'schema_key' => QuestionTypeSchemaRegistry::resolve(
                     $questionType->schema_key,
                     $questionType->is_objective,
@@ -509,7 +510,7 @@ class QuestionTypeController extends Controller
 
     public function update(QuestionTypeUpsertRequest $request, QuestionType $questionType)
     {
-        $payload = $this->buildPayload($request->validated(), $questionType->created_by);
+        $payload = $this->buildPayload($request->validated(), $questionType->created_by, $questionType);
 
         $oldValues = $this->auditValues($questionType->load('objectiveType:id,name'));
         $questionType->update($payload);
@@ -563,7 +564,7 @@ class QuestionTypeController extends Controller
             ->with('success', 'Question type deleted successfully.');
     }
 
-    private function buildPayload(array $validated, ?int $creatorId): array
+    private function buildPayload(array $validated, ?int $creatorId, ?QuestionType $existing = null): array
     {
         $isObjective = (bool) ($validated['is_objective'] ?? false);
         $schema = QuestionTypeSchemaRegistry::resolve(
@@ -595,7 +596,9 @@ class QuestionTypeController extends Controller
             'question_text_rtl' => (bool) ($validated['question_text_rtl'] ?? false),
             'schema_key' => $schema['key'],
             'objective_type_id' => $legacy['objective_type_id'],
-            'column_per_row' => $legacy['column_per_row'],
+            'column_per_row' => $isObjective
+                ? 1
+                : (int) ($validated['column_per_row'] ?? $existing?->column_per_row ?? 1),
             'status' => $validated['status'],
             'created_by' => $creatorId,
         ];
@@ -613,6 +616,7 @@ class QuestionTypeController extends Controller
             'is_objective' => $questionType->is_objective,
             'options_only' => $questionType->options_only,
             'question_text_rtl' => $questionType->question_text_rtl,
+            'column_per_row' => $questionType->column_per_row,
             'schema' => QuestionTypeSchemaRegistry::resolve(
                 $questionType->schema_key,
                 $questionType->is_objective,
@@ -871,6 +875,7 @@ class QuestionTypeController extends Controller
             'is_objective' => $questionType->is_objective,
             'options_only' => $questionType->options_only,
             'question_text_rtl' => $questionType->question_text_rtl,
+            'column_per_row' => $questionType->column_per_row,
             'schema_key' => $schema['key'],
             'schema' => $schema,
             'status' => $questionType->status,

@@ -15,6 +15,7 @@ interface QuestionTypePayload {
     is_objective: boolean;
     options_only: boolean;
     question_text_rtl: boolean;
+    column_per_row: number;
     schema_key: string;
     status: number;
 }
@@ -40,6 +41,7 @@ export default function EditQuestionType({
         is_objective: questionType.is_objective,
         options_only: questionType.options_only,
         question_text_rtl: questionType.question_text_rtl,
+        column_per_row: questionType.column_per_row,
         schema_key: questionType.schema_key,
         status: String(questionType.status),
     });
