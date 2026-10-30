@@ -41,6 +41,9 @@ interface FloatingComboboxProps {
     maxVisibleOptions?: number;
     /** Show long option names on multiple lines instead of truncating them. */
     wrapOptionLabels?: boolean;
+    visibleScrollbar?: boolean;
+    /** Keep wheel events on a portaled list from reaching a modal's scroll lock. */
+    stopWheelPropagation?: boolean;
 }
 
 /**
@@ -64,6 +67,8 @@ export function FloatingCombobox({
     className,
     maxVisibleOptions,
     wrapOptionLabels = false,
+    visibleScrollbar = false,
+    stopWheelPropagation = false,
 }: FloatingComboboxProps) {
     const [query, setQuery] = useState('');
 
@@ -233,6 +238,11 @@ export function FloatingCombobox({
                     modal={false}
                     anchor={{ to: 'bottom start', gap: 6, padding: 8 }}
                     style={{ '--anchor-max-height': '14rem' } as CSSProperties}
+                    onWheel={
+                        stopWheelPropagation
+                            ? (event) => event.stopPropagation()
+                            : undefined
+                    }
                     className={cn(
                         // Headless UI sets max-height inline for anchored panels,
                         // so --anchor-max-height above caps this scrollable list.
@@ -240,7 +250,9 @@ export function FloatingCombobox({
                         'dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40',
                         'origin-top transition duration-100 ease-out',
                         'data-[closed]:scale-95 data-[closed]:opacity-0',
-                        'scrollbar-slim',
+                        visibleScrollbar
+                            ? 'scrollbar-slim-muted'
+                            : 'scrollbar-slim',
                     )}
                 >
                     {/* Empty state */}

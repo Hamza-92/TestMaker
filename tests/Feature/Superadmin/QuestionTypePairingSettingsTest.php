@@ -5,6 +5,7 @@ use App\Models\Chapter;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
+use App\Models\QuestionTypeOrder;
 use App\Models\QuestionTypeOrGroup;
 use App\Models\SchoolClass;
 use App\Models\Subject;
@@ -173,6 +174,42 @@ it('shows only subjective question types available in the exact selected scope',
             ->has('questionTypes', 1)
             ->where('questionTypes.0.id', $fixture['outside']->id),
         );
+});
+
+it('includes subjective types saved in the scope order before they have active questions', function () {
+    $fixture = makePairingFixture();
+    $scope = [
+        'pattern_id' => $fixture['pattern']->id,
+        'class_id' => $fixture['class']->id,
+        'subject_id' => $fixture['subject']->id,
+    ];
+    $pending = makePairingQuestionType($fixture['admin'], 'Pending Subjective Type');
+    QuestionTypeOrder::create([
+        ...$scope,
+        'question_type_id' => $pending->id,
+        'sort_order' => 3,
+    ]);
+
+    $this->actingAs($fixture['admin'])
+        ->get(route('superadmin.question-type-pairings', $scope))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('superadmin/question-type-pairings')
+            ->has('questionTypes', 3)
+            ->where('questionTypes.1.id', $pending->id),
+        );
+
+    $this->actingAs($fixture['admin'])
+        ->post(route('superadmin.question-type-pairings.store'), [
+            ...$scope,
+            'question_type_ids' => [$fixture['first']->id, $pending->id],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $this->assertDatabaseHas('question_type_or_group_members', [
+        'question_type_id' => $pending->id,
+    ]);
 });
 
 it('normalizes bidirectional pairs and rejects duplicate or invalid pairings', function () {

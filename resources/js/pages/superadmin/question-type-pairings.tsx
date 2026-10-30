@@ -494,8 +494,8 @@ export default function QuestionTypePairings({
 
                     {scopedTypes.length < 2 ? (
                         <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                            At least two active subjective types with questions
-                            are required to create a group.
+                            At least two subjective question types are required
+                            to create a group.
                         </div>
                     ) : (
                         <div className="space-y-4 py-2">
@@ -664,6 +664,8 @@ function TypeSelect({
             label={label}
             options={options}
             value={findComboboxOption(options, value || null)}
+            stopWheelPropagation
+            visibleScrollbar
             onChange={(option) =>
                 onChange(option === null ? null : Number(option.id))
             }

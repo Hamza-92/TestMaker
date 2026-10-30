@@ -124,7 +124,7 @@ class QuestionTypePairingController extends Controller
             }
 
             $this->validateScope($group->pattern_id, $group->class_id, $group->subject_id);
-            $availableIds = $this->scopedQuestionTypeQuery(
+            $availableIds = $this->availableQuestionTypeQuery(
                 $group->pattern_id,
                 $group->class_id,
                 $group->subject_id,
@@ -312,6 +312,27 @@ class QuestionTypePairingController extends Controller
         return QuestionType::query()
             ->where('is_objective', false)
             ->where('status', 1)
+            ->where(function (Builder $query) use ($patternId, $classId, $subjectId): void {
+                $query->whereIn('question_types.id', DB::table('question_type_orders')
+                    ->where('pattern_id', $patternId)
+                    ->where('class_id', $classId)
+                    ->where('subject_id', $subjectId)
+                    ->select('question_type_id'))
+                    ->orWhereIn('question_types.id', DB::table('questions')
+                        ->join('chapters', 'chapters.id', '=', 'questions.chapter_id')
+                        ->where('questions.status', 1)
+                        ->where('chapters.pattern_id', $patternId)
+                        ->where('chapters.class_id', $classId)
+                        ->where('chapters.subject_id', $subjectId)
+                        ->select('questions.question_type_id'));
+            });
+    }
+
+    private function availableQuestionTypeQuery(int $patternId, int $classId, int $subjectId): Builder
+    {
+        return QuestionType::query()
+            ->where('is_objective', false)
+            ->where('status', 1)
             ->whereIn('question_types.id', DB::table('questions')
                 ->join('chapters', 'chapters.id', '=', 'questions.chapter_id')
                 ->where('questions.status', 1)
@@ -336,7 +357,7 @@ class QuestionTypePairingController extends Controller
 
     private function groups(int $patternId, int $classId, int $subjectId): array
     {
-        $availableIds = $this->scopedQuestionTypeQuery($patternId, $classId, $subjectId)
+        $availableIds = $this->availableQuestionTypeQuery($patternId, $classId, $subjectId)
             ->pluck('id')
             ->map(fn ($id) => (int) $id);
 
