@@ -12,6 +12,8 @@ class PaperQuestionSection extends Model
         'class_id',
         'subject_id',
         'sort_order',
+        'label_en',
+        'label_ur',
         'created_by',
     ];
 

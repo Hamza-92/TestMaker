@@ -13914,6 +13914,8 @@ function PaperSectionHeading({
     index,
     medium,
     settings,
+    labelEnglish,
+    labelUrdu,
     totalMarks,
     questionCount,
     marksEach,
@@ -13922,13 +13924,15 @@ function PaperSectionHeading({
     index: number;
     medium: 'English' | 'Urdu' | 'Both';
     settings: PaperSettings;
+    labelEnglish?: string | null;
+    labelUrdu?: string | null;
     totalMarks?: number;
     questionCount?: number;
     marksEach?: number;
     federal?: boolean;
 }) {
-    const english = `${federal ? 'SECTION –' : 'Section'} ${englishSectionIdentifier(index)}`;
-    const urdu = `حصہ ${urduSectionIdentifier(index)}`;
+    const english = labelEnglish?.trim() || `${federal ? 'SECTION –' : 'Section'} ${englishSectionIdentifier(index)}`;
+    const urdu = labelUrdu?.trim() || `حصہ ${urduSectionIdentifier(index)}`;
     const openingBracket =
         !federal && settings.sectionHeadingBrackets ? '(' : '';
     const closingBracket =
@@ -14748,6 +14752,8 @@ export function GeneratedPaperView({
         const logicalSections = targetPaper.sections.filter(
             (section) => section.orRole !== 'alternative',
         );
+        const showObjectiveSection =
+            targetPaper.sectioning?.showObjectiveSection !== false;
         const subjectiveHeadingIndexByKey = new Map<string, number>();
 
         for (const logicalSection of logicalSections) {
@@ -14760,7 +14766,8 @@ export function GeneratedPaperView({
             ) {
                 subjectiveHeadingIndexByKey.set(
                     key,
-                    subjectiveHeadingIndexByKey.size + 1,
+                    subjectiveHeadingIndexByKey.size +
+                        (showObjectiveSection ? 1 : 0),
                 );
             }
         }
@@ -14783,6 +14790,8 @@ export function GeneratedPaperView({
                 targetPaper.sectioning?.active &&
                 settings.showSections &&
                 section.paperSectionKey &&
+                (showObjectiveSection ||
+                    section.paperSectionKey !== OBJECTIVE_PAPER_SECTION_KEY) &&
                 section.paperSectionKey !==
                     previousLogicalSection?.paperSectionKey,
             );
@@ -14799,6 +14808,26 @@ export function GeneratedPaperView({
                         index={paperSectionHeadingIndex}
                         medium={targetPaper.sectioning?.medium ?? 'English'}
                         settings={settings}
+                        labelEnglish={
+                            section.paperSectionKey ===
+                            OBJECTIVE_PAPER_SECTION_KEY
+                                ? targetPaper.sectioning?.objectiveLabelEnglish
+                                : targetPaper.sectioning?.groups.find(
+                                      (group) =>
+                                          `configured:${group.id}` ===
+                                          section.paperSectionKey,
+                                  )?.labelEnglish
+                        }
+                        labelUrdu={
+                            section.paperSectionKey ===
+                            OBJECTIVE_PAPER_SECTION_KEY
+                                ? targetPaper.sectioning?.objectiveLabelUrdu
+                                : targetPaper.sectioning?.groups.find(
+                                      (group) =>
+                                          `configured:${group.id}` ===
+                                          section.paperSectionKey,
+                                  )?.labelUrdu
+                        }
                     />
                 ) : null;
             const primary = renderPaperSection(

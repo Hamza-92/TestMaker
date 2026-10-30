@@ -28,12 +28,11 @@ class PaperQuestionSectionController extends Controller
             ],
             'questionTypes' => $scope === null ? [] : $this->questionTypes(...$scope),
             'sections' => $scope === null ? [] : $this->sections(...$scope),
-            'sectioningActive' => $scope !== null && PaperQuestionSectionScope::query()
+            'sectionSettings' => $scope === null ? null : PaperQuestionSectionScope::query()
                 ->where('pattern_id', $scope[0])
                 ->where('class_id', $scope[1])
                 ->where('subject_id', $scope[2])
-                ->where('is_active', true)
-                ->exists(),
+                ->first(['is_active', 'show_objective_section', 'objective_label_en', 'objective_label_ur']),
         ]);
     }
 
@@ -44,6 +43,9 @@ class PaperQuestionSectionController extends Controller
             'class_id' => ['required', 'integer', 'exists:classes,id'],
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
             'is_active' => ['required', 'boolean'],
+            'show_objective_section' => ['sometimes', 'required', 'boolean'],
+            'objective_label_en' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'objective_label_ur' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
         $patternId = (int) $validated['pattern_id'];
         $classId = (int) $validated['class_id'];
@@ -53,12 +55,20 @@ class PaperQuestionSectionController extends Controller
             throw ValidationException::withMessages(['subject_id' => 'The selected scope is not linked.']);
         }
 
+        $settings = ['is_active' => (bool) $validated['is_active'], 'updated_by' => $request->user()?->id];
+        foreach (['show_objective_section', 'objective_label_en', 'objective_label_ur'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $value = $validated[$field];
+                $settings[$field] = is_string($value) && trim($value) === '' ? null : $value;
+            }
+        }
+
         PaperQuestionSectionScope::query()->updateOrCreate(
             ['pattern_id' => $patternId, 'class_id' => $classId, 'subject_id' => $subjectId],
-            ['is_active' => (bool) $validated['is_active'], 'updated_by' => $request->user()?->id],
+            $settings,
         );
 
-        return back()->with('success', $validated['is_active'] ? 'Paper sections activated.' : 'Paper sections deactivated.');
+        return back()->with('success', 'Paper section settings saved.');
     }
 
     public function store(Request $request)
@@ -69,6 +79,8 @@ class PaperQuestionSectionController extends Controller
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
             'question_type_ids' => ['required', 'array', 'min:1'],
             'question_type_ids.*' => ['required', 'integer', 'distinct', 'exists:question_types,id'],
+            'label_en' => ['nullable', 'string', 'max:255'],
+            'label_ur' => ['nullable', 'string', 'max:255'],
         ]);
         $patternId = (int) $validated['pattern_id'];
         $classId = (int) $validated['class_id'];
@@ -77,7 +89,7 @@ class PaperQuestionSectionController extends Controller
 
         $this->validateSelection($patternId, $classId, $subjectId, $typeIds);
 
-        DB::transaction(function () use ($request, $patternId, $classId, $subjectId, $typeIds): void {
+        DB::transaction(function () use ($request, $validated, $patternId, $classId, $subjectId, $typeIds): void {
             $nextOrder = ((int) PaperQuestionSection::query()
                 ->where('pattern_id', $patternId)
                 ->where('class_id', $classId)
@@ -89,6 +101,8 @@ class PaperQuestionSectionController extends Controller
                 'class_id' => $classId,
                 'subject_id' => $subjectId,
                 'sort_order' => max(2, $nextOrder),
+                'label_en' => trim($validated['label_en'] ?? '') ?: null,
+                'label_ur' => trim($validated['label_ur'] ?? '') ?: null,
                 'created_by' => $request->user()?->id,
             ]);
             $this->replaceMembers($section, $typeIds);
@@ -102,11 +116,24 @@ class PaperQuestionSectionController extends Controller
         $validated = $request->validate([
             'question_type_ids' => ['required', 'array', 'min:1'],
             'question_type_ids.*' => ['required', 'integer', 'distinct', 'exists:question_types,id'],
+            'label_en' => ['nullable', 'string', 'max:255'],
+            'label_ur' => ['nullable', 'string', 'max:255'],
         ]);
         $typeIds = array_values(array_unique(array_map('intval', $validated['question_type_ids'])));
 
         $this->validateSelection($section->pattern_id, $section->class_id, $section->subject_id, $typeIds, $section->id);
-        DB::transaction(fn () => $this->replaceMembers($section, $typeIds));
+        DB::transaction(function () use ($section, $typeIds, $validated): void {
+            $labels = [];
+            foreach (['label_en', 'label_ur'] as $field) {
+                if (array_key_exists($field, $validated)) {
+                    $labels[$field] = trim($validated[$field] ?? '') ?: null;
+                }
+            }
+            if ($labels !== []) {
+                $section->update($labels);
+            }
+            $this->replaceMembers($section, $typeIds);
+        });
 
         return back()->with('success', 'Paper section updated successfully.');
     }
@@ -169,6 +196,8 @@ class PaperQuestionSectionController extends Controller
             ->orderBy('sort_order')->get()->map(fn (PaperQuestionSection $section) => [
                 'id' => $section->id,
                 'sort_order' => $section->sort_order,
+                'label_en' => $section->label_en,
+                'label_ur' => $section->label_ur,
                 'question_types' => $section->members->map(fn ($member) => [
                     'id' => $member->question_type_id,
                     'name' => $member->questionType?->name ?? 'Unknown type',

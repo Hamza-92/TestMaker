@@ -130,11 +130,17 @@ export interface GeneratedPaperSection {
 export interface GeneratedPaperSectionGroup {
     id: number;
     questionTypeIds: number[];
+    labelEnglish?: string | null;
+    labelUrdu?: string | null;
 }
 
 export interface GeneratedPaperSectioning {
     active: boolean;
     groups: GeneratedPaperSectionGroup[];
+    /** Simple paper sections only; false lets subjective headings begin at A. */
+    showObjectiveSection?: boolean;
+    objectiveLabelEnglish?: string | null;
+    objectiveLabelUrdu?: string | null;
     medium?: 'English' | 'Urdu' | 'Both';
     /** True when a scoped custom layout is authoritative for this paper. */
     custom?: boolean;

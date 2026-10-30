@@ -37,7 +37,15 @@ interface TypeOption {
 interface PaperSection {
     id: number;
     sort_order: number;
+    label_en: string | null;
+    label_ur: string | null;
     question_types: TypeOption[];
+}
+interface SectionSettings {
+    is_active: boolean;
+    show_objective_section: boolean;
+    objective_label_en: string | null;
+    objective_label_ur: string | null;
 }
 
 export default function PaperQuestionSections({
@@ -45,13 +53,13 @@ export default function PaperQuestionSections({
     selectedScope,
     questionTypes,
     sections,
-    sectioningActive,
+    sectionSettings,
 }: {
     scopeCatalog: ScopeCatalog;
     selectedScope: Scope | null;
     questionTypes: TypeOption[];
     sections: PaperSection[];
-    sectioningActive: boolean;
+    sectionSettings: SectionSettings | null;
 }) {
     const { can } = usePermission();
     const canEdit = can('question_types.edit');
@@ -67,6 +75,9 @@ export default function PaperQuestionSections({
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<PaperSection | null>(null);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [labelEnglish, setLabelEnglish] = useState('');
+    const [labelUrdu, setLabelUrdu] = useState('');
+    const [objectiveFormOpen, setObjectiveFormOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<PaperSection | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [scopeToggleBusy, setScopeToggleBusy] = useState(false);
@@ -98,6 +109,9 @@ export default function PaperQuestionSections({
         selectedScope?.pattern_id === patternId &&
         selectedScope?.class_id === classId &&
         selectedScope?.subject_id === subjectId;
+    const sectioningActive = sectionSettings?.is_active ?? false;
+    const showObjectiveSection =
+        sectionSettings?.show_objective_section ?? true;
     const assignedElsewhere = new Set(
         sections
             .filter((section) => section.id !== editing?.id)
@@ -133,12 +147,16 @@ export default function PaperQuestionSections({
         setFormOpen(false);
         setEditing(null);
         setSelectedIds([]);
+        setLabelEnglish('');
+        setLabelUrdu('');
         setErrors({});
     };
 
     const openCreate = () => {
         setEditing(null);
         setSelectedIds([]);
+        setLabelEnglish('');
+        setLabelUrdu('');
         setErrors({});
         setFormOpen(true);
     };
@@ -146,6 +164,8 @@ export default function PaperQuestionSections({
     const openEdit = (section: PaperSection) => {
         setEditing(section);
         setSelectedIds(section.question_types.map((type) => type.id));
+        setLabelEnglish(section.label_en ?? '');
+        setLabelUrdu(section.label_ur ?? '');
         setErrors({});
         setFormOpen(true);
     };
@@ -166,6 +186,8 @@ export default function PaperQuestionSections({
                 class_id: classId,
                 subject_id: subjectId,
                 question_type_ids: selectedIds,
+                label_en: labelEnglish,
+                label_ur: labelUrdu,
             },
             {
                 preserveScroll: true,
@@ -176,7 +198,10 @@ export default function PaperQuestionSections({
         );
     };
 
-    const toggleScope = (isActive: boolean) => {
+    const saveScope = (
+        changes: Record<string, string | boolean>,
+        onSuccess?: () => void,
+    ) => {
         if (!patternId || !classId || !subjectId || scopeToggleBusy) {
             return;
         }
@@ -188,14 +213,19 @@ export default function PaperQuestionSections({
                 pattern_id: patternId,
                 class_id: classId,
                 subject_id: subjectId,
-                is_active: isActive,
+                is_active: sectioningActive,
+                ...changes,
             },
             {
                 preserveScroll: true,
+                onSuccess,
+                onError: setErrors,
                 onFinish: () => setScopeToggleBusy(false),
             },
         );
     };
+    const toggleScope = (isActive: boolean) =>
+        saveScope({ is_active: isActive });
 
     return (
         <>
@@ -262,8 +292,8 @@ export default function PaperQuestionSections({
                                     Configured sections
                                 </h2>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    Section A is reserved for all objective
-                                    question types.
+                                    Configure objective and subjective section
+                                    headings for this subject.
                                 </p>
                             </div>
                             {canEdit && (
@@ -295,16 +325,51 @@ export default function PaperQuestionSections({
                             )}
                         </div>
                         <SectionRow
-                            label="Section A"
+                            label={
+                                showObjectiveSection
+                                    ? 'Section A'
+                                    : 'Objective section'
+                            }
                             types={[
                                 { id: 0, name: 'All objective question types' },
                             ]}
-                            locked
+                            detail={[
+                                showObjectiveSection ? 'Shown' : 'Hidden',
+                                sectionSettings?.objective_label_en,
+                                sectionSettings?.objective_label_ur,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            onEdit={
+                                canEdit
+                                    ? () => {
+                                          setLabelEnglish(
+                                              sectionSettings?.objective_label_en ??
+                                                  '',
+                                          );
+                                          setLabelUrdu(
+                                              sectionSettings?.objective_label_ur ??
+                                                  '',
+                                          );
+                                          setErrors({});
+                                          setObjectiveFormOpen(true);
+                                      }
+                                    : undefined
+                            }
+                            locked={!canEdit}
                         />
                         {sections.map((section) => (
                             <SectionRow
                                 key={section.id}
-                                label={sectionLabel(section.sort_order)}
+                                label={sectionLabel(
+                                    section.sort_order -
+                                        (showObjectiveSection ? 0 : 1),
+                                )}
+                                detail={
+                                    [section.label_en, section.label_ur]
+                                        .filter(Boolean)
+                                        .join(' / ') || undefined
+                                }
                                 types={section.question_types}
                                 onEdit={() => openEdit(section)}
                                 onDelete={() => setDeleteTarget(section)}
@@ -327,13 +392,44 @@ export default function PaperQuestionSections({
                 <DialogContent className="sm:max-w-2xl">
                     <DialogTitle>
                         {editing
-                            ? `Edit ${sectionLabel(editing.sort_order)}`
-                            : `Create ${sectionLabel(Math.max(2, sections.length + 2))}`}
+                            ? `Edit ${sectionLabel(editing.sort_order - (showObjectiveSection ? 0 : 1))}`
+                            : `Create ${sectionLabel(Math.max(2, sections.length + 2) - (showObjectiveSection ? 0 : 1))}`}
                     </DialogTitle>
                     <DialogDescription>
                         Select one or more subjective question types for this
                         section.
                     </DialogDescription>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1 text-sm font-medium">
+                            English label
+                            <input
+                                className="w-full rounded-md border bg-background px-3 py-2 font-normal"
+                                value={labelEnglish}
+                                onChange={(event) =>
+                                    setLabelEnglish(event.target.value)
+                                }
+                                placeholder={sectionLabel(
+                                    (editing?.sort_order ??
+                                        Math.max(2, sections.length + 2)) -
+                                        (showObjectiveSection ? 0 : 1),
+                                )}
+                                maxLength={255}
+                            />
+                        </label>
+                        <label className="space-y-1 text-sm font-medium">
+                            Urdu label
+                            <input
+                                className="w-full rounded-md border bg-background px-3 py-2 font-normal"
+                                dir="rtl"
+                                value={labelUrdu}
+                                onChange={(event) =>
+                                    setLabelUrdu(event.target.value)
+                                }
+                                placeholder="Default Urdu label"
+                                maxLength={255}
+                            />
+                        </label>
+                    </div>
                     <div className="grid max-h-[55vh] gap-2 overflow-y-auto py-2 sm:grid-cols-2">
                         {questionTypes.map((type) => {
                             const unavailable = assignedElsewhere.has(type.id);
@@ -369,6 +465,11 @@ export default function PaperQuestionSections({
                             {errors.question_type_ids}
                         </p>
                     )}
+                    {(errors.label_en || errors.label_ur) && (
+                        <p className="text-xs text-destructive">
+                            {errors.label_en || errors.label_ur}
+                        </p>
+                    )}
                     <DialogFooter>
                         <Button
                             variant="outline"
@@ -388,6 +489,89 @@ export default function PaperQuestionSections({
             </Dialog>
 
             <Dialog
+                open={objectiveFormOpen}
+                onOpenChange={(open) =>
+                    !open && !scopeToggleBusy && setObjectiveFormOpen(false)
+                }
+            >
+                <DialogContent>
+                    <DialogTitle>Objective section</DialogTitle>
+                    <DialogDescription>
+                        Set whether objective questions have a section heading
+                        and customize its labels.
+                    </DialogDescription>
+                    <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                        <span>Show objective section heading</span>
+                        <Switch
+                            checked={showObjectiveSection}
+                            onCheckedChange={(checked) =>
+                                saveScope({ show_objective_section: checked })
+                            }
+                            disabled={scopeToggleBusy}
+                            aria-label="Show objective section heading"
+                        />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1 text-sm font-medium">
+                            English label
+                            <input
+                                className="w-full rounded-md border bg-background px-3 py-2 font-normal"
+                                value={labelEnglish}
+                                onChange={(event) =>
+                                    setLabelEnglish(event.target.value)
+                                }
+                                placeholder="Section A"
+                                maxLength={255}
+                            />
+                        </label>
+                        <label className="space-y-1 text-sm font-medium">
+                            Urdu label
+                            <input
+                                className="w-full rounded-md border bg-background px-3 py-2 font-normal"
+                                dir="rtl"
+                                value={labelUrdu}
+                                onChange={(event) =>
+                                    setLabelUrdu(event.target.value)
+                                }
+                                placeholder="حصہ الف"
+                                maxLength={255}
+                            />
+                        </label>
+                    </div>
+                    {(errors.objective_label_en ||
+                        errors.objective_label_ur) && (
+                        <p className="text-xs text-destructive">
+                            {errors.objective_label_en ||
+                                errors.objective_label_ur}
+                        </p>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setObjectiveFormOpen(false)}
+                            disabled={scopeToggleBusy}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() =>
+                                saveScope(
+                                    {
+                                        objective_label_en: labelEnglish,
+                                        objective_label_ur: labelUrdu,
+                                    },
+                                    () => setObjectiveFormOpen(false),
+                                )
+                            }
+                            disabled={scopeToggleBusy}
+                        >
+                            Save labels
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
                 open={deleteTarget !== null}
                 onOpenChange={(open) => !open && setDeleteTarget(null)}
             >
@@ -395,7 +579,10 @@ export default function PaperQuestionSections({
                     <DialogTitle>
                         Remove{' '}
                         {deleteTarget
-                            ? sectionLabel(deleteTarget.sort_order)
+                            ? sectionLabel(
+                                  deleteTarget.sort_order -
+                                      (showObjectiveSection ? 0 : 1),
+                              )
                             : 'section'}
                         ?
                     </DialogTitle>
@@ -434,12 +621,14 @@ export default function PaperQuestionSections({
 
 function SectionRow({
     label,
+    detail,
     types,
     locked,
     onEdit,
     onDelete,
 }: {
     label: string;
+    detail?: string;
     types: TypeOption[];
     locked?: boolean;
     onEdit?: () => void;
@@ -449,6 +638,11 @@ function SectionRow({
         <div className="flex flex-col gap-3 border-b px-4 py-4 last:border-b-0 md:flex-row md:items-center md:justify-between md:px-5">
             <div className="min-w-0">
                 <h3 className="font-bold text-foreground">{label}</h3>
+                {detail && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {detail}
+                    </p>
+                )}
                 <div className="mt-2 flex flex-wrap gap-2">
                     {types.map((type) => (
                         <span
@@ -470,15 +664,17 @@ function SectionRow({
                     >
                         <PencilIcon />
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={onDelete}
-                        title={`Remove ${label}`}
-                    >
-                        <Trash2Icon />
-                    </Button>
+                    {onDelete && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={onDelete}
+                            title={`Remove ${label}`}
+                        >
+                            <Trash2Icon />
+                        </Button>
+                    )}
                 </div>
             )}
         </div>

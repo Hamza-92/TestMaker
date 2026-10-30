@@ -456,14 +456,14 @@ class GeneratePaperController extends Controller
 
     private function paperSectioning(object $scope): array
     {
-        $active = PaperQuestionSectionScope::query()
+        $sectionScope = PaperQuestionSectionScope::query()
             ->where('pattern_id', (int) $scope->pattern_id)
             ->where('class_id', (int) $scope->class_id)
             ->where('subject_id', (int) $scope->subject_id)
             ->where('is_active', true)
-            ->exists();
+            ->first();
 
-        if (! $active) {
+        if ($sectionScope === null) {
             return ['active' => false, 'groups' => []];
         }
 
@@ -476,6 +476,8 @@ class GeneratePaperController extends Controller
             ->get()
             ->map(fn (PaperQuestionSection $section) => [
                 'id' => $section->id,
+                'labelEnglish' => $section->label_en,
+                'labelUrdu' => $section->label_ur,
                 'questionTypeIds' => $section->members
                     ->pluck('question_type_id')
                     ->map(fn ($id) => (int) $id)
@@ -485,7 +487,13 @@ class GeneratePaperController extends Controller
             ->values()
             ->all();
 
-        return ['active' => true, 'groups' => $groups];
+        return [
+            'active' => true,
+            'groups' => $groups,
+            'showObjectiveSection' => $sectionScope->show_objective_section,
+            'objectiveLabelEnglish' => $sectionScope->objective_label_en,
+            'objectiveLabelUrdu' => $sectionScope->objective_label_ur,
+        ];
     }
 
     private function multipartSetting(object $scope, $availableSubjectiveTypeIds): ?array

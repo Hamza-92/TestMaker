@@ -518,12 +518,32 @@ test('paper generator returns question types in the saved pattern class subject 
         ->assertJsonPath('multipart.partTypes.0.questionTextRtl', false)
         ->assertJsonPath('multipart.partTypes.1.questionTextRtl', true)
         ->assertJsonPath('paperSectioning.active', true)
+        ->assertJsonPath('paperSectioning.showObjectiveSection', true)
         ->assertJsonCount(1, 'paperSectioning.groups')
         ->assertJsonPath('paperSectioning.groups.0.id', $paperSection->id)
         ->assertJsonPath('paperSectioning.groups.0.questionTypeIds', [
             $first->id,
             $second->id,
         ]);
+
+    PaperQuestionSectionScope::query()->update([
+        'show_objective_section' => false,
+        'objective_label_en' => 'Part I',
+        'objective_label_ur' => 'حصہ اول',
+    ]);
+    $paperSection->update(['label_en' => 'Part II', 'label_ur' => 'حصہ دوم']);
+
+    $this->actingAs($customer)
+        ->getJson(route('customer.papers.generate.question-types', [
+            'chapter_ids' => [$chapter->id],
+            'sources' => [Question::SOURCE_EXERCISE],
+        ]))
+        ->assertOk()
+        ->assertJsonPath('paperSectioning.showObjectiveSection', false)
+        ->assertJsonPath('paperSectioning.objectiveLabelEnglish', 'Part I')
+        ->assertJsonPath('paperSectioning.objectiveLabelUrdu', 'حصہ اول')
+        ->assertJsonPath('paperSectioning.groups.0.labelEnglish', 'Part II')
+        ->assertJsonPath('paperSectioning.groups.0.labelUrdu', 'حصہ دوم');
 
     $customLayout = CustomPaperLayout::create([
         'pattern_id' => $pattern->id,
