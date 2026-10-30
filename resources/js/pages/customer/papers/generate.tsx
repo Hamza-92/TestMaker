@@ -6217,12 +6217,8 @@ export default function GeneratePaper({
                       .filter((group) => group.cards.length > 0)
                 : [];
             const multipartSections: GeneratedPaperSection[] = multipartConfig
-                ? multipartGroupsForPaper.flatMap((group, groupIndex) =>
+                ? multipartGroupsForPaper.flatMap((group) =>
                       group.cards.map((selection) => {
-                          const headingSuffix =
-                              multipartGroupsForPaper.length > 1
-                                  ? ` ${groupIndex + 1}`
-                                  : '';
                           const configuredParts = selection.rows.filter(
                               (part) => typeof part.questionTypeId === 'number',
                           );
@@ -6272,20 +6268,16 @@ export default function GeneratePaper({
                               questionTypeId: null,
                               category: 'Subjective Questions',
                               title:
-                                  (multipartConfig.headingEnglish ||
-                                      'Multipart questions') + headingSuffix,
+                                  multipartConfig.headingEnglish ||
+                                  'Multipart questions',
                               titleEnglish:
                                   chapterMedium !== 'Urdu'
-                                      ? (multipartConfig.headingEnglish ||
-                                            'Multipart questions') +
-                                        headingSuffix
+                                      ? multipartConfig.headingEnglish ||
+                                        'Multipart questions'
                                       : null,
                               titleUrdu:
                                   chapterMedium !== 'English'
                                       ? multipartConfig.headingUrdu
-                                          ? multipartConfig.headingUrdu +
-                                            headingSuffix
-                                          : null
                                       : null,
                               requiredQuestions: parts.length,
                               totalQuestions: 1,
@@ -6299,13 +6291,8 @@ export default function GeneratePaper({
                                   groupChoiceCount: group.choiceCount,
                                   groupQuestionCount: group.cards.length,
                                   headingEnglish:
-                                      (multipartConfig.headingEnglish ||
-                                          'Multipart questions') +
-                                      headingSuffix,
-                                  headingUrdu: multipartConfig.headingUrdu
-                                      ? multipartConfig.headingUrdu +
-                                        headingSuffix
-                                      : null,
+                                      multipartConfig.headingEnglish,
+                                  headingUrdu: multipartConfig.headingUrdu,
                                   rows: [{ parts }],
                               },
                               orGroupId: null,
