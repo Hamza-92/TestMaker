@@ -59,6 +59,9 @@ final class QatPaperBuilder
         if ($chapters->isEmpty()) {
             throw ValidationException::withMessages(['chapter_ids' => 'No chapters are available for this syllabus.']);
         }
+        if ($syllabus === 'qat') {
+            $subject->syllabus_months = $months;
+        }
 
         return [$subject, $chapters, $access];
     }
@@ -78,10 +81,21 @@ final class QatPaperBuilder
             ->where('chapter.qat_subject_id', $subject->id)
             ->where('chapter.status', true)
             ->where('question.status', true)
+            ->when(isset($subject->syllabus_months), fn (Builder $query) => $this->applyMonthlySelection($query, $chapterIds, $subject->syllabus_months))
             ->where(function (Builder $query): void {
                 $query->whereNull('question.qat_topic_id')->orWhere('topic.status', true);
             })
             ->when($topicIds !== null, fn (Builder $query) => $query->whereIn('topic.source_topic_id', $topicIds));
+    }
+
+    public function applyMonthlySelection(Builder $query, array $chapterIds, array $months, string $chapterColumn = 'chapter.id', string $questionColumn = 'question.source_question_id'): Builder
+    {
+        $mappings = DB::table('qat_chapter_months')->whereIn('qat_chapter_id', $chapterIds)->whereIn('month', $months)
+            ->get(['qat_chapter_id', 'source_question_ids']);
+        $wholeChapters = $mappings->whereNull('source_question_ids')->pluck('qat_chapter_id')->all();
+        $questionIds = $mappings->whereNotNull('source_question_ids')->flatMap(fn ($mapping) => json_decode($mapping->source_question_ids, true) ?: [])->unique()->values()->all();
+
+        return $query->where(fn (Builder $selection) => $selection->whereIn($chapterColumn, $wholeChapters)->orWhereIn($questionColumn, $questionIds));
     }
 
     public function withTypeOrder(Builder $query, object $subject): Builder

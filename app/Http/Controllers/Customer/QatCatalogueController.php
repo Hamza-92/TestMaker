@@ -6,6 +6,7 @@ use App\Enums\TeacherPermission;
 use App\Http\Controllers\Controller;
 use App\Models\QatPaper;
 use App\Support\AppUserAccess;
+use App\Support\Qat\QatPaperBuilder;
 use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -210,6 +211,10 @@ class QatCatalogueController extends Controller
                 fn ($months) => $months->selectRaw('1')->from('qat_chapter_months as cm')
                     ->whereColumn('cm.qat_chapter_id', 'ch.id')->where('cm.month', $month)
             ));
+
+        if ($month !== null) {
+            app(QatPaperBuilder::class)->applyMonthlySelection($baseQuestions, $chapterIds->all(), [$month], 'ch.id', 'q.source_question_id');
+        }
 
         $counts = (clone $baseQuestions)->select('ch.id as chapter_id', 'q.question_type_id')
             ->selectRaw('count(*) as total')->groupBy('ch.id', 'q.question_type_id')->get();

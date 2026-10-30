@@ -93,31 +93,49 @@ class QatCatalogueController extends Controller
             'subject_id' => ['required', 'integer'],
         ]);
 
-        $description = DB::table('qat_month_syllabi as syllabus')
-            ->join('qat_subjects as subject', 'subject.id', '=', 'syllabus.qat_subject_id')
+        $subject = DB::table('qat_subjects as subject')
             ->join('qat_catalogues as catalogue', 'catalogue.id', '=', 'subject.qat_catalogue_id')
             ->where('catalogue.academic_year', $data['academic_year'])
             ->where('subject.source_pattern_id', $data['source_pattern_id'])
             ->where('subject.class_id', $data['class_id'])
             ->where('subject.subject_id', $data['subject_id'])
-            ->where('syllabus.month', $data['month'])
-            ->value('syllabus.description');
+            ->first(['subject.id']);
+        $description = $subject ? DB::table('qat_month_syllabi')->where('qat_subject_id', $subject->id)
+            ->where('month', $data['month'])->value('description') : null;
+        $savedChapters = DB::table('qat_chapters as chapter')
+            ->join('qat_chapter_months as month', 'month.qat_chapter_id', '=', 'chapter.id')
+            ->where('chapter.qat_subject_id', $subject?->id ?? 0)->where('month.month', $data['month'])
+            ->get(['chapter.id', 'chapter.source_chapter_id', 'month.source_question_ids']);
+        $savedQuestions = $savedChapters->flatMap(fn ($chapter) => $chapter->source_question_ids === null
+            ? DB::table('qat_questions')->where('qat_chapter_id', $chapter->id)->pluck('source_question_id')->all()
+            : (json_decode($chapter->source_question_ids, true) ?: []));
+        $chapters = $this->chapters($request)->getData(true);
+        $chapterIds = array_map('intval', array_column($chapters, 'id'));
+        $questionIds = collect($chapters)->flatMap(fn ($chapter) => array_column($chapter['questions'], 'id'))->map(fn ($id) => (int) $id);
 
-        return response()->json(['description' => $description ?? '']);
+        return response()->json([
+            'description' => $description ?? '',
+            'chapters' => $chapters,
+            'chapter_ids' => $savedChapters->pluck('source_chapter_id')->map(fn ($id) => (int) $id)->intersect($chapterIds)->values(),
+            'question_ids' => $savedQuestions->map(fn ($id) => (int) $id)->intersect($questionIds)->unique()->values(),
+            'saved' => $savedChapters->isNotEmpty() || $description !== null,
+        ]);
     }
 
     public function store(Request $request, QatCatalogueTransfer $transfer): RedirectResponse
     {
+        $sync = $request->boolean('sync_month');
         $data = $request->validate([
+            'sync_month' => ['sometimes', 'boolean'],
             'academic_year' => ['required', 'regex:/^20\d{2}-\d{2}$/'],
             'month' => ['required', 'integer', 'between:1,12'],
             'description' => ['nullable', 'string', 'max:15000'],
             'source_pattern_id' => ['required', 'integer', 'exists:patterns,id'],
             'class_id' => ['required', 'integer', 'exists:classes,id'],
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
-            'chapter_ids' => ['required', 'array', 'min:1'],
+            'chapter_ids' => [$sync ? 'present' : 'required', 'array', $sync ? 'min:0' : 'min:1'],
             'chapter_ids.*' => ['required', 'integer', 'distinct', 'exists:chapters,id'],
-            'question_ids' => ['sometimes', 'array'],
+            'question_ids' => [$sync ? 'present' : 'sometimes', 'array'],
             'question_ids.*' => ['required', 'integer', 'distinct', 'exists:questions,id'],
         ]);
 

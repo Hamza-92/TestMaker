@@ -134,6 +134,12 @@ class QatCatalogueTransfer
             }
 
             $report = ['chapters' => 0, 'topics' => 0, 'questions' => 0, 'month_assignments' => 0];
+            if ($data['sync_month'] ?? false) {
+                DB::table('qat_chapter_months')->where('month', $month)
+                    ->whereIn('qat_chapter_id', DB::table('qat_chapters')->where('qat_subject_id', $qatSubjectId)->select('id'))
+                    ->whereNotIn('qat_chapter_id', DB::table('qat_chapters')->where('qat_subject_id', $qatSubjectId)->whereIn('source_chapter_id', $data['chapter_ids'])->select('id'))
+                    ->delete();
+            }
             foreach ($chapters as $chapter) {
                 $qatChapterId = DB::table('qat_chapters')
                     ->where('qat_subject_id', $qatSubjectId)
@@ -199,6 +205,17 @@ class QatCatalogueTransfer
                             ]);
                         }
                     });
+                $mapping = DB::table('qat_chapter_months')->where('qat_chapter_id', $qatChapterId)->where('month', $month);
+                $previous = $mapping->value('source_question_ids');
+                if (($data['sync_month'] ?? false) || $previous !== null) {
+                    $ids = Question::query()->where('chapter_id', $chapter->id)
+                        ->when($selectedQuestions !== null, fn ($query) => $query->whereIn('id', array_keys($selectedQuestions)))
+                        ->pluck('id')->map(fn ($id) => (int) $id)->all();
+                    if (! ($data['sync_month'] ?? false)) {
+                        $ids = array_values(array_unique([...json_decode($previous, true), ...$ids]));
+                    }
+                    $mapping->update(['source_question_ids' => json_encode($ids)]);
+                }
             }
 
             return $report;

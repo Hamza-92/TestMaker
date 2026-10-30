@@ -1,4 +1,5 @@
 import { Editor } from '@tinymce/tinymce-react';
+import { Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/tm';
 import { questionTextToEditorHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
@@ -30,9 +31,11 @@ function loadEditor() {
 export default function QatSyllabusEditor({
     value,
     onChange,
+    disabled = false,
 }: {
     value: string;
     onChange: (value: string) => void;
+    disabled?: boolean;
 }) {
     const [editorStatus, setEditorStatus] = useState<
         'loading' | 'ready' | 'error'
@@ -85,14 +88,17 @@ export default function QatSyllabusEditor({
         return (
             <div
                 role="status"
-                aria-label="Loading syllabus editor"
-                className="h-80 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800"
-            />
+                className="flex h-80 items-center justify-center gap-2 rounded-lg bg-slate-100 text-sm text-slate-500 dark:bg-slate-800"
+            >
+                <Loader2Icon className="size-5 animate-spin" />
+                Loading syllabus editor…
+            </div>
         );
     }
 
     return (
         <Editor
+            disabled={disabled}
             id="qat-syllabus-description"
             licenseKey="gpl"
             value={questionTextToEditorHtml(value)}

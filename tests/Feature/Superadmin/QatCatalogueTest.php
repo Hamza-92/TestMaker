@@ -113,6 +113,49 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
         ...$withoutDescription, 'question_ids' => [$first->id],
     ])->assertSessionHasNoErrors();
     expect(DB::table('qat_month_syllabi')->value('description'))->toBe('Kept for older forms.');
+
+    $scope = [
+        'academic_year' => $payload['academic_year'], 'month' => 4,
+        'source_pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+    ];
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', $scope))
+        ->assertOk()->assertJsonPath('description', 'Kept for older forms.')
+        ->assertJsonPath('chapter_ids', [$chapter->id])->assertJsonPath('question_ids', [$first->id, $second->id]);
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'sync_month' => true, 'month' => 5, 'description' => '<p>May only</p>', 'question_ids' => [$second->id],
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', [...$scope, 'month' => 5]))
+        ->assertOk()->assertJsonPath('description', '<p>May only</p>')->assertJsonPath('question_ids', [$second->id]);
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'sync_month' => true, 'description' => '<p>Edited April</p>', 'question_ids' => [$first->id],
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', $scope))
+        ->assertOk()->assertJsonPath('description', '<p>Edited April</p>')->assertJsonPath('question_ids', [$first->id]);
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', [...$scope, 'month' => 5]))
+        ->assertOk()->assertJsonPath('question_ids', [$second->id]);
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', [...$scope, 'academic_year' => '2027-28']))
+        ->assertOk()->assertJsonPath('description', '')->assertJsonPath('chapter_ids', [])->assertJsonPath('question_ids', []);
+
+    $school = User::factory()->create(['user_type' => UserType::Customer->value, 'account_type' => 'paid']);
+    Subscription::create([
+        'user_id' => $school->id, 'name' => 'QAT', 'amount' => 1000,
+        'started_at' => now()->subDay(), 'duration' => 30, 'expired_at' => now()->addDays(29),
+        'status' => 'active', 'created_by' => $admin->id, 'access_scope' => [], 'allow_qat_tests' => true,
+    ]);
+    $qatSubjectId = DB::table('qat_subjects')->value('id');
+    foreach ([4 => $first->id, 5 => $second->id] as $month => $sourceQuestionId) {
+        $qatQuestionId = DB::table('qat_questions')->where('source_question_id', $sourceQuestionId)->value('id');
+        $this->actingAs($school)->postJson(route('customer.qat.questions'), [
+            'subject_id' => $qatSubjectId, 'syllabus' => 'qat', 'months' => [$month],
+        ])->assertOk()->assertJsonPath('questions.total', 1)->assertJsonPath('questions.data.0.id', $qatQuestionId);
+    }
+    $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
+        ...$payload, 'sync_month' => true, 'month' => 5, 'description' => null, 'chapter_ids' => [], 'question_ids' => [],
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.syllabus-description', [...$scope, 'month' => 5]))
+        ->assertOk()->assertJsonPath('description', '')->assertJsonPath('chapter_ids', [])->assertJsonPath('question_ids', []);
+    expect(DB::table('qat_questions')->count())->toBe(2)
+        ->and(DB::table('qat_chapter_months')->pluck('month')->all())->toBe([4]);
 });
 
 test('QAT transfer copies one scope once and can assign it to another month', function () {
