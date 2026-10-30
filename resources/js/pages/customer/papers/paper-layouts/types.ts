@@ -962,28 +962,21 @@ export function paperChapterNumbers(paper: GeneratedPaper): string {
         .join(', ');
 }
 
-const ROMAN_NUMERALS = [
-    'i',
-    'ii',
-    'iii',
-    'iv',
-    'v',
-    'vi',
-    'vii',
-    'viii',
-    'ix',
-    'x',
-    'xi',
-    'xii',
-    'xiii',
-    'xiv',
-    'xv',
-    'xvi',
-    'xvii',
-    'xviii',
-    'xix',
-    'xx',
-];
+const ROMAN_VALUES = [
+    [1000, 'm'],
+    [900, 'cm'],
+    [500, 'd'],
+    [400, 'cd'],
+    [100, 'c'],
+    [90, 'xc'],
+    [50, 'l'],
+    [40, 'xl'],
+    [10, 'x'],
+    [9, 'ix'],
+    [5, 'v'],
+    [4, 'iv'],
+    [1, 'i'],
+] as const;
 
 /**
  * Format a per-question label given a 0-based index, the paper-wide override
@@ -998,7 +991,21 @@ export function formatQuestionLabel(
     const format = override === 'default' ? sectionDefault : override;
 
     if (format === 'roman') {
-        return ROMAN_NUMERALS[index] ?? String(index + 1);
+        if (!Number.isSafeInteger(index) || index < 0) {
+            return String(index + 1);
+        }
+
+        let remainder = index + 1;
+        let label = '';
+
+        for (const [value, numeral] of ROMAN_VALUES) {
+            while (remainder >= value) {
+                label += numeral;
+                remainder -= value;
+            }
+        }
+
+        return label;
     }
 
     if (format === 'alpha') {
