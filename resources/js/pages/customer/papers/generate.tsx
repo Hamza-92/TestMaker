@@ -765,6 +765,24 @@ function updateSectionQuestion(
     };
 }
 
+function usesFederalOrQuestionCell(
+    paper: GeneratedPaper,
+    section: GeneratedPaperSection,
+): boolean {
+    return (
+        paper.settings?.paperLayout === 'federal-board' &&
+        !paper.sectioning?.custom &&
+        section.category === 'Subjective Questions' &&
+        !section.multipart &&
+        Boolean(section.orGroupId && section.orRole) &&
+        paper.sections.some(
+            (candidate) =>
+                candidate.orGroupId === section.orGroupId &&
+                candidate.orRole !== section.orRole,
+        )
+    );
+}
+
 interface PaperQuestionPoolFilters {
     chapterIds: number[];
     topicIds: number[];
@@ -4133,7 +4151,13 @@ export default function GeneratePaper({
             return null;
         }
 
-        return { section, ...match };
+        return {
+            section,
+            ...match,
+            usesFederalStatement:
+                usesFederalOrQuestionCell(generatedPaper, section) &&
+                Boolean(match.question.federalStatement),
+        };
     }, [generatedPaper, paperQuestionEditorTarget]);
     const filteredPaperPickerQuestions = useMemo(() => {
         if (!activePaperPickerContext?.questionTypeId) {
@@ -7258,6 +7282,7 @@ export default function GeneratePaper({
         sectionId: string,
         questionId: string,
         value: string,
+        updateFederalStatement = false,
     ) {
         setGeneratedPaper((current) =>
             current
@@ -7268,7 +7293,13 @@ export default function GeneratePaper({
                               ? updateSectionQuestion(
                                     section,
                                     questionId,
-                                    (question) => ({ ...question, text: value }),
+                                    (question) => ({
+                                        ...question,
+                                        text: value,
+                                        ...(updateFederalStatement
+                                            ? { federalStatement: value }
+                                            : {}),
+                                    }),
                                 )
                               : section,
                       ),
@@ -7366,6 +7397,7 @@ export default function GeneratePaper({
             activePaperQuestionEditorContext.section.id,
             activePaperQuestionEditorContext.question.id,
             value,
+            activePaperQuestionEditorContext.usesFederalStatement,
         );
         closePaperQuestionEditor();
     }
@@ -9233,9 +9265,12 @@ export default function GeneratePaper({
                                 key={
                                     activePaperQuestionEditorContext.question.id
                                 }
-                                question={
-                                    activePaperQuestionEditorContext.question
-                                }
+                                question={{
+                                    text: activePaperQuestionEditorContext.usesFederalStatement
+                                        ? activePaperQuestionEditorContext.question.federalStatement ??
+                                          activePaperQuestionEditorContext.question.text
+                                        : activePaperQuestionEditorContext.question.text,
+                                }}
                                 onClose={closePaperQuestionEditor}
                                 onSave={savePaperQuestionEdit}
                             />
