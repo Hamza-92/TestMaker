@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { Switch } from '@/components/ui/switch';
+import { useCustomerSidebar } from '@/layouts/customer/customer-layout';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { QatQuestionStatement } from './question';
 import type { QatQuestion } from './question';
@@ -164,6 +165,7 @@ export default function QatCreate({
     templates: QatTemplate[];
     initialSelections?: GenerationSelections | null;
 }) {
+    const { collapsed: sidebarCollapsed } = useCustomerSidebar();
     const [classIds, setClassIds] = useState<number[]>(
         initialSelections?.class_ids ?? [],
     );
@@ -736,13 +738,8 @@ export default function QatCreate({
     const summaryTotalMarks = summaryHasCurrentQuestions ? totalMarks : 0;
 
     return (
-        <div className="w-full space-y-4">
+        <div className="w-full space-y-4 pb-20">
             <Head title={`${mode === 'auto' ? 'Auto' : 'Manual'} QAT paper`} />
-            <Button asChild variant="ghost" size="sm" className="-ml-3">
-                <Link href="/qa-tests">
-                    <ArrowLeftIcon /> QAT Tests
-                </Link>
-            </Button>
             <PageHeader
                 title={
                     mode === 'auto'
@@ -982,13 +979,11 @@ export default function QatCreate({
 
                     {coverage.length > 0 && (
                         <>
-                            <div>
+                            {mode === 'auto' && (
                                 <h2 className="border-t border-slate-200 pt-4 text-lg font-semibold dark:border-slate-700">
-                                    {mode === 'auto'
-                                        ? 'Choose a paper template'
-                                        : 'Pick questions manually'}
+                                    Choose a paper template
                                 </h2>
-                            </div>
+                            )}
                             {poolError && (
                                 <p
                                     role="alert"
@@ -1180,11 +1175,314 @@ export default function QatCreate({
                                         )}
                                     </div>
                                 )}
+                            {poolScopeKey === questionScopeKey &&
+                                (mode === 'auto' || pool !== null) && (
+                                    <>
+                                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                                            <h2 className="text-lg font-semibold">
+                                                {mode === 'auto'
+                                                    ? 'Review paper'
+                                                    : 'Selected questions overview'}
+                                            </h2>
+                                            {mode === 'auto' && (
+                                                <div className="flex items-center gap-3">
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setTemplateId(null);
+                                                            setAutoSections([]);
+                                                            setMinutes(40);
+                                                        }}
+                                                    >
+                                                        Clear
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <label className="space-y-1 text-xs font-semibold text-slate-600">
+                                                Paper name
+                                                <input
+                                                    className={inputClass}
+                                                    value={name}
+                                                    maxLength={150}
+                                                    onChange={(event) =>
+                                                        setName(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </label>
+                                            <label className="space-y-1 text-xs font-semibold text-slate-600">
+                                                Duration (minutes)
+                                                <input
+                                                    type="number"
+                                                    min="10"
+                                                    max="240"
+                                                    className={inputClass}
+                                                    value={minutes}
+                                                    onChange={(event) =>
+                                                        setMinutes(
+                                                            Number(
+                                                                event.target
+                                                                    .value,
+                                                            ),
+                                                        )
+                                                    }
+                                                />
+                                            </label>
+                                        </div>
+                                        {mode === 'auto' && (
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                <fieldset className="space-y-1">
+                                                    <legend className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                        Paper variants
+                                                    </legend>
+                                                    <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+                                                        {[1, 2, 3, 4].map(
+                                                            (count) => (
+                                                                <button
+                                                                    key={count}
+                                                                    type="button"
+                                                                    aria-pressed={
+                                                                        variants ===
+                                                                        count
+                                                                    }
+                                                                    onClick={() =>
+                                                                        setVariants(
+                                                                            count,
+                                                                        )
+                                                                    }
+                                                                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
+                                                                >
+                                                                    {count}{' '}
+                                                                    {count === 1
+                                                                        ? 'Paper'
+                                                                        : 'Papers'}
+                                                                </button>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </fieldset>
+                                                <label className="flex items-end gap-2 pb-2 text-sm">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={allowRepeat}
+                                                        onChange={(event) =>
+                                                            setAllowRepeat(
+                                                                event.target
+                                                                    .checked,
+                                                            )
+                                                        }
+                                                        className="size-4 accent-brand-600"
+                                                    />
+                                                    Allow repeats between
+                                                    variants
+                                                </label>
+                                            </div>
+                                        )}
+                                        {mode === 'auto' &&
+                                            totalQuestions > 0 &&
+                                            !variantsHaveEnoughQuestions && (
+                                                <p className="text-sm text-amber-700 dark:text-amber-400">
+                                                    This syllabus does not have
+                                                    enough questions for the
+                                                    selected number of paper
+                                                    variants.
+                                                </p>
+                                            )}
+                                        <div className="space-y-2">
+                                            {mode === 'auto' && (
+                                                <h3 className="text-right text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                                    {isPefPattern
+                                                        ? 'PEF Pattern'
+                                                        : 'Non PEF Pattern'}
+                                                </h3>
+                                            )}
+                                            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                                                <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
+                                                    <span>Question type</span>
+                                                    <span className="text-right">
+                                                        Total
+                                                    </span>
+                                                    <span className="text-right">
+                                                        Required
+                                                    </span>
+                                                    <span className="text-right">
+                                                        Marks
+                                                    </span>
+                                                </div>
+                                                {reviewRows.map((row) => (
+                                                    <div
+                                                        key={row.id}
+                                                        className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
+                                                    >
+                                                        <span className="truncate">
+                                                            {row.name}
+                                                        </span>
+                                                        {mode === 'auto' ? (
+                                                            <>
+                                                                <input
+                                                                    aria-label={`${row.name} total`}
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    step="1"
+                                                                    className={`${inputClass} px-2 text-right`}
+                                                                    value={
+                                                                        row.count ||
+                                                                        ''
+                                                                    }
+                                                                    placeholder="0"
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        updateAutoSection(
+                                                                            row.id,
+                                                                            'quantity',
+                                                                            Number(
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <input
+                                                                    aria-label={`${row.name} required`}
+                                                                    type="number"
+                                                                    min={
+                                                                        row.count >
+                                                                        0
+                                                                            ? 1
+                                                                            : 0
+                                                                    }
+                                                                    max={
+                                                                        row.count
+                                                                    }
+                                                                    step="1"
+                                                                    disabled={
+                                                                        row.count ===
+                                                                        0
+                                                                    }
+                                                                    className={`${inputClass} px-2 text-right disabled:opacity-50`}
+                                                                    value={
+                                                                        row.required ||
+                                                                        ''
+                                                                    }
+                                                                    placeholder="0"
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        updateAutoSection(
+                                                                            row.id,
+                                                                            'required_questions',
+                                                                            Number(
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <input
+                                                                    aria-label={`${row.name} marks`}
+                                                                    type="number"
+                                                                    min={
+                                                                        row.required *
+                                                                        0.5
+                                                                    }
+                                                                    max={
+                                                                        row.required *
+                                                                        20
+                                                                    }
+                                                                    step="0.5"
+                                                                    disabled={
+                                                                        row.count ===
+                                                                        0
+                                                                    }
+                                                                    className={`${inputClass} px-2 text-right disabled:opacity-50`}
+                                                                    value={
+                                                                        row.marks ||
+                                                                        ''
+                                                                    }
+                                                                    placeholder="0"
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        updateAutoSection(
+                                                                            row.id,
+                                                                            'marks',
+                                                                            Number(
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <strong className="text-right">
+                                                                    {row.count}
+                                                                </strong>
+                                                                <strong className="text-right">
+                                                                    {
+                                                                        row.required
+                                                                    }
+                                                                </strong>
+                                                                <strong className="text-right">
+                                                                    {row.marks}
+                                                                </strong>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
+                                                    <span>Total</span>
+                                                    <span className="text-right">
+                                                        {totalQuestions}
+                                                    </span>
+                                                    <span className="text-right">
+                                                        {reviewRows.reduce(
+                                                            (sum, row) =>
+                                                                sum +
+                                                                row.required,
+                                                            0,
+                                                        )}
+                                                    </span>
+                                                    <span className="text-right">
+                                                        {totalMarks}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {saveError && (
+                                            <p
+                                                role="alert"
+                                                className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
+                                            >
+                                                {saveError}
+                                            </p>
+                                        )}
+                                    </>
+                                )}
                             {pool &&
                                 poolScopeKey === questionScopeKey &&
                                 mode === 'manual' &&
                                 (!poolBusy || selectedOnly) && (
-                                    <div className="space-y-3">
+                                    <section
+                                        className="space-y-3"
+                                        aria-labelledby="qat-manual-questions"
+                                    >
+                                        <h2
+                                            id="qat-manual-questions"
+                                            className="border-t border-slate-200 pt-4 text-lg font-semibold dark:border-slate-700"
+                                        >
+                                            Pick questions manually
+                                        </h2>
                                         <div className="flex flex-wrap items-center gap-3">
                                             <div className="relative w-full sm:w-72">
                                                 <SearchIcon className="absolute left-3 top-2.5 size-4 text-slate-400" />
@@ -1402,285 +1700,10 @@ export default function QatCreate({
                                                 />
                                             )}
                                         </div>
-                                    </div>
+                                    </section>
                                 )}
                         </>
                     )}
-
-                    {poolScopeKey === questionScopeKey &&
-                        (mode === 'auto' || totalQuestions > 0) && (
-                            <>
-                                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
-                                    <h2 className="text-lg font-semibold">
-                                        Review paper
-                                    </h2>
-                                    {mode === 'auto' && (
-                                        <div className="flex items-center gap-3">
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setTemplateId(null);
-                                                    setAutoSections([]);
-                                                    setMinutes(40);
-                                                }}
-                                            >
-                                                Clear
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                        Paper name
-                                        <input
-                                            className={inputClass}
-                                            value={name}
-                                            maxLength={150}
-                                            onChange={(event) =>
-                                                setName(event.target.value)
-                                            }
-                                        />
-                                    </label>
-                                    <label className="space-y-1 text-xs font-semibold text-slate-600">
-                                        Duration (minutes)
-                                        <input
-                                            type="number"
-                                            min="10"
-                                            max="240"
-                                            className={inputClass}
-                                            value={minutes}
-                                            onChange={(event) =>
-                                                setMinutes(
-                                                    Number(event.target.value),
-                                                )
-                                            }
-                                        />
-                                    </label>
-                                </div>
-                                {mode === 'auto' && (
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <fieldset className="space-y-1">
-                                            <legend className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                                Paper variants
-                                            </legend>
-                                            <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-                                                {[1, 2, 3, 4].map((count) => (
-                                                    <button
-                                                        key={count}
-                                                        type="button"
-                                                        aria-pressed={
-                                                            variants === count
-                                                        }
-                                                        onClick={() =>
-                                                            setVariants(count)
-                                                        }
-                                                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
-                                                    >
-                                                        {count}{' '}
-                                                        {count === 1
-                                                            ? 'Paper'
-                                                            : 'Papers'}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </fieldset>
-                                        <label className="flex items-end gap-2 pb-2 text-sm">
-                                            <input
-                                                type="checkbox"
-                                                checked={allowRepeat}
-                                                onChange={(event) =>
-                                                    setAllowRepeat(
-                                                        event.target.checked,
-                                                    )
-                                                }
-                                                className="size-4 accent-brand-600"
-                                            />
-                                            Allow repeats between variants
-                                        </label>
-                                    </div>
-                                )}
-                                {mode === 'auto' &&
-                                    totalQuestions > 0 &&
-                                    !variantsHaveEnoughQuestions && (
-                                        <p className="text-sm text-amber-700 dark:text-amber-400">
-                                            This syllabus does not have enough
-                                            questions for the selected number of
-                                            paper variants.
-                                        </p>
-                                    )}
-                                <div className="space-y-2">
-                                    {mode === 'auto' && (
-                                        <h3 className="text-right text-sm font-semibold text-slate-700 dark:text-slate-200">
-                                            {isPefPattern
-                                                ? 'PEF Pattern'
-                                                : 'Non PEF Pattern'}
-                                        </h3>
-                                    )}
-                                    <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-                                        <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:bg-slate-800/50">
-                                            <span>Question type</span>
-                                            <span className="text-right">
-                                                Total
-                                            </span>
-                                            <span className="text-right">
-                                                Required
-                                            </span>
-                                            <span className="text-right">
-                                                Marks
-                                            </span>
-                                        </div>
-                                        {reviewRows.map((row) => (
-                                            <div
-                                                key={row.id}
-                                                className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-700"
-                                            >
-                                                <span className="truncate">
-                                                    {row.name}
-                                                </span>
-                                                {mode === 'auto' ? (
-                                                    <>
-                                                        <input
-                                                            aria-label={`${row.name} total`}
-                                                            type="number"
-                                                            min="0"
-                                                            max="100"
-                                                            step="1"
-                                                            className={`${inputClass} px-2 text-right`}
-                                                            value={
-                                                                row.count || ''
-                                                            }
-                                                            placeholder="0"
-                                                            onChange={(event) =>
-                                                                updateAutoSection(
-                                                                    row.id,
-                                                                    'quantity',
-                                                                    Number(
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                    ),
-                                                                )
-                                                            }
-                                                        />
-                                                        <input
-                                                            aria-label={`${row.name} required`}
-                                                            type="number"
-                                                            min={
-                                                                row.count > 0
-                                                                    ? 1
-                                                                    : 0
-                                                            }
-                                                            max={row.count}
-                                                            step="1"
-                                                            disabled={
-                                                                row.count === 0
-                                                            }
-                                                            className={`${inputClass} px-2 text-right disabled:opacity-50`}
-                                                            value={
-                                                                row.required ||
-                                                                ''
-                                                            }
-                                                            placeholder="0"
-                                                            onChange={(event) =>
-                                                                updateAutoSection(
-                                                                    row.id,
-                                                                    'required_questions',
-                                                                    Number(
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                    ),
-                                                                )
-                                                            }
-                                                        />
-                                                        <input
-                                                            aria-label={`${row.name} marks`}
-                                                            type="number"
-                                                            min={
-                                                                row.required *
-                                                                0.5
-                                                            }
-                                                            max={
-                                                                row.required *
-                                                                20
-                                                            }
-                                                            step="0.5"
-                                                            disabled={
-                                                                row.count === 0
-                                                            }
-                                                            className={`${inputClass} px-2 text-right disabled:opacity-50`}
-                                                            value={
-                                                                row.marks || ''
-                                                            }
-                                                            placeholder="0"
-                                                            onChange={(event) =>
-                                                                updateAutoSection(
-                                                                    row.id,
-                                                                    'marks',
-                                                                    Number(
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                    ),
-                                                                )
-                                                            }
-                                                        />
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <strong className="text-right">
-                                                            {row.count}
-                                                        </strong>
-                                                        <strong className="text-right">
-                                                            {row.required}
-                                                        </strong>
-                                                        <strong className="text-right">
-                                                            {row.marks}
-                                                        </strong>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ))}
-                                        <div className="grid grid-cols-[minmax(0,1fr)_70px_70px_70px] gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-800/50">
-                                            <span>Total</span>
-                                            <span className="text-right">
-                                                {totalQuestions}
-                                            </span>
-                                            <span className="text-right">
-                                                {reviewRows.reduce(
-                                                    (sum, row) =>
-                                                        sum + row.required,
-                                                    0,
-                                                )}
-                                            </span>
-                                            <span className="text-right">
-                                                {totalMarks}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                {saveError && (
-                                    <p
-                                        role="alert"
-                                        className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
-                                    >
-                                        {saveError}
-                                    </p>
-                                )}
-                            </>
-                        )}
-
-                    <div className="flex justify-end border-t border-slate-200 pt-5 dark:border-slate-700">
-                        <Button
-                            variant="primary"
-                            onClick={generate}
-                            disabled={saving || !canGenerate}
-                        >
-                            {saving ? 'Generating…' : 'Generate paper'}
-                            <ArrowRightIcon />
-                        </Button>
-                    </div>
                 </Card>
                 <aside
                     className="order-first min-w-0 lg:sticky lg:top-0 lg:order-last"
@@ -1813,6 +1836,23 @@ export default function QatCreate({
                         </div>
                     </Card>
                 </aside>
+            </div>
+            <div
+                className={`fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.04)] backdrop-blur transition-[left] duration-200 dark:border-slate-800 dark:bg-slate-900/95 md:px-6 ${sidebarCollapsed ? 'md:left-16' : 'md:left-60'} print:hidden`}
+            >
+                <Button asChild variant="secondary">
+                    <Link href="/qa-tests">
+                        <ArrowLeftIcon /> Back
+                    </Link>
+                </Button>
+                <Button
+                    variant="primary"
+                    onClick={generate}
+                    disabled={saving || !canGenerate}
+                >
+                    {saving ? 'Generating…' : 'Generate paper'}
+                    <ArrowRightIcon />
+                </Button>
             </div>
         </div>
     );
