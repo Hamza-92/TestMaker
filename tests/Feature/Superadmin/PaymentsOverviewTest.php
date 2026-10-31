@@ -8,11 +8,15 @@ use App\Models\Subscription;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    // Keep the month-end boundary covered regardless of the date CI runs.
+    $this->travelTo(Carbon::parse('2026-10-31 12:00:00', 'Asia/Karachi'));
+
     $this->seed(PermissionSeeder::class);
     $this->master = User::factory()->create([
         'user_type' => UserType::SuperAdmin,
@@ -109,11 +113,11 @@ it('shows one approved sale per subscription in the month of first approval', fu
 
     $previousSubscription = overviewSubscription($otherAgent, 40);
     $previousSale = overviewPayment($previousSubscription, $otherAgent, 'approved', '100.00');
-    DB::table('payment_logs')->where('id', $previousSale->id)->update(['created_at' => now()->subMonth()]);
+    DB::table('payment_logs')->where('id', $previousSale->id)->update(['created_at' => now()->subMonthNoOverflow()]);
     overviewPayment($previousSubscription, $otherAgent, 'approved', '50.00');
 
     $recordedLastMonth = overviewPayment(overviewSubscription($agent, 30), $agent, 'approved', '100.00');
-    DB::table('payment_logs')->where('id', $recordedLastMonth->id)->update(['created_at' => now()->subMonth()]);
+    DB::table('payment_logs')->where('id', $recordedLastMonth->id)->update(['created_at' => now()->subMonthNoOverflow()]);
     AuditLog::record(
         model: $recordedLastMonth,
         event: AuditEvent::Updated,
@@ -158,7 +162,7 @@ it('lists this months submissions with payment status filters and a date range',
     $reviewed = overviewPayment($subscription, $this->master, 'reviewed', '75.00');
     $rejected = overviewPayment($subscription, $this->master, 'rejected', '50.00');
     $older = overviewPayment($subscription, $this->master, 'approved', '100.00');
-    DB::table('payment_logs')->where('id', $older->id)->update(['created_at' => now()->subMonth()]);
+    DB::table('payment_logs')->where('id', $older->id)->update(['created_at' => now()->subMonthNoOverflow()]);
 
     $page = $this->actingAs($this->master)
         ->get(route('superadmin.payments'))
@@ -209,7 +213,7 @@ it('lists this months submissions with payment status filters and a date range',
         ->assertOk()->viewData('page')['props']['paymentRequests']['data'];
     expect(collect($rejectedRows)->pluck('id')->all())->toBe([$rejected->id]);
 
-    $previousMonth = now('Asia/Karachi')->subMonth()->toDateString();
+    $previousMonth = now('Asia/Karachi')->subMonthNoOverflow()->toDateString();
     $olderRows = $this->get(route('superadmin.payments', [
         'from' => $previousMonth,
         'to' => $previousMonth,

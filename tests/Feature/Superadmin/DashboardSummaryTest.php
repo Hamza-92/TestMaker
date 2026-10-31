@@ -10,11 +10,15 @@ use App\Models\TrialSetting;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    // Keep the month-end boundary covered regardless of the date CI runs.
+    $this->travelTo(Carbon::parse('2026-10-31 12:00:00', 'Asia/Karachi'));
+
     $this->seed(PermissionSeeder::class);
     $this->master = User::factory()->create([
         'user_type' => UserType::SuperAdmin,
@@ -83,7 +87,7 @@ it('shows accurate customer and payment summary values to the master admin', fun
     dashboardPayment($trialPlan, $this->master, 'pending_review', '10.00');
     $oldPayment = dashboardPayment($expiringPlan, $this->master, 'approved', '900.00');
     DB::table('payment_logs')->where('id', $oldPayment->id)->update([
-        'created_at' => now()->subMonth(),
+        'created_at' => now()->subMonthNoOverflow(),
     ]);
 
     $page = $this->actingAs($this->master)->get(route('dashboard'))->assertOk()->viewData('page');
