@@ -70,11 +70,11 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     ]);
     $aprilId = DB::table('qat_chapters')->insertGetId([
         'qat_subject_id' => $subjectId, 'source_chapter_id' => 101,
-        'name' => 'April chapter', 'status' => true, 'created_at' => now(), 'updated_at' => now(),
+        'name' => 'April chapter', 'chapter_number' => 1, 'status' => true, 'created_at' => now(), 'updated_at' => now(),
     ]);
     $mayId = DB::table('qat_chapters')->insertGetId([
         'qat_subject_id' => $subjectId, 'source_chapter_id' => 102,
-        'name' => 'May chapter', 'status' => true, 'created_at' => now(), 'updated_at' => now(),
+        'name' => 'May chapter', 'chapter_number' => 2, 'status' => true, 'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('qat_chapter_months')->insert([
         ['qat_chapter_id' => $aprilId, 'month' => 4],
@@ -156,6 +156,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertOk()->assertInertia(fn ($page) => $page
         ->component('customer/qat/paper')
         ->where('previewId', $previewId)
+        ->where('paper.paper_data.chapters', [['id' => $mayId, 'name' => 'May chapter', 'chapter_number' => 2]])
         ->where('backUrl', route('customer.qat.create', ['mode' => 'auto', 'preview' => $previewId]))
         ->where('schoolDetails.name', 'Sample School')
         ->where('schoolDetails.logo', 'school-logos/sample.png')
@@ -184,16 +185,21 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertNotFound();
     $paper = QatPaper::query()->sole();
     expect($paper->paper_data['chapter_ids'])->toBe([$mayId])
+        ->and($paper->paper_data['chapters'])->toBe([['id' => $mayId, 'name' => 'May chapter', 'chapter_number' => 2]])
         ->and($paper->paper_data['sections'][0]['questions'][0]['id'])->toBe($mayQuestionId)
         ->and($paper->paper_data['minutes'])->toBe(35)
         ->and($paper->paper_data['template']['id'])->toBe($templateId)
         ->and($paper->total_marks)->toBe(2.0);
+    DB::table('qat_chapters')->where('id', $mayId)->update(['name' => 'Renamed chapter', 'chapter_number' => 9]);
     $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
         ->assertInertia(fn ($page) => $page->component('customer/qat/paper')
             ->where('backUrl', route('customer.qat.create', ['mode' => 'auto', 'paper' => $paper->id]))
+            ->where('paper.paper_data.chapters.0.name', 'May chapter')
+            ->where('paper.paper_data.chapters.0.chapter_number', 2)
             ->where('schoolDetails.name', 'Sample School')
             ->where('schoolDetails.logo', 'school-logos/sample.png')
             ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
+    DB::table('qat_chapters')->where('id', $mayId)->update(['name' => 'May chapter', 'chapter_number' => 2]);
     $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'auto', 'paper' => $paper->id]))
         ->assertOk()->assertInertia(fn ($page) => $page
         ->where('initialSelections.subject_id', $subjectId)
@@ -202,6 +208,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     unset($legacyData['sections'][0]['heading_en'], $legacyData['sections'][0]['heading_ur']);
     unset($legacyData['sections'][0]['questions'][0]['objective_answers']);
     unset($legacyData['generation_settings']);
+    unset($legacyData['chapters']);
     $paper->update(['paper_data' => $legacyData]);
     $originalQuestionData = DB::table('qat_questions')->where('id', $mayQuestionId)->value('question_data');
     $updatedQuestionData = json_decode($originalQuestionData, true);
@@ -210,6 +217,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('backUrl', route('customer.qat.index'))
+            ->where('paper.paper_data.chapters', [['id' => $mayId, 'name' => 'May chapter', 'chapter_number' => 2]])
             ->where('paper.paper_data.sections.0.questions.0.objective_answers.options', [0])
             ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
             ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں'));
@@ -246,6 +254,16 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         return $this->actingAs($school)->postJson(route('customer.qat.previews.save', $previewId))
             ->assertCreated()->json();
     };
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Manual monthly QAT', 'mode' => 'manual', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
+        'minutes' => 40, 'manual_questions' => [['id' => $mayQuestionId, 'marks' => 1]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('syllabus');
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Manual QAT without chapters', 'mode' => 'manual', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [],
+        'minutes' => 40, 'manual_questions' => [['id' => $mayQuestionId, 'marks' => 1]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('chapter_ids');
     $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Manual QAT', 'mode' => 'manual', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId],
@@ -406,7 +424,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
 
     $saveGenerated([
         'name' => 'Ordered manual QAT', 'mode' => 'manual', 'class_ids' => [$classId],
-        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5], 'minutes' => 40,
+        'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$mayId], 'minutes' => 40,
         'manual_questions' => [
             ['id' => $subjectiveQuestionId, 'marks' => 3],
             ['id' => $mayQuestionId, 'marks' => 1],
@@ -414,7 +432,9 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ],
     ]);
     $orderedPaper = QatPaper::query()->where('name', 'Ordered manual QAT')->sole();
-    expect(collect($orderedPaper->paper_data['sections'])->pluck('question_type_id')->all())
+    expect($orderedPaper->paper_data['syllabus'])->toBe('custom')
+        ->and($orderedPaper->paper_data['chapter_ids'])->toBe([$mayId])
+        ->and(collect($orderedPaper->paper_data['sections'])->pluck('question_type_id')->all())
         ->toBe([$firstObjective->id, $type->id, $subjective->id]);
     expect($orderedPaper->paper_data['sections'][0]['heading_en'])
         ->toBe('Answer the first objective questions');

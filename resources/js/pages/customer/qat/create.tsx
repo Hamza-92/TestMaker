@@ -8,7 +8,7 @@ import {
     GraduationCapIcon,
     SearchIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { Switch } from '@/components/ui/switch';
@@ -173,16 +173,12 @@ export default function QatCreate({
     const [chapterIds, setChapterIds] = useState<number[]>(
         initialSelections?.chapter_ids ?? [],
     );
-    const [classSearch, setClassSearch] = useState('');
-    const [manualSyllabus, setSyllabus] = useState<'custom' | 'qat'>(
-        initialSelections?.syllabus ?? 'custom',
-    );
-    const syllabus = mode === 'auto' ? 'qat' : manualSyllabus;
+    const syllabus = mode === 'auto' ? 'qat' : 'custom';
     const [qatYear, setQatYear] = useState(
         initialSelections?.academic_year ?? '',
     );
     const [months, setMonths] = useState<number[]>(
-        initialSelections?.months ?? [],
+        mode === 'auto' ? (initialSelections?.months ?? []) : [],
     );
     const [pool, setPool] = useState<Pool | null>(null);
     const [poolScopeKey, setPoolScopeKey] = useState('');
@@ -241,6 +237,9 @@ export default function QatCreate({
         (item) =>
             chapterIds.includes(item.id) &&
             subjectIds.includes(item.qat_subject_id),
+    );
+    const subjectChapters = chapters.filter(
+        (item) => item.qat_subject_id === targetSubjects[0]?.id,
     );
     const selectedSubjectIds = targetSubjects.map((item) => item.id);
     const monthChoices = [
@@ -733,20 +732,11 @@ export default function QatCreate({
         }
     }
 
-    const visibleClasses = useMemo(
-        () =>
-            classes.filter((item) =>
-                item.name
-                    .toLocaleLowerCase()
-                    .includes(classSearch.trim().toLocaleLowerCase()),
-            ),
-        [classes, classSearch],
-    );
     const summaryHasCurrentQuestions = poolScopeKey === questionScopeKey;
     const summaryTotalMarks = summaryHasCurrentQuestions ? totalMarks : 0;
 
     return (
-        <div className="w-full space-y-6">
+        <div className="w-full space-y-4">
             <Head title={`${mode === 'auto' ? 'Auto' : 'Manual'} QAT paper`} />
             <Button asChild variant="ghost" size="sm" className="-ml-3">
                 <Link href="/qa-tests">
@@ -761,567 +751,239 @@ export default function QatCreate({
                 }
             />
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-                <Card padding="lg" className="min-w-0 space-y-6">
-                    {mode === 'auto' ? (
-                        <section className="space-y-4">
-                            <h2 className="text-lg font-semibold">
-                                Choose your class &amp; subject
-                            </h2>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="space-y-1.5">
-                                    <span className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                                        Class
-                                    </span>
-                                    <FloatingCombobox
-                                        label="Class"
-                                        hideLabel
-                                        compact
-                                        placeholder="Search classes"
-                                        leadingIcon={GraduationCapIcon}
-                                        options={classOptions}
-                                        value={
-                                            classOptions.find(
-                                                (item) =>
-                                                    item.id === classIds[0],
-                                            ) ?? null
-                                        }
-                                        onChange={(item) =>
-                                            toggleClass(
-                                                item ? Number(item.id) : null,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <span className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
-                                        Subject
-                                    </span>
-                                    <FloatingCombobox
-                                        label="Subject"
-                                        hideLabel
-                                        compact
-                                        placeholder="Search subjects"
-                                        leadingIcon={BookOpenIcon}
-                                        disabled={!classIds.length}
-                                        options={subjectOptions}
-                                        value={
-                                            subjectOptions.find(
-                                                (item) =>
-                                                    item.id === subjectIds[0],
-                                            ) ?? null
-                                        }
-                                        onChange={(item) =>
-                                            toggleSubject(
-                                                item ? Number(item.id) : null,
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-                            {!classes.length && (
-                                <EmptyState
-                                    icon={GraduationCapIcon}
-                                    title="No classes available"
-                                />
-                            )}
-                            {classIds.length > 0 && !subjectOptions.length && (
-                                <EmptyState
-                                    icon={BookOpenIcon}
-                                    title="No subjects available"
-                                />
-                            )}
-                        </section>
-                    ) : (
-                        <section className="space-y-3">
-                            <h2 className="text-lg font-semibold">
-                                Choose your class
-                            </h2>
-                            <div className="relative w-full sm:max-w-xs">
-                                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    className={`${inputClass} pl-9`}
-                                    aria-label="Search classes"
+                <Card padding="md" className="min-w-0 space-y-4">
+                    <section className="space-y-3">
+                        <h2 className="text-lg font-semibold">
+                            Choose your class &amp; subject
+                        </h2>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <span className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                    Class
+                                </span>
+                                <FloatingCombobox
+                                    label="Class"
+                                    hideLabel
+                                    compact
                                     placeholder="Search classes"
-                                    value={classSearch}
-                                    onChange={(event) =>
-                                        setClassSearch(event.target.value)
+                                    leadingIcon={GraduationCapIcon}
+                                    options={classOptions}
+                                    value={
+                                        classOptions.find(
+                                            (item) => item.id === classIds[0],
+                                        ) ?? null
+                                    }
+                                    onChange={(item) =>
+                                        toggleClass(
+                                            item ? Number(item.id) : null,
+                                        )
                                     }
                                 />
                             </div>
-                            {visibleClasses.length ? (
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                    {visibleClasses.map((item) => (
+                            <div className="space-y-1.5">
+                                <span className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                    Subject
+                                </span>
+                                <FloatingCombobox
+                                    label="Subject"
+                                    hideLabel
+                                    compact
+                                    placeholder="Search subjects"
+                                    leadingIcon={BookOpenIcon}
+                                    disabled={!classIds.length}
+                                    options={subjectOptions}
+                                    value={
+                                        subjectOptions.find(
+                                            (item) => item.id === subjectIds[0],
+                                        ) ?? null
+                                    }
+                                    onChange={(item) =>
+                                        toggleSubject(
+                                            item ? Number(item.id) : null,
+                                        )
+                                    }
+                                />
+                            </div>
+                        </div>
+                        {!classes.length && (
+                            <EmptyState
+                                icon={GraduationCapIcon}
+                                title="No classes available"
+                            />
+                        )}
+                        {classIds.length > 0 && !subjectOptions.length && (
+                            <EmptyState
+                                icon={BookOpenIcon}
+                                title="No subjects available"
+                            />
+                        )}
+                        {mode === 'manual' && targetSubject && (
+                            <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/30">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <h3 className="text-sm font-semibold">
+                                        Chapters
+                                    </h3>
+                                    <label className={selectAllClass}>
+                                        <input
+                                            type="checkbox"
+                                            className="size-4 accent-brand-600"
+                                            checked={
+                                                subjectChapters.length > 0 &&
+                                                subjectChapters.every(
+                                                    (chapter) =>
+                                                        chapterIds.includes(
+                                                            chapter.id,
+                                                        ),
+                                                )
+                                            }
+                                            disabled={!subjectChapters.length}
+                                            onChange={(event) =>
+                                                toggleChapterGroup(
+                                                    subjectChapters.map(
+                                                        (chapter) => chapter.id,
+                                                    ),
+                                                    event.target.checked,
+                                                )
+                                            }
+                                        />
+                                        Select all
+                                    </label>
+                                </div>
+                                <div className="grid gap-1 sm:grid-cols-2">
+                                    {subjectChapters.map((chapter) => (
                                         <label
-                                            key={item.id}
-                                            className={`tm-lift flex h-20 cursor-pointer items-center gap-2 rounded-xl border p-3 ${classIds.includes(item.id) ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                            key={chapter.id}
+                                            className="flex cursor-pointer items-start gap-2 rounded-md p-2 text-sm transition-colors hover:bg-white dark:hover:bg-slate-800"
                                         >
                                             <input
-                                                type="radio"
-                                                name="qat-class"
-                                                className="size-4 accent-brand-600"
-                                                checked={classIds.includes(
-                                                    item.id,
+                                                type="checkbox"
+                                                className="mt-0.5 size-4 shrink-0 accent-brand-600"
+                                                checked={chapterIds.includes(
+                                                    chapter.id,
                                                 )}
                                                 onChange={() =>
-                                                    toggleClass(item.id)
+                                                    toggleChapter(chapter.id)
                                                 }
                                             />
-                                            <span className="min-w-0">
-                                                <strong className="block truncate text-sm">
-                                                    {item.name}
-                                                </strong>
-                                                <small className="text-slate-500">
-                                                    {item.subject_count}{' '}
-                                                    {item.subject_count === 1
-                                                        ? 'book'
-                                                        : 'books'}
-                                                </small>
+                                            <span className="min-w-0 break-words">
+                                                {chapter.name}
                                             </span>
                                         </label>
                                     ))}
                                 </div>
-                            ) : (
-                                <EmptyState
-                                    icon={GraduationCapIcon}
-                                    title="No classes available"
-                                />
-                            )}
-                        </section>
-                    )}
+                                {!subjectChapters.length && (
+                                    <p className="text-sm text-slate-500">
+                                        No chapters available for this subject.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </section>
 
-                    {mode === 'manual' && selectedClasses.length > 0 && (
-                        <>
-                            <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
-                                Select a book &amp; its chapters
+                    {mode === 'auto' && targetSubject && (
+                        <section className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                            <h2 className="text-lg font-semibold">
+                                Choose your syllabus
                             </h2>
-                            <div className="space-y-4">
-                                {selectedClasses.map((klass) => {
-                                    const books = subjects.filter(
-                                        (item) =>
-                                            item.qat_class_id === klass.id,
-                                    );
-
-                                    return (
-                                        <section
-                                            key={klass.id}
-                                            className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"
-                                        >
-                                            <div className="flex items-center justify-between bg-slate-50 px-4 py-3 dark:bg-slate-800/50">
-                                                <h3 className="flex items-center gap-2 text-sm font-semibold">
-                                                    <GraduationCapIcon className="size-4 text-brand-600" />{' '}
-                                                    {klass.name}
-                                                </h3>
-                                                <span className="text-xs text-slate-500">
-                                                    {books.length} books
-                                                </span>
-                                            </div>
-                                            {books.map((book) => {
-                                                const bookChapters =
-                                                    chapters.filter(
-                                                        (item) =>
-                                                            item.qat_subject_id ===
-                                                            book.id,
-                                                    );
-                                                const checked =
-                                                    subjectIds.includes(
-                                                        book.id,
-                                                    );
-
-                                                return (
-                                                    <div
-                                                        key={book.id}
-                                                        className="border-t border-slate-200 px-4 py-4 dark:border-slate-700"
-                                                    >
-                                                        <label className="flex cursor-pointer items-center gap-3">
-                                                            <input
-                                                                type="radio"
-                                                                name="qat-subject"
-                                                                className="size-4 accent-brand-600"
-                                                                checked={
-                                                                    checked
-                                                                }
-                                                                onChange={() =>
-                                                                    toggleSubject(
-                                                                        book.id,
-                                                                    )
-                                                                }
-                                                            />
-                                                            <BookOpenIcon className="size-4 text-brand-600" />
-                                                            <span className="min-w-0 flex-1">
-                                                                <strong className="block text-sm">
-                                                                    {book.name}
-                                                                </strong>
-                                                                <small className="text-slate-500">
-                                                                    {
-                                                                        bookChapters.length
-                                                                    }{' '}
-                                                                    chapters
-                                                                </small>
-                                                            </span>
-                                                            <Badge tone="neutral">
-                                                                {
-                                                                    bookChapters.filter(
-                                                                        (
-                                                                            item,
-                                                                        ) =>
-                                                                            chapterIds.includes(
-                                                                                item.id,
-                                                                            ),
-                                                                    ).length
-                                                                }
-                                                                /
-                                                                {
-                                                                    bookChapters.length
-                                                                }
-                                                            </Badge>
-                                                        </label>
-                                                        {checked && (
-                                                            <div className="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/40">
-                                                                <div className="mb-3 flex items-center justify-between">
-                                                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                                        Chapters
-                                                                    </span>
-                                                                    <label
-                                                                        className={
-                                                                            selectAllClass
-                                                                        }
-                                                                    >
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            className="size-4 accent-brand-600"
-                                                                            checked={
-                                                                                bookChapters.length >
-                                                                                    0 &&
-                                                                                bookChapters.every(
-                                                                                    (
-                                                                                        item,
-                                                                                    ) =>
-                                                                                        chapterIds.includes(
-                                                                                            item.id,
-                                                                                        ),
-                                                                                )
-                                                                            }
-                                                                            disabled={
-                                                                                !bookChapters.length
-                                                                            }
-                                                                            onChange={(
-                                                                                event,
-                                                                            ) =>
-                                                                                toggleChapterGroup(
-                                                                                    bookChapters.map(
-                                                                                        (
-                                                                                            item,
-                                                                                        ) =>
-                                                                                            item.id,
-                                                                                    ),
-                                                                                    event
-                                                                                        .target
-                                                                                        .checked,
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                        Select
-                                                                        all
-                                                                    </label>
-                                                                </div>
-                                                                <div className="grid gap-2 sm:grid-cols-2">
-                                                                    {bookChapters.map(
-                                                                        (
-                                                                            chapter,
-                                                                        ) => (
-                                                                            <label
-                                                                                key={
-                                                                                    chapter.id
-                                                                                }
-                                                                                className="flex cursor-pointer items-center gap-2 rounded-md p-1.5 text-sm hover:bg-white dark:hover:bg-slate-800"
-                                                                            >
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    className="size-4 accent-brand-600"
-                                                                                    checked={chapterIds.includes(
-                                                                                        chapter.id,
-                                                                                    )}
-                                                                                    onChange={() =>
-                                                                                        toggleChapter(
-                                                                                            chapter.id,
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                                <span className="truncate">
-                                                                                    {
-                                                                                        chapter.name
-                                                                                    }
-                                                                                </span>
-                                                                            </label>
-                                                                        ),
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </section>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
-
-                    {selectedSubjects.length > 0 && (
-                        <>
-                            <div>
-                                <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
-                                    Choose your syllabus
-                                </h2>
-                            </div>
-                            {mode === 'manual' && (
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSyllabus('custom')}
-                                        className={`rounded-xl border p-4 text-left ${syllabus === 'custom' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="block space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                    Academic year
+                                    <select
+                                        className={inputClass}
+                                        value={activeYear}
+                                        onChange={(event) => {
+                                            setQatYear(event.target.value);
+                                            setMonths([]);
+                                        }}
                                     >
-                                        <strong className="block text-sm">
-                                            Custom syllabus
-                                        </strong>
-                                        <span className="mt-1 block text-xs text-slate-500">
-                                            Use the chapters selected above.
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSyllabus('qat')}
-                                        className={`rounded-xl border p-4 text-left ${syllabus === 'qat' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                    >
-                                        <strong className="block text-sm">
-                                            QAT monthly syllabus
-                                        </strong>
-                                        <span className="mt-1 block text-xs text-slate-500">
-                                            Use chapters mapped to selected
-                                            preparation month.
-                                        </span>
-                                    </button>
-                                </div>
-                            )}
-                            {syllabus === 'qat' && (
-                                <div className="space-y-3">
-                                    <div
-                                        className={
-                                            mode === 'auto'
-                                                ? 'grid gap-4 sm:grid-cols-2'
-                                                : 'space-y-3'
+                                        {availableYears.map((year) => (
+                                            <option key={year} value={year}>
+                                                {year}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="block space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                    Preparation month
+                                    <select
+                                        className={inputClass}
+                                        value={months[0] ?? ''}
+                                        disabled={!monthChoices.length}
+                                        onChange={(event) =>
+                                            setMonths(
+                                                event.target.value
+                                                    ? [
+                                                          Number(
+                                                              event.target
+                                                                  .value,
+                                                          ),
+                                                      ]
+                                                    : [],
+                                            )
                                         }
                                     >
-                                        <label
-                                            className={`block space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-400 ${mode === 'manual' ? 'max-w-xs' : ''}`}
-                                        >
-                                            Academic year
-                                            <select
-                                                className={inputClass}
-                                                value={activeYear}
-                                                onChange={(event) => {
-                                                    setQatYear(
-                                                        event.target.value,
-                                                    );
-                                                    setMonths([]);
-                                                }}
+                                        <option value="">Select month</option>
+                                        {monthChoices.map((month) => (
+                                            <option key={month} value={month}>
+                                                {MONTHS[month - 1]}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </div>
+                            {selectedMonthDescriptions.length > 0 && (
+                                <div
+                                    aria-live="polite"
+                                    className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-3 dark:border-brand-500/30 dark:bg-brand-500/5"
+                                >
+                                    {selectedMonthDescriptions.map(
+                                        ({ month, books }) => (
+                                            <div
+                                                key={month}
+                                                className="space-y-2"
                                             >
-                                                {availableYears.map((year) => (
-                                                    <option
-                                                        key={year}
-                                                        value={year}
-                                                    >
-                                                        {year}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
-                                        {mode === 'auto' ? (
-                                            <label className="block space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                                                Preparation month
-                                                <select
-                                                    className={inputClass}
-                                                    value={months[0] ?? ''}
-                                                    disabled={
-                                                        !monthChoices.length
-                                                    }
-                                                    onChange={(event) =>
-                                                        setMonths(
-                                                            event.target.value
-                                                                ? [
-                                                                      Number(
-                                                                          event
-                                                                              .target
-                                                                              .value,
-                                                                      ),
-                                                                  ]
-                                                                : [],
-                                                        )
-                                                    }
-                                                >
-                                                    <option value="">
-                                                        Select month
-                                                    </option>
-                                                    {monthChoices.map(
-                                                        (month) => (
-                                                            <option
-                                                                key={month}
-                                                                value={month}
-                                                            >
-                                                                {
-                                                                    MONTHS[
-                                                                        month -
-                                                                            1
-                                                                    ]
+                                                <h3 className="text-sm font-semibold text-brand-700 dark:text-brand-300">
+                                                    {MONTHS[month - 1]} Syllabus
+                                                </h3>
+                                                {books.length ? (
+                                                    books.map((book) => (
+                                                        <div
+                                                            key={book.id}
+                                                            dir="auto"
+                                                            className="max-w-full overflow-x-auto text-sm text-slate-700 dark:text-slate-200"
+                                                        >
+                                                            <QuestionContent
+                                                                value={
+                                                                    book.description
                                                                 }
-                                                            </option>
-                                                        ),
-                                                    )}
-                                                </select>
-                                            </label>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <h3 className="text-sm font-semibold">
-                                                        Preparation month
-                                                    </h3>
-                                                </div>
-                                                <div
-                                                    className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4"
-                                                    role="group"
-                                                    aria-label="Preparation month"
-                                                >
-                                                    {monthChoices.map(
-                                                        (month) => (
-                                                            <button
-                                                                type="button"
-                                                                key={month}
-                                                                aria-pressed={months.includes(
-                                                                    month,
-                                                                )}
-                                                                onClick={() =>
-                                                                    setMonths([
-                                                                        month,
-                                                                    ])
-                                                                }
-                                                                className={`rounded-lg border px-3 py-2 text-sm ${months.includes(month) ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                                            >
-                                                                {
-                                                                    MONTHS[
-                                                                        month -
-                                                                            1
-                                                                    ]
-                                                                }
-                                                            </button>
-                                                        ),
-                                                    )}
-                                                </div>
+                                                                className="break-words [&_h2]:text-lg [&_h2]:font-semibold [&_p+p]:mt-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 dark:[&_td]:border-slate-600 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2 [&_th]:font-semibold dark:[&_th]:border-slate-600"
+                                                            />
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                        No description has been
+                                                        added for this month.
+                                                    </p>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                    {selectedMonthDescriptions.length > 0 && (
-                                        <div
-                                            aria-live="polite"
-                                            className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-500/30 dark:bg-brand-500/5"
-                                        >
-                                            {selectedMonthDescriptions.map(
-                                                ({ month, books }) => (
-                                                    <div
-                                                        key={month}
-                                                        className="space-y-2 border-t border-brand-100 pt-3 first:border-t-0 first:pt-0 dark:border-brand-500/20"
-                                                    >
-                                                        <h5 className="text-sm font-semibold text-brand-700 dark:text-brand-300">
-                                                            {MONTHS[month - 1]}{' '}
-                                                            Syllabus
-                                                        </h5>
-                                                        {books.length ? (
-                                                            books.map(
-                                                                (book) => (
-                                                                    <div
-                                                                        key={
-                                                                            book.id
-                                                                        }
-                                                                        className="min-w-0 space-y-1 text-sm text-slate-700 dark:text-slate-200"
-                                                                    >
-                                                                        <div
-                                                                            dir="auto"
-                                                                            className="max-w-full overflow-x-auto"
-                                                                        >
-                                                                            <QuestionContent
-                                                                                value={
-                                                                                    book.description
-                                                                                }
-                                                                                className="break-words [&_h2]:text-lg [&_h2]:font-semibold [&_p+p]:mt-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 dark:[&_td]:border-slate-600 [&_th]:border [&_th]:border-slate-300 [&_th]:p-2 [&_th]:font-semibold dark:[&_th]:border-slate-600"
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                ),
-                                                            )
-                                                        ) : (
-                                                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                                No description
-                                                                has been added
-                                                                for this month.
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                ),
-                                            )}
-                                        </div>
-                                    )}
-                                    {!monthChoices.length && (
-                                        <p className="text-sm text-amber-700">
-                                            No month mappings have been added
-                                            for these books.
-                                        </p>
+                                        ),
                                     )}
                                 </div>
                             )}
-                            {mode === 'manual' && (
-                                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-sm font-semibold">
-                                            Current syllabus coverage
-                                        </h3>
-                                        <Badge tone="info">
-                                            {coverage.length} chapters
-                                        </Badge>
-                                    </div>
-                                    {coverage.length ? (
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            {coverage.map((chapter) => (
-                                                <Badge
-                                                    key={chapter.id}
-                                                    tone="neutral"
-                                                >
-                                                    {
-                                                        selectedSubjects.find(
-                                                            (subject) =>
-                                                                subject.id ===
-                                                                chapter.qat_subject_id,
-                                                        )?.name
-                                                    }{' '}
-                                                    · {chapter.name}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="mt-3 text-sm text-slate-500">
-                                            {syllabus === 'qat'
-                                                ? 'Select a month with mapped chapters.'
-                                                : 'Select chapters from the book above.'}
-                                        </p>
-                                    )}
-                                </div>
+                            {!monthChoices.length && (
+                                <p className="text-sm text-amber-700">
+                                    No month mappings have been added for this
+                                    subject.
+                                </p>
                             )}
-                        </>
+                        </section>
                     )}
 
                     {coverage.length > 0 && (
                         <>
                             <div>
-                                <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
+                                <h2 className="border-t border-slate-200 pt-4 text-lg font-semibold dark:border-slate-700">
                                     {mode === 'auto'
                                         ? 'Choose a paper template'
                                         : 'Pick questions manually'}
@@ -1397,7 +1059,7 @@ export default function QatCreate({
                                                                     template.minutes,
                                                                 );
                                                             }}
-                                                            className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selectedTemplate?.id === template.id ? 'border-brand-500 bg-brand-50 shadow-sm dark:bg-brand-500/10' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}
+                                                            className={`rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selectedTemplate?.id === template.id ? 'border-brand-500 bg-brand-50 shadow-sm dark:bg-brand-500/10' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'}`}
                                                         >
                                                             <div className="flex items-start justify-between gap-3">
                                                                 <div>
@@ -1580,11 +1242,11 @@ export default function QatCreate({
                                                 />
                                             </div>
                                         </div>
-                                        <div className="max-h-[60vh] space-y-3 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-slate-50/30 p-2 dark:border-slate-700 dark:bg-slate-900/30">
+                                        <div className="max-h-[60vh] space-y-2 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-slate-50/30 p-2 dark:border-slate-700 dark:bg-slate-900/30">
                                             {listedQuestions.map((question) => (
                                                 <div
                                                     key={question.id}
-                                                    className={`rounded-xl border p-4 ${manual[question.id] ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}
+                                                    className={`rounded-xl border p-3 ${manual[question.id] ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}
                                                 >
                                                     <label className="flex cursor-pointer items-start gap-3">
                                                         <input
@@ -1748,7 +1410,7 @@ export default function QatCreate({
                     {poolScopeKey === questionScopeKey &&
                         (mode === 'auto' || totalQuestions > 0) && (
                             <>
-                                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-6 dark:border-slate-700">
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
                                     <h2 className="text-lg font-semibold">
                                         Review paper
                                     </h2>
@@ -2025,13 +1687,13 @@ export default function QatCreate({
                     aria-label="Paper summary"
                 >
                     <Card padding="none" className="overflow-hidden">
-                        <div className="bg-gradient-to-br from-brand-600 to-brand-700 px-5 py-5 text-white">
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <span className="flex size-10 items-center justify-center rounded-xl bg-white/15">
+                        <div className="bg-gradient-to-br from-brand-600 to-brand-700 p-4 text-white">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
                                         <FileTextIcon className="size-5" />
                                     </span>
-                                    <h2 className="font-semibold">
+                                    <h2 className="whitespace-nowrap font-semibold">
                                         Paper summary
                                     </h2>
                                 </div>
@@ -2040,8 +1702,8 @@ export default function QatCreate({
                                 </span>
                             </div>
                         </div>
-                        <div className="space-y-5 p-5">
-                            <dl className="space-y-3 text-sm">
+                        <div className="space-y-4 p-4">
+                            <dl className="space-y-2.5 text-sm">
                                 <div className="flex items-start justify-between gap-3">
                                     <dt className="shrink-0 text-slate-500 dark:text-slate-400">
                                         Class

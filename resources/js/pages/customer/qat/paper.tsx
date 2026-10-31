@@ -46,6 +46,11 @@ type QatPaperView = {
         months: number[];
         minutes: number;
         variant: string | null;
+        chapters?: {
+            id: number;
+            name: string;
+            chapter_number: number | null;
+        }[];
         sections: PaperSection[];
     };
 };
@@ -226,6 +231,35 @@ export default function QatPaper({
     const objectiveQuestions = objectiveSections.flatMap(
         (section) => section.questions,
     );
+    const chapters = paper.paper_data.chapters ?? [];
+    const chapterNumbers = [
+        ...new Set(
+            chapters
+                .map((chapter) => chapter.chapter_number)
+                .filter(
+                    (number): number is number =>
+                        number !== null &&
+                        Number.isInteger(number) &&
+                        number > 0,
+                ),
+        ),
+    ].sort((left, right) => left - right);
+    const unnumberedChapterNames = chapters
+        .filter(
+            (chapter) => !chapter.chapter_number || chapter.chapter_number < 1,
+        )
+        .map((chapter) => chapter.name);
+    const chapterLabels = chapters.length
+        ? [...chapterNumbers.map(String), ...new Set(unnumberedChapterNames)]
+        : [
+              ...new Set(
+                  paper.paper_data.sections.flatMap((section) =>
+                      section.questions.map(
+                          (question) => question.chapter_name,
+                      ),
+                  ),
+              ),
+          ];
 
     async function savePaper() {
         if (!previewId || saving) {
@@ -452,14 +486,15 @@ export default function QatPaper({
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-end gap-2 pb-1 text-xs font-semibold">
                             <span className="text-left">
-                                Total Time:{' '}
+                                <strong>Total Time:</strong>{' '}
                                 {formatDuration(paper.paper_data.minutes)}
                             </span>
                             <h1 className="text-center font-bold">
                                 {paper.subject_name} ({paper.class_name})
                             </h1>
                             <span className="text-right">
-                                Total Marks: {paper.total_marks}
+                                <strong>Total Marks:</strong>{' '}
+                                {paper.total_marks}
                             </span>
                         </div>
                         <table
@@ -470,14 +505,14 @@ export default function QatPaper({
                                 <tr>
                                     <td className="w-1/2 border border-slate-900 px-2 py-2">
                                         <div className="flex items-end gap-2">
-                                            <span className="shrink-0">
+                                            <span className="shrink-0 font-bold">
                                                 Roll No:
                                             </span>
                                             <span
                                                 className="h-4 min-w-0 flex-1 border-b border-slate-700"
                                                 aria-hidden="true"
                                             />
-                                            <span className="shrink-0">
+                                            <span className="shrink-0 font-bold">
                                                 Section:
                                             </span>
                                             <span
@@ -488,7 +523,7 @@ export default function QatPaper({
                                     </td>
                                     <td className="w-1/2 border border-slate-900 px-2 py-2">
                                         <div className="flex items-end gap-2">
-                                            <span className="shrink-0">
+                                            <span className="shrink-0 font-bold">
                                                 Signature of Supervisor:
                                             </span>
                                             <span
@@ -501,7 +536,7 @@ export default function QatPaper({
                                 <tr>
                                     <td className="border border-slate-900 px-2 py-2">
                                         <div className="flex items-end gap-2">
-                                            <span className="shrink-0">
+                                            <span className="shrink-0 font-bold">
                                                 Name:
                                             </span>
                                             <span
@@ -512,7 +547,7 @@ export default function QatPaper({
                                     </td>
                                     <td className="border border-slate-900 px-2 py-2">
                                         <div className="flex items-end gap-2">
-                                            <span className="shrink-0">
+                                            <span className="shrink-0 font-bold">
                                                 Father&apos;s Name:
                                             </span>
                                             <span
@@ -522,10 +557,33 @@ export default function QatPaper({
                                         </div>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td
+                                        colSpan={2}
+                                        className="border border-slate-900 px-2 py-2"
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <span className="shrink-0 font-bold">
+                                                Chapters:
+                                            </span>
+                                            <div
+                                                dir="auto"
+                                                className="min-w-0 break-words"
+                                            >
+                                                <QuestionContent
+                                                    value={chapterLabels
+                                                        .filter(Boolean)
+                                                        .join(', ')}
+                                                    inline
+                                                />
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </header>
-                    <div className="mt-6 space-y-6">
+                    <div className="mt-3 space-y-3">
                         {objectiveQuestions.length > 0 && (
                             <section>
                                 <QatSectionHeading number={1} />

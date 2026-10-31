@@ -48,7 +48,7 @@ final class QatPaperBuilder
         }
 
         $chapters = $query->orderBy('chapter.sort_id')->orderBy('chapter.id')
-            ->get(['chapter.id', 'chapter.name', 'chapter.source_chapter_id'])
+            ->get(['chapter.id', 'chapter.name', 'chapter.chapter_number', 'chapter.source_chapter_id'])
             ->filter(fn ($chapter) => $user->isSchoolOwner() || AppUserAccess::allowsChapter(
                 $access, (int) $subject->source_pattern_id, (int) $subject->source_class_id,
                 (int) $subject->subject_id, (int) $chapter->source_chapter_id,
@@ -64,6 +64,24 @@ final class QatPaperBuilder
         }
 
         return [$subject, $chapters, $access];
+    }
+
+    public function withChapters(array $paperData): array
+    {
+        if (! isset($paperData['chapters'])) {
+            $paperData['chapters'] = DB::table('qat_chapters')
+                ->where('qat_subject_id', $paperData['subject_id'] ?? 0)
+                ->whereIn('id', $paperData['chapter_ids'] ?? [])
+                ->orderBy('sort_id')->orderBy('id')
+                ->get(['id', 'name', 'chapter_number'])
+                ->map(fn ($chapter) => [
+                    'id' => (int) $chapter->id,
+                    'name' => $chapter->name,
+                    'chapter_number' => $chapter->chapter_number !== null ? (int) $chapter->chapter_number : null,
+                ])->all();
+        }
+
+        return $paperData;
     }
 
     public function questionQuery(object $subject, array $chapterIds, array $access): Builder

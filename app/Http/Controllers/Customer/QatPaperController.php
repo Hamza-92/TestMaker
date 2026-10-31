@@ -262,6 +262,11 @@ class QatPaperController extends Controller
                     'syllabus' => $data['syllabus'],
                     'months' => $data['syllabus'] === 'qat' ? $data['months'] : [],
                     'chapter_ids' => $chapters->pluck('id')->all(),
+                    'chapters' => $chapters->map(fn ($chapter) => [
+                        'id' => (int) $chapter->id,
+                        'name' => $chapter->name,
+                        'chapter_number' => $chapter->chapter_number !== null ? (int) $chapter->chapter_number : null,
+                    ])->all(),
                     'minutes' => (int) $data['minutes'],
                     'is_pef_pattern' => $isPefPattern,
                     'template' => $template ? [
@@ -291,7 +296,7 @@ class QatPaperController extends Controller
     public function preview(Request $request, string $preview, QatPaperBuilder $builder): Response
     {
         $papers = $this->previewPapers($request, $preview);
-        $papers = array_map(fn ($paper) => [...$paper, 'paper_data' => $builder->withObjectiveAnswers($paper['paper_data'])], $papers);
+        $papers = array_map(fn ($paper) => [...$paper, 'paper_data' => $builder->withChapters($builder->withObjectiveAnswers($paper['paper_data']))], $papers);
 
         return Inertia::render('customer/qat/paper', [
             'paper' => $papers[0],
@@ -361,7 +366,7 @@ class QatPaperController extends Controller
                 'total_marks' => $qatPaper->total_marks,
                 'question_count' => $qatPaper->question_count,
                 'created_at' => $qatPaper->created_at?->toISOString(),
-                'paper_data' => $builder->withObjectiveAnswers($paperData),
+                'paper_data' => $builder->withChapters($builder->withObjectiveAnswers($paperData)),
             ],
             'schoolDetails' => $this->schoolDetails($request),
         ]);
@@ -381,6 +386,9 @@ class QatPaperController extends Controller
     {
         if (($data['mode'] ?? null) === 'auto' && $data['syllabus'] !== 'qat') {
             throw ValidationException::withMessages(['syllabus' => 'Automatic QAT papers use the QAT monthly syllabus.']);
+        }
+        if (($data['mode'] ?? null) === 'manual' && $data['syllabus'] !== 'custom') {
+            throw ValidationException::withMessages(['syllabus' => 'Manual QAT papers use the selected chapters.']);
         }
         if ($data['syllabus'] === 'custom' && empty($data['chapter_ids'])) {
             throw ValidationException::withMessages(['chapter_ids' => 'Select at least one chapter.']);
