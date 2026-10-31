@@ -8,8 +8,9 @@ import {
     GraduationCapIcon,
     SearchIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
+import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import { Switch } from '@/components/ui/switch';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { QatQuestionStatement } from './question';
@@ -72,6 +73,22 @@ type AutoSection = {
     quantity: number;
     required_questions: number;
     marks: number;
+};
+
+type GenerationSelections = {
+    name: string;
+    class_ids: number[];
+    subject_id: number;
+    academic_year: string;
+    syllabus: 'custom' | 'qat';
+    chapter_ids: number[];
+    months: number[];
+    minutes: number;
+    template_id: number | null;
+    sections: QatTemplate['sections'];
+    variants: number;
+    allow_repeat: boolean;
+    manual_questions: { id: number; marks: number }[];
 };
 
 function normalizedSections(sections: QatTemplate['sections']) {
@@ -137,6 +154,7 @@ export default function QatCreate({
     chapters,
     monthSyllabi,
     templates,
+    initialSelections = null,
 }: {
     mode: 'auto' | 'manual';
     classes: QatClass[];
@@ -144,14 +162,28 @@ export default function QatCreate({
     chapters: QatChapter[];
     monthSyllabi: QatMonthSyllabus[];
     templates: QatTemplate[];
+    initialSelections?: GenerationSelections | null;
 }) {
-    const [classIds, setClassIds] = useState<number[]>([]);
-    const [subjectIds, setSubjectIds] = useState<number[]>([]);
-    const [chapterIds, setChapterIds] = useState<number[]>([]);
+    const [classIds, setClassIds] = useState<number[]>(
+        initialSelections?.class_ids ?? [],
+    );
+    const [subjectIds, setSubjectIds] = useState<number[]>(
+        initialSelections ? [initialSelections.subject_id] : [],
+    );
+    const [chapterIds, setChapterIds] = useState<number[]>(
+        initialSelections?.chapter_ids ?? [],
+    );
     const [classSearch, setClassSearch] = useState('');
-    const [syllabus, setSyllabus] = useState<'custom' | 'qat'>('custom');
-    const [qatYear, setQatYear] = useState('');
-    const [months, setMonths] = useState<number[]>([]);
+    const [manualSyllabus, setSyllabus] = useState<'custom' | 'qat'>(
+        initialSelections?.syllabus ?? 'custom',
+    );
+    const syllabus = mode === 'auto' ? 'qat' : manualSyllabus;
+    const [qatYear, setQatYear] = useState(
+        initialSelections?.academic_year ?? '',
+    );
+    const [months, setMonths] = useState<number[]>(
+        initialSelections?.months ?? [],
+    );
     const [pool, setPool] = useState<Pool | null>(null);
     const [poolScopeKey, setPoolScopeKey] = useState('');
     const [poolBusy, setPoolBusy] = useState(false);
@@ -159,13 +191,21 @@ export default function QatCreate({
     const [questionSearch, setQuestionSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
     const [selectedOnly, setSelectedOnly] = useState(false);
-    const [templateId, setTemplateId] = useState<number | null>(null);
-    const [autoSections, setAutoSections] = useState<AutoSection[]>([]);
+    const [templateId, setTemplateId] = useState<number | null>(
+        initialSelections?.template_id ?? null,
+    );
+    const [autoSections, setAutoSections] = useState<AutoSection[]>(() =>
+        normalizedSections(initialSelections?.sections ?? []),
+    );
     const [manual, setManual] = useState<Record<number, ManualChoice>>({});
-    const [name, setName] = useState('QAT Practice Paper');
-    const [minutes, setMinutes] = useState(40);
-    const [variants, setVariants] = useState(1);
-    const [allowRepeat, setAllowRepeat] = useState(false);
+    const [name, setName] = useState(
+        initialSelections?.name ?? 'QAT Practice Paper',
+    );
+    const [minutes, setMinutes] = useState(initialSelections?.minutes ?? 40);
+    const [variants, setVariants] = useState(initialSelections?.variants ?? 1);
+    const [allowRepeat, setAllowRepeat] = useState(
+        initialSelections?.allow_repeat ?? false,
+    );
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
 
@@ -177,6 +217,14 @@ export default function QatCreate({
             subjectIds.includes(item.id) &&
             classIds.includes(item.qat_class_id),
     );
+    const classOptions = classes.map((item) => ({
+        id: item.id,
+        label: item.name,
+        hint: item.academic_year,
+    }));
+    const subjectOptions = subjects
+        .filter((item) => classIds.includes(item.qat_class_id))
+        .map((item) => ({ id: item.id, label: item.name }));
     const availableYears = [
         ...new Set(selectedSubjects.map((item) => item.academic_year)),
     ];
@@ -249,6 +297,10 @@ export default function QatCreate({
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
     const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
+    const restoreScopeKey = useRef(questionScopeKey);
+    const pendingManualChoices = useRef(
+        initialSelections?.manual_questions ?? [],
+    );
     const typeRanks = new Map(
         (pool?.types ?? []).map((type, index) => [type.id, index]),
     );
@@ -389,10 +441,16 @@ export default function QatCreate({
         ).toFixed(2),
     );
     useEffect(() => {
+        if (questionScopeKey !== restoreScopeKey.current) {
+            pendingManualChoices.current = [];
+        }
+
         setPool(null);
         setPoolScopeKey('');
         setManual({});
         setSelectedOnly(false);
+        setPoolBusy(false);
+        setPoolError('');
     }, [questionScopeKey]);
 
     useEffect(() => {
@@ -452,8 +510,40 @@ export default function QatCreate({
                     throw new Error(firstError(body));
                 }
 
+                if (abort.signal.aborted) {
+                    return;
+                }
+
                 setPool(body as Pool);
                 setPoolScopeKey(questionScopeKey);
+
+                if (
+                    pendingManualChoices.current.length &&
+                    questionScopeKey === restoreScopeKey.current
+                ) {
+                    const marksById = new Map(
+                        pendingManualChoices.current.map((choice) => [
+                            choice.id,
+                            choice.marks,
+                        ]),
+                    );
+                    setManual(
+                        Object.fromEntries(
+                            (body as Pool).questions.data
+                                .filter((question) =>
+                                    marksById.has(question.id),
+                                )
+                                .map((question) => [
+                                    question.id,
+                                    {
+                                        question,
+                                        marks: marksById.get(question.id)!,
+                                    },
+                                ]),
+                        ),
+                    );
+                    pendingManualChoices.current = [];
+                }
             } catch (error) {
                 if (!abort.signal.aborted) {
                     setPoolError(
@@ -522,12 +612,12 @@ export default function QatCreate({
         );
     }
 
-    function toggleClass(id: number) {
+    function toggleClass(id: number | null) {
         if (classIds[0] === id) {
             return;
         }
 
-        setClassIds([id]);
+        setClassIds(id === null ? [] : [id]);
         setSubjectIds([]);
         setChapterIds([]);
         setMonths([]);
@@ -537,12 +627,12 @@ export default function QatCreate({
         setQuestionSearch('');
     }
 
-    function toggleSubject(id: number) {
+    function toggleSubject(id: number | null) {
         if (subjectIds[0] === id) {
             return;
         }
 
-        setSubjectIds([id]);
+        setSubjectIds(id === null ? [] : [id]);
         setChapterIds([]);
         setMonths([]);
         setTemplateId(null);
@@ -672,61 +762,134 @@ export default function QatCreate({
             />
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
                 <Card padding="lg" className="min-w-0 space-y-6">
-                    <section className="space-y-3">
-                        <h2 className="text-lg font-semibold">
-                            Choose your class
-                        </h2>
-                        <div className="relative w-full sm:max-w-xs">
-                            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                                className={`${inputClass} pl-9`}
-                                aria-label="Search classes"
-                                placeholder="Search classes"
-                                value={classSearch}
-                                onChange={(event) =>
-                                    setClassSearch(event.target.value)
-                                }
-                            />
-                        </div>
-                        {visibleClasses.length ? (
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                {visibleClasses.map((item) => (
-                                    <label
-                                        key={item.id}
-                                        className={`tm-lift flex h-20 cursor-pointer items-center gap-2 rounded-xl border p-3 ${classIds.includes(item.id) ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="qat-class"
-                                            className="size-4 accent-brand-600"
-                                            checked={classIds.includes(item.id)}
-                                            onChange={() =>
-                                                toggleClass(item.id)
-                                            }
-                                        />
-                                        <span className="min-w-0">
-                                            <strong className="block truncate text-sm">
-                                                {item.name}
-                                            </strong>
-                                            <small className="text-slate-500">
-                                                {item.subject_count}{' '}
-                                                {item.subject_count === 1
-                                                    ? 'book'
-                                                    : 'books'}
-                                            </small>
-                                        </span>
-                                    </label>
-                                ))}
+                    {mode === 'auto' ? (
+                        <section className="space-y-4">
+                            <h2 className="text-lg font-semibold">
+                                Choose your class &amp; subject
+                            </h2>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <span className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                        Class
+                                    </span>
+                                    <FloatingCombobox
+                                        label="Class"
+                                        hideLabel
+                                        compact
+                                        placeholder="Search classes"
+                                        leadingIcon={GraduationCapIcon}
+                                        options={classOptions}
+                                        value={
+                                            classOptions.find(
+                                                (item) =>
+                                                    item.id === classIds[0],
+                                            ) ?? null
+                                        }
+                                        onChange={(item) =>
+                                            toggleClass(
+                                                item ? Number(item.id) : null,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <span className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                        Subject
+                                    </span>
+                                    <FloatingCombobox
+                                        label="Subject"
+                                        hideLabel
+                                        compact
+                                        placeholder="Search subjects"
+                                        leadingIcon={BookOpenIcon}
+                                        disabled={!classIds.length}
+                                        options={subjectOptions}
+                                        value={
+                                            subjectOptions.find(
+                                                (item) =>
+                                                    item.id === subjectIds[0],
+                                            ) ?? null
+                                        }
+                                        onChange={(item) =>
+                                            toggleSubject(
+                                                item ? Number(item.id) : null,
+                                            )
+                                        }
+                                    />
+                                </div>
                             </div>
-                        ) : (
-                            <EmptyState
-                                icon={GraduationCapIcon}
-                                title="No classes available"
-                            />
-                        )}
-                    </section>
+                            {!classes.length && (
+                                <EmptyState
+                                    icon={GraduationCapIcon}
+                                    title="No classes available"
+                                />
+                            )}
+                            {classIds.length > 0 && !subjectOptions.length && (
+                                <EmptyState
+                                    icon={BookOpenIcon}
+                                    title="No subjects available"
+                                />
+                            )}
+                        </section>
+                    ) : (
+                        <section className="space-y-3">
+                            <h2 className="text-lg font-semibold">
+                                Choose your class
+                            </h2>
+                            <div className="relative w-full sm:max-w-xs">
+                                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    className={`${inputClass} pl-9`}
+                                    aria-label="Search classes"
+                                    placeholder="Search classes"
+                                    value={classSearch}
+                                    onChange={(event) =>
+                                        setClassSearch(event.target.value)
+                                    }
+                                />
+                            </div>
+                            {visibleClasses.length ? (
+                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                    {visibleClasses.map((item) => (
+                                        <label
+                                            key={item.id}
+                                            className={`tm-lift flex h-20 cursor-pointer items-center gap-2 rounded-xl border p-3 ${classIds.includes(item.id) ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="qat-class"
+                                                className="size-4 accent-brand-600"
+                                                checked={classIds.includes(
+                                                    item.id,
+                                                )}
+                                                onChange={() =>
+                                                    toggleClass(item.id)
+                                                }
+                                            />
+                                            <span className="min-w-0">
+                                                <strong className="block truncate text-sm">
+                                                    {item.name}
+                                                </strong>
+                                                <small className="text-slate-500">
+                                                    {item.subject_count}{' '}
+                                                    {item.subject_count === 1
+                                                        ? 'book'
+                                                        : 'books'}
+                                                </small>
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            ) : (
+                                <EmptyState
+                                    icon={GraduationCapIcon}
+                                    title="No classes available"
+                                />
+                            )}
+                        </section>
+                    )}
 
-                    {selectedClasses.length > 0 && (
+                    {mode === 'manual' && selectedClasses.length > 0 && (
                         <>
                             <h2 className="border-t border-slate-200 pt-6 text-lg font-semibold dark:border-slate-700">
                                 Select a book &amp; its chapters
@@ -912,77 +1075,150 @@ export default function QatCreate({
                                     Choose your syllabus
                                 </h2>
                             </div>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setSyllabus('custom')}
-                                    className={`rounded-xl border p-4 text-left ${syllabus === 'custom' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                >
-                                    <strong className="block text-sm">
-                                        Custom syllabus
-                                    </strong>
-                                    <span className="mt-1 block text-xs text-slate-500">
-                                        Use the chapters selected above.
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setSyllabus('qat')}
-                                    className={`rounded-xl border p-4 text-left ${syllabus === 'qat' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
-                                >
-                                    <strong className="block text-sm">
-                                        QAT monthly syllabus
-                                    </strong>
-                                    <span className="mt-1 block text-xs text-slate-500">
-                                        Use chapters mapped to selected
-                                        preparation month.
-                                    </span>
-                                </button>
-                            </div>
+                            {mode === 'manual' && (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSyllabus('custom')}
+                                        className={`rounded-xl border p-4 text-left ${syllabus === 'custom' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                    >
+                                        <strong className="block text-sm">
+                                            Custom syllabus
+                                        </strong>
+                                        <span className="mt-1 block text-xs text-slate-500">
+                                            Use the chapters selected above.
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSyllabus('qat')}
+                                        className={`rounded-xl border p-4 text-left ${syllabus === 'qat' ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                    >
+                                        <strong className="block text-sm">
+                                            QAT monthly syllabus
+                                        </strong>
+                                        <span className="mt-1 block text-xs text-slate-500">
+                                            Use chapters mapped to selected
+                                            preparation month.
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
                             {syllabus === 'qat' && (
                                 <div className="space-y-3">
-                                    <label className="block max-w-xs space-y-1 text-xs font-semibold text-slate-600">
-                                        Academic year
-                                        <select
-                                            className={inputClass}
-                                            value={activeYear}
-                                            onChange={(event) => {
-                                                setQatYear(event.target.value);
-                                                setMonths([]);
-                                            }}
-                                        >
-                                            {availableYears.map((year) => (
-                                                <option key={year} value={year}>
-                                                    {year}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <h3 className="text-sm font-semibold">
-                                            Preparation month
-                                        </h3>
-                                    </div>
                                     <div
-                                        className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4"
-                                        role="group"
-                                        aria-label="Preparation month"
+                                        className={
+                                            mode === 'auto'
+                                                ? 'grid gap-4 sm:grid-cols-2'
+                                                : 'space-y-3'
+                                        }
                                     >
-                                        {monthChoices.map((month) => (
-                                            <button
-                                                type="button"
-                                                key={month}
-                                                aria-pressed={months.includes(
-                                                    month,
-                                                )}
-                                                onClick={() =>
-                                                    setMonths([month])
-                                                }
-                                                className={`rounded-lg border px-3 py-2 text-sm ${months.includes(month) ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                        <label
+                                            className={`block space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-400 ${mode === 'manual' ? 'max-w-xs' : ''}`}
+                                        >
+                                            Academic year
+                                            <select
+                                                className={inputClass}
+                                                value={activeYear}
+                                                onChange={(event) => {
+                                                    setQatYear(
+                                                        event.target.value,
+                                                    );
+                                                    setMonths([]);
+                                                }}
                                             >
-                                                {MONTHS[month - 1]}
-                                            </button>
-                                        ))}
+                                                {availableYears.map((year) => (
+                                                    <option
+                                                        key={year}
+                                                        value={year}
+                                                    >
+                                                        {year}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        {mode === 'auto' ? (
+                                            <label className="block space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                                Preparation month
+                                                <select
+                                                    className={inputClass}
+                                                    value={months[0] ?? ''}
+                                                    disabled={
+                                                        !monthChoices.length
+                                                    }
+                                                    onChange={(event) =>
+                                                        setMonths(
+                                                            event.target.value
+                                                                ? [
+                                                                      Number(
+                                                                          event
+                                                                              .target
+                                                                              .value,
+                                                                      ),
+                                                                  ]
+                                                                : [],
+                                                        )
+                                                    }
+                                                >
+                                                    <option value="">
+                                                        Select month
+                                                    </option>
+                                                    {monthChoices.map(
+                                                        (month) => (
+                                                            <option
+                                                                key={month}
+                                                                value={month}
+                                                            >
+                                                                {
+                                                                    MONTHS[
+                                                                        month -
+                                                                            1
+                                                                    ]
+                                                                }
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </select>
+                                            </label>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <h3 className="text-sm font-semibold">
+                                                        Preparation month
+                                                    </h3>
+                                                </div>
+                                                <div
+                                                    className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4"
+                                                    role="group"
+                                                    aria-label="Preparation month"
+                                                >
+                                                    {monthChoices.map(
+                                                        (month) => (
+                                                            <button
+                                                                type="button"
+                                                                key={month}
+                                                                aria-pressed={months.includes(
+                                                                    month,
+                                                                )}
+                                                                onClick={() =>
+                                                                    setMonths([
+                                                                        month,
+                                                                    ])
+                                                                }
+                                                                className={`rounded-lg border px-3 py-2 text-sm ${months.includes(month) ? 'border-brand-500 bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10' : 'border-slate-200 hover:border-brand-300 dark:border-slate-700'}`}
+                                                            >
+                                                                {
+                                                                    MONTHS[
+                                                                        month -
+                                                                            1
+                                                                    ]
+                                                                }
+                                                            </button>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     {selectedMonthDescriptions.length > 0 && (
                                         <div
@@ -1042,41 +1278,43 @@ export default function QatCreate({
                                     )}
                                 </div>
                             )}
-                            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-semibold">
-                                        Current syllabus coverage
-                                    </h3>
-                                    <Badge tone="info">
-                                        {coverage.length} chapters
-                                    </Badge>
-                                </div>
-                                {coverage.length ? (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        {coverage.map((chapter) => (
-                                            <Badge
-                                                key={chapter.id}
-                                                tone="neutral"
-                                            >
-                                                {
-                                                    selectedSubjects.find(
-                                                        (subject) =>
-                                                            subject.id ===
-                                                            chapter.qat_subject_id,
-                                                    )?.name
-                                                }{' '}
-                                                · {chapter.name}
-                                            </Badge>
-                                        ))}
+                            {mode === 'manual' && (
+                                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-sm font-semibold">
+                                            Current syllabus coverage
+                                        </h3>
+                                        <Badge tone="info">
+                                            {coverage.length} chapters
+                                        </Badge>
                                     </div>
-                                ) : (
-                                    <p className="mt-3 text-sm text-slate-500">
-                                        {syllabus === 'qat'
-                                            ? 'Select a month with mapped chapters.'
-                                            : 'Select chapters from the book above.'}
-                                    </p>
-                                )}
-                            </div>
+                                    {coverage.length ? (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {coverage.map((chapter) => (
+                                                <Badge
+                                                    key={chapter.id}
+                                                    tone="neutral"
+                                                >
+                                                    {
+                                                        selectedSubjects.find(
+                                                            (subject) =>
+                                                                subject.id ===
+                                                                chapter.qat_subject_id,
+                                                        )?.name
+                                                    }{' '}
+                                                    · {chapter.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-3 text-sm text-slate-500">
+                                            {syllabus === 'qat'
+                                                ? 'Select a month with mapped chapters.'
+                                                : 'Select chapters from the book above.'}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -1530,32 +1768,6 @@ export default function QatCreate({
                                         </div>
                                     )}
                                 </div>
-                                <div className="grid gap-3 sm:grid-cols-3">
-                                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-                                        <small className="text-slate-500">
-                                            Subjects
-                                        </small>
-                                        <strong className="mt-1 block text-xl">
-                                            {selectedSubjects.length}
-                                        </strong>
-                                    </div>
-                                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-                                        <small className="text-slate-500">
-                                            Questions
-                                        </small>
-                                        <strong className="mt-1 block text-xl">
-                                            {totalQuestions}
-                                        </strong>
-                                    </div>
-                                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-                                        <small className="text-slate-500">
-                                            Total marks
-                                        </small>
-                                        <strong className="mt-1 block text-xl">
-                                            {totalMarks}
-                                        </strong>
-                                    </div>
-                                </div>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <label className="space-y-1 text-xs font-semibold text-slate-600">
                                         Paper name
@@ -1859,14 +2071,16 @@ export default function QatCreate({
                                             : 'Not selected'}
                                     </dd>
                                 </div>
-                                <div className="flex items-start justify-between gap-3">
-                                    <dt className="shrink-0 text-slate-500 dark:text-slate-400">
-                                        Chapters
-                                    </dt>
-                                    <dd className="font-semibold text-slate-900 dark:text-slate-100">
-                                        {targetCoverage.length}
-                                    </dd>
-                                </div>
+                                {mode === 'manual' && (
+                                    <div className="flex items-start justify-between gap-3">
+                                        <dt className="shrink-0 text-slate-500 dark:text-slate-400">
+                                            Chapters
+                                        </dt>
+                                        <dd className="font-semibold text-slate-900 dark:text-slate-100">
+                                            {targetCoverage.length}
+                                        </dd>
+                                    </div>
+                                )}
                                 {mode === 'auto' && (
                                     <div className="flex items-start justify-between gap-3">
                                         <dt className="shrink-0 text-slate-500 dark:text-slate-400">

@@ -216,6 +216,29 @@ class QatPaperController extends Controller
         }
         unset($paperSections);
 
+        $generationSettings = [
+            'mode' => $data['mode'],
+            'name' => trim($data['name']),
+            'class_ids' => $classIds,
+            'subject_id' => (int) $subject->id,
+            'academic_year' => $subject->academic_year,
+            'syllabus' => $data['syllabus'],
+            'chapter_ids' => $chapters->pluck('id')->all(),
+            'months' => $data['syllabus'] === 'qat' ? $data['months'] : [],
+            'minutes' => (int) $data['minutes'],
+            'template_id' => $template ? (int) $template->id : null,
+            'sections' => collect($data['sections'] ?? [])->map(fn ($section) => [
+                'question_type_id' => (int) $section['question_type_id'],
+                'quantity' => (int) $section['quantity'],
+                'required_questions' => (int) ($section['required_questions'] ?? $section['quantity']),
+                'marks' => (float) $section['marks'],
+            ])->all(),
+            'variants' => $variants,
+            'allow_repeat' => (bool) ($data['allow_repeat'] ?? false),
+            'manual_questions' => collect($data['manual_questions'] ?? [])->map(fn ($question) => [
+                'id' => (int) $question['id'], 'marks' => (float) $question['marks'],
+            ])->all(),
+        ];
         $papers = [];
         foreach ($prepared as $index => $sections) {
             $name = trim($data['name']).(count($prepared) > 1 ? ' — Paper '.chr(65 + $index) : '');
@@ -232,6 +255,7 @@ class QatPaperController extends Controller
                     : $questions->sum('marks'), 2),
                 'question_count' => $questions->count(),
                 'paper_data' => [
+                    'generation_settings' => $generationSettings,
                     'class_id' => (int) $subject->class_id,
                     'subject_id' => (int) $subject->id,
                     'academic_year' => $subject->academic_year,
@@ -273,6 +297,7 @@ class QatPaperController extends Controller
             'paper' => $papers[0],
             'variants' => $papers,
             'previewId' => $preview,
+            'backUrl' => route('customer.qat.create', ['mode' => $papers[0]['mode'], 'preview' => $preview]),
             'schoolDetails' => $this->schoolDetails($request),
         ]);
     }
@@ -324,6 +349,9 @@ class QatPaperController extends Controller
         }
 
         return Inertia::render('customer/qat/paper', [
+            'backUrl' => isset($paperData['generation_settings'])
+                ? route('customer.qat.create', ['mode' => $qatPaper->mode, 'paper' => $qatPaper->id])
+                : route('customer.qat.index'),
             'paper' => [
                 'id' => $qatPaper->id,
                 'name' => $qatPaper->name,
@@ -351,6 +379,9 @@ class QatPaperController extends Controller
 
     private function validateSyllabus(array $data): void
     {
+        if (($data['mode'] ?? null) === 'auto' && $data['syllabus'] !== 'qat') {
+            throw ValidationException::withMessages(['syllabus' => 'Automatic QAT papers use the QAT monthly syllabus.']);
+        }
         if ($data['syllabus'] === 'custom' && empty($data['chapter_ids'])) {
             throw ValidationException::withMessages(['chapter_ids' => 'Select at least one chapter.']);
         }

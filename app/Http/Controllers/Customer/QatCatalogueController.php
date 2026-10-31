@@ -20,19 +20,7 @@ class QatCatalogueController extends Controller
         $user = auth()->user();
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:150']]);
         $search = trim($filters['q'] ?? '');
-        $visibleUserIds = [$user->id];
-        if ($user->isSchoolOwner()) {
-            $visibleUserIds = array_values(array_unique([
-                ...$visibleUserIds, ...SchoolTeacherSummary::for($user)['ids'],
-            ]));
-        } elseif ($user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
-            $owner = $user->schoolOwner();
-            if ($owner !== null) {
-                $visibleUserIds = array_values(array_unique([
-                    ...$visibleUserIds, $owner->id, ...SchoolTeacherSummary::for($user)['ids'],
-                ]));
-            }
-        }
+        $visibleUserIds = $this->visibleUserIds($request);
 
         $papers = QatPaper::query()->whereIn('user_id', $visibleUserIds)
             ->where('is_draft', false)
@@ -64,9 +52,10 @@ class QatCatalogueController extends Controller
         ]);
     }
 
-    public function create(string $mode): Response
+    public function create(Request $request, string $mode): Response
     {
         abort_unless(in_array($mode, ['auto', 'manual'], true), 404);
+        $initialSelections = $this->initialSelections($request, $mode);
 
         $user = auth()->user();
         $access = AppUserAccess::resolve($user);
@@ -145,12 +134,60 @@ class QatCatalogueController extends Controller
 
         return Inertia::render('customer/qat/create', [
             'mode' => $mode,
+            'initialSelections' => $initialSelections,
             'classes' => $classes,
             'subjects' => $subjects,
             'chapters' => $chapters,
             'monthSyllabi' => $monthSyllabi,
             'templates' => $templates,
         ]);
+    }
+
+    private function initialSelections(Request $request, string $mode): ?array
+    {
+        $data = $request->validate([
+            'preview' => ['nullable', 'uuid', 'prohibits:paper'],
+            'paper' => ['nullable', 'integer', 'prohibits:preview'],
+        ]);
+        if (! empty($data['preview'])) {
+            $entry = $request->session()->get('qat_preview');
+            abort_unless(is_array($entry) && ($entry['id'] ?? null) === $data['preview'], 404);
+            abort_unless((int) ($entry['user_id'] ?? 0) === (int) $request->user()->id, 403);
+            $paperMode = $entry['papers'][0]['mode'] ?? null;
+            $settings = $entry['papers'][0]['paper_data']['generation_settings'] ?? null;
+        } elseif (! empty($data['paper'])) {
+            $paper = QatPaper::query()->findOrFail($data['paper']);
+            abort_unless(in_array((int) $paper->user_id, $this->visibleUserIds($request), true), 403);
+            $paperMode = $paper->mode;
+            $settings = $paper->paper_data['generation_settings'] ?? null;
+        } else {
+            return null;
+        }
+
+        abort_unless($paperMode === $mode && is_array($settings), 404);
+
+        return $settings;
+    }
+
+    private function visibleUserIds(Request $request): array
+    {
+        $user = $request->user();
+        $ids = [(int) $user->id];
+        if ($user->isSchoolOwner()) {
+            return array_values(array_unique(array_map('intval', [
+                ...$ids, ...SchoolTeacherSummary::for($user)['ids'],
+            ])));
+        }
+        if ($user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
+            $owner = $user->schoolOwner();
+            if ($owner !== null) {
+                return array_values(array_unique(array_map('intval', [
+                    ...$ids, (int) $owner->id, ...SchoolTeacherSummary::for($user)['ids'],
+                ])));
+            }
+        }
+
+        return $ids;
     }
 
     public function show(Request $request, int $qatSubject): Response

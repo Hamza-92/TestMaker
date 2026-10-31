@@ -134,6 +134,17 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         'template_id' => $templateId,
     ])->assertUnprocessable()->assertJsonValidationErrors('class_ids');
 
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Custom auto QAT', 'mode' => 'auto', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId],
+        'template_id' => $templateId,
+    ])->assertUnprocessable()->assertJsonValidationErrors('syllabus');
+    $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
+        'name' => 'Auto QAT without month', 'mode' => 'auto', 'class_ids' => [$classId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [],
+        'template_id' => $templateId,
+    ])->assertUnprocessable()->assertJsonValidationErrors('months');
+
     $generation = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Monthly QAT', 'mode' => 'auto', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
@@ -145,12 +156,26 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->assertOk()->assertInertia(fn ($page) => $page
         ->component('customer/qat/paper')
         ->where('previewId', $previewId)
+        ->where('backUrl', route('customer.qat.create', ['mode' => 'auto', 'preview' => $previewId]))
         ->where('schoolDetails.name', 'Sample School')
         ->where('schoolDetails.logo', 'school-logos/sample.png')
         ->where('paper.paper_data.sections.0.questions.0.objective_answers.options', [0])
         ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
         ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں')
         ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
+    $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'auto', 'preview' => $previewId]))
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('initialSelections.class_ids', [$classId])
+        ->where('initialSelections.subject_id', $subjectId)
+        ->where('initialSelections.months', [5])
+        ->where('initialSelections.syllabus', 'qat')
+        ->where('initialSelections.template_id', $templateId)
+        ->where('initialSelections.minutes', 35)
+        ->where('initialSelections.sections.0.quantity', 1));
+    $this->actingAs($school)->get(route('customer.qat.create', 'auto'))
+        ->assertOk()->assertInertia(fn ($page) => $page->where('initialSelections', null));
+    $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'manual', 'preview' => $previewId]))
+        ->assertNotFound();
     $this->actingAs($school)->get(route('customer.qat.index'))
         ->assertOk()->assertInertia(fn ($page) => $page->has('papers.data', 0));
     $this->actingAs($school)->postJson(route('customer.qat.previews.save', $previewId))
@@ -165,12 +190,18 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->and($paper->total_marks)->toBe(2.0);
     $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
         ->assertInertia(fn ($page) => $page->component('customer/qat/paper')
+            ->where('backUrl', route('customer.qat.create', ['mode' => 'auto', 'paper' => $paper->id]))
             ->where('schoolDetails.name', 'Sample School')
             ->where('schoolDetails.logo', 'school-logos/sample.png')
             ->where('paper.paper_data.sections.0.questions.0.statement_en', 'May question'));
+    $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'auto', 'paper' => $paper->id]))
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('initialSelections.subject_id', $subjectId)
+        ->where('initialSelections.months', [5]));
     $legacyData = $paper->paper_data;
     unset($legacyData['sections'][0]['heading_en'], $legacyData['sections'][0]['heading_ur']);
     unset($legacyData['sections'][0]['questions'][0]['objective_answers']);
+    unset($legacyData['generation_settings']);
     $paper->update(['paper_data' => $legacyData]);
     $originalQuestionData = DB::table('qat_questions')->where('id', $mayQuestionId)->value('question_data');
     $updatedQuestionData = json_decode($originalQuestionData, true);
@@ -178,6 +209,7 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     DB::table('qat_questions')->where('id', $mayQuestionId)->update(['question_data' => json_encode($updatedQuestionData)]);
     $this->actingAs($school)->get(route('customer.qat.papers.show', $paper))->assertOk()
         ->assertInertia(fn ($page) => $page
+            ->where('backUrl', route('customer.qat.index'))
             ->where('paper.paper_data.sections.0.questions.0.objective_answers.options', [0])
             ->where('paper.paper_data.sections.0.heading_en', 'Choose the answer')
             ->where('paper.paper_data.sections.0.heading_ur', 'درست جواب منتخب کریں'));
@@ -190,12 +222,16 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         'allow_qat_tests' => true,
     ]);
     $this->actingAs($otherSchool)->get(route('customer.qat.papers.show', $paper))->assertForbidden();
+    $this->actingAs($otherSchool)->get(route('customer.qat.create', ['mode' => 'auto', 'paper' => $paper->id]))
+        ->assertForbidden();
     $privatePreview = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [
         'name' => 'Private preview', 'mode' => 'auto', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [4],
         'template_id' => $templateId,
     ])->assertCreated();
     $privatePreviewId = basename($privatePreview->json('preview_url'));
+    $this->actingAs($otherSchool)->get(route('customer.qat.create', ['mode' => 'auto', 'preview' => $privatePreviewId]))
+        ->assertForbidden();
     $this->actingAs($otherSchool)->get(route('customer.qat.previews.show', $privatePreviewId))
         ->assertForbidden();
     $this->actingAs($otherSchool)->postJson(route('customer.qat.previews.save', $privatePreviewId))
@@ -215,22 +251,33 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId],
         'minutes' => 40, 'manual_questions' => [['id' => $mayQuestionId, 'marks' => 1]],
     ])->assertUnprocessable()->assertJsonValidationErrors('manual_questions');
-    $saveGenerated([
+    $manualSaved = $saveGenerated([
         'name' => 'Manual QAT', 'mode' => 'manual', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId],
         'minutes' => 40, 'manual_questions' => [['id' => $aprilQuestionId, 'marks' => 3]],
     ]);
     expect(QatPaper::query()->count())->toBe(2);
+    $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'manual', 'paper' => $manualSaved['paper_id']]))
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('initialSelections.chapter_ids', [$aprilId])
+        ->where('initialSelections.syllabus', 'custom')
+        ->where('initialSelections.manual_questions', [['id' => $aprilQuestionId, 'marks' => 3]]));
 
+    DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $aprilId, 'month' => 5]);
     $variantSave = $saveGenerated([
         'name' => 'Two variants', 'mode' => 'auto', 'class_ids' => [$classId],
-        'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId, $mayId],
+        'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
         'template_id' => $templateId, 'variants' => 2,
     ]);
     expect($variantSave['paper_ids'])->toHaveCount(2);
+    $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'auto', 'paper' => $variantSave['paper_ids'][1]]))
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('initialSelections.name', 'Two variants')
+        ->where('initialSelections.variants', 2));
     $variants = QatPaper::query()->where('name', 'like', 'Two variants%')->get();
     expect($variants)->toHaveCount(2)
         ->and($variants->pluck('paper_data')->pluck('sections.0.questions.0.id')->unique())->toHaveCount(2);
+    DB::table('qat_chapter_months')->where('qat_chapter_id', $aprilId)->where('month', 5)->delete();
 
     $extraQuestions = [];
     foreach (range(1, 35) as $number) {
@@ -280,6 +327,12 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         'sections' => [['question_type_id' => $type->id, 'quantity' => 4, 'required_questions' => 3, 'marks' => 1.5]],
     ];
     $customGeneration = $this->actingAs($school)->postJson(route('customer.qat.papers.store'), $customPayload)->assertCreated();
+    $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'auto', 'preview' => basename($customGeneration->json('preview_url'))]))
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('initialSelections.minutes', 50)
+        ->where('initialSelections.sections.0.quantity', 4)
+        ->where('initialSelections.sections.0.required_questions', 3)
+        ->where('initialSelections.sections.0.marks', 1.5));
     $this->actingAs($school)->get($customGeneration->json('preview_url'))->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('paper.question_count', 4)->where('paper.total_marks', 4.5)

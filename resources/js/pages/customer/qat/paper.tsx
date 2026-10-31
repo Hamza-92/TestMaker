@@ -190,11 +190,13 @@ export default function QatPaper({
     paper: initialPaper,
     variants = [],
     previewId = null,
+    backUrl = '/qa-tests',
     schoolDetails,
 }: {
     paper: QatPaperView;
     variants?: QatPaperView[];
     previewId?: string | null;
+    backUrl?: string;
     schoolDetails: SchoolDetails;
 }) {
     const [activeVariant, setActiveVariant] = useState(0);
@@ -628,7 +630,7 @@ export default function QatPaper({
             <div className="sticky bottom-0 z-20 -mx-4 border-y border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:-mx-6 md:px-6 print:hidden">
                 <div className="flex justify-end">
                     <Button asChild variant="secondary">
-                        <Link href="/qa-tests">
+                        <Link href={backUrl}>
                             <ArrowLeftIcon /> Back
                         </Link>
                     </Button>
