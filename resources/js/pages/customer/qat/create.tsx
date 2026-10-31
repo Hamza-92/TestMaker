@@ -740,6 +740,11 @@ export default function QatCreate({
     return (
         <div className="w-full space-y-4 pb-20">
             <Head title={`${mode === 'auto' ? 'Auto' : 'Manual'} QAT paper`} />
+            <Button asChild variant="ghost" size="sm" className="-ml-3">
+                <Link href="/qa-tests">
+                    <ArrowLeftIcon /> QAT Tests
+                </Link>
+            </Button>
             <PageHeader
                 title={
                     mode === 'auto'
