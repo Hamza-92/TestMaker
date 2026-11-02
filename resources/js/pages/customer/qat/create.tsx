@@ -5,6 +5,7 @@ import QatGenerationForm from '@/components/qat/generation-form';
 import type { QatGenerationFormProps } from '@/components/qat/generation-form';
 import { QatGenerationHeader } from '@/components/qat/generation-header';
 import { QatSyllabusCard } from '@/components/qat/syllabus-card';
+import { QatTemplateCard } from '@/components/qat/template-card';
 
 export default function QatCreate(props: QatGenerationFormProps) {
     const { mode } = props;
@@ -39,6 +40,9 @@ export default function QatCreate(props: QatGenerationFormProps) {
                     <>
                         <QatClassSubjectCard {...selection} />
                         <QatSyllabusCard {...selection.syllabus} />
+                        {mode === 'auto' && (
+                            <QatTemplateCard {...selection.template} />
+                        )}
                     </>
                 )}
             />

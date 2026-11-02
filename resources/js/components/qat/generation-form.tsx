@@ -192,6 +192,30 @@ export type QatSyllabusSelection = {
 
 export type QatGenerationViewState = QatClassSubjectSelection & {
     syllabus: QatSyllabusSelection;
+    template: QatTemplateSelection;
+};
+
+export type QatTemplateSelection = {
+    subjectSelected: boolean;
+    syllabusSelected: boolean;
+    loading: boolean;
+    error: string;
+    selectedId: number | null;
+    options: {
+        id: number;
+        name: string;
+        category: string | null;
+        minutes: number;
+        ready: boolean;
+        rows: {
+            id: number;
+            name: string;
+            total: number;
+            required: number;
+            marks: number;
+        }[];
+    }[];
+    onSelect: (id: number) => void;
 };
 
 export default function QatGenerationForm({
@@ -786,6 +810,62 @@ export default function QatGenerationForm({
             subjectId: subjectIds[0] ?? null,
             onClassChange: toggleClass,
             onSubjectChange: toggleSubject,
+            template: {
+                subjectSelected: targetSubject !== null,
+                syllabusSelected: targetCoverage.length > 0,
+                loading:
+                    targetCoverage.length > 0 &&
+                    !poolError &&
+                    (poolBusy || poolScopeKey !== questionScopeKey),
+                error: poolError,
+                selectedId: selectedTemplate?.id ?? null,
+                options: availableTemplates.map((template) => ({
+                    id: template.id,
+                    name: template.name,
+                    category: template.category,
+                    minutes: template.minutes,
+                    ready: template.sections.every(
+                        (section) =>
+                            (pool?.types.find(
+                                (type) => type.id === section.question_type_id,
+                            )?.total ?? 0) >= section.quantity,
+                    ),
+                    rows: template.sections
+                        .map((section) => ({
+                            id: section.question_type_id,
+                            name:
+                                pool?.types.find(
+                                    (type) =>
+                                        type.id === section.question_type_id,
+                                )?.name ??
+                                `Question type ${section.question_type_id}`,
+                            total: section.quantity,
+                            required:
+                                section.required_questions ?? section.quantity,
+                            marks: section.marks,
+                        }))
+                        .sort(
+                            (left, right) =>
+                                (typeRanks.get(left.id) ??
+                                    Number.MAX_SAFE_INTEGER) -
+                                (typeRanks.get(right.id) ??
+                                    Number.MAX_SAFE_INTEGER),
+                        ),
+                })),
+                onSelect: (id) => {
+                    const template = availableTemplates.find(
+                        (item) => item.id === id,
+                    );
+
+                    if (!template) {
+                        return;
+                    }
+
+                    setTemplateId(template.id);
+                    setAutoSections(normalizedSections(template.sections));
+                    setMinutes(template.minutes);
+                },
+            },
             syllabus: {
                 mode,
                 subjectSelected: targetSubject !== null,
