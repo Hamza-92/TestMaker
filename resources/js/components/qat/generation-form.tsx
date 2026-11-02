@@ -194,6 +194,35 @@ export type QatGenerationViewState = QatClassSubjectSelection & {
     syllabus: QatSyllabusSelection;
     template: QatTemplateSelection;
     review: QatReviewSelection;
+    manualPicker: QatManualSelection;
+    summary: QatSelectionSummary;
+};
+
+export type QatSelectionSummary = {
+    className: string;
+    subjectName: string;
+    chapterCount: number;
+    minutes: number;
+    questionCount: number;
+    totalMarks: number;
+};
+
+export type QatManualSelection = {
+    subjectSelected: boolean;
+    chaptersSelected: boolean;
+    loading: boolean;
+    error: string;
+    types: PoolType[];
+    questions: QatQuestion[];
+    selected: Record<number, number>;
+    search: string;
+    typeFilter: string;
+    selectedOnly: boolean;
+    onSearchChange: (value: string) => void;
+    onTypeChange: (value: string) => void;
+    onSelectedOnlyChange: (value: boolean) => void;
+    onToggle: (id: number) => void;
+    onMarksChange: (id: number, marks: number) => void;
 };
 
 export type QatReviewSelection = {
@@ -764,6 +793,14 @@ export default function QatGenerationForm({
         subjectIds.length === 1 &&
         targetCoverage.length > 0 &&
         totalQuestions > 0 &&
+        (mode !== 'manual' ||
+            (selectedManual.length <= 100 &&
+                selectedManual.every(
+                    (item) =>
+                        Number.isFinite(item.marks) &&
+                        item.marks >= 0.5 &&
+                        item.marks <= 20,
+                ))) &&
         !poolBusy &&
         !poolError &&
         poolScopeKey === questionScopeKey &&
@@ -846,6 +883,74 @@ export default function QatGenerationForm({
             subjectId: subjectIds[0] ?? null,
             onClassChange: toggleClass,
             onSubjectChange: toggleSubject,
+            summary: {
+                className: selectedClasses[0]?.name ?? 'Not selected',
+                subjectName: targetSubject?.name ?? 'Not selected',
+                chapterCount: targetCoverage.length,
+                minutes,
+                questionCount: summaryHasCurrentQuestions ? totalQuestions : 0,
+                totalMarks: summaryTotalMarks,
+            },
+            manualPicker: {
+                subjectSelected: targetSubject !== null,
+                chaptersSelected: targetCoverage.length > 0,
+                loading:
+                    targetCoverage.length > 0 &&
+                    !poolError &&
+                    (poolBusy || !summaryHasCurrentQuestions),
+                error: poolError,
+                types: summaryHasCurrentQuestions ? (pool?.types ?? []) : [],
+                questions: summaryHasCurrentQuestions ? listedQuestions : [],
+                selected: summaryHasCurrentQuestions
+                    ? Object.fromEntries(
+                          selectedManual.map(({ question, marks }) => [
+                              question.id,
+                              marks,
+                          ]),
+                      )
+                    : {},
+                search: questionSearch,
+                typeFilter,
+                selectedOnly,
+                onSearchChange: setQuestionSearch,
+                onTypeChange: setTypeFilter,
+                onSelectedOnlyChange: setSelectedOnly,
+                onToggle: (id) => {
+                    const question = pool?.questions.data.find(
+                        (item) => item.id === id,
+                    );
+
+                    if (!question || !summaryHasCurrentQuestions) {
+                        return;
+                    }
+
+                    setManual((current) => {
+                        const next = { ...current };
+
+                        if (next[id]) {
+                            delete next[id];
+                        } else {
+                            next[id] = {
+                                question,
+                                marks: question.is_objective ? 1 : 2,
+                            };
+                        }
+
+                        return next;
+                    });
+                },
+                onMarksChange: (id, marks) =>
+                    setManual((current) => {
+                        if (!current[id]) {
+                            return current;
+                        }
+
+                        return {
+                            ...current,
+                            [id]: { ...current[id], marks: marks || 1 },
+                        };
+                    }),
+            },
             review: {
                 name,
                 minutes,
