@@ -4,6 +4,7 @@ import { QatClassSubjectCard } from '@/components/qat/class-subject-card';
 import QatGenerationForm from '@/components/qat/generation-form';
 import type { QatGenerationFormProps } from '@/components/qat/generation-form';
 import { QatGenerationHeader } from '@/components/qat/generation-header';
+import { QatReviewCard } from '@/components/qat/review-card';
 import { QatSyllabusCard } from '@/components/qat/syllabus-card';
 import { QatTemplateCard } from '@/components/qat/template-card';
 
@@ -12,7 +13,7 @@ export default function QatCreate(props: QatGenerationFormProps) {
     const title = `${mode === 'auto' ? 'Auto' : 'Manual'} paper generation`;
 
     return (
-        <div className="w-full space-y-4">
+        <div className={`w-full space-y-4 ${mode === 'auto' ? 'pb-20' : ''}`}>
             <Head title={title} />
             <nav
                 aria-label="Breadcrumb"
@@ -41,7 +42,10 @@ export default function QatCreate(props: QatGenerationFormProps) {
                         <QatClassSubjectCard {...selection} />
                         <QatSyllabusCard {...selection.syllabus} />
                         {mode === 'auto' && (
-                            <QatTemplateCard {...selection.template} />
+                            <>
+                                <QatTemplateCard {...selection.template} />
+                                <QatReviewCard {...selection.review} />
+                            </>
                         )}
                     </>
                 )}

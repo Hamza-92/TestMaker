@@ -193,6 +193,42 @@ export type QatSyllabusSelection = {
 export type QatGenerationViewState = QatClassSubjectSelection & {
     syllabus: QatSyllabusSelection;
     template: QatTemplateSelection;
+    review: QatReviewSelection;
+};
+
+export type QatReviewSelection = {
+    name: string;
+    minutes: number;
+    variants: number;
+    allowRepeat: boolean;
+    isPefPattern: boolean;
+    loading: boolean;
+    rows: {
+        id: number;
+        name: string;
+        count: number;
+        required: number;
+        marks: number;
+        available: number;
+    }[];
+    totalQuestions: number;
+    totalMarks: number;
+    variantsHaveEnoughQuestions: boolean;
+    canGenerate: boolean;
+    saving: boolean;
+    error: string;
+    sidebarCollapsed: boolean;
+    onNameChange: (value: string) => void;
+    onMinutesChange: (value: number) => void;
+    onVariantsChange: (value: number) => void;
+    onAllowRepeatChange: (value: boolean) => void;
+    onSectionChange: (
+        id: number,
+        field: 'quantity' | 'required_questions' | 'marks',
+        value: number,
+    ) => void;
+    onClear: () => void;
+    onGenerate: () => Promise<void>;
 };
 
 export type QatTemplateSelection = {
@@ -810,6 +846,41 @@ export default function QatGenerationForm({
             subjectId: subjectIds[0] ?? null,
             onClassChange: toggleClass,
             onSubjectChange: toggleSubject,
+            review: {
+                name,
+                minutes,
+                variants,
+                allowRepeat,
+                isPefPattern,
+                loading: poolBusy,
+                rows:
+                    poolScopeKey === questionScopeKey
+                        ? reviewRows.map((row) => ({
+                              ...row,
+                              available:
+                                  autoRows.find((item) => item.id === row.id)
+                                      ?.available ?? 0,
+                          }))
+                        : [],
+                totalQuestions: summaryHasCurrentQuestions ? totalQuestions : 0,
+                totalMarks: summaryTotalMarks,
+                variantsHaveEnoughQuestions,
+                canGenerate,
+                saving,
+                error: saveError,
+                sidebarCollapsed,
+                onNameChange: setName,
+                onMinutesChange: setMinutes,
+                onVariantsChange: setVariants,
+                onAllowRepeatChange: setAllowRepeat,
+                onSectionChange: updateAutoSection,
+                onClear: () => {
+                    setTemplateId(null);
+                    setAutoSections([]);
+                    setMinutes(40);
+                },
+                onGenerate: generate,
+            },
             template: {
                 subjectSelected: targetSubject !== null,
                 syllabusSelected: targetCoverage.length > 0,
