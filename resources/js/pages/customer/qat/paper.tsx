@@ -3,14 +3,16 @@ import {
     ArrowLeftIcon,
     CheckIcon,
     DownloadIcon,
+    FileTextIcon,
     KeyRoundIcon,
     Loader2Icon,
     PrinterIcon,
     SaveIcon,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Button, Card, PageHeader } from '@/components/tm';
+import { Button } from '@/components/tm';
 import { Switch } from '@/components/ui/switch';
+import { useCustomerSidebar } from '@/layouts/customer/customer-layout';
 import { QuestionContent } from '../papers/paper-layouts/questions/question-content';
 import {
     DEFAULT_PAPER_SETTINGS,
@@ -20,7 +22,7 @@ import { QatObjectiveQuestion, QatQuestionContent } from './question';
 import type { QatQuestion } from './question';
 
 const toolbarHoverClass =
-    'hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300';
+    'border border-sky-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300';
 
 type PaperSection = {
     question_type_id: number;
@@ -204,6 +206,7 @@ export default function QatPaper({
     backUrl?: string;
     schoolDetails: SchoolDetails;
 }) {
+    const { collapsed: sidebarCollapsed } = useCustomerSidebar();
     const [activeVariant, setActiveVariant] = useState(0);
     const [saving, setSaving] = useState(false);
     const [downloading, setDownloading] = useState(false);
@@ -211,6 +214,7 @@ export default function QatPaper({
     const [actionError, setActionError] = useState('');
     const paperVariants = variants.length ? variants : [initialPaper];
     const paper = paperVariants[activeVariant] ?? initialPaper;
+    const variantLabel = `Paper ${paper.paper_data.variant ?? String.fromCharCode(65 + activeVariant)}`;
     const schoolLogoUrl = storageAssetUrl(schoolDetails.logo);
     const objectiveSections = paper.paper_data.sections
         .map((section) => ({
@@ -354,7 +358,7 @@ export default function QatPaper({
     }
 
     return (
-        <div className="w-full space-y-5">
+        <div className="w-full space-y-4 pb-20 print:space-y-0 print:pb-0">
             <Head title={paper.name} />
             <style>{`
                 @page { size: A4; margin: 10mm; }
@@ -376,15 +380,12 @@ export default function QatPaper({
                     #qat-print-sheet .qat-question { break-inside: avoid; page-break-inside: avoid; }
                 }
             `}</style>
-            <div className="print:hidden">
-                <PageHeader
-                    title={paper.name}
-                    meta={`${paper.question_count} questions · ${paper.total_marks} marks`}
-                />
-            </div>
-            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 print:hidden">
+            <div
+                aria-label="Paper controls"
+                className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-violet-50 p-3 shadow-sm dark:border-sky-900/60 dark:from-sky-950 dark:via-slate-900 dark:to-violet-950 print:hidden"
+            >
                 <div
-                    className="flex flex-wrap gap-1.5"
+                    className="flex flex-wrap gap-1 rounded-xl border border-sky-100 bg-sky-100/50 p-1 dark:border-slate-700 dark:bg-slate-800/80"
                     role="group"
                     aria-label="Paper variants"
                 >
@@ -394,7 +395,7 @@ export default function QatPaper({
                             type="button"
                             aria-pressed={activeVariant === index}
                             onClick={() => setActiveVariant(index)}
-                            className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${toolbarHoverClass} ${activeVariant === index ? 'border-slate-900 bg-slate-900 text-white dark:border-brand-500 dark:bg-brand-600' : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+                            className={`min-h-9 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${activeVariant === index ? 'bg-gradient-to-r from-indigo-500 to-brand-600 text-white shadow-sm hover:from-indigo-600 hover:to-brand-700' : 'text-slate-500 hover:bg-white hover:text-brand-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-sky-300'}`}
                         >
                             Paper{' '}
                             {variant.paper_data.variant ??
@@ -405,14 +406,19 @@ export default function QatPaper({
                 <div className="flex flex-wrap items-center gap-2">
                     <label
                         htmlFor="qat-answer-key"
-                        className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition-colors dark:border-slate-700 dark:text-slate-200 ${toolbarHoverClass}`}
+                        className={`relative inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-xs font-semibold ${toolbarHoverClass}`}
                     >
-                        <KeyRoundIcon className="size-4" />
+                        <KeyRoundIcon
+                            aria-hidden="true"
+                            className="size-4 text-amber-500"
+                        />
                         Answer key
                         <Switch
                             id="qat-answer-key"
+                            aria-label="Answer key"
                             checked={showAnswers}
                             onCheckedChange={setShowAnswers}
+                            className="data-[state=checked]:bg-emerald-500"
                         />
                     </label>
                     <Button
@@ -420,9 +426,9 @@ export default function QatPaper({
                         variant="secondary"
                         size="sm"
                         onClick={() => window.print()}
-                        className={toolbarHoverClass}
+                        className={`h-10 rounded-lg ${toolbarHoverClass}`}
                     >
-                        <PrinterIcon /> Print
+                        <PrinterIcon className="text-sky-500" /> Print
                     </Button>
                     <Button
                         type="button"
@@ -430,29 +436,29 @@ export default function QatPaper({
                         size="sm"
                         onClick={() => void savePaper()}
                         disabled={!previewId || saving}
-                        className={toolbarHoverClass}
+                        className={`h-10 rounded-lg ${toolbarHoverClass}`}
                     >
                         {saving ? (
                             <Loader2Icon className="animate-spin" />
                         ) : previewId ? (
-                            <SaveIcon />
+                            <SaveIcon className="text-violet-500" />
                         ) : (
-                            <CheckIcon />
+                            <CheckIcon className="text-emerald-500" />
                         )}
                         {saving ? 'Saving…' : previewId ? 'Save' : 'Saved'}
                     </Button>
                     <Button
                         type="button"
-                        variant="primary"
+                        variant="secondary"
                         size="sm"
                         onClick={() => void downloadPdf()}
                         disabled={downloading}
-                        className={`border border-transparent ${toolbarHoverClass}`}
+                        className={`h-10 rounded-lg ${toolbarHoverClass}`}
                     >
                         {downloading ? (
                             <Loader2Icon className="animate-spin" />
                         ) : (
-                            <DownloadIcon />
+                            <DownloadIcon className="text-emerald-500" />
                         )}
                         {downloading ? 'Preparing PDF…' : 'Download PDF'}
                     </Button>
@@ -461,156 +467,249 @@ export default function QatPaper({
             {actionError && (
                 <p
                     role="alert"
-                    className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 print:hidden"
+                    className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300 print:hidden"
                 >
                     {actionError}
                 </p>
             )}
-            <Card className="mx-auto max-w-[210mm] overflow-hidden p-0 print:overflow-visible">
-                <article
-                    id="qat-print-sheet"
-                    className="min-h-[297mm] bg-white px-[10mm] py-[10mm] text-slate-900 print:min-h-0"
+            <section
+                aria-label="Paper board"
+                className="min-w-0 overflow-hidden rounded-2xl border border-sky-200/70 bg-gradient-to-br from-sky-100/70 via-slate-100 to-violet-100/60 shadow-sm dark:border-sky-900/60 dark:from-[#142c42] dark:via-slate-950 dark:to-[#28213e] print:overflow-visible print:rounded-none print:border-0 print:bg-none print:shadow-none"
+            >
+                <div className="flex items-center justify-between gap-3 border-b border-sky-200/60 bg-white/60 px-4 py-3 text-xs dark:border-sky-900/60 dark:bg-slate-900/50 print:hidden">
+                    <h2 className="flex items-center gap-2 font-semibold text-[#425b7b] dark:text-slate-300">
+                        <FileTextIcon
+                            aria-hidden="true"
+                            className="size-4 text-brand-500"
+                        />
+                        Paper preview
+                    </h2>
+                    <span className="rounded-md border border-sky-100 bg-white/80 px-2 py-1 text-[11px] font-semibold text-brand-600 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300">
+                        A4 · {variantLabel}
+                    </span>
+                </div>
+                <div
+                    role="region"
+                    aria-label="Paper sheet"
+                    tabIndex={0}
+                    className="overflow-x-auto p-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 sm:p-6 print:overflow-visible print:p-0"
                 >
-                    <header className="break-inside-avoid">
-                        <div className="mb-3 flex items-center justify-center gap-3 text-center">
-                            {schoolLogoUrl && (
-                                <img
-                                    src={schoolLogoUrl}
-                                    alt=""
-                                    className="h-8 w-8 shrink-0 object-contain"
-                                />
-                            )}
-                            <div className="text-lg font-bold leading-tight">
-                                {schoolDetails.name}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-end gap-2 pb-1 text-xs font-semibold">
-                            <span className="text-left">
-                                <strong>Total Time:</strong>{' '}
-                                {formatDuration(paper.paper_data.minutes)}
-                            </span>
-                            <h1 className="text-center font-bold">
-                                {paper.subject_name} ({paper.class_name})
-                            </h1>
-                            <span className="text-right">
-                                <strong>Total Marks:</strong>{' '}
-                                {paper.total_marks}
-                            </span>
-                        </div>
-                        <table
-                            role="presentation"
-                            className="w-full table-fixed border-collapse border border-slate-900 text-xs"
+                    <div className="mx-auto w-[210mm] shrink-0 overflow-hidden bg-white shadow-sm print:w-full print:overflow-visible print:shadow-none">
+                        <article
+                            id="qat-print-sheet"
+                            className="min-h-[297mm] bg-white px-[10mm] py-[10mm] text-slate-900 print:min-h-0"
                         >
-                            <tbody>
-                                <tr>
-                                    <td className="w-1/2 border border-slate-900 px-2 py-2">
-                                        <div className="flex items-end gap-2">
-                                            <span className="shrink-0 font-bold">
-                                                Roll No:
-                                            </span>
-                                            <span
-                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
-                                                aria-hidden="true"
-                                            />
-                                            <span className="shrink-0 font-bold">
-                                                Section:
-                                            </span>
-                                            <span
-                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
-                                                aria-hidden="true"
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="w-1/2 border border-slate-900 px-2 py-2">
-                                        <div className="flex items-end gap-2">
-                                            <span className="shrink-0 font-bold">
-                                                Signature of Supervisor:
-                                            </span>
-                                            <span
-                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
-                                                aria-hidden="true"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td className="border border-slate-900 px-2 py-2">
-                                        <div className="flex items-end gap-2">
-                                            <span className="shrink-0 font-bold">
-                                                Name:
-                                            </span>
-                                            <span
-                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
-                                                aria-hidden="true"
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="border border-slate-900 px-2 py-2">
-                                        <div className="flex items-end gap-2">
-                                            <span className="shrink-0 font-bold">
-                                                Father&apos;s Name:
-                                            </span>
-                                            <span
-                                                className="h-4 min-w-0 flex-1 border-b border-slate-700"
-                                                aria-hidden="true"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        colSpan={2}
-                                        className="border border-slate-900 px-2 py-2"
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <span className="shrink-0 font-bold">
-                                                Chapters:
-                                            </span>
-                                            <div
-                                                dir="auto"
-                                                className="min-w-0 break-words"
-                                            >
-                                                <QuestionContent
-                                                    value={chapterLabels
-                                                        .filter(Boolean)
-                                                        .join(', ')}
-                                                    inline
-                                                />
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </header>
-                    <div className="mt-3 space-y-3">
-                        {objectiveQuestions.length > 0 && (
-                            <section>
-                                <QatSectionHeading number={1} />
-                                <div className="mt-2 space-y-4">
-                                    {objectiveSections.map(
-                                        (section, sectionIndex) => {
-                                            const preceding = objectiveSections
-                                                .slice(0, sectionIndex)
-                                                .reduce(
-                                                    (total, previous) =>
-                                                        total +
-                                                        previous.questions
-                                                            .length,
-                                                    0,
-                                                );
-
-                                            return (
-                                                <div
-                                                    key={`${section.question_type_id}-${sectionIndex}`}
-                                                    className="space-y-3"
-                                                >
-                                                    <QatTypeHeading
-                                                        section={section}
-                                                        number={
-                                                            sectionIndex + 1
-                                                        }
+                            <header className="break-inside-avoid">
+                                <div className="mb-3 flex items-center justify-center gap-3 text-center">
+                                    {schoolLogoUrl && (
+                                        <img
+                                            src={schoolLogoUrl}
+                                            alt=""
+                                            className="h-8 w-8 shrink-0 object-contain"
+                                        />
+                                    )}
+                                    <div className="text-lg font-bold leading-tight">
+                                        {schoolDetails.name}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-end gap-2 pb-1 text-xs font-semibold">
+                                    <span className="text-left">
+                                        <strong>Total Time:</strong>{' '}
+                                        {formatDuration(
+                                            paper.paper_data.minutes,
+                                        )}
+                                    </span>
+                                    <h1 className="text-center font-bold">
+                                        {paper.subject_name} ({paper.class_name}
+                                        )
+                                    </h1>
+                                    <span className="text-right">
+                                        <strong>Total Marks:</strong>{' '}
+                                        {paper.total_marks}
+                                    </span>
+                                </div>
+                                <table
+                                    role="presentation"
+                                    className="w-full table-fixed border-collapse border border-slate-900 text-xs"
+                                >
+                                    <tbody>
+                                        <tr>
+                                            <td className="w-1/2 border border-slate-900 px-2 py-2">
+                                                <div className="flex items-end gap-2">
+                                                    <span className="shrink-0 font-bold">
+                                                        Roll No:
+                                                    </span>
+                                                    <span
+                                                        className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                        aria-hidden="true"
                                                     />
+                                                    <span className="shrink-0 font-bold">
+                                                        Section:
+                                                    </span>
+                                                    <span
+                                                        className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                        aria-hidden="true"
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="w-1/2 border border-slate-900 px-2 py-2">
+                                                <div className="flex items-end gap-2">
+                                                    <span className="shrink-0 font-bold">
+                                                        Signature of Supervisor:
+                                                    </span>
+                                                    <span
+                                                        className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                        aria-hidden="true"
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td className="border border-slate-900 px-2 py-2">
+                                                <div className="flex items-end gap-2">
+                                                    <span className="shrink-0 font-bold">
+                                                        Name:
+                                                    </span>
+                                                    <span
+                                                        className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                        aria-hidden="true"
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="border border-slate-900 px-2 py-2">
+                                                <div className="flex items-end gap-2">
+                                                    <span className="shrink-0 font-bold">
+                                                        Father&apos;s Name:
+                                                    </span>
+                                                    <span
+                                                        className="h-4 min-w-0 flex-1 border-b border-slate-700"
+                                                        aria-hidden="true"
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td
+                                                colSpan={2}
+                                                className="border border-slate-900 px-2 py-2"
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <span className="shrink-0 font-bold">
+                                                        Chapters:
+                                                    </span>
+                                                    <div
+                                                        dir="auto"
+                                                        className="min-w-0 break-words"
+                                                    >
+                                                        <QuestionContent
+                                                            value={chapterLabels
+                                                                .filter(Boolean)
+                                                                .join(', ')}
+                                                            inline
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </header>
+                            <div className="mt-3 space-y-3">
+                                {objectiveQuestions.length > 0 && (
+                                    <section>
+                                        <QatSectionHeading number={1} />
+                                        <div className="mt-2 space-y-4">
+                                            {objectiveSections.map(
+                                                (section, sectionIndex) => {
+                                                    const preceding =
+                                                        objectiveSections
+                                                            .slice(
+                                                                0,
+                                                                sectionIndex,
+                                                            )
+                                                            .reduce(
+                                                                (
+                                                                    total,
+                                                                    previous,
+                                                                ) =>
+                                                                    total +
+                                                                    previous
+                                                                        .questions
+                                                                        .length,
+                                                                0,
+                                                            );
+
+                                                    return (
+                                                        <div
+                                                            key={`${section.question_type_id}-${sectionIndex}`}
+                                                            className="space-y-3"
+                                                        >
+                                                            <QatTypeHeading
+                                                                section={
+                                                                    section
+                                                                }
+                                                                number={
+                                                                    sectionIndex +
+                                                                    1
+                                                                }
+                                                            />
+                                                            {section.questions.map(
+                                                                (
+                                                                    question,
+                                                                    index,
+                                                                ) => (
+                                                                    <div
+                                                                        key={
+                                                                            question.id
+                                                                        }
+                                                                        data-paper-question
+                                                                        className="qat-question px-2"
+                                                                    >
+                                                                        <QatObjectiveQuestion
+                                                                            showAnswers={
+                                                                                showAnswers
+                                                                            }
+                                                                            question={
+                                                                                question
+                                                                            }
+                                                                            number={
+                                                                                preceding +
+                                                                                index +
+                                                                                1
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                    </section>
+                                )}
+                                {subjectiveSections.map(
+                                    (section, sectionIndex) => {
+                                        const sectionNumber =
+                                            sectionIndex +
+                                            (objectiveQuestions.length ? 2 : 1);
+
+                                        return (
+                                            <section
+                                                key={`${section.question_type_id}-${sectionIndex}`}
+                                            >
+                                                <QatSectionHeading
+                                                    number={sectionNumber}
+                                                />
+                                                <QatTypeHeading
+                                                    section={section}
+                                                    number={
+                                                        objectiveSections.length +
+                                                        sectionIndex +
+                                                        1
+                                                    }
+                                                />
+                                                <div className="mt-2 space-y-2">
                                                     {section.questions.map(
                                                         (question, index) => (
                                                             <div
@@ -620,79 +719,40 @@ export default function QatPaper({
                                                                 data-paper-question
                                                                 className="qat-question px-2"
                                                             >
-                                                                <QatObjectiveQuestion
-                                                                    showAnswers={
-                                                                        showAnswers
-                                                                    }
+                                                                <QatQuestionContent
                                                                     question={
                                                                         question
                                                                     }
-                                                                    number={
-                                                                        preceding +
+                                                                    number={romanSection(
                                                                         index +
-                                                                        1
-                                                                    }
+                                                                            1,
+                                                                    ).toLowerCase()}
                                                                 />
                                                             </div>
                                                         ),
                                                     )}
                                                 </div>
-                                            );
-                                        },
-                                    )}
-                                </div>
-                            </section>
-                        )}
-                        {subjectiveSections.map((section, sectionIndex) => {
-                            const sectionNumber =
-                                sectionIndex +
-                                (objectiveQuestions.length ? 2 : 1);
-
-                            return (
-                                <section
-                                    key={`${section.question_type_id}-${sectionIndex}`}
-                                >
-                                    <QatSectionHeading number={sectionNumber} />
-                                    <QatTypeHeading
-                                        section={section}
-                                        number={
-                                            objectiveSections.length +
-                                            sectionIndex +
-                                            1
-                                        }
-                                    />
-                                    <div className="mt-2 space-y-2">
-                                        {section.questions.map(
-                                            (question, index) => (
-                                                <div
-                                                    key={question.id}
-                                                    data-paper-question
-                                                    className="qat-question px-2"
-                                                >
-                                                    <QatQuestionContent
-                                                        question={question}
-                                                        number={romanSection(
-                                                            index + 1,
-                                                        ).toLowerCase()}
-                                                    />
-                                                </div>
-                                            ),
-                                        )}
-                                    </div>
-                                </section>
-                            );
-                        })}
+                                            </section>
+                                        );
+                                    },
+                                )}
+                            </div>
+                        </article>
                     </div>
-                </article>
-            </Card>
-            <div className="sticky bottom-0 z-20 -mx-4 border-y border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:-mx-6 md:px-6 print:hidden">
-                <div className="flex justify-end">
-                    <Button asChild variant="secondary">
-                        <Link href={backUrl}>
-                            <ArrowLeftIcon /> Back
-                        </Link>
-                    </Button>
                 </div>
+            </section>
+            <div
+                className={`fixed inset-x-0 bottom-0 z-20 border-t border-sky-100 bg-white px-4 py-3 shadow-sm transition-[left] duration-200 dark:border-slate-800 dark:bg-slate-900 md:px-6 ${sidebarCollapsed ? 'md:left-16' : 'md:left-60'} print:hidden`}
+            >
+                <Button
+                    asChild
+                    variant="secondary"
+                    className={`h-10 rounded-lg ${toolbarHoverClass}`}
+                >
+                    <Link href={backUrl}>
+                        <ArrowLeftIcon /> Back
+                    </Link>
+                </Button>
             </div>
         </div>
     );

@@ -8,6 +8,7 @@ import {
     SparklesIcon,
 } from 'lucide-react';
 import type { QatTemplateSelection } from '@/components/qat/generation-form';
+import { QatStepHeader } from '@/components/qat/step-header';
 
 export function QatTemplateCard({
     subjectSelected,
@@ -21,33 +22,16 @@ export function QatTemplateCard({
     return (
         <section
             aria-labelledby="qat-template-title"
-            className="relative isolate overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 via-[#fcfaff] to-[#f0ecff] shadow-[0_6px_24px_-10px_rgba(139,92,246,0.18)] dark:border-violet-900/50 dark:from-[#2b1c46] dark:via-slate-900 dark:to-[#282040]"
+            className="relative isolate overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 via-[#fcfaff] to-[#f0ecff] shadow-sm dark:border-violet-900/50 dark:from-[#2b1c46] dark:via-slate-900 dark:to-[#282040]"
         >
-            <div className="relative z-10 flex items-center gap-3 px-5 py-4 sm:gap-4 sm:px-6">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/50 bg-gradient-to-br from-violet-400 via-violet-600 to-purple-800 text-xl font-bold text-white shadow-[0_4px_12px_rgba(139,92,246,0.25)] dark:border-violet-300/20">
-                    3
-                </span>
-                <div className="min-w-0 flex-1 space-y-1">
-                    <h2
-                        id="qat-template-title"
-                        className="text-lg font-bold leading-snug tracking-tight text-[#112650] dark:text-slate-50 sm:text-xl"
-                    >
-                        Choose a paper template
-                    </h2>
-                    <p className="text-xs font-medium leading-relaxed text-[#526985] dark:text-slate-400 sm:text-[13px]">
-                        Select a pattern for your test paper
-                    </p>
-                </div>
-                <img
-                    src="/images/qat/templates.webp"
-                    alt=""
-                    aria-hidden="true"
-                    width={800}
-                    height={346}
-                    decoding="async"
-                    className="pointer-events-none h-12 w-20 shrink-0 select-none object-contain object-right sm:h-14 sm:w-48"
-                />
-            </div>
+            <QatStepHeader
+                id="qat-template-title"
+                step={3}
+                tone="purple"
+                title="Choose a paper template"
+                description="Select a pattern for your test paper"
+                image="/images/qat/templates.webp"
+            />
             <div
                 aria-busy={loading}
                 className="relative z-10 px-5 pb-5 pt-1 sm:pl-[5.25rem] sm:pr-6"
@@ -116,7 +100,7 @@ export function QatTemplateCard({
                                     aria-label={template.name}
                                     aria-pressed={selected}
                                     onClick={() => onSelect(template.id)}
-                                    className={`group flex min-w-0 flex-col rounded-xl border p-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 motion-reduce:transition-none ${selected ? 'border-violet-500 bg-gradient-to-br from-white to-violet-100/70 shadow-[0_4px_16px_-6px_rgba(124,58,237,0.3)] dark:border-violet-400 dark:from-slate-900 dark:to-violet-950/70' : 'border-violet-200/80 bg-white/90 hover:border-violet-400 hover:bg-violet-50 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/90 dark:hover:border-violet-600 dark:hover:bg-violet-950/40'}`}
+                                    className={`group flex min-w-0 flex-col rounded-xl border p-4 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 motion-reduce:transition-none ${selected ? 'border-violet-500 bg-gradient-to-br from-white to-violet-100/70 shadow-sm dark:border-violet-400 dark:from-slate-900 dark:to-violet-950/70' : 'border-violet-200/80 bg-white/90 hover:border-violet-400 hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-900/90 dark:hover:border-violet-600 dark:hover:bg-violet-950/40'}`}
                                 >
                                     <div className="flex items-start gap-3">
                                         <span

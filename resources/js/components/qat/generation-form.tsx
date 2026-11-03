@@ -8,7 +8,7 @@ import {
     GraduationCapIcon,
     SearchIcon,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
@@ -199,12 +199,16 @@ export type QatGenerationViewState = QatClassSubjectSelection & {
 };
 
 export type QatSelectionSummary = {
+    mode: 'auto' | 'manual';
     className: string;
     subjectName: string;
     chapterCount: number;
     minutes: number;
     questionCount: number;
     totalMarks: number;
+    templateName: string | null;
+    variants: number;
+    months: string[];
 };
 
 export type QatManualSelection = {
@@ -432,37 +436,65 @@ export default function QatGenerationForm({
     const pendingManualChoices = useRef(
         initialSelections?.manual_questions ?? [],
     );
-    const typeRanks = new Map(
-        (pool?.types ?? []).map((type, index) => [type.id, index]),
+    const typeRanks = useMemo(
+        () =>
+            new Map((pool?.types ?? []).map((type, index) => [type.id, index])),
+        [pool],
     );
-    const selectedManual = Object.values(manual).sort(
-        (left, right) =>
-            (typeRanks.get(left.question.question_type_id) ??
-                Number.MAX_SAFE_INTEGER) -
-            (typeRanks.get(right.question.question_type_id) ??
-                Number.MAX_SAFE_INTEGER),
+    const selectedManual = useMemo(
+        () =>
+            Object.values(manual).sort(
+                (left, right) =>
+                    (typeRanks.get(left.question.question_type_id) ??
+                        Number.MAX_SAFE_INTEGER) -
+                    (typeRanks.get(right.question.question_type_id) ??
+                        Number.MAX_SAFE_INTEGER),
+            ),
+        [manual, typeRanks],
     );
     const searchTerm = questionSearch.trim().toLocaleLowerCase();
-    const listedQuestions = selectedOnly
-        ? selectedManual.map(({ question }) => question)
-        : (pool?.questions.data ?? []).filter(
-              (question) =>
-                  (!typeFilter ||
-                      question.question_type_id === Number(typeFilter)) &&
-                  (!searchTerm ||
-                      JSON.stringify({
-                          statement_en: question.statement_en,
-                          statement_ur: question.statement_ur,
-                          description_en: question.description_en,
-                          description_ur: question.description_ur,
-                          content: question.content,
-                          chapter_name: question.chapter_name,
-                          topic_name: question.topic_name,
-                          type_name: question.type_name,
-                      })
-                          .toLocaleLowerCase()
-                          .includes(searchTerm)),
-          );
+    const questionSearchIndex = useMemo(
+        () =>
+            new Map(
+                (pool?.questions.data ?? []).map((question) => [
+                    question.id,
+                    JSON.stringify({
+                        statement_en: question.statement_en,
+                        statement_ur: question.statement_ur,
+                        description_en: question.description_en,
+                        description_ur: question.description_ur,
+                        content: question.content,
+                        chapter_name: question.chapter_name,
+                        topic_name: question.topic_name,
+                        type_name: question.type_name,
+                    }).toLocaleLowerCase(),
+                ]),
+            ),
+        [pool],
+    );
+    const listedQuestions = useMemo(
+        () =>
+            selectedOnly
+                ? selectedManual.map(({ question }) => question)
+                : (pool?.questions.data ?? []).filter(
+                      (question) =>
+                          (!typeFilter ||
+                              question.question_type_id ===
+                                  Number(typeFilter)) &&
+                          (!searchTerm ||
+                              questionSearchIndex
+                                  .get(question.id)
+                                  ?.includes(searchTerm)),
+                  ),
+        [
+            selectedOnly,
+            selectedManual,
+            pool,
+            typeFilter,
+            searchTerm,
+            questionSearchIndex,
+        ],
+    );
     const autoRows = [
         ...autoSections,
         ...(pool?.types ?? [])
@@ -884,12 +916,21 @@ export default function QatGenerationForm({
             onClassChange: toggleClass,
             onSubjectChange: toggleSubject,
             summary: {
+                mode,
                 className: selectedClasses[0]?.name ?? 'Not selected',
                 subjectName: targetSubject?.name ?? 'Not selected',
                 chapterCount: targetCoverage.length,
                 minutes,
                 questionCount: summaryHasCurrentQuestions ? totalQuestions : 0,
                 totalMarks: summaryTotalMarks,
+                templateName: selectedTemplate?.name ?? null,
+                variants,
+                months:
+                    mode === 'auto'
+                        ? months
+                              .filter((month) => monthChoices.includes(month))
+                              .map((month) => MONTHS[month - 1])
+                        : [],
             },
             manualPicker: {
                 subjectSelected: targetSubject !== null,

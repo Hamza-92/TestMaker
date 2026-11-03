@@ -35,12 +35,8 @@ export function QatGenerationHeader({ mode }: { mode: 'auto' | 'manual' }) {
     return (
         <header
             aria-labelledby="qat-generation-title"
-            className="relative isolate overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-[#f3f8ff] via-[#f7fbff] to-[#e8f8f0] shadow-[0_8px_32px_-12px_rgba(59,130,246,0.18)] dark:border-sky-900/50 dark:from-slate-900 dark:via-[#132344] dark:to-[#113c3a]"
+            className="relative isolate overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-[#f3f8ff] via-[#f7fbff] to-[#e8f8f0] shadow-sm dark:border-sky-900/50 dark:from-slate-900 dark:via-[#132344] dark:to-[#113c3a]"
         >
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -left-20 -top-24 size-72 rounded-full bg-white/65 blur-3xl dark:bg-sky-500/10"
-            />
             <div className="relative z-10 space-y-6 px-5 pb-2 pt-6 sm:px-7 sm:pt-7 md:py-8 md:pr-[40%] lg:pl-8 xl:space-y-7">
                 <div className="space-y-2">
                     <h1
@@ -65,7 +61,7 @@ export function QatGenerationHeader({ mode }: { mode: 'auto' | 'manual' }) {
                             className="flex min-w-0 items-center gap-2.5"
                         >
                             <span
-                                className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-white/35 bg-gradient-to-br text-white shadow-md ${color}`}
+                                className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-white/35 bg-gradient-to-br text-white shadow-sm ${color}`}
                             >
                                 <Icon
                                     className="size-5"

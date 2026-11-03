@@ -15,6 +15,7 @@ import {
     Trash2Icon,
 } from 'lucide-react';
 import type { QatReviewSelection } from '@/components/qat/generation-form';
+import { QatStepHeader } from '@/components/qat/step-header';
 
 const fieldClass =
     'h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition-colors hover:border-sky-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-700';
@@ -57,43 +58,30 @@ export function QatReviewCard({
         <>
             <section
                 aria-labelledby="qat-review-title"
-                className="relative isolate overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-50/70 shadow-[0_6px_24px_-10px_rgba(59,130,246,0.18)] dark:border-sky-900/50 dark:from-[#152c48] dark:via-slate-900 dark:to-[#1b2445]"
+                className="relative isolate overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-50/70 shadow-sm dark:border-sky-900/50 dark:from-[#152c48] dark:via-slate-900 dark:to-[#1b2445]"
             >
-                <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-5 py-4 sm:flex sm:gap-4 sm:px-6">
-                    <span className="row-span-2 flex size-11 shrink-0 items-center justify-center rounded-full border border-white/50 bg-gradient-to-br from-sky-400 via-brand-600 to-indigo-600 text-xl font-bold text-white shadow-[0_4px_12px_rgba(37,99,235,0.25)] dark:border-sky-300/20">
-                        4
-                    </span>
-                    <div className="row-span-2 min-w-0 flex-1 space-y-1">
-                        <h2
-                            id="qat-review-title"
-                            className="text-lg font-bold leading-snug tracking-tight text-[#112650] dark:text-slate-50 sm:text-xl"
-                        >
-                            Review paper
-                        </h2>
-                        <p className="text-xs font-medium leading-relaxed text-[#526985] dark:text-slate-400 sm:text-[13px]">
-                            Set paper details and question distribution
-                        </p>
-                    </div>
-                    <img
-                        src="/images/qat/review-paper.webp"
-                        alt=""
-                        aria-hidden="true"
-                        width={800}
-                        height={176}
-                        decoding="async"
-                        className="pointer-events-none h-12 w-20 shrink-0 select-none object-contain object-right sm:h-14 sm:w-40"
-                    />
-                    <button
-                        type="button"
-                        onClick={onClear}
-                        disabled={saving}
-                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-sky-200 bg-white/90 px-3 py-2 text-xs font-semibold text-brand-600 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-sky-950/70"
-                    >
-                        <Trash2Icon aria-hidden="true" className="size-3.5" />{' '}
-                        Clear
-                    </button>
-                </div>
+                <QatStepHeader
+                    id="qat-review-title"
+                    step={4}
+                    title="Review paper"
+                    description="Set paper details and question distribution"
+                    image="/images/qat/review-paper.webp"
+                />
                 <div className="space-y-5 px-5 pb-5 pt-1 sm:pl-[5.25rem] sm:pr-6">
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={onClear}
+                            disabled={saving}
+                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-sky-200 bg-white/90 px-3 py-2 text-xs font-semibold text-brand-600 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-sky-950/70"
+                        >
+                            <Trash2Icon
+                                aria-hidden="true"
+                                className="size-3.5"
+                            />{' '}
+                            Clear
+                        </button>
+                    </div>
                     <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
                         <div className="space-y-1.5">
                             <label
@@ -156,7 +144,7 @@ export function QatReviewCard({
                                         type="button"
                                         aria-pressed={variants === count}
                                         onClick={() => onVariantsChange(count)}
-                                        className={`min-h-9 rounded-lg px-1.5 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:text-xs ${variants === count ? 'bg-gradient-to-r from-indigo-500 to-brand-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-sky-300'}`}
+                                        className={`min-h-9 whitespace-nowrap rounded-lg px-1.5 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:text-xs ${variants === count ? 'bg-gradient-to-r from-indigo-500 to-brand-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-sky-300'}`}
                                     >
                                         {count}{' '}
                                         {count === 1 ? 'Paper' : 'Papers'}
@@ -210,7 +198,7 @@ export function QatReviewCard({
                         </div>
                         {rows.length ? (
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[480px] table-fixed text-left text-sm">
+                                <table className="relative w-full min-w-[480px] table-fixed text-left text-sm">
                                     <caption className="sr-only">
                                         Question distribution: total questions,
                                         required questions and section marks
@@ -457,7 +445,7 @@ export function QatReviewCard({
                 </div>
             </section>
             <div
-                className={`fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-sky-100 bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(37,99,235,0.06)] backdrop-blur transition-[left] duration-200 dark:border-slate-800 dark:bg-slate-900/95 md:px-6 ${sidebarCollapsed ? 'md:left-16' : 'md:left-60'} print:hidden`}
+                className={`fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-sky-100 bg-white px-4 py-3 shadow-sm transition-[left] duration-200 dark:border-slate-800 dark:bg-slate-900 md:px-6 ${sidebarCollapsed ? 'md:left-16' : 'md:left-60'} print:hidden`}
             >
                 <Link
                     href="/qa-tests"
@@ -470,7 +458,7 @@ export function QatReviewCard({
                     type="button"
                     onClick={onGenerate}
                     disabled={saving || !canGenerate}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(37,99,235,0.2)] transition-all hover:from-indigo-600 hover:to-brand-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:from-indigo-600 hover:to-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                 >
                     {saving ? (
                         <LoaderCircleIcon

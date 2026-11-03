@@ -5,6 +5,7 @@ import {
     SigmaIcon,
 } from 'lucide-react';
 import type { QatReviewSelection } from '@/components/qat/generation-form';
+import { QatStepHeader } from '@/components/qat/step-header';
 
 const inputClass =
     'h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
@@ -22,33 +23,15 @@ export function QatManualOverviewCard({
     return (
         <section
             aria-labelledby="qat-manual-overview-title"
-            className="min-w-0 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-50/70 shadow-[0_6px_24px_-10px_rgba(59,130,246,0.18)] dark:border-sky-900/50 dark:from-[#152c48] dark:via-slate-900 dark:to-[#1b2445]"
+            className="min-w-0 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-50/70 shadow-sm dark:border-sky-900/50 dark:from-[#152c48] dark:via-slate-900 dark:to-[#1b2445]"
         >
-            <div className="flex items-center gap-3 px-5 py-4 sm:gap-4 sm:px-6">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/50 bg-gradient-to-br from-sky-400 via-brand-600 to-indigo-600 text-xl font-bold text-white shadow-[0_4px_12px_rgba(37,99,235,0.25)]">
-                    3
-                </span>
-                <div className="min-w-0 flex-1 space-y-1">
-                    <h2
-                        id="qat-manual-overview-title"
-                        className="text-lg font-bold leading-snug tracking-tight text-[#112650] dark:text-slate-50 sm:text-xl"
-                    >
-                        Selected questions overview
-                    </h2>
-                    <p className="text-xs font-medium leading-relaxed text-[#526985] dark:text-slate-400 sm:text-[13px]">
-                        Set your paper name and duration
-                    </p>
-                </div>
-                <img
-                    src="/images/qat/review-paper.webp"
-                    alt=""
-                    aria-hidden="true"
-                    width={800}
-                    height={176}
-                    decoding="async"
-                    className="pointer-events-none h-12 w-20 shrink-0 select-none object-contain object-right sm:h-14 sm:w-40"
-                />
-            </div>
+            <QatStepHeader
+                id="qat-manual-overview-title"
+                step={3}
+                title="Selected questions overview"
+                description="Set your paper name and duration"
+                image="/images/qat/review-paper.webp"
+            />
             <div className="space-y-4 px-5 pb-5 pt-1 sm:px-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">

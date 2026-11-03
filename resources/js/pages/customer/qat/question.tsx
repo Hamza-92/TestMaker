@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, memo, useMemo } from 'react';
 import {
     bilingualPartsHaveSameVisibleText,
     containsUrduScript,
@@ -164,7 +164,7 @@ function renderDelimitedLatex(value: string): string {
     return root.innerHTML;
 }
 
-function QatRichText({
+const QatRichText = memo(function QatRichText({
     value,
     inline = false,
 }: {
@@ -174,7 +174,7 @@ function QatRichText({
     const content = useMemo(() => renderDelimitedLatex(value), [value]);
 
     return <QuestionContent value={content} inline={inline} />;
-}
+});
 
 function ObjectiveOptions({
     options,
@@ -386,7 +386,7 @@ function ObjectiveLine({
     );
 }
 
-export function QatObjectiveQuestion({
+export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     question,
     number,
     showAnswers = false,
@@ -472,7 +472,7 @@ export function QatObjectiveQuestion({
             ))}
         </div>
     );
-}
+});
 
 function LocalizedText({
     en,
@@ -551,7 +551,11 @@ function LocalizedText({
     );
 }
 
-export function QatQuestionStatement({ question }: { question: QatQuestion }) {
+export const QatQuestionStatement = memo(function QatQuestionStatement({
+    question,
+}: {
+    question: QatQuestion;
+}) {
     const content = question.content ?? {};
     const firstItem = records(content.items)[0] ?? {};
     const en =
@@ -583,9 +587,9 @@ export function QatQuestionStatement({ question }: { question: QatQuestion }) {
             )}
         </div>
     );
-}
+});
 
-export function QatQuestionContent({
+export const QatQuestionContent = memo(function QatQuestionContent({
     question,
     number,
 }: {
@@ -777,4 +781,4 @@ export function QatQuestionContent({
             )}
         </div>
     );
-}
+});

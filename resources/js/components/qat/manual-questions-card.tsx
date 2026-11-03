@@ -5,6 +5,7 @@ import {
     SearchIcon,
 } from 'lucide-react';
 import type { QatManualSelection } from '@/components/qat/generation-form';
+import { QatStepHeader } from '@/components/qat/step-header';
 import { Switch } from '@/components/ui/switch';
 import { QatQuestionStatement } from '@/pages/customer/qat/question';
 
@@ -33,33 +34,16 @@ export function QatManualQuestionsCard({
     return (
         <section
             aria-labelledby="qat-manual-picker-title"
-            className="min-w-0 overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-[#fcfaff] to-indigo-50/60 shadow-[0_6px_24px_-10px_rgba(139,92,246,0.18)] dark:border-violet-900/50 dark:from-[#2b1c46] dark:via-slate-900 dark:to-[#24223d]"
+            className="min-w-0 overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-[#fcfaff] to-indigo-50/60 shadow-sm dark:border-violet-900/50 dark:from-[#2b1c46] dark:via-slate-900 dark:to-[#24223d]"
         >
-            <div className="flex items-center gap-3 px-5 py-4 sm:gap-4 sm:px-6">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/50 bg-gradient-to-br from-violet-400 via-violet-600 to-purple-800 text-xl font-bold text-white shadow-[0_4px_12px_rgba(139,92,246,0.25)]">
-                    4
-                </span>
-                <div className="min-w-0 flex-1 space-y-1">
-                    <h2
-                        id="qat-manual-picker-title"
-                        className="text-lg font-bold leading-snug tracking-tight text-[#112650] dark:text-slate-50 sm:text-xl"
-                    >
-                        Pick your questions
-                    </h2>
-                    <p className="text-xs font-medium leading-relaxed text-[#526985] dark:text-slate-400 sm:text-[13px]">
-                        Choose questions and set their marks
-                    </p>
-                </div>
-                <img
-                    src="/images/qat/templates.webp"
-                    alt=""
-                    aria-hidden="true"
-                    width={800}
-                    height={346}
-                    decoding="async"
-                    className="pointer-events-none h-12 w-20 shrink-0 select-none object-contain object-right sm:h-14 sm:w-40"
-                />
-            </div>
+            <QatStepHeader
+                id="qat-manual-picker-title"
+                step={4}
+                tone="purple"
+                title="Pick your questions"
+                description="Choose questions and set their marks"
+                image="/images/qat/templates.webp"
+            />
             <div className="space-y-4 px-5 pb-5 pt-1 sm:px-6">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <div className="relative w-full sm:w-52">
@@ -142,7 +126,7 @@ export function QatManualQuestionsCard({
                         role="region"
                         aria-label="Available questions"
                         tabIndex={0}
-                        className="max-h-[60vh] space-y-2.5 overflow-y-auto overscroll-contain rounded-xl border border-violet-100 bg-white/50 p-2 outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-violet-900/70 dark:bg-slate-950/20 sm:p-3"
+                        className="max-h-[60vh] space-y-2.5 overflow-y-auto rounded-xl border border-violet-100 bg-white/50 p-2 outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-violet-900/70 dark:bg-slate-950/20 sm:p-3"
                     >
                         {questions.map((question) => {
                             const checked = Object.hasOwn(
@@ -153,6 +137,10 @@ export function QatManualQuestionsCard({
                             return (
                                 <div
                                     key={question.id}
+                                    style={{
+                                        contentVisibility: 'auto',
+                                        containIntrinsicSize: 'auto 160px',
+                                    }}
                                     className={`rounded-xl border p-3 transition-colors ${checked ? 'border-brand-400 bg-sky-50 shadow-sm dark:border-brand-500 dark:bg-sky-950/40' : 'border-slate-200 bg-white hover:border-violet-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-violet-700'}`}
                                 >
                                     <label className="flex cursor-pointer items-start gap-2.5">
