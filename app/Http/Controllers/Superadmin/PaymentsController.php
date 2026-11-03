@@ -47,7 +47,6 @@ class PaymentsController extends Controller
     private function summary(callable $visibleCustomer, User $actor): array
     {
         $payments = PaymentLog::query()->whereHas('subscription.user', $visibleCustomer);
-        $subscriptions = Subscription::query()->whereHas('user', $visibleCustomer);
         $eligibleStatuses = [
             PaymentStatus::PendingReview->value,
             PaymentStatus::Reviewed->value,
@@ -58,17 +57,12 @@ class PaymentsController extends Controller
             ->where('status', PaymentStatus::Approved->value)
             ->sum('amount');
         $gross = (string) (clone $payments)->sum('amount');
-        $subscriptionCommission = (clone $subscriptions)
-            ->whereNotNull('commission_amount')
-            ->whereHas('paymentLogs', fn (Builder $query) => $query->whereIn('status', $eligibleStatuses))
-            ->sum('commission_amount');
-        $legacyCommission = (clone $payments)
+        $commission = (clone $payments)
             ->whereIn('status', $eligibleStatuses)
-            ->whereHas('subscription', fn (Builder $query) => $query->whereNull('commission_amount'))
             ->sum('commission_amount');
 
         $grossCents = (int) round((float) $gross * 100);
-        $commissionCents = ((int) $subscriptionCommission + (int) $legacyCommission) * 100;
+        $commissionCents = (int) $commission * 100;
         $expenseQuery = Expense::query();
         if (! $actor->isMasterSuperAdmin()) {
             $expenseQuery->where('created_by', $actor->id);
@@ -132,18 +126,17 @@ class PaymentsController extends Controller
         $end = CarbonImmutable::parse($to, 'Asia/Karachi')->addDay()->startOfDay()->utc();
 
         $query = PaymentLog::query()
-            ->select(['id', 'subscription_id', 'amount', 'status', 'created_at'])
+            ->select(['id', 'subscription_id', 'amount', 'commission_amount', 'status', 'created_at'])
             ->whereHas('subscription.user', $visibleCustomer)
             ->where('created_at', '>=', $start)
             ->where('created_at', '<', $end)
             ->with(['subscription' => fn ($subscription) => $subscription
-                ->select(['id', 'user_id', 'created_by', 'name', 'amount', 'commission_amount'])
+                ->select(['id', 'user_id', 'created_by', 'name', 'amount'])
                 ->with(['user:id,name,phone,school_name', 'creator:id,name'])
                 ->withSum([
                     'paymentLogs as approved_total' => fn ($payments) => $payments
                         ->where('status', PaymentStatus::Approved->value),
-                ], 'amount')
-                ->withSum('paymentLogs as legacy_commission', 'commission_amount')]);
+                ], 'amount')]);
 
         match ($status) {
             'pending' => $query->whereIn('status', [PaymentStatus::PendingReview->value, PaymentStatus::Reviewed->value]),
@@ -161,21 +154,17 @@ class PaymentsController extends Controller
             ->select('subscription_id')
             ->selectRaw('SUM(amount) as approved_amount')
             ->groupBy('subscription_id');
-        $legacyCommissionBySubscription = PaymentLog::query()
-            ->select('subscription_id')
-            ->selectRaw('SUM(commission_amount) as legacy_commission')
-            ->groupBy('subscription_id');
         $subscriptionTotals = Subscription::query()
             ->whereIn('subscriptions.id', $filteredSubscriptions)
             ->leftJoinSub($approvedBySubscription, 'approved_payments', fn ($join) => $join
                 ->on('approved_payments.subscription_id', '=', 'subscriptions.id'))
-            ->leftJoinSub($legacyCommissionBySubscription, 'legacy_commissions', fn ($join) => $join
-                ->on('legacy_commissions.subscription_id', '=', 'subscriptions.id'))
             ->selectRaw('COALESCE(SUM(subscriptions.amount), 0) as payable')
             ->selectRaw('COALESCE(SUM(CASE WHEN subscriptions.amount > COALESCE(approved_payments.approved_amount, 0) THEN subscriptions.amount - COALESCE(approved_payments.approved_amount, 0) ELSE 0 END), 0) as due')
-            ->selectRaw('COALESCE(SUM(COALESCE(subscriptions.commission_amount, legacy_commissions.legacy_commission, 0)), 0) as commission')
             ->first();
         $paidTotal = (clone $query)->sum('amount');
+        $commissionTotal = (clone $query)
+            ->whereIn('status', [PaymentStatus::PendingReview->value, PaymentStatus::Reviewed->value, PaymentStatus::Approved->value])
+            ->sum('commission_amount');
         $page = $query->latest('created_at')->orderByDesc('id')->paginate(20);
 
         return [
@@ -184,7 +173,7 @@ class PaymentsController extends Controller
                 'payable' => number_format((float) $subscriptionTotals->payable, 2, '.', ''),
                 'paid' => number_format((float) $paidTotal, 2, '.', ''),
                 'due' => number_format((float) $subscriptionTotals->due, 2, '.', ''),
-                'commission' => number_format((float) $subscriptionTotals->commission, 2, '.', ''),
+                'commission' => number_format((float) $commissionTotal, 2, '.', ''),
             ],
             'data' => $page->getCollection()->map(function (PaymentLog $log) {
                 $subscription = $log->subscription;
@@ -200,7 +189,7 @@ class PaymentsController extends Controller
                     'payable' => (string) $subscription->amount,
                     'paid' => (string) $log->amount,
                     'due' => number_format(max((float) $subscription->amount - (float) $subscription->approved_total, 0), 2, '.', ''),
-                    'commission' => (string) ($subscription->commission_amount ?? $subscription->legacy_commission ?? 0),
+                    'commission' => (string) ($log->commission_amount ?? 0),
                     'status' => $log->status->value,
                 ];
             })->all(),
@@ -242,30 +231,35 @@ class PaymentsController extends Controller
             ->where('first_approvals.first_approved_at', '<', $monthEnd)
             ->whereHas('user', $visibleCustomer)
             ->whereHas('creator')
-            ->with('creator:id,name,email')
-            ->withSum([
-                'paymentLogs as legacy_approved_commission' => fn (Builder $query) => $query
-                    ->where('status', PaymentStatus::Approved->value),
-            ], 'commission_amount')
-            ->get(['subscriptions.id', 'subscriptions.created_by', 'subscriptions.commission_amount']);
+            ->get(['subscriptions.id', 'subscriptions.created_by']);
 
-        $agents = $subscriptions
-            ->groupBy('created_by')
-            ->map(function ($sales) {
-                $agent = $sales->first()->creator;
+        $salesByAgent = $subscriptions->groupBy('created_by');
+        $paidAt = 'COALESCE(approval_events.approved_at, payment_logs.reviewed_at, payment_logs.created_at)';
+        $commissionByAgent = PaymentLog::query()
+            ->leftJoinSub($approvalEvents, 'approval_events', fn ($join) => $join
+                ->on('approval_events.auditable_id', '=', 'payment_logs.id'))
+            ->where('payment_logs.status', PaymentStatus::Approved->value)
+            ->whereHas('subscription.user', $visibleCustomer)
+            ->whereNotNull('payment_logs.created_by')
+            ->where('payment_logs.commission_amount', '>', 0)
+            ->whereRaw("{$paidAt} >= ?", [$monthStart->toDateTimeString()])
+            ->whereRaw("{$paidAt} < ?", [$monthEnd->toDateTimeString()])
+            ->selectRaw('payment_logs.created_by as agent_id, COALESCE(SUM(payment_logs.commission_amount), 0) as commission')
+            ->groupBy('payment_logs.created_by')
+            ->get()
+            ->pluck('commission', 'agent_id');
 
-                return [
-                    'id' => $agent->id,
-                    'name' => $agent->name,
-                    'email' => $agent->email,
-                    'sales' => $sales->count(),
-                    'commission' => number_format((float) $sales->sum(
-                        fn (Subscription $subscription) => $subscription->commission_amount
-                            ?? $subscription->legacy_approved_commission
-                            ?? 0
-                    ), 2, '.', ''),
-                ];
-            })
+        $agentIds = $salesByAgent->keys()->merge($commissionByAgent->keys())->unique();
+        $agents = User::query()
+            ->whereIn('id', $agentIds)
+            ->get(['id', 'name', 'email'])
+            ->map(fn (User $agent) => [
+                'id' => $agent->id,
+                'name' => $agent->name,
+                'email' => $agent->email,
+                'sales' => $salesByAgent->get($agent->id, collect())->count(),
+                'commission' => number_format((float) $commissionByAgent->get($agent->id, 0), 2, '.', ''),
+            ])
             ->sortBy([['sales', 'desc'], ['name', 'asc']])
             ->values();
 

@@ -3,7 +3,6 @@ import {
     ArrowLeftIcon,
     CalendarIcon,
     ClipboardListIcon,
-    CoinsIcon,
     FileTextIcon,
     HashIcon,
     SaveIcon,
@@ -37,7 +36,6 @@ interface SubscriptionData {
     id: number;
     name: string;
     amount: string;
-    commission_amount: string;
     allowed_questions: number | null;
     started_at: string | null;
     expired_at: string | null;
@@ -66,7 +64,6 @@ interface Props {
 interface FormData {
     name: string;
     amount: string;
-    commission_amount: string;
     is_question_based: boolean;
     allowed_questions: string;
     started_at: string;
@@ -201,7 +198,6 @@ export default function EditCustomerSubscription({ customer, subscription, planN
     const { data, setData, put, processing, errors } = useForm<FormData>({
         name: subscription.name,
         amount: subscription.amount,
-        commission_amount: subscription.commission_amount,
         is_question_based: subscription.is_question_based,
         allowed_questions: subscription.allowed_questions != null ? String(subscription.allowed_questions) : '',
         started_at: subscription.started_at ?? '',
@@ -296,18 +292,6 @@ export default function EditCustomerSubscription({ customer, subscription, planN
                                         onChange={(e) => setData('amount', e.target.value)}
                                     />
                                 </div>
-                            </Field>
-
-                            <Field label="Commission Amount" error={errors.commission_amount}>
-                                <InputWithIcon
-                                    icon={<CoinsIcon />}
-                                    type="number"
-                                    min="0"
-                                    max={data.amount || undefined}
-                                    value={data.commission_amount}
-                                    onChange={(e) => setData('commission_amount', e.target.value)}
-                                    placeholder="Optional"
-                                />
                             </Field>
 
                             <Field label="Start Date" required error={errors.started_at}>

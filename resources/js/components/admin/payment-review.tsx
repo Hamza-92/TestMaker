@@ -37,6 +37,7 @@ export interface PaymentToReview {
     subscription_started_at: string | null;
     subscription_expired_at: string | null;
     amount: string;
+    commission_amount: string;
     payment_method: string | null;
     account_number: string | null;
     next_payment_date: string | null;
@@ -483,6 +484,10 @@ export function PaymentsToReview({
                                 <Detail
                                     label="Method"
                                     value={selected.payment_method ?? '—'}
+                                />
+                                <Detail
+                                    label="Commission"
+                                    value={money(selected.commission_amount)}
                                 />
                                 <Detail
                                     label="Account / reference"

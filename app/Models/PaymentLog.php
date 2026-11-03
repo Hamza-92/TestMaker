@@ -32,6 +32,7 @@ class PaymentLog extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'commission_amount' => 'integer',
             'payment_method' => PaymentMethod::class,
             'status' => PaymentStatus::class,
             'attachments' => 'array',

@@ -34,6 +34,7 @@ function reportPayment(User $agent, User $customer, int $commission, string $amo
     $payment = PaymentLog::create([
         'subscription_id' => $subscription->id,
         'amount' => $amount,
+        'commission_amount' => $commission,
         'payment_method' => $method,
         'status' => 'approved',
         'created_by' => $agent->id,
@@ -74,7 +75,7 @@ it('reports approved payments commissions and expenses by Pakistan calendar mont
         'created_by' => $this->master->id,
     ]);
     $first = reportPayment($this->master, $customer, 20, '100.00', 'cash', '2026-09-30 12:00:00');
-    reportPayment($this->master, $customer, 20, '50.00', 'online', '2026-10-01 00:30:00', $first->subscription);
+    reportPayment($this->master, $customer, 5, '50.00', 'online', '2026-10-01 00:30:00', $first->subscription);
     reportPayment($this->master, $customer, 30, '200.00', 'bank_transfer', '2026-10-15 12:00:00');
     reportPayment($this->master, $customer, 10, '75.00', 'cheque', '2026-11-01 00:00:00');
     Expense::create(['name' => 'Rent', 'amount' => '40.00', 'created_by' => $this->master->id]);
@@ -89,12 +90,12 @@ it('reports approved payments commissions and expenses by Pakistan calendar mont
         ->and($report['months'][9]['gross'])->toBe('250.00')
         ->and($report['months'][9]['online'])->toBe('50.00')
         ->and($report['months'][9]['bank_transfer'])->toBe('200.00')
-        ->and($report['months'][9]['commissions'])->toBe('30.00')
+        ->and($report['months'][9]['commissions'])->toBe('35.00')
         ->and($report['months'][9]['expenses'])->toBe('40.00')
-        ->and($report['months'][9]['profit'])->toBe('180.00')
+        ->and($report['months'][9]['profit'])->toBe('175.00')
         ->and($report['months'][10]['gross'])->toBe('75.00')
         ->and($report['totals']['gross'])->toBe('425.00')
-        ->and($report['totals']['profit'])->toBe('325.00');
+        ->and($report['totals']['profit'])->toBe('320.00');
 
     $priorYear = $this->get(route('superadmin.payments.annual-report', ['year' => 2025]))
         ->assertOk()->viewData('page')['props'];

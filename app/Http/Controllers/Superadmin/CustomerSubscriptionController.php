@@ -57,6 +57,7 @@ class CustomerSubscriptionController extends Controller
         $paymentLogs = $subscription->paymentLogs->map(fn (PaymentLog $log) => [
             'id' => $log->id,
             'amount' => (string) $log->amount,
+            'commission_amount' => $log->commission_amount !== null ? (string) $log->commission_amount : null,
             'payment_method' => $log->payment_method?->value,
             'payment_method_label' => $log->account_number === 'legacy-testmaker' ? 'Legacy TestMaker Record' : $log->payment_method?->label(),
             'account_number' => $log->account_number === 'legacy-testmaker' ? null : $log->account_number,
@@ -91,7 +92,6 @@ class CustomerSubscriptionController extends Controller
                 'id' => $subscription->id,
                 'name' => $subscription->name,
                 'amount' => (string) $subscription->amount,
-                'commission_amount' => (string) ($subscription->commission_amount ?? $subscription->paymentLogs->sum('commission_amount')),
                 'allowed_questions' => $subscription->allowed_questions,
                 'started_at' => $subscription->started_at?->toISOString(),
                 'expired_at' => $subscription->expired_at?->toISOString(),
@@ -145,6 +145,7 @@ class CustomerSubscriptionController extends Controller
             $log = PaymentLog::create([
                 'subscription_id' => $subscription->id,
                 'amount' => $validated['amount'],
+                'commission_amount' => $validated['commission_amount'] ?? null,
                 'payment_method' => $validated['payment_method'],
                 'account_number' => $validated['account_number'] ?: null,
                 'status' => PaymentStatus::PendingReview->value,
@@ -158,6 +159,7 @@ class CustomerSubscriptionController extends Controller
                 event: AuditEvent::Created,
                 newValues: [
                     'amount' => $log->amount,
+                    'commission_amount' => $log->commission_amount,
                     'payment_method' => $log->payment_method->value,
                     'status' => $log->status->value,
                 ],
@@ -261,7 +263,6 @@ class CustomerSubscriptionController extends Controller
                 'id' => $subscription->id,
                 'name' => $subscription->name,
                 'amount' => (string) $subscription->amount,
-                'commission_amount' => $subscription->commission_amount !== null ? (string) $subscription->commission_amount : '',
                 'allowed_questions' => $subscription->allowed_questions,
                 'started_at' => $subscription->started_at?->toDateString(),
                 'expired_at' => $subscription->expired_at?->toDateString(),
@@ -293,7 +294,6 @@ class CustomerSubscriptionController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::in([...self::PLAN_NAMES, $subscription->name])],
             'amount' => ['required', 'numeric', 'min:0'],
-            'commission_amount' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'is_question_based' => ['boolean'],
             'allowed_questions' => [
                 Rule::requiredIf(fn () => $request->boolean('is_question_based')),
@@ -341,7 +341,6 @@ class CustomerSubscriptionController extends Controller
         $oldValues = [
             'name' => $subscription->name,
             'amount' => (string) $subscription->amount,
-            'commission_amount' => $subscription->commission_amount,
             'status' => $subscription->status?->value,
             'payment_due_date' => $subscription->payment_due_date?->toDateString(),
             'pattern_access' => $oldSummaryIds['pattern_access'],
@@ -368,7 +367,6 @@ class CustomerSubscriptionController extends Controller
                 'is_question_based' => $isQuestionBased,
                 'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
                 'amount' => $validated['amount'],
-                'commission_amount' => $validated['commission_amount'] ?? null,
                 'started_at' => $startedAt,
                 'duration' => $duration,
                 'expired_at' => $expiredAt,
@@ -383,7 +381,6 @@ class CustomerSubscriptionController extends Controller
                 newValues: [
                     'name' => $subscription->name,
                     'amount' => (string) $subscription->amount,
-                    'commission_amount' => $subscription->commission_amount,
                     'status' => $subscription->status->value,
                     'payment_due_date' => $subscription->payment_due_date?->toDateString(),
                     'pattern_access' => $subscription->pattern_access,
@@ -441,7 +438,6 @@ class CustomerSubscriptionController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::in(self::PLAN_NAMES)],
             'amount' => ['required', 'integer', 'min:0'],
-            'commission_amount' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'is_question_based' => ['boolean'],
             'allowed_questions' => [
                 Rule::requiredIf(fn () => $request->boolean('is_question_based')),
@@ -463,6 +459,10 @@ class CustomerSubscriptionController extends Controller
             'payment_paid' => [
                 Rule::requiredIf(fn () => $request->boolean('has_payment')),
                 'nullable', 'integer', 'min:1',
+            ],
+            'payment_commission_amount' => [
+                'nullable', 'integer', 'min:0',
+                Rule::when($request->boolean('has_payment'), ['lte:payment_paid']),
             ],
             'payment_method' => [
                 Rule::requiredIf(fn () => $request->boolean('has_payment')),
@@ -524,7 +524,6 @@ class CustomerSubscriptionController extends Controller
                 'is_question_based' => $isQuestionBased,
                 'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
                 'amount' => $validated['amount'],
-                'commission_amount' => $validated['commission_amount'] ?? null,
                 'started_at' => $startedAt,
                 'duration' => $duration,
                 'expired_at' => $expiredAt,
@@ -539,7 +538,6 @@ class CustomerSubscriptionController extends Controller
                 newValues: [
                     'name' => $createdSubscription->name,
                     'amount' => $createdSubscription->amount,
-                    'commission_amount' => $createdSubscription->commission_amount,
                     'status' => $createdSubscription->status->value,
                     'pattern_access' => $createdSubscription->pattern_access,
                     'class_access' => $createdSubscription->class_access,
@@ -559,7 +557,6 @@ class CustomerSubscriptionController extends Controller
                     'subscription_id' => $createdSubscription->id,
                     'subscription_name' => $createdSubscription->name,
                     'subscription_amount' => (string) $createdSubscription->amount,
-                    'subscription_commission_amount' => $createdSubscription->commission_amount,
                     'subscription_status' => $createdSubscription->status->value,
                     'payment_due_date' => $createdSubscription->payment_due_date?->toDateString(),
                 ],
@@ -571,6 +568,7 @@ class CustomerSubscriptionController extends Controller
                 $paymentLog = PaymentLog::create([
                     'subscription_id' => $createdSubscription->id,
                     'amount' => $validated['payment_paid'],
+                    'commission_amount' => $validated['payment_commission_amount'] ?? null,
                     'payment_method' => $validated['payment_method'],
                     'next_payment_date' => $validated['next_payment_date'] ?? null,
                     'status' => PaymentStatus::PendingReview->value,
@@ -584,6 +582,7 @@ class CustomerSubscriptionController extends Controller
                     event: AuditEvent::Created,
                     newValues: [
                         'amount' => $paymentLog->amount,
+                        'commission_amount' => $paymentLog->commission_amount,
                         'payment_method' => $paymentLog->payment_method->value,
                         'status' => $paymentLog->status->value,
                     ],
@@ -604,6 +603,7 @@ class CustomerSubscriptionController extends Controller
     {
         return $request->validate([
             'amount' => ['required', 'integer', 'min:1'],
+            'commission_amount' => ['nullable', 'integer', 'min:0', 'lte:amount'],
             'payment_method' => ['required', 'in:cash,bank_transfer,online,cheque'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -648,11 +648,15 @@ class CustomerSubscriptionController extends Controller
         $trackedAmount = (float) $logs
             ->filter(fn (PaymentLog $log) => $log->status !== PaymentStatus::Rejected)
             ->sum('amount');
+        $commissionAmount = (int) $logs
+            ->filter(fn (PaymentLog $log) => $log->status !== PaymentStatus::Rejected)
+            ->sum('commission_amount');
 
         return [
             'subscription_amount' => number_format($subscriptionAmount, 2, '.', ''),
             'received_amount' => number_format($receivedAmount, 2, '.', ''),
             'under_review_amount' => number_format($underReviewAmount, 2, '.', ''),
+            'commission_amount' => number_format($commissionAmount, 2, '.', ''),
             'pending_amount' => number_format(max($subscriptionAmount - $receivedAmount, 0), 2, '.', ''),
             'remaining_trackable_amount' => number_format(max($subscriptionAmount - $trackedAmount, 0), 2, '.', ''),
         ];

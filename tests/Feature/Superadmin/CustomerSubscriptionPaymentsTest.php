@@ -116,7 +116,7 @@ it('accepts only the listed plan names for new subscriptions and renames', funct
     expect($subscription->fresh()->name)->toBe('Starter Plan');
 });
 
-it('stores commission on the subscription even without a payment', function () {
+it('does not store commission on a subscription without a payment', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
 
@@ -132,11 +132,11 @@ it('stores commission on the subscription even without a payment', function () {
         ])
         ->assertSessionHasNoErrors();
 
-    expect(Subscription::query()->sole()->commission_amount)->toBe(150)
+    expect(Subscription::query()->sole()->commission_amount)->toBeNull()
         ->and(PaymentLog::count())->toBe(0);
 });
 
-it('keeps commission on the subscription when an initial payment is recorded', function () {
+it('stores initial commission on its payment rather than the subscription', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
 
@@ -144,7 +144,7 @@ it('keeps commission on the subscription when an initial payment is recorded', f
         ->post(route('superadmin.customers.subscriptions.store', $customer), [
             'name' => 'Primary',
             'amount' => 1200,
-            'commission_amount' => 150,
+            'payment_commission_amount' => 150,
             'started_at' => '2026-04-18',
             'duration' => 30,
             'status' => 'active',
@@ -155,14 +155,14 @@ it('keeps commission on the subscription when an initial payment is recorded', f
         ])
         ->assertSessionHasNoErrors();
 
-    expect(Subscription::query()->sole()->commission_amount)->toBe(150)
-        ->and(PaymentLog::query()->sole()->commission_amount)->toBeNull();
+    expect(Subscription::query()->sole()->commission_amount)->toBeNull()
+        ->and(PaymentLog::query()->sole()->commission_amount)->toBe(150);
 });
 
-it('updates subscription commission without requiring a payment', function () {
+it('does not allow a subscription edit to change legacy commission', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
-    $subscription = makeSubscription($customer, $admin);
+    $subscription = makeSubscription($customer, $admin, ['commission_amount' => 125]);
 
     $this->actingAs($admin)
         ->put(route('superadmin.customers.subscriptions.update', [$customer, $subscription]), [
@@ -175,7 +175,7 @@ it('updates subscription commission without requiring a payment', function () {
         ])
         ->assertSessionHasNoErrors();
 
-    expect($subscription->fresh()->commission_amount)->toBe(120)
+    expect($subscription->fresh()->commission_amount)->toBe(125)
         ->and(PaymentLog::count())->toBe(0);
 });
 
@@ -189,6 +189,7 @@ it('stores subscription payments in pending review status', function () {
         ->from(route('superadmin.customers.subscriptions.show', [$customer, $subscription]))
         ->post(route('superadmin.customers.subscriptions.payment-logs.store', [$customer, $subscription]), [
             'amount' => '400',
+            'commission_amount' => 50,
             'payment_method' => PaymentMethod::Online->value,
             'account_number' => 'TXN-2002',
             'status' => PaymentStatus::Approved->value,
@@ -201,7 +202,39 @@ it('stores subscription payments in pending review status', function () {
 
     expect($payment->status)->toBe(PaymentStatus::PendingReview)
         ->and($payment->payment_method)->toBe(PaymentMethod::Online)
+        ->and($payment->commission_amount)->toBe(50)
         ->and((string) $payment->amount)->toBe('400.00');
+});
+
+it('rejects commission larger than the payment amount', function () {
+    $admin = makeSuperAdmin();
+    $customer = makeCustomer();
+    $subscription = makeSubscription($customer, $admin);
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.customers.subscriptions.payment-logs.store', [$customer, $subscription]), [
+            'amount' => 400,
+            'commission_amount' => 401,
+            'payment_method' => PaymentMethod::Cash->value,
+        ])
+        ->assertSessionHasErrors('commission_amount');
+
+    expect(PaymentLog::count())->toBe(0);
+
+    $this->post(route('superadmin.customers.subscriptions.store', $customer), [
+        'name' => 'Primary',
+        'amount' => 1200,
+        'started_at' => '2026-04-18',
+        'duration' => 30,
+        'status' => 'active',
+        'has_payment' => true,
+        'payment_paid' => 400,
+        'payment_commission_amount' => 401,
+        'payment_method' => PaymentMethod::Cash->value,
+        'next_payment_date' => '2026-05-01',
+    ])->assertSessionHasErrors('payment_commission_amount');
+
+    expect(PaymentLog::count())->toBe(0);
 });
 
 it('does not allow a saved payment log to be edited before review', function () {

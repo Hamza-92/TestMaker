@@ -83,7 +83,6 @@ interface Subscription {
     id: number;
     name: string;
     amount: string;
-    commission_amount: string;
     allowed_questions: number | null;
     is_question_based: boolean;
     started_at: string | null;
@@ -107,6 +106,7 @@ interface PaymentSummary {
     subscription_amount: string;
     received_amount: string;
     under_review_amount: string;
+    commission_amount: string;
     pending_amount: string;
     remaining_trackable_amount: string;
 }
@@ -114,6 +114,7 @@ interface PaymentSummary {
 interface PaymentLog {
     id: number;
     amount: string;
+    commission_amount: string | null;
     payment_method: string | null;
     payment_method_label: string | null;
     account_number: string | null;
@@ -150,6 +151,7 @@ interface Props {
 
 interface PaymentFormState {
     amount: string;
+    commission_amount: string;
     payment_method: string;
     account_number: string;
     notes: string;
@@ -209,6 +211,7 @@ const AUDIT_EVENT_CFG: Record<string, { dot: string; label: string }> = {
 function buildPaymentForm(amount: string): PaymentFormState {
     return {
         amount,
+        commission_amount: '',
         payment_method: 'online',
         account_number: '',
         notes: '',
@@ -574,17 +577,9 @@ export default function ShowSubscription({
     function submitPayment(e: React.FormEvent) {
         e.preventDefault();
 
-        if (!paymentForm.receipt) {
-            setPaymentErrors((prev) => ({
-                ...prev,
-                receipt: 'A receipt is required.',
-            }));
-
-            return;
-        }
-
         const fd = new FormData();
         fd.append('amount', paymentForm.amount);
+        fd.append('commission_amount', paymentForm.commission_amount);
         fd.append('payment_method', paymentForm.payment_method);
         fd.append('account_number', paymentForm.account_number);
         fd.append('notes', paymentForm.notes);
@@ -690,10 +685,6 @@ export default function ShowSubscription({
                             label="Amount"
                             highlight
                             value={money(subscription.amount)}
-                        />
-                        <InfoCell
-                            label="Commission"
-                            value={money(subscription.commission_amount)}
                         />
                         {subscription.is_question_based && (
                             <InfoCell
@@ -850,7 +841,7 @@ export default function ShowSubscription({
                         </Button>
                     }
                 >
-                    <div className="grid gap-3 border-b p-5 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-3 border-b p-5 sm:grid-cols-2 xl:grid-cols-5">
                         <MetricCard
                             icon={<WalletIcon className="size-4" />}
                             label="Plan Amount"
@@ -872,6 +863,11 @@ export default function ShowSubscription({
                             icon={<FileTextIcon className="size-4" />}
                             label="Under Review"
                             value={money(paymentSummary.under_review_amount)}
+                        />
+                        <MetricCard
+                            icon={<WalletIcon className="size-4" />}
+                            label="Commission"
+                            value={money(paymentSummary.commission_amount)}
                         />
                     </div>
 
@@ -902,6 +898,9 @@ export default function ShowSubscription({
                                             Amount
                                         </th>
                                         <th className="px-4 py-3 text-xs font-medium text-muted-foreground">
+                                            Commission
+                                        </th>
+                                        <th className="px-4 py-3 text-xs font-medium text-muted-foreground">
                                             Method
                                         </th>
                                         <th className="px-4 py-3 text-xs font-medium text-muted-foreground">
@@ -930,6 +929,9 @@ export default function ShowSubscription({
                                             </td>
                                             <td className="whitespace-nowrap px-4 py-3 align-top font-semibold">
                                                 {money(log.amount)}
+                                            </td>
+                                            <td className="whitespace-nowrap px-4 py-3 align-top">
+                                                {log.commission_amount === null ? '—' : money(log.commission_amount)}
                                             </td>
                                             <td className="px-4 py-3 align-top text-sm">
                                                 {log.payment_method_label ??
@@ -1087,6 +1089,30 @@ export default function ShowSubscription({
                             </div>
                         </div>
 
+                            <div className="space-y-1.5">
+                                <Label htmlFor="p-commission">Commission Amount</Label>
+                                <Input
+                                    id="p-commission"
+                                    type="number"
+                                    min="0"
+                                    max={paymentForm.amount || undefined}
+                                    placeholder="Optional"
+                                    value={paymentForm.commission_amount}
+                                    onChange={(e) =>
+                                        setPaymentForm((current) => ({
+                                            ...current,
+                                            commission_amount: e.target.value,
+                                        }))
+                                    }
+                                    aria-invalid={!!paymentErrors.commission_amount}
+                                />
+                                {paymentErrors.commission_amount && (
+                                    <p className="text-xs text-destructive">
+                                        {paymentErrors.commission_amount}
+                                    </p>
+                                )}
+                            </div>
+
                         <div className="space-y-1.5">
                             <Label htmlFor="p-account">Account / Ref #</Label>
                             <Input
@@ -1128,12 +1154,7 @@ export default function ShowSubscription({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label className="flex items-center gap-1">
-                                Receipt
-                                <span className="text-xs text-destructive">
-                                    *
-                                </span>
-                            </Label>
+                            <Label>Receipt (optional)</Label>
                             <div
                                 className="flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-input px-4 py-3 transition-colors hover:border-ring/50"
                                 onClick={() => fileRef.current?.click()}
@@ -1226,6 +1247,11 @@ export default function ShowSubscription({
                                     icon={<CreditCardIcon className="size-4" />}
                                     label="Amount"
                                     value={money(paymentDetail.amount)}
+                                />
+                                <DetailRow
+                                    icon={<WalletIcon className="size-4" />}
+                                    label="Commission"
+                                    value={paymentDetail.commission_amount === null ? '—' : money(paymentDetail.commission_amount)}
                                 />
                                 <DetailRow
                                     icon={

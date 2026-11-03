@@ -57,16 +57,16 @@ function overviewPayment(Subscription $subscription, User $creator, string $stat
     ]);
 }
 
-it('shows payment totals and counts each eligible subscription commission once', function () {
+it('shows payment totals and sums commissions from eligible payment records', function () {
     $paid = overviewSubscription($this->master, 120);
     $rejectedOnly = overviewSubscription($this->master, 80);
     $legacy = overviewSubscription($this->master, null);
     overviewSubscription($this->master, 70);
 
-    overviewPayment($paid, $this->master, 'pending_review', '200.00');
-    overviewPayment($paid, $this->master, 'approved', '300.50');
-    overviewPayment($paid, $this->master, 'rejected', '50.00');
-    overviewPayment($rejectedOnly, $this->master, 'rejected', '40.00');
+    overviewPayment($paid, $this->master, 'pending_review', '200.00', 30);
+    overviewPayment($paid, $this->master, 'approved', '300.50', 90);
+    overviewPayment($paid, $this->master, 'rejected', '50.00', 9);
+    overviewPayment($rejectedOnly, $this->master, 'rejected', '40.00', 8);
     overviewPayment($legacy, $this->master, 'approved', '100.00', 25);
 
     $page = $this->actingAs($this->master)
@@ -104,11 +104,11 @@ it('shows one approved sale per subscription in the month of first approval', fu
     ]);
 
     $sale = overviewSubscription($agent, 120);
-    overviewPayment($sale, $agent, 'approved', '200.00');
-    overviewPayment($sale, $agent, 'approved', '100.00');
+    overviewPayment($sale, $agent, 'approved', '200.00', 70);
+    overviewPayment($sale, $agent, 'approved', '100.00', 50);
     overviewPayment(overviewSubscription($agent, 80), $agent, 'pending_review', '50.00');
     overviewPayment(overviewSubscription($noSalesAgent, 90), $noSalesAgent, 'rejected', '50.00');
-    overviewPayment(overviewSubscription($otherAgent, 50), $otherAgent, 'approved', '100.00');
+    overviewPayment(overviewSubscription($otherAgent, 50), $otherAgent, 'approved', '100.00', 50);
     overviewPayment(overviewSubscription($agent, null), $agent, 'approved', '100.00', 25);
 
     $previousSubscription = overviewSubscription($otherAgent, 40);
@@ -116,7 +116,7 @@ it('shows one approved sale per subscription in the month of first approval', fu
     DB::table('payment_logs')->where('id', $previousSale->id)->update(['created_at' => now()->subMonthNoOverflow()]);
     overviewPayment($previousSubscription, $otherAgent, 'approved', '50.00');
 
-    $recordedLastMonth = overviewPayment(overviewSubscription($agent, 30), $agent, 'approved', '100.00');
+    $recordedLastMonth = overviewPayment(overviewSubscription($agent, 30), $agent, 'approved', '100.00', 30);
     DB::table('payment_logs')->where('id', $recordedLastMonth->id)->update(['created_at' => now()->subMonthNoOverflow()]);
     AuditLog::record(
         model: $recordedLastMonth,
@@ -157,10 +157,10 @@ it('shows one approved sale per subscription in the month of first approval', fu
 it('lists this months submissions with payment status filters and a date range', function () {
     $subscription = overviewSubscription($this->master, 90);
     $subscription->user->update(['name' => 'A Customer', 'phone' => '03001234567', 'school_name' => 'A School']);
-    $approved = overviewPayment($subscription, $this->master, 'approved', '200.00');
-    $pending = overviewPayment($subscription, $this->master, 'pending_review', '250.00');
-    $reviewed = overviewPayment($subscription, $this->master, 'reviewed', '75.00');
-    $rejected = overviewPayment($subscription, $this->master, 'rejected', '50.00');
+    $approved = overviewPayment($subscription, $this->master, 'approved', '200.00', 20);
+    $pending = overviewPayment($subscription, $this->master, 'pending_review', '250.00', 30);
+    $reviewed = overviewPayment($subscription, $this->master, 'reviewed', '75.00', 40);
+    $rejected = overviewPayment($subscription, $this->master, 'rejected', '50.00', 10);
     $older = overviewPayment($subscription, $this->master, 'approved', '100.00');
     DB::table('payment_logs')->where('id', $older->id)->update(['created_at' => now()->subMonthNoOverflow()]);
 
@@ -195,7 +195,7 @@ it('lists this months submissions with payment status filters and a date range',
         'payable' => '1000.00',
         'paid' => '250.00',
         'due' => '700.00',
-        'commission' => '90',
+        'commission' => '30',
         'status' => 'pending_review',
     ]);
 

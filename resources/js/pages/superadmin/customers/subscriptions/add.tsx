@@ -50,7 +50,6 @@ interface Props {
 interface FormData {
     name: string;
     amount: string;
-    commission_amount: string;
     is_question_based: boolean;
     allowed_questions: string;
     started_at: string;
@@ -66,6 +65,7 @@ interface FormData {
     // Payment
     has_payment: boolean;
     payment_paid: string;
+    payment_commission_amount: string;
     payment_method: string;
     next_payment_date: string;
     receipt: File | null;
@@ -196,7 +196,6 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
     const { data, setData, post, processing, errors } = useForm<FormData>({
         name: '',
         amount: '',
-        commission_amount: '',
         is_question_based: false,
         allowed_questions: '',
         started_at: today,
@@ -211,6 +210,7 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
         max_teachers: '',
         has_payment: false,
         payment_paid: '',
+        payment_commission_amount: '',
         payment_method: 'online',
         next_payment_date: '',
         receipt: null,
@@ -305,18 +305,6 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
                                         onChange={(e) => setData('amount', e.target.value)}
                                     />
                                 </div>
-                            </Field>
-
-                            <Field label="Commission Amount" error={errors.commission_amount}>
-                                <InputWithIcon
-                                    icon={<CoinsIcon />}
-                                    type="number"
-                                    min="0"
-                                    max={data.amount || undefined}
-                                    value={data.commission_amount}
-                                    onChange={(e) => setData('commission_amount', e.target.value)}
-                                    placeholder="Optional"
-                                />
                             </Field>
 
                             <Field label="Start Date" required error={errors.started_at}>
@@ -455,6 +443,7 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
                                     setData('has_payment', checked);
                                     if (!checked) {
                                         setData('payment_paid', '');
+                                        setData('payment_commission_amount', '');
                                         setData('payment_method', 'online');
                                         setData('next_payment_date', '');
                                         setData('receipt', null);
@@ -516,8 +505,19 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
                                     </Field>
                                 </div>
 
-                                {/* Row 2: Method | Next Payment Date */}
-                                <div className="grid gap-4 sm:grid-cols-2">
+                                {/* Row 2: Commission | Method | Next Payment Date */}
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <Field label="Commission Amount" error={errors.payment_commission_amount}>
+                                        <InputWithIcon
+                                            icon={<CoinsIcon />}
+                                            type="number"
+                                            min="0"
+                                            max={data.payment_paid || undefined}
+                                            value={data.payment_commission_amount}
+                                            onChange={(e) => setData('payment_commission_amount', e.target.value)}
+                                            placeholder="Optional"
+                                        />
+                                    </Field>
                                     <Field label="Payment Method" required error={errors.payment_method}>
                                         <Select value={data.payment_method} onValueChange={(v) => setData('payment_method', v)}>
                                             <SelectTrigger className="w-full">

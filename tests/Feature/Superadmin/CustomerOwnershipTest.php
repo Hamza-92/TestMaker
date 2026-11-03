@@ -78,7 +78,7 @@ it('lists only customers created by the delegated user and calculates totals fro
     expect($masterPage['props']['canViewAllCustomers'])->toBeTrue();
 });
 
-it('counts subscription commission once the first pending payment is recorded', function () {
+it('sums commission on the recorded payments for the current agent', function () {
     $subscription = ownershipSubscription($this->ownCustomer, $this->staff);
     $subscription->update(['commission_amount' => 125]);
 
@@ -96,6 +96,7 @@ it('counts subscription commission once the first pending payment is recorded', 
     $payment = PaymentLog::create([
         'subscription_id' => $subscription->id,
         'amount' => 200,
+        'commission_amount' => 125,
         'payment_method' => PaymentMethod::Online,
         'status' => PaymentStatus::PendingReview,
         'created_by' => $this->staff->id,
@@ -112,12 +113,13 @@ it('counts subscription commission once the first pending payment is recorded', 
     PaymentLog::create([
         'subscription_id' => $subscription->id,
         'amount' => 100,
+        'commission_amount' => 20,
         'payment_method' => PaymentMethod::Online,
         'status' => PaymentStatus::Approved,
         'created_by' => $this->staff->id,
     ]);
 
-    expect($myCommission())->toBe('125');
+    expect($myCommission())->toBe('145');
 });
 
 it('does not count rejected payment commission', function () {
@@ -127,6 +129,7 @@ it('does not count rejected payment commission', function () {
     PaymentLog::create([
         'subscription_id' => $subscription->id,
         'amount' => 200,
+        'commission_amount' => 125,
         'payment_method' => PaymentMethod::Online,
         'status' => PaymentStatus::Rejected,
         'created_by' => $this->staff->id,

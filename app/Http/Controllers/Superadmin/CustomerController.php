@@ -53,7 +53,7 @@ class CustomerController extends Controller
             ->with([
                 'subscriptions' => fn ($q) => $q
                     ->latest('started_at')
-                    ->select(['id', 'user_id', 'name', 'amount', 'commission_amount', 'started_at', 'expired_at', 'duration', 'status', 'created_by'])
+                    ->select(['id', 'user_id', 'name', 'amount', 'started_at', 'expired_at', 'duration', 'status', 'created_by'])
                     ->with(['paymentLogs' => fn ($pq) => $pq->select([
                         'id', 'subscription_id', 'amount', 'commission_amount',
                         'status', 'next_payment_date', 'created_by',
@@ -105,12 +105,6 @@ class CustomerController extends Controller
 
                     if (! $hasRecordedPayment) {
                         return 0;
-                    }
-
-                    if ($subscription->commission_amount !== null) {
-                        return (int) $subscription->created_by === $currentUserId
-                            ? $subscription->commission_amount
-                            : 0;
                     }
 
                     return $subscription->paymentLogs

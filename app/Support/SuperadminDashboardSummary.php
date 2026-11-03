@@ -232,6 +232,7 @@ class SuperadminDashboardSummary
             'subscription_started_at' => $subscription->started_at?->toISOString(),
             'subscription_expired_at' => $subscription->expired_at?->toISOString(),
             'amount' => (string) $log->amount,
+            'commission_amount' => (string) ($log->commission_amount ?? 0),
             'payment_method' => $log->account_number === 'legacy-testmaker'
                 ? 'Legacy TestMaker Record'
                 : $log->payment_method?->label(),

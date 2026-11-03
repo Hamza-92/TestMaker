@@ -33,11 +33,12 @@ function shareholderSubscription(User $customer, User $agent, int $commission): 
     ]);
 }
 
-function shareholderPayment(Subscription $subscription, User $agent, string $amount, string $status): void
+function shareholderPayment(Subscription $subscription, User $agent, string $amount, string $status, ?int $commission = null): void
 {
     PaymentLog::create([
         'subscription_id' => $subscription->id,
         'amount' => $amount,
+        'commission_amount' => $commission,
         'payment_method' => 'cash',
         'status' => $status,
         'created_by' => $agent->id,
@@ -47,8 +48,8 @@ function shareholderPayment(Subscription $subscription, User $agent, string $amo
 it('calculates the all-time reserve from approved profit and keeps a spend audit trail', function () {
     $customer = User::factory()->create(['user_type' => UserType::Customer, 'account_type' => 'paid', 'created_by' => $this->master->id]);
     $subscription = shareholderSubscription($customer, $this->master, 100);
-    shareholderPayment($subscription, $this->master, '1000.00', 'approved');
-    shareholderPayment($subscription, $this->master, '500.00', 'rejected');
+    shareholderPayment($subscription, $this->master, '1000.00', 'approved', 100);
+    shareholderPayment($subscription, $this->master, '500.00', 'rejected', 50);
     Expense::create(['name' => 'Rent', 'amount' => '200.00', 'created_by' => $this->master->id]);
 
     $page = $this->actingAs($this->master)->get(route('superadmin.payments.shareholder'))

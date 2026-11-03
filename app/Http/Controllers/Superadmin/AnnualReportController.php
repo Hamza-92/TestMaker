@@ -8,7 +8,6 @@ use App\Enums\UserType;
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\PaymentLog;
-use App\Models\Subscription;
 use App\Support\CustomerAccess;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -70,7 +69,7 @@ class AnnualReportController extends Controller
                 ->on('approval_events.auditable_id', '=', 'payment_logs.id'))
             ->whereRaw("{$paidAt} >= ?", [$start->toDateTimeString()])
             ->whereRaw("{$paidAt} < ?", [$end->toDateTimeString()])
-            ->select(['payment_logs.id', 'payment_logs.amount', 'payment_logs.payment_method'])
+            ->select(['payment_logs.id', 'payment_logs.amount', 'payment_logs.commission_amount', 'payment_logs.payment_method'])
             ->selectRaw("{$paidAt} as paid_at")
             ->cursor();
 
@@ -79,34 +78,8 @@ class AnnualReportController extends Controller
             $amount = (int) round((float) $payment->amount * 100);
             $method = $payment->payment_method?->value ?? 'other';
             $months[$month]['gross'] += $amount;
+            $months[$month]['commissions'] += (int) round((float) $payment->commission_amount * 100);
             $months[$month][array_key_exists($method, $months[$month]) ? $method : 'other'] += $amount;
-        }
-
-        $firstApprovals = DB::table('payment_logs')
-            ->leftJoinSub($approvalEvents, 'approval_events', fn ($join) => $join
-                ->on('approval_events.auditable_id', '=', 'payment_logs.id'))
-            ->where('payment_logs.status', PaymentStatus::Approved->value)
-            ->select('payment_logs.subscription_id')
-            ->selectRaw("MIN({$paidAt}) as first_approved_at")
-            ->groupBy('payment_logs.subscription_id');
-        $subscriptions = Subscription::query()
-            ->joinSub($firstApprovals, 'first_approvals', fn ($join) => $join
-                ->on('first_approvals.subscription_id', '=', 'subscriptions.id'))
-            ->where('first_approvals.first_approved_at', '>=', $start)
-            ->where('first_approvals.first_approved_at', '<', $end)
-            ->whereHas('user', $visibleCustomer)
-            ->select(['subscriptions.id', 'subscriptions.commission_amount', 'first_approvals.first_approved_at'])
-            ->withSum([
-                'paymentLogs as legacy_approved_commission' => fn (Builder $query) => $query
-                    ->where('status', PaymentStatus::Approved->value),
-            ], 'commission_amount')
-            ->get();
-
-        foreach ($subscriptions as $subscription) {
-            $month = CarbonImmutable::parse($subscription->first_approved_at, 'UTC')->timezone('Asia/Karachi')->month;
-            $months[$month]['commissions'] += (int) round((float) ($subscription->commission_amount
-                ?? $subscription->legacy_approved_commission
-                ?? 0) * 100);
         }
 
         $expenses = Expense::query()
