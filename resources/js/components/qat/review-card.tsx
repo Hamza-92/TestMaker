@@ -197,7 +197,7 @@ export function QatReviewCard({
                                 )}
                                 <span
                                     role="status"
-                                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-semibold motion-safe:animate-pulse ${isPefPattern ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-bold text-white motion-safe:animate-pulse ${isPefPattern ? 'bg-emerald-700' : 'bg-orange-700'}`}
                                 >
                                     {isPefPattern ? (
                                         <BadgeCheckIcon
