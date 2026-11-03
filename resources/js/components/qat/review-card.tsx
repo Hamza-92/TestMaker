@@ -10,6 +10,7 @@ import {
     FileTextIcon,
     Layers3Icon,
     LoaderCircleIcon,
+    RotateCcwIcon,
     SigmaIcon,
     StarIcon,
     Trash2Icon,
@@ -52,6 +53,8 @@ export function QatReviewCard({
     onAllowRepeatChange,
     onSectionChange,
     onClear,
+    canResetDefault,
+    onResetDefault,
     onGenerate,
 }: QatReviewSelection) {
     return (
@@ -177,24 +180,41 @@ export function QatReviewCard({
                                     Question distribution
                                 </h3>
                             </div>
-                            <span
-                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-semibold ${isPefPattern ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'}`}
-                            >
-                                {isPefPattern ? (
-                                    <BadgeCheckIcon
-                                        aria-hidden="true"
-                                        className="size-3.5"
-                                    />
-                                ) : (
-                                    <AlertCircleIcon
-                                        aria-hidden="true"
-                                        className="size-3.5"
-                                    />
+                            <div className="flex flex-wrap items-center gap-2">
+                                {canResetDefault && (
+                                    <button
+                                        type="button"
+                                        onClick={onResetDefault}
+                                        disabled={saving || loading}
+                                        className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition-colors hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-sky-950"
+                                    >
+                                        <RotateCcwIcon
+                                            aria-hidden="true"
+                                            className="size-3.5"
+                                        />
+                                        Reset default
+                                    </button>
                                 )}
-                                {isPefPattern
-                                    ? 'PEF Pattern'
-                                    : 'Non PEF Pattern'}
-                            </span>
+                                <span
+                                    role="status"
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-semibold motion-safe:animate-pulse ${isPefPattern ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'}`}
+                                >
+                                    {isPefPattern ? (
+                                        <BadgeCheckIcon
+                                            aria-hidden="true"
+                                            className="size-3.5"
+                                        />
+                                    ) : (
+                                        <AlertCircleIcon
+                                            aria-hidden="true"
+                                            className="size-3.5"
+                                        />
+                                    )}
+                                    {isPefPattern
+                                        ? 'PEF Pattern'
+                                        : 'Non PEF Pattern'}
+                                </span>
+                            </div>
                         </div>
                         {rows.length ? (
                             <div className="overflow-x-auto">

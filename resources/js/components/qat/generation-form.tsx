@@ -261,6 +261,8 @@ export type QatReviewSelection = {
         value: number,
     ) => void;
     onClear: () => void;
+    canResetDefault: boolean;
+    onResetDefault: () => void;
     onGenerate: () => Promise<void>;
 };
 
@@ -798,10 +800,22 @@ export default function QatGenerationForm({
         setSubjectIds(id === null ? [] : [id]);
         setChapterIds([]);
         setMonths([]);
-        setTemplateId(null);
-        setAutoSections([]);
+        const firstTemplate =
+            mode === 'auto'
+                ? templates.find((template) => template.qat_subject_id === id)
+                : undefined;
+        applyTemplate(firstTemplate ?? null);
         setTypeFilter('');
         setQuestionSearch('');
+    }
+
+    function applyTemplate(template: QatTemplate | null) {
+        setTemplateId(template?.id ?? null);
+        setAutoSections(normalizedSections(template?.sections ?? []));
+
+        if (mode === 'auto') {
+            setMinutes(template?.minutes ?? 40);
+        }
     }
 
     function toggleChapter(id: number) {
@@ -1025,6 +1039,14 @@ export default function QatGenerationForm({
                     setAutoSections([]);
                     setMinutes(40);
                 },
+                canResetDefault:
+                    mode === 'auto' &&
+                    availableTemplates.length > 0 &&
+                    !isPefPattern,
+                onResetDefault: () =>
+                    applyTemplate(
+                        selectedTemplate ?? availableTemplates[0] ?? null,
+                    ),
                 onGenerate: generate,
             },
             template: {
@@ -1078,9 +1100,7 @@ export default function QatGenerationForm({
                         return;
                     }
 
-                    setTemplateId(template.id);
-                    setAutoSections(normalizedSections(template.sections));
-                    setMinutes(template.minutes);
+                    applyTemplate(template);
                 },
             },
             syllabus: {
