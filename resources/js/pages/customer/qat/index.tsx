@@ -133,7 +133,7 @@ export default function QatIndex({
     }
 
     return (
-        <div className="w-full space-y-7 pb-4">
+        <div className="relative w-full space-y-7 pb-4">
             <Head title="QAT practice papers on the PEF pattern" />
             <header className="relative isolate overflow-hidden rounded-[24px] border border-sky-100 bg-gradient-to-br from-white via-[#f2f8ff] to-[#edf9f4] px-6 py-6 dark:border-slate-800 dark:from-slate-900 dark:via-[#15243e] dark:to-[#15332e] sm:px-8">
                 <Sprinkles className="absolute inset-0 -z-10 size-full text-sky-400/60 dark:text-sky-400/40" />

@@ -127,16 +127,14 @@ class QatCatalogueController extends Controller
             ->get(['qat_subject_id', 'month', 'description'])
             ->filter(fn ($syllabus) => $visibleMonthKeys->has($syllabus->qat_subject_id.':'.$syllabus->month))
             ->values();
-        $templates = $mode === 'auto'
-            ? DB::table('qat_paper_templates')->whereIn('qat_subject_id', $subjects->pluck('id'))
-                ->where('status', true)->orderBy('name')
-                ->get(['id', 'qat_subject_id', 'name', 'category', 'minutes', 'sections'])
-                ->map(function ($template) {
-                    $template->sections = json_decode($template->sections, true) ?: [];
+        $templates = DB::table('qat_paper_templates')->whereIn('qat_subject_id', $subjects->pluck('id'))
+            ->where('status', true)->orderBy('name')
+            ->get(['id', 'qat_subject_id', 'name', 'category', 'minutes', 'sections'])
+            ->map(function ($template) {
+                $template->sections = json_decode($template->sections, true) ?: [];
 
-                    return $template;
-                })
-            : collect();
+                return $template;
+            });
 
         return Inertia::render('customer/qat/create', [
             'mode' => $mode,

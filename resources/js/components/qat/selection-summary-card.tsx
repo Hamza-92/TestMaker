@@ -32,7 +32,7 @@ export function QatSummaryCard({
             value: mode === 'auto' ? 'QAT monthly' : 'Custom',
         },
         { icon: Layers3Icon, label: 'Chapters', value: chapterCount },
-        ...(mode === 'auto'
+        ...(mode === 'auto' || templateName !== null
             ? [
                   {
                       icon: FileTextIcon,

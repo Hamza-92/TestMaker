@@ -56,7 +56,9 @@ export function QatReviewCard({
     canResetDefault,
     onResetDefault,
     onGenerate,
-}: QatReviewSelection) {
+    showVariants = true,
+    showActions = true,
+}: QatReviewSelection & { showVariants?: boolean; showActions?: boolean }) {
     return (
         <>
             <section
@@ -131,42 +133,48 @@ export function QatReviewCard({
                             />
                         </div>
                     </div>
-                    <div className="grid items-end gap-4 sm:grid-cols-2 sm:gap-5">
-                        <fieldset className="min-w-0 space-y-2">
-                            <legend className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-[#425b7b] dark:text-slate-300">
-                                <Layers3Icon
-                                    aria-hidden="true"
-                                    className="size-4 text-brand-500"
+                    {showVariants && (
+                        <div className="grid items-end gap-4 sm:grid-cols-2 sm:gap-5">
+                            <fieldset className="min-w-0 space-y-2">
+                                <legend className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-[#425b7b] dark:text-slate-300">
+                                    <Layers3Icon
+                                        aria-hidden="true"
+                                        className="size-4 text-brand-500"
+                                    />
+                                    Paper variants
+                                </legend>
+                                <div className="grid grid-cols-4 gap-1 rounded-xl border border-sky-100 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800/80">
+                                    {[1, 2, 3, 4].map((count) => (
+                                        <button
+                                            key={count}
+                                            type="button"
+                                            aria-pressed={variants === count}
+                                            onClick={() =>
+                                                onVariantsChange(count)
+                                            }
+                                            className={`min-h-9 whitespace-nowrap rounded-lg px-1.5 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:text-xs ${variants === count ? 'bg-gradient-to-r from-indigo-500 to-brand-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-sky-300'}`}
+                                        >
+                                            {count}{' '}
+                                            {count === 1 ? 'Paper' : 'Papers'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
+                            <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-sky-100 bg-white/70 px-3 py-2.5 text-xs font-medium text-slate-600 transition-colors focus-within:ring-2 focus-within:ring-brand-500/20 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-sky-700">
+                                <input
+                                    type="checkbox"
+                                    checked={allowRepeat}
+                                    onChange={(event) =>
+                                        onAllowRepeatChange(
+                                            event.target.checked,
+                                        )
+                                    }
+                                    className="size-4 shrink-0 accent-brand-600"
                                 />
-                                Paper variants
-                            </legend>
-                            <div className="grid grid-cols-4 gap-1 rounded-xl border border-sky-100 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800/80">
-                                {[1, 2, 3, 4].map((count) => (
-                                    <button
-                                        key={count}
-                                        type="button"
-                                        aria-pressed={variants === count}
-                                        onClick={() => onVariantsChange(count)}
-                                        className={`min-h-9 whitespace-nowrap rounded-lg px-1.5 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:text-xs ${variants === count ? 'bg-gradient-to-r from-indigo-500 to-brand-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-brand-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-sky-300'}`}
-                                    >
-                                        {count}{' '}
-                                        {count === 1 ? 'Paper' : 'Papers'}
-                                    </button>
-                                ))}
-                            </div>
-                        </fieldset>
-                        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-sky-100 bg-white/70 px-3 py-2.5 text-xs font-medium text-slate-600 transition-colors focus-within:ring-2 focus-within:ring-brand-500/20 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-sky-700">
-                            <input
-                                type="checkbox"
-                                checked={allowRepeat}
-                                onChange={(event) =>
-                                    onAllowRepeatChange(event.target.checked)
-                                }
-                                className="size-4 shrink-0 accent-brand-600"
-                            />
-                            Allow repeats between variants
-                        </label>
-                    </div>
+                                Allow repeats between variants
+                            </label>
+                        </div>
+                    )}
                     <div className="overflow-hidden rounded-xl border border-sky-200/80 bg-white dark:border-sky-900 dark:bg-slate-900">
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-100 bg-gradient-to-r from-sky-100/80 via-sky-50 to-violet-50 px-4 py-3 dark:border-sky-900 dark:from-sky-950/80 dark:via-slate-800 dark:to-violet-950/40">
                             <div className="flex items-center gap-2.5">
@@ -440,7 +448,9 @@ export function QatReviewCard({
                             >
                                 {loading
                                     ? 'Loading question distribution…'
-                                    : 'Select a syllabus to set the question distribution.'}
+                                    : showVariants
+                                      ? 'Select a syllabus to set the question distribution.'
+                                      : 'Select chapters to set the question distribution.'}
                             </p>
                         )}
                     </div>
@@ -450,8 +460,9 @@ export function QatReviewCard({
                                 aria-hidden="true"
                                 className="mt-0.5 size-4 shrink-0"
                             />
-                            This syllabus does not have enough questions for the
-                            selected number of paper variants.
+                            {showVariants
+                                ? 'This syllabus does not have enough questions for the selected number of paper variants.'
+                                : 'The selected chapters do not have enough questions for this distribution.'}
                         </p>
                     )}
                     {error && (
@@ -464,34 +475,39 @@ export function QatReviewCard({
                     )}
                 </div>
             </section>
-            <div
-                className={`fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-sky-100 bg-white px-4 py-3 shadow-sm transition-[left] duration-200 dark:border-slate-800 dark:bg-slate-900 md:px-6 ${sidebarCollapsed ? 'md:left-16' : 'md:left-60'} print:hidden`}
-            >
-                <Link
-                    href="/qa-tests"
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            {showActions && (
+                <div
+                    className={`fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-sky-100 bg-white px-4 py-3 shadow-sm transition-[left] duration-200 dark:border-slate-800 dark:bg-slate-900 md:px-6 ${sidebarCollapsed ? 'md:left-16' : 'md:left-60'} print:hidden`}
                 >
-                    <ArrowLeftIcon aria-hidden="true" className="size-4" />
-                    Back
-                </Link>
-                <button
-                    type="button"
-                    onClick={onGenerate}
-                    disabled={saving || !canGenerate}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:from-indigo-600 hover:to-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-                >
-                    {saving ? (
-                        <LoaderCircleIcon
-                            aria-hidden="true"
-                            className="size-4 animate-spin motion-reduce:animate-none"
-                        />
-                    ) : (
-                        <FileTextIcon aria-hidden="true" className="size-4" />
-                    )}
-                    {saving ? 'Generating…' : 'Generate paper'}
-                    <ArrowRightIcon aria-hidden="true" className="size-4" />
-                </button>
-            </div>
+                    <Link
+                        href="/qa-tests"
+                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                        <ArrowLeftIcon aria-hidden="true" className="size-4" />
+                        Back
+                    </Link>
+                    <button
+                        type="button"
+                        onClick={onGenerate}
+                        disabled={saving || !canGenerate}
+                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:from-indigo-600 hover:to-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    >
+                        {saving ? (
+                            <LoaderCircleIcon
+                                aria-hidden="true"
+                                className="size-4 animate-spin motion-reduce:animate-none"
+                            />
+                        ) : (
+                            <FileTextIcon
+                                aria-hidden="true"
+                                className="size-4"
+                            />
+                        )}
+                        {saving ? 'Generating…' : 'Generate paper'}
+                        <ArrowRightIcon aria-hidden="true" className="size-4" />
+                    </button>
+                </div>
+            )}
         </>
     );
 }

@@ -77,6 +77,7 @@ class QatPaperController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'mode' => ['required', 'in:auto,manual'],
+            'selection_method' => ['nullable', 'in:manual,template'],
             'class_ids' => ['required', 'array', 'size:1'],
             'class_ids.*' => ['required', 'integer', 'distinct'],
             'subject_id' => ['required', 'integer'],
@@ -107,7 +108,8 @@ class QatPaperController extends Controller
         $template = null;
         $templateSections = [];
         $isPefPattern = false;
-        if ($data['mode'] === 'auto') {
+        $usesTemplate = $data['mode'] === 'auto' || ($data['selection_method'] ?? 'manual') === 'template';
+        if ($usesTemplate) {
             if (! empty($data['template_id'])) {
                 $template = DB::table('qat_paper_templates')
                     ->where('id', $data['template_id'] ?? 0)
@@ -197,11 +199,28 @@ class QatPaperController extends Controller
             if ($pool->only($ids)->count() !== count($ids)) {
                 throw ValidationException::withMessages(['manual_questions' => 'Some selected questions are unavailable.']);
             }
+            $manualSections = collect($data['sections'] ?? [])->keyBy('question_type_id');
+            if ($usesTemplate) {
+                $groups = collect($manual)->groupBy(fn ($item) => $pool->get($item['id'])->question_type_id);
+                if ($manualSections->isEmpty() || $manualSections->count() !== $groups->count()) {
+                    throw ValidationException::withMessages(['sections' => 'The selected questions must match the question distribution.']);
+                }
+                foreach ($manualSections as $typeId => $section) {
+                    $required = (int) ($section['required_questions'] ?? $section['quantity']);
+                    $items = $groups->get($typeId, collect());
+                    if ($required < 1 || $required > (int) $section['quantity']
+                        || $items->count() !== (int) $section['quantity']
+                        || $items->contains(fn ($item) => abs((float) $item['marks'] - (float) $section['marks']) > 0.00001)) {
+                        throw ValidationException::withMessages(['sections' => 'The selected questions, required counts and marks must match the question distribution.']);
+                    }
+                }
+            }
             $prepared[] = collect($manual)->groupBy(fn ($item) => $pool->get($item['id'])->question_type_id)
                 ->map(fn ($items, $typeId) => [
                     'question_type_id' => (int) $typeId,
                     'title' => $pool->get($items->first()['id'])->type_name ?: 'Question type '.$typeId,
                     ...($typeHeadings[(int) $typeId] ?? []),
+                    ...($usesTemplate ? ['required_questions' => (int) ($manualSections[$typeId]['required_questions'] ?? $manualSections[$typeId]['quantity'])] : []),
                     'questions' => $items->map(fn ($item) => [
                         ...$builder->presentQuestion($pool->get($item['id']), true),
                         'marks' => (float) $item['marks'],
@@ -218,6 +237,7 @@ class QatPaperController extends Controller
 
         $generationSettings = [
             'mode' => $data['mode'],
+            'selection_method' => $usesTemplate ? 'template' : 'manual',
             'name' => trim($data['name']),
             'class_ids' => $classIds,
             'subject_id' => (int) $subject->id,
@@ -250,7 +270,7 @@ class QatPaperController extends Controller
                 'class_ids' => $classIds,
                 'class_name' => $subject->class_name,
                 'subject_name' => $subject->subject_name,
-                'total_marks' => round($data['mode'] === 'auto'
+                'total_marks' => round($usesTemplate
                     ? collect($sections)->sum(fn ($section) => (int) $section['required_questions'] * (float) ($section['questions'][0]['marks'] ?? 0))
                     : $questions->sum('marks'), 2),
                 'question_count' => $questions->count(),

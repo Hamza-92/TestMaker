@@ -1,5 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeftIcon, ChevronRightIcon } from 'lucide-react';
+import {
+    ArrowLeftIcon,
+    ChevronRightIcon,
+    Layers3Icon,
+    PenLineIcon,
+} from 'lucide-react';
 import { QatClassSubjectCard } from '@/components/qat/class-subject-card';
 import { QatGenerationActions } from '@/components/qat/generation-actions';
 import QatGenerationForm from '@/components/qat/generation-form';
@@ -17,7 +22,7 @@ export default function QatCreate(props: QatGenerationFormProps) {
     const title = `${mode === 'auto' ? 'Auto' : 'Manual'} paper generation`;
 
     return (
-        <div className="w-full space-y-4 pb-20">
+        <div className="relative w-full space-y-4 pb-20">
             <Head title={title} />
             <nav
                 aria-label="Breadcrumb"
@@ -50,8 +55,65 @@ export default function QatCreate(props: QatGenerationFormProps) {
                             <QatSyllabusCard {...selection.syllabus} />
                         </div>
                         <div className="min-w-0 lg:col-start-1">
+                            {mode === 'manual' && (
+                                <fieldset className="relative mb-4 rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 to-sky-50 p-4 dark:border-violet-900/50 dark:from-violet-950/30 dark:to-sky-950/30">
+                                    <legend className="sr-only">
+                                        Question selection method
+                                    </legend>
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <span className="text-sm font-semibold text-[#112650] dark:text-slate-100">
+                                            Question selection
+                                        </span>
+                                        <div className="grid w-full grid-cols-2 rounded-xl border border-violet-100 bg-white p-1 dark:border-slate-700 dark:bg-slate-900 sm:flex sm:w-auto">
+                                            {(
+                                                [
+                                                    {
+                                                        id: 'manual',
+                                                        label: 'Pick questions manually',
+                                                        icon: PenLineIcon,
+                                                    },
+                                                    {
+                                                        id: 'template',
+                                                        label: 'Use a template',
+                                                        icon: Layers3Icon,
+                                                    },
+                                                ] as const
+                                            ).map(
+                                                ({ id, label, icon: Icon }) => (
+                                                    <button
+                                                        key={id}
+                                                        type="button"
+                                                        aria-pressed={
+                                                            selection.selectionMethod ===
+                                                            id
+                                                        }
+                                                        onClick={() =>
+                                                            selection.onSelectionMethodChange(
+                                                                id,
+                                                            )
+                                                        }
+                                                        className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${selection.selectionMethod === id ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700 dark:text-slate-400 dark:hover:bg-violet-950/50 dark:hover:text-violet-300'}`}
+                                                    >
+                                                        <Icon
+                                                            aria-hidden="true"
+                                                            className="size-3.5"
+                                                        />
+                                                        {label}
+                                                    </button>
+                                                ),
+                                            )}
+                                        </div>
+                                    </div>
+                                </fieldset>
+                            )}
                             {mode === 'manual' ? (
-                                <QatManualOverviewCard {...selection.review} />
+                                selection.selectionMethod === 'template' ? (
+                                    <QatTemplateCard {...selection.template} />
+                                ) : (
+                                    <QatManualOverviewCard
+                                        {...selection.review}
+                                    />
+                                )
                             ) : (
                                 <QatTemplateCard {...selection.template} />
                             )}
@@ -59,9 +121,17 @@ export default function QatCreate(props: QatGenerationFormProps) {
                         <QatSummaryCard {...selection.summary} />
                         <div className="min-w-0 lg:col-start-1">
                             {mode === 'manual' ? (
-                                <QatManualQuestionsCard
-                                    {...selection.manualPicker}
-                                />
+                                selection.selectionMethod === 'template' ? (
+                                    <QatReviewCard
+                                        {...selection.review}
+                                        showVariants={false}
+                                        showActions={false}
+                                    />
+                                ) : (
+                                    <QatManualQuestionsCard
+                                        {...selection.manualPicker}
+                                    />
+                                )
                             ) : (
                                 <QatReviewCard {...selection.review} />
                             )}

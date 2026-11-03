@@ -79,6 +79,7 @@ type AutoSection = {
 };
 
 type GenerationSelections = {
+    selection_method?: 'manual' | 'template';
     name: string;
     class_ids: number[];
     subject_id: number;
@@ -191,6 +192,8 @@ export type QatSyllabusSelection = {
 };
 
 export type QatGenerationViewState = QatClassSubjectSelection & {
+    selectionMethod: 'manual' | 'template';
+    onSelectionMethodChange: (method: 'manual' | 'template') => void;
     syllabus: QatSyllabusSelection;
     template: QatTemplateSelection;
     review: QatReviewSelection;
@@ -302,6 +305,11 @@ export default function QatGenerationForm({
     render?: (selection: QatGenerationViewState) => ReactNode;
 }) {
     const { collapsed: sidebarCollapsed } = useCustomerSidebar();
+    const [selectionMethod, setSelectionMethod] = useState<
+        'manual' | 'template'
+    >(initialSelections?.selection_method ?? 'manual');
+    const manualTemplate = mode === 'manual' && selectionMethod === 'template';
+    const usesDistribution = mode === 'auto' || manualTemplate;
     const [classIds, setClassIds] = useState<number[]>(
         initialSelections?.class_ids ?? [],
     );
@@ -331,7 +339,20 @@ export default function QatGenerationForm({
     const [autoSections, setAutoSections] = useState<AutoSection[]>(() =>
         normalizedSections(initialSelections?.sections ?? []),
     );
-    const [manual, setManual] = useState<Record<number, ManualChoice>>({});
+    const [manualChoices, setManualChoices] = useState<
+        Record<number, ManualChoice>
+    >({});
+    const [templateChoices, setTemplateChoices] = useState<
+        Record<number, ManualChoice>
+    >({});
+    const manual = manualTemplate ? templateChoices : manualChoices;
+    const setManual = manualTemplate ? setTemplateChoices : setManualChoices;
+    const [templateRevision, setTemplateRevision] = useState(0);
+    const lastTemplatePick = useRef('');
+    const restoringTemplateChoices = useRef(
+        initialSelections?.selection_method === 'template' &&
+            initialSelections.manual_questions.length > 0,
+    );
     const [name, setName] = useState(
         initialSelections?.name ?? 'QAT Practice Paper',
     );
@@ -575,27 +596,24 @@ export default function QatGenerationForm({
             marks: items.reduce((total, item) => total + item.marks, 0),
         };
     });
-    const reviewRows =
-        mode === 'auto'
-            ? autoRows.map((type) => ({
-                  id: type.id,
-                  name: type.name,
-                  count: type.quantity,
-                  required: type.required_questions ?? type.quantity,
-                  marks: Number(
-                      (
-                          (type.required_questions ?? type.quantity) *
-                          type.marks
-                      ).toFixed(2),
-                  ),
-              }))
-            : manualRows.map((row) => ({ ...row, required: row.count }));
-    const totalQuestions =
-        mode === 'auto'
-            ? autoRows.reduce((total, type) => total + type.quantity, 0)
-            : selectedManual.length;
+    const reviewRows = usesDistribution
+        ? autoRows.map((type) => ({
+              id: type.id,
+              name: type.name,
+              count: type.quantity,
+              required: type.required_questions ?? type.quantity,
+              marks: Number(
+                  (
+                      (type.required_questions ?? type.quantity) * type.marks
+                  ).toFixed(2),
+              ),
+          }))
+        : manualRows.map((row) => ({ ...row, required: row.count }));
+    const totalQuestions = usesDistribution
+        ? autoRows.reduce((total, type) => total + type.quantity, 0)
+        : selectedManual.length;
     const totalMarks = Number(
-        (mode === 'auto'
+        (usesDistribution
             ? autoRows.reduce(
                   (total, type) =>
                       total +
@@ -608,15 +626,84 @@ export default function QatGenerationForm({
     useEffect(() => {
         if (questionScopeKey !== restoreScopeKey.current) {
             pendingManualChoices.current = [];
+            restoringTemplateChoices.current = false;
         }
 
         setPool(null);
         setPoolScopeKey('');
-        setManual({});
+        setManualChoices({});
+        setTemplateChoices({});
+        lastTemplatePick.current = '';
         setSelectedOnly(false);
         setPoolBusy(false);
         setPoolError('');
     }, [questionScopeKey]);
+
+    useEffect(() => {
+        if (!manualTemplate || poolScopeKey !== questionScopeKey || !pool) {
+            return;
+        }
+
+        const key = `${questionScopeKey}|${templateRevision}`;
+
+        if (lastTemplatePick.current === key) {
+            return;
+        }
+
+        lastTemplatePick.current = key;
+
+        if (restoringTemplateChoices.current) {
+            restoringTemplateChoices.current = false;
+
+            return;
+        }
+
+        setTemplateChoices((current) => {
+            const next: Record<number, ManualChoice> = {};
+
+            for (const row of activeAutoRows) {
+                const candidates = pool.questions.data.filter(
+                    (question) => question.question_type_id === row.id,
+                );
+
+                if (candidates.length < row.quantity) {
+                    return {};
+                }
+
+                const existing = candidates
+                    .filter((question) => current[question.id])
+                    .slice(0, row.quantity);
+                const remaining = candidates.filter(
+                    (question) =>
+                        !existing.some((item) => item.id === question.id),
+                );
+
+                for (let index = remaining.length - 1; index > 0; index--) {
+                    const other = Math.floor(Math.random() * (index + 1));
+                    [remaining[index], remaining[other]] = [
+                        remaining[other],
+                        remaining[index],
+                    ];
+                }
+
+                for (const question of [
+                    ...existing,
+                    ...remaining.slice(0, row.quantity - existing.length),
+                ]) {
+                    next[question.id] = { question, marks: row.marks };
+                }
+            }
+
+            return next;
+        });
+    }, [
+        manualTemplate,
+        pool,
+        poolScopeKey,
+        questionScopeKey,
+        templateRevision,
+        activeAutoRows,
+    ]);
 
     useEffect(() => {
         if (
@@ -692,7 +779,9 @@ export default function QatGenerationForm({
                             choice.marks,
                         ]),
                     );
-                    setManual(
+                    (initialSelections?.selection_method === 'template'
+                        ? setTemplateChoices
+                        : setManualChoices)(
                         Object.fromEntries(
                             (body as Pool).questions.data
                                 .filter((question) =>
@@ -736,6 +825,7 @@ export default function QatGenerationForm({
         mode,
         questionScopeKey,
         poolScopeKey,
+        initialSelections?.selection_method,
     ]);
 
     function updateAutoSection(
@@ -743,6 +833,7 @@ export default function QatGenerationForm({
         field: 'quantity' | 'required_questions' | 'marks',
         value: number,
     ) {
+        setTemplateRevision((revision) => revision + 1);
         const rows = autoRows.map((row) => ({
             question_type_id: row.id,
             quantity: row.quantity,
@@ -801,7 +892,7 @@ export default function QatGenerationForm({
         setChapterIds([]);
         setMonths([]);
         const firstTemplate =
-            mode === 'auto'
+            mode === 'auto' || selectionMethod === 'template'
                 ? templates.find((template) => template.qat_subject_id === id)
                 : undefined;
         applyTemplate(firstTemplate ?? null);
@@ -810,10 +901,11 @@ export default function QatGenerationForm({
     }
 
     function applyTemplate(template: QatTemplate | null) {
+        setTemplateRevision((revision) => revision + 1);
         setTemplateId(template?.id ?? null);
         setAutoSections(normalizedSections(template?.sections ?? []));
 
-        if (mode === 'auto') {
+        if (template || mode === 'auto') {
             setMinutes(template?.minutes ?? 40);
         }
     }
@@ -850,8 +942,23 @@ export default function QatGenerationForm({
         !poolBusy &&
         !poolError &&
         poolScopeKey === questionScopeKey &&
-        (mode !== 'auto' ||
+        (!usesDistribution ||
             (templateHasEnoughQuestions && variantsHaveEnoughQuestions)) &&
+        (!manualTemplate ||
+            (selectedManual.length === totalQuestions &&
+                activeAutoRows.every((row) => {
+                    const items = selectedManual.filter(
+                        (item) => item.question.question_type_id === row.id,
+                    );
+
+                    return (
+                        items.length === row.quantity &&
+                        items.every(
+                            (item) =>
+                                Math.abs(item.marks - row.marks) < 0.00001,
+                        )
+                    );
+                }))) &&
         name.trim().length > 0 &&
         paperMinutes >= 10 &&
         paperMinutes <= 240;
@@ -875,6 +982,7 @@ export default function QatGenerationForm({
                 body: JSON.stringify({
                     name: name.trim(),
                     mode,
+                    selection_method: usesDistribution ? 'template' : 'manual',
                     class_ids: classIds,
                     subject_id: targetSubject.id,
                     syllabus,
@@ -884,11 +992,10 @@ export default function QatGenerationForm({
                             : [],
                     months: syllabus === 'qat' ? months : [],
                     minutes: paperMinutes,
-                    template_id: mode === 'auto' ? selectedTemplate?.id : null,
-                    sections:
-                        mode === 'auto'
-                            ? normalizedSections(activeAutoRows)
-                            : [],
+                    template_id: usesDistribution ? selectedTemplate?.id : null,
+                    sections: usesDistribution
+                        ? normalizedSections(activeAutoRows)
+                        : [],
                     variants: mode === 'auto' ? variants : 1,
                     allow_repeat: mode === 'auto' && allowRepeat,
                     manual_questions:
@@ -923,6 +1030,18 @@ export default function QatGenerationForm({
 
     if (render) {
         return render({
+            selectionMethod,
+            onSelectionMethodChange: (method) => {
+                setSelectionMethod(method);
+
+                if (
+                    method === 'template' &&
+                    !selectedTemplate &&
+                    autoSections.length === 0
+                ) {
+                    applyTemplate(availableTemplates[0] ?? null);
+                }
+            },
             classOptions,
             subjectOptions,
             classId: classIds[0] ?? null,
@@ -937,7 +1056,9 @@ export default function QatGenerationForm({
                 minutes,
                 questionCount: summaryHasCurrentQuestions ? totalQuestions : 0,
                 totalMarks: summaryTotalMarks,
-                templateName: selectedTemplate?.name ?? null,
+                templateName: usesDistribution
+                    ? (selectedTemplate?.name ?? null)
+                    : null,
                 variants,
                 months:
                     mode === 'auto'
@@ -1037,10 +1158,11 @@ export default function QatGenerationForm({
                 onClear: () => {
                     setTemplateId(null);
                     setAutoSections([]);
+                    setTemplateRevision((revision) => revision + 1);
                     setMinutes(40);
                 },
                 canResetDefault:
-                    mode === 'auto' &&
+                    usesDistribution &&
                     availableTemplates.length > 0 &&
                     !isPefPattern,
                 onResetDefault: () =>
