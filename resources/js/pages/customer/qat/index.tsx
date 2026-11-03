@@ -1,7 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowRightIcon,
-    FileTextIcon,
     LoaderCircleIcon,
     PenLineIcon,
     SearchIcon,
@@ -10,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Pagination } from '@/components/tm';
+import { Button, Modal, Pagination } from '@/components/tm';
 import type { PageMeta } from '@/components/tm';
 
 type SavedPaper = {
@@ -21,6 +20,9 @@ type SavedPaper = {
     subject_name: string | null;
     total_marks: number;
     question_count: number;
+    chapter_count: number;
+    created_at: string;
+    can_delete: boolean;
     updated_at: string;
     author_name: string | null;
 };
@@ -30,10 +32,13 @@ function formatDate(value: string): string {
 
     return Number.isNaN(date.getTime())
         ? '—'
-        : date.toLocaleDateString(undefined, {
+        : date.toLocaleString(undefined, {
               year: 'numeric',
               month: 'short',
               day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
           });
 }
 
@@ -46,6 +51,59 @@ export default function QatIndex({
 }) {
     const [search, setSearch] = useState(filters.q);
     const [busy, setBusy] = useState(false);
+    const [deletingPaper, setDeletingPaper] = useState<SavedPaper | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+
+    async function deletePaper() {
+        if (!deletingPaper || deleting) {
+            return;
+        }
+
+        setDeleting(true);
+        setDeleteError('');
+
+        try {
+            const response = await fetch(
+                `/qa-tests/papers/${deletingPaper.id}`,
+                {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRF-TOKEN':
+                            document.querySelector<HTMLMetaElement>(
+                                'meta[name="csrf-token"]',
+                            )?.content ?? '',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        Accept: 'application/json',
+                    },
+                },
+            );
+
+            if (!response.ok) {
+                setDeleteError(
+                    'Could not delete this paper. Please try again.',
+                );
+
+                return;
+            }
+        } catch {
+            setDeleteError(
+                'Could not delete this paper. Check your connection and try again.',
+            );
+
+            return;
+        } finally {
+            setDeleting(false);
+        }
+
+        setDeletingPaper(null);
+        navigate(
+            papers.data.length === 1
+                ? Math.max(1, papers.current_page - 1)
+                : papers.current_page,
+        );
+    }
 
     function navigate(page = 1, q = filters.q) {
         router.get(
@@ -197,10 +255,115 @@ export default function QatIndex({
                     </form>
                 </div>
                 {papers.data.length ? (
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        {papers.data.map((paper) => (
-                            <SavedPaperCard key={paper.id} paper={paper} />
-                        ))}
+                    <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white dark:border-slate-800 dark:bg-slate-900">
+                        <div
+                            role="region"
+                            aria-label="Saved QAT papers table"
+                            tabIndex={0}
+                            className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+                        >
+                            <table className="w-full min-w-[800px] text-left text-xs">
+                                <caption className="sr-only">
+                                    Saved QAT practice papers
+                                </caption>
+                                <thead className="border-b border-violet-100 bg-[#f3edfa] text-[#756586] dark:border-slate-700 dark:bg-violet-950/30 dark:text-violet-200">
+                                    <tr>
+                                        {[
+                                            'Paper',
+                                            'Class',
+                                            'Subject',
+                                            'Chapters',
+                                            'Created',
+                                        ].map((heading) => (
+                                            <th
+                                                key={heading}
+                                                scope="col"
+                                                className="whitespace-nowrap px-4 py-3 font-semibold"
+                                            >
+                                                {heading}
+                                            </th>
+                                        ))}
+                                        <th scope="col" className="px-4 py-3">
+                                            <span className="sr-only">
+                                                Actions
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-violet-100/80 text-[#344451] dark:divide-slate-800 dark:text-slate-200">
+                                    {papers.data.map((paper) => (
+                                        <tr
+                                            key={paper.id}
+                                            className="transition-colors hover:bg-violet-50/60 dark:hover:bg-violet-950/15"
+                                        >
+                                            <th
+                                                scope="row"
+                                                className="whitespace-nowrap px-4 py-3 font-semibold tabular-nums"
+                                            >
+                                                <Link
+                                                    href={`/qa-tests/papers/${paper.id}`}
+                                                    aria-label={`Open ${paper.name}`}
+                                                    title={paper.name}
+                                                    className="rounded text-inherit hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500 dark:hover:text-sky-400"
+                                                >
+                                                    #{paper.id}
+                                                </Link>
+                                            </th>
+                                            <td className="whitespace-nowrap px-4 py-3">
+                                                {paper.class_names || '—'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {paper.subject_name || '—'}
+                                            </td>
+                                            <td className="px-4 py-3 tabular-nums">
+                                                {paper.chapter_count}
+                                            </td>
+                                            <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                                                {formatDate(paper.created_at)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-end gap-4 whitespace-nowrap font-semibold">
+                                                    <Link
+                                                        href={`/qa-tests/papers/${paper.id}`}
+                                                        aria-label={`View paper ${paper.id}`}
+                                                        className="rounded text-violet-600 underline decoration-violet-300 underline-offset-2 hover:text-violet-800 focus-visible:outline-2 focus-visible:outline-brand-500 dark:text-violet-300 dark:hover:text-violet-200"
+                                                    >
+                                                        Paper
+                                                    </Link>
+                                                    <Link
+                                                        href={`/qa-tests/papers/${paper.id}?answer_key=1`}
+                                                        aria-label={`Answer key for paper ${paper.id}`}
+                                                        className="rounded text-violet-600 underline decoration-violet-300 underline-offset-2 hover:text-violet-800 focus-visible:outline-2 focus-visible:outline-brand-500 dark:text-violet-300 dark:hover:text-violet-200"
+                                                    >
+                                                        Answer key
+                                                    </Link>
+                                                    {paper.can_delete && (
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Delete paper ${paper.id}`}
+                                                            disabled={
+                                                                busy || deleting
+                                                            }
+                                                            onClick={() => {
+                                                                setDeleteError(
+                                                                    '',
+                                                                );
+                                                                setDeletingPaper(
+                                                                    paper,
+                                                                );
+                                                            }}
+                                                            className="rounded text-rose-600 underline decoration-rose-300 underline-offset-2 hover:text-rose-800 focus-visible:outline-2 focus-visible:outline-rose-500 disabled:opacity-50 dark:text-rose-400 dark:hover:text-rose-300"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center rounded-2xl border border-sky-100 bg-white px-5 py-9 text-center dark:border-slate-800 dark:bg-slate-900">
@@ -242,6 +405,45 @@ export default function QatIndex({
                     onPageChange={(page) => navigate(page)}
                 />
             </section>
+            <Modal
+                open={deletingPaper !== null}
+                onOpenChange={(open) => {
+                    if (!open && !deleting) {
+                        setDeletingPaper(null);
+                    }
+                }}
+                title="Delete QAT paper?"
+                className="max-w-md"
+                footer={
+                    <>
+                        <Button
+                            disabled={deleting}
+                            onClick={() => setDeletingPaper(null)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            disabled={deleting}
+                            onClick={() => void deletePaper()}
+                        >
+                            {deleting ? 'Deleting…' : 'Delete paper'}
+                        </Button>
+                    </>
+                }
+            >
+                <p className="break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    Delete “{deletingPaper?.name}”? This cannot be undone.
+                </p>
+                {deleteError && (
+                    <p
+                        role="alert"
+                        className="mt-3 text-sm text-rose-600 dark:text-rose-400"
+                    >
+                        {deleteError}
+                    </p>
+                )}
+            </Modal>
         </div>
     );
 }
@@ -299,83 +501,6 @@ function GenerationCard({ mode }: { mode: 'auto' | 'manual' }) {
                 {auto ? 'Let’s create a paper' : 'Start choosing questions'}
                 <ArrowRightIcon aria-hidden="true" className="size-3.5" />
             </span>
-        </Link>
-    );
-}
-
-function SavedPaperCard({ paper }: { paper: SavedPaper }) {
-    const auto = paper.mode === 'auto';
-
-    return (
-        <Link
-            href={`/qa-tests/papers/${paper.id}`}
-            aria-label={`Open ${paper.name}`}
-            className={`group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-white p-5 outline-none transition-[border-color,box-shadow] hover:shadow-md focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:bg-slate-900 dark:focus-visible:ring-offset-slate-950 ${auto ? 'border-sky-100 hover:border-sky-300 dark:border-slate-800 dark:hover:border-sky-700' : 'border-violet-100 hover:border-violet-300 dark:border-slate-800 dark:hover:border-violet-700'}`}
-        >
-            <div
-                aria-hidden="true"
-                className={`absolute left-5 right-5 top-0 h-0.5 rounded-b-full ${auto ? 'bg-gradient-to-r from-sky-400 via-blue-500 to-sky-100 dark:to-sky-950' : 'bg-gradient-to-r from-violet-400 via-purple-400 to-violet-100 dark:to-violet-950'}`}
-            />
-            <div className="mb-4 flex items-center gap-2.5">
-                <span
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${auto ? 'bg-sky-50 text-brand-500 dark:bg-sky-500/10 dark:text-sky-400' : 'bg-violet-50 text-violet-500 dark:bg-violet-500/10 dark:text-violet-400'}`}
-                >
-                    <FileTextIcon aria-hidden="true" className="size-[18px]" />
-                </span>
-                <span
-                    className={`text-[10px] font-bold uppercase tracking-[0.12em] ${auto ? 'text-brand-500 dark:text-sky-400' : 'text-violet-500 dark:text-violet-400'}`}
-                >
-                    {auto ? 'Auto paper' : 'Manual paper'}
-                </span>
-            </div>
-            <h3
-                title={paper.name}
-                className="line-clamp-2 break-words text-[15px] font-bold leading-6 text-[#112650] dark:text-slate-100"
-            >
-                {paper.name}
-            </h3>
-            <p className="mt-1.5 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">
-                {[paper.subject_name, paper.class_names]
-                    .filter(Boolean)
-                    .join(' · ')}
-            </p>
-            <div className="mb-4 mt-5 flex items-baseline gap-4 text-[11px] text-slate-500 dark:text-slate-400">
-                <span>
-                    <strong className="mr-1 text-base font-semibold tabular-nums text-[#112650] dark:text-slate-200">
-                        {paper.question_count}
-                    </strong>{' '}
-                    questions
-                </span>
-                <span
-                    className="h-4 w-px self-center bg-slate-200 dark:bg-slate-700"
-                    aria-hidden="true"
-                />
-                <span>
-                    <strong className="mr-1 text-base font-semibold tabular-nums text-[#112650] dark:text-slate-200">
-                        {paper.total_marks}
-                    </strong>{' '}
-                    marks
-                </span>
-            </div>
-            {paper.author_name && (
-                <p
-                    title={paper.author_name}
-                    className="mb-3 truncate text-[10px] text-slate-400 dark:text-slate-500"
-                >
-                    By {paper.author_name}
-                </p>
-            )}
-            <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                    {formatDate(paper.updated_at)}
-                </span>
-                <span
-                    className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${auto ? 'text-brand-600 dark:text-sky-400' : 'text-violet-600 dark:text-violet-400'}`}
-                >
-                    Open paper
-                    <ArrowRightIcon aria-hidden="true" className="size-3.5" />
-                </span>
-            </div>
         </Link>
     );
 }

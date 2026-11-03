@@ -198,19 +198,21 @@ export default function QatPaper({
     variants = [],
     previewId = null,
     backUrl = '/qa-tests',
+    showAnswerKey = false,
     schoolDetails,
 }: {
     paper: QatPaperView;
     variants?: QatPaperView[];
     previewId?: string | null;
     backUrl?: string;
+    showAnswerKey?: boolean;
     schoolDetails: SchoolDetails;
 }) {
     const { collapsed: sidebarCollapsed } = useCustomerSidebar();
     const [activeVariant, setActiveVariant] = useState(0);
     const [saving, setSaving] = useState(false);
     const [downloading, setDownloading] = useState(false);
-    const [showAnswers, setShowAnswers] = useState(false);
+    const [showAnswers, setShowAnswers] = useState(showAnswerKey);
     const [actionError, setActionError] = useState('');
     const paperVariants = variants.length ? variants : [initialPaper];
     const paper = paperVariants[activeVariant] ?? initialPaper;

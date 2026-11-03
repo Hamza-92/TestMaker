@@ -32,7 +32,8 @@ class QatCatalogueController extends Controller
             ->with('user:id,name')
             ->orderByDesc('updated_at')
             ->paginate(12, ['id', 'user_id', 'name', 'mode', 'class_names', 'subject_name',
-                'total_marks', 'question_count', 'updated_at'])
+                'total_marks', 'question_count', 'updated_at', 'created_at',
+                'paper_data->chapter_ids as saved_chapter_ids', 'paper_data->chapters as saved_chapters'])
             ->withQueryString();
         $papers->getCollection()->transform(fn (QatPaper $paper) => [
             'id' => $paper->id,
@@ -42,8 +43,13 @@ class QatCatalogueController extends Controller
             'subject_name' => $paper->subject_name,
             'total_marks' => $paper->total_marks,
             'question_count' => $paper->question_count,
+            'chapter_count' => count(array_unique(json_decode($paper->saved_chapter_ids ?? 'null', true)
+                ?? array_column(json_decode($paper->saved_chapters ?? '[]', true) ?? [], 'id'))),
+            'created_at' => $paper->created_at?->toISOString(),
             'updated_at' => $paper->updated_at?->toISOString(),
             'author_name' => (int) $paper->user_id === (int) $user->id ? null : $paper->user?->name,
+            'can_delete' => (int) $paper->user_id === (int) $user->id
+                && ($user->isSchoolOwner() || $user->hasTeacherPermission(TeacherPermission::ManageOwnPapers->value)),
         ]);
 
         return Inertia::render('customer/qat/index', [

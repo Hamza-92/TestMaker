@@ -139,6 +139,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('qa-tests/papers/{qatPaper}', [CustomerQatPaperController::class, 'show'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.papers.show');
+        Route::delete('qa-tests/papers/{qatPaper}', [CustomerQatPaperController::class, 'destroy'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:manage_own_papers'])
+            ->name('customer.qat.papers.destroy');
         Route::get('qat-tests/subjects/{qatSubject}', [CustomerQatCatalogueController::class, 'show'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.subjects.show');

@@ -357,6 +357,7 @@ class QatPaperController extends Controller
             'backUrl' => isset($paperData['generation_settings'])
                 ? route('customer.qat.create', ['mode' => $qatPaper->mode, 'paper' => $qatPaper->id])
                 : route('customer.qat.index'),
+            'showAnswerKey' => $request->boolean('answer_key'),
             'paper' => [
                 'id' => $qatPaper->id,
                 'name' => $qatPaper->name,
@@ -370,6 +371,17 @@ class QatPaperController extends Controller
             ],
             'schoolDetails' => $this->schoolDetails($request),
         ]);
+    }
+
+    public function destroy(Request $request, QatPaper $qatPaper): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless((int) $qatPaper->user_id === (int) $user->id
+            && ($user->isSchoolOwner() || $user->hasTeacherPermission(TeacherPermission::ManageOwnPapers->value)), 403);
+
+        $qatPaper->delete();
+
+        return response()->json(['deleted' => true]);
     }
 
     private function schoolDetails(Request $request): array
