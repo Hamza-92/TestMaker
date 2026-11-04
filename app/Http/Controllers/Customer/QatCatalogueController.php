@@ -17,7 +17,12 @@ class QatCatalogueController extends Controller
 {
     public function index(Request $request): Response
     {
-        return $this->renderPapers($request, QatAccess::only($request->user()) ? 'home' : 'combined');
+        if (! QatAccess::only($request->user())) {
+            return $this->renderPapers($request, 'combined');
+        }
+
+        // Existing saved-paper search and pagination links still use this URL.
+        return $this->renderPapers($request, $request->hasAny(['q', 'page']) ? 'papers' : 'home');
     }
 
     public function papers(Request $request): Response
