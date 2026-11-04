@@ -9,6 +9,8 @@ interface Permission {
     name: string;
     display_name: string;
     granted: boolean;
+    grantable: boolean;
+    excluded_from_full_access: boolean;
 }
 
 interface PermissionGroup {
@@ -24,12 +26,14 @@ interface TargetUser {
 
 interface FormData {
     permissions: string[];
-    [key: string]: string[];
+    full_access: boolean;
+    [key: string]: string[] | boolean;
 }
 
 // "customers.view" → "view", "subscriptions.manage_payments" → "manage_payments"
 function getAction(permName: string): string {
     const idx = permName.indexOf('.');
+
     return idx >= 0 ? permName.slice(idx + 1) : permName;
 }
 
@@ -40,14 +44,18 @@ function formatAction(action: string): string {
         .join(' ');
 }
 
-const STANDARD_ACTIONS = ['view', 'create', 'edit', 'delete'];
+const STANDARD_ACTIONS = ['view', 'create', 'edit', 'reset_password', 'delete'];
 
 export default function UserPermissions({
     targetUser,
     permissionGroups,
+    fullAccess,
+    canGrantFullAccess,
 }: {
     targetUser: TargetUser;
     permissionGroups: PermissionGroup[];
+    fullAccess: boolean;
+    canGrantFullAccess: boolean;
 }) {
     const initialGranted = useMemo(
         () => permissionGroups.flatMap((g) =>
@@ -58,11 +66,13 @@ export default function UserPermissions({
 
     const { data, setData, put, processing, errors, recentlySuccessful } = useForm<FormData>({
         permissions: initialGranted,
+        full_access: fullAccess,
     });
 
     useEffect(() => {
         setData('permissions', initialGranted);
-    }, [targetUser.id, initialGranted, setData]);
+        setData('full_access', fullAccess);
+    }, [targetUser.id, initialGranted, fullAccess, setData]);
 
     // Build ordered column list: standard actions first, then any extras
     const columns = useMemo(() => {
@@ -70,6 +80,7 @@ export default function UserPermissions({
         permissionGroups.forEach((g) => g.permissions.forEach((p) => all.add(getAction(p.name))));
         const standard = STANDARD_ACTIONS.filter((a) => all.has(a));
         const extras = Array.from(all).filter((a) => !STANDARD_ACTIONS.includes(a));
+
         return [...standard, ...extras];
     }, [permissionGroups]);
 
@@ -84,8 +95,25 @@ export default function UserPermissions({
         );
     }
 
+    function toggleFullAccess(checked: boolean) {
+        setData((current) => ({
+            ...current,
+            full_access: checked,
+            permissions: checked
+                ? current.permissions.filter((name) =>
+                      !permissionGroups.some((group) => group.permissions.some((permission) =>
+                          permission.name === name && permission.excluded_from_full_access,
+                      )),
+                  )
+                : current.permissions,
+        }));
+    }
+
     function toggleGroup(group: PermissionGroup, toChecked: boolean) {
-        const names = group.permissions.map((p) => p.name);
+        const names = group.permissions
+            .filter((p) => p.grantable && (!data.full_access || !p.excluded_from_full_access))
+            .map((p) => p.name);
+
         if (toChecked) {
             setData('permissions', Array.from(new Set([...data.permissions, ...names])));
         } else {
@@ -94,9 +122,20 @@ export default function UserPermissions({
     }
 
     function groupState(group: PermissionGroup): 'all' | 'some' | 'none' {
-        const granted = group.permissions.filter((p) => data.permissions.includes(p.name)).length;
-        if (granted === 0) return 'none';
-        if (granted === group.permissions.length) return 'all';
+        const selectable = group.permissions.filter((p) => p.grantable);
+        const granted = selectable.filter((p) =>
+            data.permissions.includes(p.name) ||
+            (data.full_access && !p.excluded_from_full_access),
+        ).length;
+
+        if (granted === 0) {
+            return 'none';
+        }
+
+        if (granted === selectable.length) {
+            return 'all';
+        }
+
         return 'some';
     }
 
@@ -130,6 +169,26 @@ export default function UserPermissions({
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
+                    {canGrantFullAccess && (
+                        <label className="flex items-start gap-3 rounded-xl border bg-card p-4">
+                            <Checkbox
+                                checked={data.full_access}
+                                onCheckedChange={(value) => toggleFullAccess(Boolean(value))}
+                                aria-label="Full access except payments"
+                            />
+                            <span>
+                                <span className="block font-medium">Full access except payments</span>
+                                <span className="text-muted-foreground block text-sm">
+                                    Includes current and future permissions. Payment logs and the master-only Payments Management module stay restricted.
+                                </span>
+                            </span>
+                        </label>
+                    )}
+                    {!canGrantFullAccess && (
+                        <p className="text-muted-foreground text-sm">
+                            Permissions you cannot grant are shown as disabled. Only the master superadmin can grant Full Access.
+                        </p>
+                    )}
                     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
@@ -164,6 +223,7 @@ export default function UserPermissions({
                                                     <div className="flex justify-center">
                                                         <Checkbox
                                                             checked={state === 'some' ? 'indeterminate' : state === 'all'}
+                                                            disabled={data.full_access || !group.permissions.some((permission) => permission.grantable)}
                                                             className={cn(state === 'some' && 'opacity-60')}
                                                             onCheckedChange={(v) => toggleGroup(group, Boolean(v))}
                                                             aria-label={`Select all ${group.group} permissions`}
@@ -175,7 +235,8 @@ export default function UserPermissions({
                                                 {columns.map((action) => {
                                                     const perm = findPerm(group, action);
                                                     const checked = perm
-                                                        ? data.permissions.includes(perm.name)
+                                                        ? data.permissions.includes(perm.name) ||
+                                                          (data.full_access && !perm.excluded_from_full_access)
                                                         : false;
 
                                                     return (
@@ -184,6 +245,7 @@ export default function UserPermissions({
                                                                 <div className="flex justify-center">
                                                                     <Checkbox
                                                                         checked={checked}
+                                                                        disabled={data.full_access || !perm.grantable}
                                                                         onCheckedChange={(v) =>
                                                                             toggle(perm.name, Boolean(v))
                                                                         }

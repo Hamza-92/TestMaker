@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { usePermission } from '@/hooks/use-permission';
 import type {
     AccessClass,
     AccessPattern,
@@ -189,6 +190,7 @@ function DateInput({ className, ...props }: Omit<React.ComponentProps<'input'>, 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AddCustomerSubscription({ customer, planNames, patterns, classes, subjects, patternClassMap, classSubjectMap }: Props) {
+    const { can } = usePermission();
     const today = new Date().toISOString().slice(0, 10);
     const receiptRef = useRef<HTMLInputElement>(null);
     const [receiptName, setReceiptName] = useState<string | null>(null);
@@ -429,6 +431,8 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
                             />
                         </div>
 
+                        {can('subscriptions.manage_payments') && (
+                            <>
                         {/* ── Initial Payment sub-section ────────────────────── */}
                         <Separator />
                         <div className="flex items-center justify-between gap-4">
@@ -595,6 +599,8 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
                                         />
                                     </Field>
                                 </div>
+                            </>
+                        )}
                             </>
                         )}
                     </div>

@@ -159,7 +159,7 @@ class CustomerController extends Controller
         return Inertia::render('superadmin/customers', [
             'customers' => $customers,
             'accountType' => $accountType->value,
-            'canViewAllCustomers' => auth()->user()->isMasterSuperAdmin(),
+            'canViewAllCustomers' => CustomerAccess::canViewAll(auth()->user()),
         ]);
     }
 

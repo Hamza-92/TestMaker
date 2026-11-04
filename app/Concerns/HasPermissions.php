@@ -4,6 +4,7 @@ namespace App\Concerns;
 
 use App\Models\Permission;
 use App\Models\User;
+use App\Support\SuperadminPermission;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Cache;
 
@@ -25,7 +26,20 @@ trait HasPermissions
             return true;
         }
 
-        return in_array($permission, $this->cachedPermissions(), true);
+        $granted = $this->cachedPermissions();
+
+        if (in_array($permission, $granted, true)) {
+            return true;
+        }
+
+        if (! in_array(SuperadminPermission::FULL_ACCESS, $granted, true)) {
+            return false;
+        }
+
+        $permissionRecord = Permission::query()->where('name', $permission)->first(['group']);
+
+        return $permissionRecord !== null
+            && ! SuperadminPermission::excludedFromFullAccess($permission, $permissionRecord->group);
     }
 
     public function getPermissionNames(): array
@@ -37,6 +51,22 @@ trait HasPermissions
         return $this->cachedPermissions();
     }
 
+    public function getEffectivePermissionNames(): array
+    {
+        $granted = $this->getPermissionNames();
+
+        if (! in_array(SuperadminPermission::FULL_ACCESS, $granted, true)) {
+            return $granted;
+        }
+
+        $included = Permission::query()->get(['name', 'group'])
+            ->reject(fn (Permission $permission) => SuperadminPermission::excludedFromFullAccess($permission->name, $permission->group))
+            ->pluck('name')
+            ->all();
+
+        return array_values(array_unique([...$granted, ...$included]));
+    }
+
     public function canManageSuperAdmin(User $target): bool
     {
         if (! $this->isSuperAdmin() || ! $target->isSuperAdmin()
@@ -44,8 +74,32 @@ trait HasPermissions
             return false;
         }
 
-        return $this->isMasterSuperAdmin()
-            || array_diff($target->getPermissionNames(), $this->getPermissionNames()) === [];
+        if ($this->isMasterSuperAdmin()) {
+            return true;
+        }
+
+        if (in_array(SuperadminPermission::FULL_ACCESS, $this->getPermissionNames(), true)) {
+            return ! $target->permissions()->get(['name', 'group'])
+                ->contains(fn (Permission $permission) => SuperadminPermission::excludedFromFullAccess($permission->name, $permission->group));
+        }
+
+        return array_diff($target->getPermissionNames(), $this->getPermissionNames()) === [];
+    }
+
+    public function canImpersonateSuperAdmin(User $target): bool
+    {
+        if (! $this->isSuperAdmin() || ! $this->isActive()
+            || ! $target->isSuperAdmin() || ! $target->isActive()
+            || $target->isMasterSuperAdmin() || $this->is($target)) {
+            return false;
+        }
+
+        if ($this->isMasterSuperAdmin()) {
+            return true;
+        }
+
+        return in_array(SuperadminPermission::FULL_ACCESS, $this->getPermissionNames(), true)
+            && ! $target->permissions->contains(fn (Permission $permission) => SuperadminPermission::excludedFromFullAccess($permission->name, $permission->group));
     }
 
     public function syncPermissions(array $permissionNames): void

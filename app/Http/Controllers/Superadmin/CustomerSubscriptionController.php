@@ -427,6 +427,7 @@ class CustomerSubscriptionController extends Controller
     public function store(Request $request, User $customer)
     {
         CustomerAccess::ensureVisible($request->user(), $customer);
+        abort_if($request->boolean('has_payment') && ! $request->user()->can('subscriptions.manage_payments'), 403);
         abort_if(
             $customer->account_type?->value === 'trial',
             403,

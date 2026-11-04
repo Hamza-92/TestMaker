@@ -18,6 +18,9 @@ class PermissionSeeder extends Seeder
             ['name' => 'customers.edit',   'display_name' => 'Edit Customers',   'group' => 'Customers'],
             ['name' => 'customers.delete', 'display_name' => 'Delete Customers', 'group' => 'Customers'],
             ['name' => 'customers.impersonate', 'display_name' => 'Log In as Customer', 'group' => 'Customers'],
+            ['name' => 'customers.reset_password', 'display_name' => 'Reset Customer Password', 'group' => 'Customers'],
+
+            ['name' => 'app.full_access', 'display_name' => 'Full Access Except Payments', 'group' => 'App Access'],
 
             // Subscriptions
             ['name' => 'subscriptions.view',            'display_name' => 'View Subscriptions',    'group' => 'Subscriptions'],

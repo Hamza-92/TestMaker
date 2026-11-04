@@ -3,6 +3,7 @@
 use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\User;
+use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -70,4 +71,37 @@ it('does not allow a user to return as the master without an impersonation sessi
         ->post(route('superadmin.users.impersonation.stop'))
         ->assertForbidden();
     expect(auth()->id())->toBe($delegate->id);
+});
+
+it('lets a full access admin log in to another delegated account and return safely', function () {
+    $this->seed(PermissionSeeder::class);
+    $master = makeMasterAdmin();
+    $fullAccess = makeDelegatedAdmin($master);
+    $fullAccess->syncPermissions(['app.full_access']);
+    $target = makeDelegatedAdmin($master);
+    $target->syncPermissions(['users.view']);
+    $paymentManager = makeDelegatedAdmin($master);
+    $paymentManager->syncPermissions(['subscriptions.manage_payments']);
+
+    $users = $this->actingAs($fullAccess)->get(route('superadmin.users'))
+        ->assertOk()->viewData('page')['props']['users'];
+    expect(collect($users)->firstWhere('id', $target->id)['can_login'])->toBeTrue()
+        ->and(collect($users)->firstWhere('id', $paymentManager->id)['can_login'])->toBeFalse();
+
+    $this->post(route('superadmin.users.login', $paymentManager))->assertForbidden();
+    $this->post(route('superadmin.users.login', $master))->assertNotFound();
+    $this->post(route('superadmin.users.login', $fullAccess))->assertForbidden();
+
+    $this->post(route('superadmin.users.login', $target))
+        ->assertRedirect(route('dashboard'));
+    expect(auth()->id())->toBe($target->id)
+        ->and(session('superadmin_impersonator_id'))->toBe($fullAccess->id);
+
+    $this->post(route('superadmin.users.login', $paymentManager))->assertForbidden();
+    expect(session('superadmin_impersonator_id'))->toBe($fullAccess->id);
+
+    $this->post(route('superadmin.users.impersonation.stop'))
+        ->assertRedirect(route('superadmin.users'));
+    expect(auth()->id())->toBe($fullAccess->id)
+        ->and(session()->has('superadmin_impersonator_id'))->toBeFalse();
 });

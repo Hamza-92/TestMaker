@@ -89,6 +89,30 @@ it('does not allow a user viewer to edit accounts or assign permissions', functi
     expect($target->fresh()->getPermissionNames())->toBe([]);
 });
 
+it('shows ungrantable permissions as disabled instead of omitting them', function () {
+    $manager = delegatedAdmin($this->master, ['users.manage_permissions', 'customers.edit']);
+    $target = delegatedAdmin($this->master, ['customers.edit']);
+
+    $page = $this->actingAs($manager)
+        ->get(route('superadmin.users.permissions', $target))
+        ->assertOk()
+        ->viewData('page');
+    $customers = collect($page['props']['permissionGroups'])->firstWhere('group', 'Customers');
+    $resetPassword = collect($customers['permissions'])->firstWhere('name', 'customers.reset_password');
+
+    expect($resetPassword['grantable'])->toBeFalse()
+        ->and($page['props']['canGrantFullAccess'])->toBeFalse();
+
+    $masterPage = $this->actingAs($this->master)
+        ->get(route('superadmin.users.permissions', $target))
+        ->assertOk()
+        ->viewData('page');
+    $masterCustomers = collect($masterPage['props']['permissionGroups'])->firstWhere('group', 'Customers');
+
+    expect(collect($masterCustomers['permissions'])->firstWhere('name', 'customers.reset_password')['grantable'])->toBeTrue()
+        ->and($masterPage['props']['canGrantFullAccess'])->toBeTrue();
+});
+
 it('saves an authorized account edit without changing its password or permissions', function () {
     $target = delegatedAdmin($this->master, ['announcements.view']);
     $originalPassword = $target->password;
@@ -261,4 +285,71 @@ it('saves and edits the same delegated permissions repeatedly', function () {
         ->toContain('announcements.view', 'questions.edit')
         ->not->toContain('questions.view');
     $this->actingAs($admin)->get('/superadmin/questions')->assertForbidden();
+});
+
+it('grants current and future nonpayment permissions through full access while keeping payments restricted', function () {
+    $admin = delegatedAdmin($this->master);
+
+    $this->actingAs($this->master)
+        ->put(route('superadmin.users.permissions.update', $admin), [
+            'full_access' => true,
+            'permissions' => [],
+        ])->assertRedirect();
+
+    Permission::create(['name' => 'future.feature', 'display_name' => 'Future Feature', 'group' => 'Features']);
+    Permission::create(['name' => 'billing.reports', 'display_name' => 'Billing Reports', 'group' => 'Payments Management']);
+
+    $this->actingAs($admin);
+    expect($admin->hasPermission('questions.edit'))->toBeTrue()
+        ->and($admin->hasPermission('future.feature'))->toBeTrue()
+        ->and($admin->hasPermission('subscriptions.manage_payments'))->toBeFalse()
+        ->and($admin->hasPermission('billing.reports'))->toBeFalse()
+        ->and(Gate::allows('future.feature'))->toBeTrue()
+        ->and(Gate::allows('billing.reports'))->toBeFalse();
+
+    $this->get(route('superadmin.questions'))->assertOk();
+    $this->get(route('superadmin.payments'))->assertForbidden();
+
+    $page = $this->get(route('superadmin.questions'))->viewData('page');
+    expect($page['props']['auth']['permissions'])
+        ->toContain('future.feature', 'customers.reset_password')
+        ->not->toContain('subscriptions.manage_payments', 'billing.reports');
+});
+
+it('keeps full access assignment with the master and rejects payment permission combinations', function () {
+    $manager = delegatedAdmin($this->master, ['users.manage_permissions']);
+    $target = delegatedAdmin($this->master);
+
+    $this->actingAs($manager)
+        ->put(route('superadmin.users.permissions.update', $target), [
+            'full_access' => true,
+            'permissions' => [],
+        ])->assertForbidden();
+
+    $this->actingAs($this->master)
+        ->put(route('superadmin.users.permissions.update', $target), [
+            'full_access' => true,
+            'permissions' => ['subscriptions.manage_payments'],
+        ])->assertSessionHasErrors('permissions');
+
+    expect($target->fresh()->getPermissionNames())->toBe([]);
+});
+
+it('lets a full access delegate assign ordinary permissions without passing on full access', function () {
+    $delegate = delegatedAdmin($this->master, ['app.full_access']);
+    $target = delegatedAdmin($this->master);
+    $otherFullAccess = delegatedAdmin($this->master, ['app.full_access']);
+
+    $this->actingAs($delegate)
+        ->put(route('superadmin.users.permissions.update', $target), [
+            'permissions' => ['questions.edit'],
+            'full_access' => false,
+        ])->assertRedirect();
+    expect($target->fresh()->getPermissionNames())->toBe(['questions.edit']);
+
+    $this->put(route('superadmin.users.permissions.update', $target), [
+        'permissions' => [],
+        'full_access' => true,
+    ])->assertForbidden();
+    $this->get(route('superadmin.users.permissions', $otherFullAccess))->assertForbidden();
 });

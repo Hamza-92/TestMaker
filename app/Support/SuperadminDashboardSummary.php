@@ -387,7 +387,7 @@ class SuperadminDashboardSummary
                     ->where('customers.user_type', UserType::Customer->value)
                     ->whereIn('customers.account_type', $types)
                     ->whereNull('customers.deleted_at')
-                    ->when(! $actor->isMasterSuperAdmin(), fn ($q) => $q->where('customers.created_by', $actor->id))
+                    ->when(! CustomerAccess::canViewAll($actor), fn ($q) => $q->where('customers.created_by', $actor->id))
                     ->select([
                         'audit_logs.id', 'audit_logs.event', 'audit_logs.new_values',
                         'audit_logs.created_at', 'customers.id as customer_id',
@@ -440,7 +440,7 @@ class SuperadminDashboardSummary
         return User::query()
             ->where('user_type', UserType::Customer->value)
             ->whereIn('account_type', $types)
-            ->when(! $actor->isMasterSuperAdmin(), fn (Builder $query) => $query->where('created_by', $actor->id))
+            ->when(! CustomerAccess::canViewAll($actor), fn (Builder $query) => $query->where('created_by', $actor->id))
             ->select('id');
     }
 

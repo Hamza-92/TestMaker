@@ -6,6 +6,7 @@ use App\Enums\UserType;
 use App\Models\PaymentLog;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\SuperadminDashboardSummary;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -17,7 +18,7 @@ beforeEach(function () {
     $this->master = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => null]);
     $this->staff = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->master->id]);
     $this->staff->syncPermissions([
-        'customers.view', 'customers.create', 'customers.edit', 'customers.impersonate',
+        'customers.view', 'customers.create', 'customers.edit', 'customers.reset_password', 'customers.impersonate',
         'subscriptions.view', 'subscriptions.create', 'subscriptions.edit', 'subscriptions.manage_payments',
     ]);
 
@@ -76,6 +77,31 @@ it('lists only customers created by the delegated user and calculates totals fro
     expect(collect($masterPage['props']['customers'])->pluck('id')->sort()->values()->all())
         ->toBe([$this->ownCustomer->id, $this->otherCustomer->id]);
     expect($masterPage['props']['canViewAllCustomers'])->toBeTrue();
+});
+
+it('shows all customers and their pages to a full access admin without opening payment management', function () {
+    $fullAccess = User::factory()->create([
+        'user_type' => UserType::SuperAdmin,
+        'created_by' => $this->master->id,
+    ]);
+    $fullAccess->syncPermissions(['app.full_access']);
+    $subscription = ownershipSubscription($this->otherCustomer, $this->master);
+
+    $page = $this->actingAs($fullAccess)
+        ->get(route('superadmin.customers.paid'))
+        ->assertOk()
+        ->viewData('page');
+
+    expect(collect($page['props']['customers'])->pluck('id')->sort()->values()->all())
+        ->toBe(collect([$this->ownCustomer->id, $this->otherCustomer->id])->sort()->values()->all())
+        ->and($page['props']['canViewAllCustomers'])->toBeTrue()
+        ->and(SuperadminDashboardSummary::for($fullAccess)['paid_customers'])->toBe(1);
+
+    $this->get(route('superadmin.customers.show', $this->otherCustomer))->assertOk();
+    $this->get(route('superadmin.customers.edit', $this->otherCustomer))->assertOk();
+    $this->get(route('superadmin.customers.subscriptions.show', [$this->otherCustomer, $subscription]))->assertOk();
+    $this->get(route('superadmin.payments'))->assertForbidden();
+    $this->post(route('superadmin.customers.subscriptions.payment-logs.store', [$this->otherCustomer, $subscription]), [])->assertForbidden();
 });
 
 it('sums commission on the recorded payments for the current agent', function () {

@@ -17,7 +17,7 @@ class SuperadminUserController extends Controller
     {
         $users = User::where('user_type', UserType::SuperAdmin)
             ->whereNotNull('created_by')
-            ->with('creator:id,name')
+            ->with(['creator:id,name', 'permissions:id,name,group'])
             ->orderByDesc('created_at')
             ->get(['id', 'user_type', 'name', 'email', 'status', 'created_at', 'created_by'])
             ->map(fn (User $user) => [
@@ -28,7 +28,8 @@ class SuperadminUserController extends Controller
                 'created_at'   => $user->created_at?->toISOString(),
                 'created_by'   => $user->creator?->name,
                 'can_manage'   => auth()->user()->canManageSuperAdmin($user),
-                'can_login'    => auth()->user()->isMasterSuperAdmin() && $user->isActive(),
+                'can_login'    => ! request()->session()->has('superadmin_impersonator_id')
+                    && auth()->user()->canImpersonateSuperAdmin($user),
             ]);
 
         return Inertia::render('superadmin/users', ['users' => $users]);
@@ -110,9 +111,9 @@ class SuperadminUserController extends Controller
 
     public function loginAsUser(Request $request, User $user)
     {
-        abort_unless($request->user()->isMasterSuperAdmin(), 403);
+        abort_if($request->session()->has('superadmin_impersonator_id'), 403);
         abort_unless($user->isSuperAdmin() && ! $user->isMasterSuperAdmin(), 404);
-        abort_unless($user->isActive(), 403);
+        abort_unless($request->user()->canImpersonateSuperAdmin($user), 403);
 
         $request->session()->put('superadmin_impersonator_id', $request->user()->id);
         Auth::login($user);
@@ -127,7 +128,7 @@ class SuperadminUserController extends Controller
         abort_unless($request->user()?->isSuperAdmin() && $impersonatorId, 403);
 
         $admin = User::query()->find($impersonatorId);
-        if (! $admin?->isMasterSuperAdmin() || ! $admin->isActive()) {
+        if (! $admin?->isSuperAdmin() || ! $admin->isActive()) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

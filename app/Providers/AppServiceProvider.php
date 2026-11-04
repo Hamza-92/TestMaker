@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\SuperadminPermission;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -39,11 +40,17 @@ class AppServiceProvider extends ServiceProvider
             if ($user->isMasterSuperAdmin()) {
                 return true;
             }
+
+            if ($user->isSuperAdmin() && $user->isActive()
+                && in_array(SuperadminPermission::FULL_ACCESS, $user->getPermissionNames(), true)
+                && $user->hasPermission($ability)) {
+                return true;
+            }
         });
 
         $permissions = [
             'customers.view', 'customers.paid.view', 'customers.trial.view',
-            'customers.create', 'customers.edit', 'customers.delete', 'customers.impersonate',
+            'customers.create', 'customers.edit', 'customers.delete', 'customers.impersonate', 'customers.reset_password',
             'subscriptions.view', 'subscriptions.create', 'subscriptions.edit', 'subscriptions.manage_payments',
             'patterns.view', 'patterns.create', 'patterns.edit', 'patterns.delete',
             'classes.view', 'classes.create', 'classes.edit', 'classes.delete',

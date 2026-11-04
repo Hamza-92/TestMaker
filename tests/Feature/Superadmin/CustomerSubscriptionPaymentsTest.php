@@ -7,6 +7,7 @@ use App\Models\PaymentLog;
 use App\Models\Subscription;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -85,6 +86,36 @@ it('creates a subscription without auto-creating a payment record', function () 
 
     expect(PaymentLog::count())->toBe(0);
     expect($subscription->payment_due_date)->toBeNull();
+});
+
+it('does not let a subscription creator bypass payment permission with an initial payment', function () {
+    $this->seed(PermissionSeeder::class);
+    $master = makeSuperAdmin();
+    $admin = User::factory()->create([
+        'user_type' => UserType::SuperAdmin,
+        'created_by' => $master->id,
+    ]);
+    $admin->syncPermissions(['customers.paid.view', 'subscriptions.create']);
+    $customer = User::factory()->create([
+        'user_type' => UserType::Customer,
+        'account_type' => 'paid',
+        'created_by' => $admin->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.customers.subscriptions.store', $customer), [
+            'name' => 'Primary',
+            'amount' => 1200,
+            'started_at' => '2026-04-18',
+            'duration' => 30,
+            'status' => 'active',
+            'has_payment' => true,
+            'payment_paid' => 1200,
+            'payment_method' => PaymentMethod::Online->value,
+        ])->assertForbidden();
+
+    expect(Subscription::count())->toBe(0)
+        ->and(PaymentLog::count())->toBe(0);
 });
 
 it('accepts only the listed plan names for new subscriptions and renames', function () {

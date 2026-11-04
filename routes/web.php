@@ -315,7 +315,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('superadmin/customers', [CustomerController::class, 'store'])->name('superadmin.customers.store')->middleware('permission:customers.create,customers.view|customers.paid.view|customers.trial.view');
         Route::get('superadmin/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('superadmin.customers.edit')->middleware('permission:customers.edit');
         Route::put('superadmin/customers/{customer}', [CustomerController::class, 'update'])->name('superadmin.customers.update')->middleware('permission:customers.edit');
-        Route::post('superadmin/customers/{customer}/reset-password', [CustomerController::class, 'resetPassword'])->name('superadmin.customers.reset-password')->middleware('permission:customers.edit');
+        Route::post('superadmin/customers/{customer}/reset-password', [CustomerController::class, 'resetPassword'])->name('superadmin.customers.reset-password')->middleware('permission:customers.reset_password');
         Route::post('superadmin/customers/{customer}/login', [CustomerController::class, 'loginAsCustomer'])->name('superadmin.customers.login')->middleware('permission:customers.impersonate');
         Route::get('superadmin/customers/{customer}/logs/{log}', [CustomerController::class, 'showLog'])->name('superadmin.customers.logs.show')->middleware('permission:customers.view|customers.paid.view|customers.trial.view');
         Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view|customers.paid.view|customers.trial.view');
@@ -516,7 +516,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/users', [SuperadminUserController::class, 'index'])->name('superadmin.users')->middleware('permission:users.view');
         Route::get('superadmin/users/add', [SuperadminUserController::class, 'create'])->name('superadmin.users.add')->middleware('permission:users.create');
         Route::post('superadmin/users', [SuperadminUserController::class, 'store'])->name('superadmin.users.store')->middleware('permission:users.create');
-        Route::post('superadmin/users/{user}/login', [SuperadminUserController::class, 'loginAsUser'])->name('superadmin.users.login')->middleware(['permission:users.view', 'master.superadmin']);
+        Route::post('superadmin/users/{user}/login', [SuperadminUserController::class, 'loginAsUser'])->name('superadmin.users.login')->middleware('permission:users.view');
         Route::get('superadmin/users/{user}/permissions', [UserPermissionController::class, 'edit'])->name('superadmin.users.permissions')->middleware('permission:users.manage_permissions');
         Route::put('superadmin/users/{user}/permissions', [UserPermissionController::class, 'update'])->name('superadmin.users.permissions.update')->middleware('permission:users.manage_permissions');
         Route::get('superadmin/users/{user}/edit', [SuperadminUserController::class, 'edit'])->name('superadmin.users.edit')->middleware('permission:users.edit');

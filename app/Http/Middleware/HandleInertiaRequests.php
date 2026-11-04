@@ -52,7 +52,7 @@ class HandleInertiaRequests extends Middleware
                     : null,
             'auth' => [
                 'user' => $user?->isTeacher() ? $user->withoutRelations() : $user,
-                'permissions' => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],
+                'permissions' => $user?->isSuperAdmin() ? $user->getEffectivePermissionNames() : [],
                 'is_master' => $user?->isMasterSuperAdmin() ?? false,
                 'teacher_permissions' => $user?->isTeacher() ? (array) ($user->teacher_permissions ?? []) : [],
                 'school_context' => $this->schoolContext($user),

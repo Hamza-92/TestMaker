@@ -471,7 +471,7 @@ export default function ShowCustomer({
                                 </Link>
                             </Button>
                         )}
-                        {can('customers.edit') && (
+                        {can('customers.reset_password') && (
                             <Button
                                 type="button"
                                 variant="outline"
