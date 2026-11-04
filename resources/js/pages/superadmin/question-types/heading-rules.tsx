@@ -30,7 +30,6 @@ interface QuestionType {
     is_objective: boolean;
     schema_key: string;
     question_text_rtl: boolean;
-    column_per_row: number;
 }
 
 interface QuestionSchema {
@@ -58,7 +57,6 @@ interface HeadingRule {
     heading_ur: string | null;
     schema_key: string | null;
     question_text_rtl: boolean | null;
-    column_per_row: number | null;
 }
 
 interface RuleForm {
@@ -69,7 +67,6 @@ interface RuleForm {
     heading_ur: string;
     schema_key: string;
     question_text_rtl: boolean | null;
-    column_per_row: number | null;
 }
 
 const INHERIT = '__inherit__';
@@ -99,7 +96,6 @@ export default function QuestionTypeHeadingRules({
         heading_ur: '',
         schema_key: '',
         question_text_rtl: null,
-        column_per_row: null,
     });
     const patternOptions = useMemo<ComboboxOptionItem[]>(
         () =>
@@ -188,7 +184,6 @@ export default function QuestionTypeHeadingRules({
             heading_ur: rule?.heading_ur ?? '',
             schema_key: rule?.schema_key ?? '',
             question_text_rtl: rule?.question_text_rtl ?? null,
-            column_per_row: rule?.column_per_row ?? null,
         });
     }
 
@@ -513,44 +508,6 @@ export default function QuestionTypeHeadingRules({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div>
-                                <label className="mb-1.5 block text-sm font-medium">
-                                    Columns per row
-                                </label>
-                                <Select
-                                    value={
-                                        form.data.column_per_row === null
-                                            ? INHERIT
-                                            : String(form.data.column_per_row)
-                                    }
-                                    onValueChange={(value) =>
-                                        form.setData(
-                                            'column_per_row',
-                                            value === INHERIT
-                                                ? null
-                                                : Number(value),
-                                        )
-                                    }
-                                    disabled={!canEdit || form.processing}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={INHERIT}>
-                                            Inherit default
-                                        </SelectItem>
-                                        {[1, 2, 3, 4, 5].map((columns) => (
-                                            <SelectItem
-                                                key={columns}
-                                                value={String(columns)}
-                                            >
-                                                {columns}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
                         </div>
 
                         {canEdit && (
@@ -564,8 +521,7 @@ export default function QuestionTypeHeadingRules({
                                             !form.data.heading_ur.trim() &&
                                             !form.data.schema_key &&
                                             form.data.question_text_rtl ===
-                                                null &&
-                                            form.data.column_per_row === null)
+                                                null)
                                     }
                                 >
                                     <SaveIcon className="size-4" />
@@ -611,9 +567,6 @@ export default function QuestionTypeHeadingRules({
                                         <th className="w-28 px-5 py-2.5">
                                             Direction
                                         </th>
-                                        <th className="w-24 px-5 py-2.5 text-center">
-                                            Columns
-                                        </th>
                                         <th className="w-24 px-5 py-2.5 text-right">
                                             Actions
                                         </th>
@@ -657,10 +610,6 @@ export default function QuestionTypeHeadingRules({
                                                     : rule.question_text_rtl
                                                       ? 'RTL'
                                                       : 'LTR'}
-                                            </td>
-                                            <td className="px-5 py-3 text-center text-muted-foreground">
-                                                {rule.column_per_row ??
-                                                    'Inherit'}
                                             </td>
                                             <td className="px-5 py-3">
                                                 {canEdit && (

@@ -280,12 +280,6 @@ export default function ShowQuestionType({
                                 </span>
                             </InfoRow>
 
-                            {!questionType.is_objective && (
-                                <InfoRow label="Default columns on paper">
-                                    <span>{questionType.column_per_row}</span>
-                                </InfoRow>
-                            )}
-
                             {answerMode && (
                                 <InfoRow label="Answer Mode">
                                     <span>{answerMode}</span>
@@ -407,7 +401,7 @@ export default function ShowQuestionType({
                                                     )}
                                                 </div>
                                             </div>
-                                            <span className="pl-12 text-xs whitespace-nowrap text-muted-foreground sm:pl-0">
+                                            <span className="whitespace-nowrap pl-12 text-xs text-muted-foreground sm:pl-0">
                                                 {fmtDt(log.created_at)}
                                             </span>
                                         </div>

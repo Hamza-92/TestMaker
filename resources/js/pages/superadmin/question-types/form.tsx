@@ -238,40 +238,13 @@ export function QuestionTypeForm({
                             form.setData('question_text_rtl', checked)
                         }
                     />
-                    {!form.data.is_objective ? (
-                        <Field
-                            label="Default columns on paper"
-                            error={form.errors.column_per_row}
-                        >
-                            <Select
-                                value={String(form.data.column_per_row)}
-                                onValueChange={(value) =>
-                                    form.setData('column_per_row', Number(value))
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {[1, 2, 3, 4, 5].map((columns) => (
-                                        <SelectItem
-                                            key={columns}
-                                            value={String(columns)}
-                                        >
-                                            {columns}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-                    ) : null}
                 </div>
             ) : null}
         </>
     );
 
     return (
-        <div className="mx-auto w-full max-w-5xl min-w-0 space-y-6 p-4 md:p-6">
+        <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6 p-4 md:p-6">
             <div className="flex min-w-0 items-center gap-4">
                 <Link
                     href={backHref}

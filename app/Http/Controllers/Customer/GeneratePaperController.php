@@ -15,6 +15,7 @@ use App\Models\Pattern;
 use App\Models\Question;
 use App\Models\QuestionType;
 use App\Models\QuestionTypeOrGroup;
+use App\Models\SubjectiveColumnSetting;
 use App\Support\AppUserAccess;
 use App\Support\CustomerPaperDefaults;
 use App\Support\Questions\QuestionTypeHeadingResolver;
@@ -337,6 +338,14 @@ class GeneratePaperController extends Controller
 
         $rows = QuestionTypeHeadingResolver::apply($rows, (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id);
 
+        $columnSettings = SubjectiveColumnSetting::query()
+            ->where('pattern_id', $scope->pattern_id)
+            ->where('class_id', $scope->class_id)
+            ->where('subject_id', $scope->subject_id)
+            ->whereIn('question_type_id', $rows->pluck('id'))
+            ->get(['question_type_id', 'columns', 'apply_to_both'])
+            ->keyBy('question_type_id');
+
         $customItemsByType = collect($customLayout['items'] ?? [])->keyBy('questionTypeId');
         $sections = $rows->map(fn ($row, int $index) => [
             'id' => 'sec_'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
@@ -363,7 +372,9 @@ class GeneratePaperController extends Controller
             'headingEnglish' => $this->visibleQuestionTypeLabel($row->heading_en ?: $row->name),
             'headingUrdu' => $this->visibleQuestionTypeLabel($row->heading_ur ?: $row->name_ur),
             'availableCount' => (int) $row->available_count,
-            'columnPerRow' => max(1, min(5, (int) ($row->column_per_row ?: 1))),
+            'columnPerRow' => (bool) $row->is_objective || ($displayMedium === 'Both' && ! $columnSettings->get($row->id)?->apply_to_both)
+                ? 1
+                : (int) ($columnSettings->get($row->id)?->columns ?? 1),
             'questionTextRtl' => (bool) $row->question_text_rtl,
             'layoutNumberGroup' => $customItemsByType->get((int) $row->id)['numberGroup'] ?? null,
             'layoutItemOrder' => $customItemsByType->get((int) $row->id)['itemOrder'] ?? null,

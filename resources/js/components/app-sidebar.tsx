@@ -201,6 +201,10 @@ export function AppSidebar() {
                               title: 'Type Settings',
                               href: '/superadmin/question-types/headings',
                           },
+                          {
+                              title: 'Question Columns',
+                              href: '/superadmin/subjective-column-settings',
+                          },
 
                           ...(can('questions.view')
                               ? [
