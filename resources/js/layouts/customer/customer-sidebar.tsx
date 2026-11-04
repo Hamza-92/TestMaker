@@ -4,13 +4,16 @@ import {
     BookmarkIcon,
     FilePlusIcon,
     HeadsetIcon,
+    HomeIcon,
     LayoutDashboardIcon,
     LayoutTemplateIcon,
+    PenLineIcon,
     SettingsIcon,
     SparklesIcon,
     ClipboardListIcon,
     UsersIcon,
     XIcon,
+    ZapIcon,
 } from 'lucide-react';
 import { CONTACT_EMAIL, PUBLIC_CONTACT_PHONES } from '@/lib/contact';
 import { useCustomerSidebar } from './customer-layout';
@@ -35,6 +38,7 @@ interface SchoolContext {
     allow_teachers: boolean;
     allow_online_mcq_tests: boolean;
     allow_qat_tests: boolean;
+    qat_only?: boolean;
     max_teachers: number | null;
     teachers_used: number;
     has_subscription: boolean;
@@ -112,6 +116,21 @@ const NAV_GROUPS: NavGroup[] = [
     },
 ];
 
+const QAT_NAV: NavItem[] = [
+    { label: 'Home', href: '/qa-tests', icon: HomeIcon },
+    {
+        label: 'Automatic Paper',
+        href: '/qa-tests/create/auto',
+        icon: ZapIcon,
+    },
+    {
+        label: 'Manual Paper',
+        href: '/qa-tests/create/manual',
+        icon: PenLineIcon,
+    },
+    { label: 'My Papers', href: '/qa-tests/papers', icon: BookmarkIcon },
+];
+
 function NavLink({
     href,
     icon: Icon,
@@ -187,6 +206,11 @@ function SidebarContent({
     const teacherPermissions = page.props.auth.teacher_permissions ?? [];
     const schoolContext = page.props.auth.school_context ?? null;
     const isOwner = schoolContext?.is_owner ?? false;
+    const qatOnly = schoolContext?.qat_only ?? false;
+    const qatItems =
+        isOwner || teacherPermissions.includes('generate_papers')
+            ? QAT_NAV
+            : [];
     const schoolName =
         schoolContext?.school_name ??
         (user.school_name as string | null) ??
@@ -229,10 +253,12 @@ function SidebarContent({
         return items.length > 0 ? { ...group, items } : null;
     }).filter((g): g is NavGroup => g !== null);
 
-    const allHrefs = [
-        '/dashboard',
-        ...visibleGroups.flatMap((g) => g.items.map((i) => i.href)),
-    ];
+    const allHrefs = qatOnly
+        ? qatItems.map((item) => item.href)
+        : [
+              '/dashboard',
+              ...visibleGroups.flatMap((g) => g.items.map((i) => i.href)),
+          ];
     const activeHref = resolveActiveHref(url, allHrefs);
     const isTeacherAccessPage = /^\/teachers\/\d+\/permissions\/?$/.test(
         url.split('?')[0],
@@ -270,41 +296,57 @@ function SidebarContent({
                     collapsed ? 'px-2' : 'px-3',
                 ].join(' ')}
             >
-                {/* Dashboard */}
-                <NavLink
-                    href="/dashboard"
-                    icon={LayoutDashboardIcon}
-                    label="Dashboard"
-                    collapsed={collapsed}
-                    active={activeHref === '/dashboard'}
-                    onNavigate={onNavigate}
-                />
+                {qatOnly ? (
+                    <div className="space-y-0.5">
+                        {qatItems.map((item) => (
+                            <NavLink
+                                key={item.href}
+                                href={item.href}
+                                icon={item.icon}
+                                label={item.label}
+                                collapsed={collapsed}
+                                active={activeHref === item.href}
+                                onNavigate={onNavigate}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <NavLink
+                        href="/dashboard"
+                        icon={LayoutDashboardIcon}
+                        label="Dashboard"
+                        collapsed={collapsed}
+                        active={activeHref === '/dashboard'}
+                        onNavigate={onNavigate}
+                    />
+                )}
 
                 {/* Groups */}
-                {visibleGroups.map((group) => (
-                    <div key={group.title}>
-                        {collapsed ? (
-                            <div className="mx-auto mb-2 h-px w-5 bg-white/10" />
-                        ) : (
-                            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-brand-200/50">
-                                {group.title}
-                            </p>
-                        )}
-                        <div className="space-y-0.5">
-                            {group.items.map((item) => (
-                                <NavLink
-                                    key={item.href}
-                                    href={item.href}
-                                    icon={item.icon}
-                                    label={item.label}
-                                    collapsed={collapsed}
-                                    active={activeHref === item.href}
-                                    onNavigate={onNavigate}
-                                />
-                            ))}
+                {!qatOnly &&
+                    visibleGroups.map((group) => (
+                        <div key={group.title}>
+                            {collapsed ? (
+                                <div className="mx-auto mb-2 h-px w-5 bg-white/10" />
+                            ) : (
+                                <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-brand-200/50">
+                                    {group.title}
+                                </p>
+                            )}
+                            <div className="space-y-0.5">
+                                {group.items.map((item) => (
+                                    <NavLink
+                                        key={item.href}
+                                        href={item.href}
+                                        icon={item.icon}
+                                        label={item.label}
+                                        collapsed={collapsed}
+                                        active={activeHref === item.href}
+                                        onNavigate={onNavigate}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
             </nav>
 
             {/* ── Contact card ───────────────────────────────────────────────── */}

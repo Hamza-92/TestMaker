@@ -104,7 +104,7 @@ function NotificationBell() {
         <button className={`${iconButtonClasses} relative`}>
             <BellIcon className="size-4" />
             {count > 0 && (
-                <span className="absolute top-1.5 right-1.5 flex size-2 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
+                <span className="absolute right-1.5 top-1.5 flex size-2 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
             )}
         </button>
     );
@@ -125,7 +125,10 @@ function LogoutMenuItem() {
                 }
             />
             <DropdownMenuItem asChild variant="destructive">
-                <button type="submit" className="w-full cursor-pointer !text-rose-700 hover:!text-rose-800">
+                <button
+                    type="submit"
+                    className="w-full cursor-pointer !text-rose-700 hover:!text-rose-800"
+                >
                     <LogOutIcon className="!text-rose-700" />
                     Log out
                 </button>
@@ -134,7 +137,7 @@ function LogoutMenuItem() {
     );
 }
 
-function UserMenu() {
+function UserMenu({ qatOnly }: { qatOnly: boolean }) {
     const page = usePage<{ auth: { user: Record<string, unknown> } }>();
     const user = page.props.auth.user;
     const name = user.name as string;
@@ -148,12 +151,12 @@ function UserMenu() {
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 transition-colors outline-none hover:bg-slate-100 data-[state=open]:bg-slate-100 dark:hover:bg-slate-800 dark:data-[state=open]:bg-slate-800">
+            <DropdownMenuTrigger className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 outline-none transition-colors hover:bg-slate-100 data-[state=open]:bg-slate-100 dark:hover:bg-slate-800 dark:data-[state=open]:bg-slate-800">
                 <div className="flex size-7 items-center justify-center rounded-full bg-brand-600 text-[11px] font-semibold text-white">
                     {initials}
                 </div>
                 <div className="hidden text-left sm:block">
-                    <p className="text-[13px] leading-none font-medium text-slate-800 dark:text-slate-100">
+                    <p className="text-[13px] font-medium leading-none text-slate-800 dark:text-slate-100">
                         {name}
                     </p>
                     {schoolName && (
@@ -178,12 +181,17 @@ function UserMenu() {
                         Profile
                     </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link href="/customer/settings" className="cursor-pointer">
-                        <SettingsIcon />
-                        Settings
-                    </Link>
-                </DropdownMenuItem>
+                {!qatOnly && (
+                    <DropdownMenuItem asChild>
+                        <Link
+                            href="/customer/settings"
+                            className="cursor-pointer"
+                        >
+                            <SettingsIcon />
+                            Settings
+                        </Link>
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <LogoutMenuItem />
             </DropdownMenuContent>
@@ -197,38 +205,42 @@ export function CustomerHeader() {
             user: Record<string, unknown>;
             is_impersonating?: boolean;
             is_teacher_impersonating?: boolean;
+            school_context?: { qat_only?: boolean } | null;
         };
         legacyWebsiteUrl: string;
     }>();
     const user = page.props.auth.user;
+    const qatOnly = page.props.auth.school_context?.qat_only ?? false;
     const isImpersonating = Boolean(page.props.auth.is_impersonating);
-    const isTeacherImpersonating = Boolean(page.props.auth.is_teacher_impersonating);
+    const isTeacherImpersonating = Boolean(
+        page.props.auth.is_teacher_impersonating,
+    );
     const schoolName =
         (user.school_name as string | null) ?? (user.name as string);
 
     return (
         <header
             data-customer-header
-            className="flex h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 md:px-5 dark:border-slate-800 dark:bg-slate-900"
+            className="flex h-14 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 dark:border-slate-800 dark:bg-slate-900 md:px-5"
         >
             <SidebarToggle />
 
             {/* ── Greeting ───────────────────────────────────────────────────── */}
-            <p className="hidden min-w-0 flex-1 truncate text-sm text-slate-500 lg:block dark:text-slate-400">
+            <p className="hidden min-w-0 flex-1 truncate text-sm text-slate-500 dark:text-slate-400 lg:block">
                 {greeting()},{' '}
                 <span className="font-semibold text-slate-800 dark:text-slate-100">
                     {schoolName}
                 </span>
             </p>
 
-            {page.props.legacyWebsiteUrl && (
+            {!qatOnly && page.props.legacyWebsiteUrl && (
                 <a
                     href={page.props.legacyWebsiteUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Visit Old Website"
                     aria-label="Visit Old Website (opens in a new tab)"
-                    className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-brand-700 bg-brand-600 px-2.5 text-xs font-semibold whitespace-nowrap text-white shadow-sm transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:border-brand-400 dark:bg-brand-500 dark:hover:bg-brand-600"
+                    className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-brand-700 bg-brand-600 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:border-brand-400 dark:bg-brand-500 dark:hover:bg-brand-600"
                 >
                     <ExternalLinkIcon className="size-4 shrink-0" />
                     <span className="hidden sm:inline">
@@ -239,14 +251,18 @@ export function CustomerHeader() {
             )}
 
             {/* ── Search ─────────────────────────────────────────────────────── */}
-            <div className="relative min-w-0 flex-1 lg:max-w-xs">
-                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400" />
-                <input
-                    type="search"
-                    placeholder="Search papers, questions…"
-                    className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:bg-slate-900 dark:focus:ring-brand-400/20"
-                />
-            </div>
+            {qatOnly ? (
+                <div className="flex-1 lg:hidden" />
+            ) : (
+                <div className="relative min-w-0 flex-1 lg:max-w-xs">
+                    <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                        type="search"
+                        placeholder="Search papers, questions…"
+                        className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 pl-8 pr-3 text-[13px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:bg-slate-900 dark:focus:ring-brand-400/20"
+                    />
+                </div>
+            )}
 
             {/* ── Actions ────────────────────────────────────────────────────── */}
             <div className="flex items-center gap-0.5">
@@ -262,16 +278,18 @@ export function CustomerHeader() {
                 {isTeacherImpersonating && (
                     <button
                         type="button"
-                        onClick={() => router.post('/teacher-impersonation/stop')}
+                        onClick={() =>
+                            router.post('/teacher-impersonation/stop')
+                        }
                         className="mr-1 rounded-md px-2 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
                     >
                         Return to School
                     </button>
                 )}
-                <NotificationBell />
+                {!qatOnly && <NotificationBell />}
                 <AppearanceToggle />
                 <div className="mx-1.5 h-5 w-px bg-slate-200 dark:bg-slate-700" />
-                <UserMenu />
+                <UserMenu qatOnly={qatOnly} />
             </div>
         </header>
     );

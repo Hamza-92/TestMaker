@@ -57,6 +57,7 @@ use App\Http\Controllers\Superadmin\TopicController;
 use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
 use App\Http\Controllers\Superadmin\UserTransferController;
+use App\Http\Middleware\RedirectQatOnlyCustomers;
 use App\Support\PricingPageContent;
 use App\Support\SiteNavigation;
 use Illuminate\Http\Request;
@@ -94,19 +95,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // â”€â”€â”€ Shared smart dashboard (renders based on user type) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::middleware(['app.user', 'school.owner'])->group(function () {
+    Route::middleware(['app.user', 'school.owner', RedirectQatOnlyCustomers::class])->group(function () {
         Route::get('customer/settings', [PaperDefaultsController::class, 'edit'])->name('customer.settings');
         Route::put('customer/settings', [PaperDefaultsController::class, 'update'])->name('customer.settings.update');
         Route::delete('customer/settings', [PaperDefaultsController::class, 'destroy'])->name('customer.settings.reset');
     });
 
     Route::get('customer/activity', [ActivityController::class, 'index'])
-        ->middleware('app.user')
+        ->middleware(['app.user', RedirectQatOnlyCustomers::class])
         ->name('customer.activity');
-    Route::get('announcements', [CustomerAnnouncementController::class, 'index'])->middleware('app.user')->name('customer.announcements');
-    Route::get('announcements/{announcement}', [CustomerAnnouncementController::class, 'show'])->middleware('app.user')->name('customer.announcements.show');
+    Route::get('announcements', [CustomerAnnouncementController::class, 'index'])
+        ->middleware(['app.user', RedirectQatOnlyCustomers::class])->name('customer.announcements');
+    Route::get('announcements/{announcement}', [CustomerAnnouncementController::class, 'show'])
+        ->middleware(['app.user', RedirectQatOnlyCustomers::class])->name('customer.announcements.show');
     Route::post('announcements/{announcement}/dismiss', [CustomerAnnouncementController::class, 'dismiss'])
-        ->middleware('app.user')
+        ->middleware(['app.user', RedirectQatOnlyCustomers::class])
         ->name('customer.announcements.dismiss');
     Route::get('customer/profile', [ProfileController::class, 'edit'])->middleware('app.user')->name('customer.profile');
     Route::patch('customer/profile', [ProfileController::class, 'update'])->middleware('app.user')->name('customer.profile.update');
@@ -118,6 +121,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('qa-tests', [CustomerQatCatalogueController::class, 'index'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.index');
+        Route::get('qa-tests/papers', [CustomerQatCatalogueController::class, 'papers'])
+            ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->name('customer.qat.papers.index');
         Route::get('qa-tests/create/{mode}', [CustomerQatCatalogueController::class, 'create'])
             ->whereIn('mode', ['auto', 'manual'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
@@ -145,7 +151,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('qat-tests/subjects/{qatSubject}', [CustomerQatCatalogueController::class, 'show'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.subjects.show');
+    });
 
+    Route::middleware(['app.user', RedirectQatOnlyCustomers::class])->group(function () {
         Route::middleware('teacher.feature:generate_papers')->group(function () {
             Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
             Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');

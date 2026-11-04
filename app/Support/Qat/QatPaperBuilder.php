@@ -28,7 +28,7 @@ final class QatPaperBuilder
             ]);
         abort_unless($subject, 404);
 
-        $access = AppUserAccess::resolve($user);
+        $access = QatAccess::catalogue($user);
         abort_unless($user->isSchoolOwner() || AppUserAccess::allowsSubject(
             $access, (int) $subject->source_pattern_id, (int) $subject->source_class_id,
             (int) $subject->subject_id,

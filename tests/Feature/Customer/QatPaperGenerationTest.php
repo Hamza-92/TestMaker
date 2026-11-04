@@ -99,6 +99,25 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
     $aprilQuestionId = DB::table('qat_questions')->where('qat_chapter_id', $aprilId)->value('id');
     $mayQuestionId = DB::table('qat_questions')->where('qat_chapter_id', $mayId)->value('id');
 
+    $teacher = User::factory()->create([
+        'user_type' => UserType::Teacher->value, 'school_id' => $school->id,
+        'teacher_permissions' => ['generate_papers'], 'access_scope' => null,
+    ]);
+    $this->actingAs($teacher)->get(route('customer.qat.create', 'manual'))->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('auth.school_context.qat_only', true)
+            ->has('chapters', 2));
+    $this->postJson(route('customer.qat.questions'), [
+        'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId],
+    ])->assertOk();
+
+    $teacher->update(['access_scope' => []]);
+    $this->actingAs($teacher->fresh())->get(route('customer.qat.create', 'manual'))->assertOk()
+        ->assertInertia(fn ($page) => $page->has('chapters', 0));
+    $this->postJson(route('customer.qat.questions'), [
+        'subject_id' => $subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$aprilId],
+    ])->assertForbidden();
+
     $this->actingAs($school)->get(route('customer.qat.create', 'auto'))->assertOk()
         ->assertInertia(fn ($page) => $page
             ->has('chapters', 2)

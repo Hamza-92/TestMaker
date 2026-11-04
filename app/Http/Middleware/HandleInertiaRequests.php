@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\Qat\QatAccess;
 use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -87,6 +88,7 @@ class HandleInertiaRequests extends Middleware
             'allow_teachers' => (bool) ($subscription?->allow_teachers ?? false),
             'allow_online_mcq_tests' => (bool) ($subscription?->allow_online_mcq_tests ?? false),
             'allow_qat_tests' => (bool) ($subscription?->allow_qat_tests ?? false),
+            'qat_only' => QatAccess::only($user),
             'max_teachers' => $user->isSchoolOwner() ? $subscription?->max_teachers : null,
             'teachers_used' => $teacherCount,
             'has_subscription' => $subscription !== null,

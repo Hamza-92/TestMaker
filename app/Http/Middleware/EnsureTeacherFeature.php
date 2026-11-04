@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Qat\QatAccess;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -36,11 +37,14 @@ class EnsureTeacherFeature
         }
 
         return Inertia::render('customer/blocked', [
-            'title'   => 'Access denied',
+            'title' => 'Access denied',
             'heading' => 'Not enough access',
             'message' => "You don't have permission to use this part of the app. Contact your school administrator if you think this is a mistake.",
-            'primary' => [
-                'href'  => '/dashboard',
+            'primary' => QatAccess::only($user) ? [
+                'href' => '/customer/profile',
+                'label' => 'Go to Profile',
+            ] : [
+                'href' => '/dashboard',
                 'label' => 'Back to Dashboard',
             ],
         ])->toResponse($request)->setStatusCode(403);

@@ -6,6 +6,7 @@ use App\Enums\TeacherPermission;
 use App\Http\Controllers\Controller;
 use App\Models\QatPaper;
 use App\Support\AppUserAccess;
+use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatPaperBuilder;
 use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\Request;
@@ -17,8 +18,19 @@ class QatCatalogueController extends Controller
 {
     public function index(Request $request): Response
     {
-        $user = auth()->user();
-        $filters = $request->validate(['q' => ['nullable', 'string', 'max:150']]);
+        return $this->renderPapers($request, QatAccess::only($request->user()) ? 'home' : 'combined');
+    }
+
+    public function papers(Request $request): Response
+    {
+        return $this->renderPapers($request, 'papers');
+    }
+
+    private function renderPapers(Request $request, string $view): Response
+    {
+        $user = $request->user();
+        $recent = $view === 'home';
+        $filters = $recent ? [] : $request->validate(['q' => ['nullable', 'string', 'max:150']]);
         $search = trim($filters['q'] ?? '');
         $visibleUserIds = $this->visibleUserIds($request);
 
@@ -30,10 +42,10 @@ class QatCatalogueController extends Controller
                     ->orWhere('subject_name', 'like', '%'.$search.'%');
             }))
             ->with('user:id,name')
-            ->orderByDesc('updated_at')
-            ->paginate(12, ['id', 'user_id', 'name', 'mode', 'class_names', 'subject_name',
+            ->orderByDesc('updated_at')->orderByDesc('id')
+            ->paginate($recent ? 5 : 12, ['id', 'user_id', 'name', 'mode', 'class_names', 'subject_name',
                 'total_marks', 'question_count', 'updated_at', 'created_at',
-                'paper_data->chapter_ids as saved_chapter_ids', 'paper_data->chapters as saved_chapters'])
+                'paper_data->chapter_ids as saved_chapter_ids', 'paper_data->chapters as saved_chapters'], page: $recent ? 1 : null)
             ->withQueryString();
         $papers->getCollection()->transform(fn (QatPaper $paper) => [
             'id' => $paper->id,
@@ -55,6 +67,7 @@ class QatCatalogueController extends Controller
         return Inertia::render('customer/qat/index', [
             'papers' => $papers,
             'filters' => ['q' => $search],
+            'view' => $view,
         ]);
     }
 
@@ -64,7 +77,7 @@ class QatCatalogueController extends Controller
         $initialSelections = $this->initialSelections($request, $mode);
 
         $user = auth()->user();
-        $access = AppUserAccess::resolve($user);
+        $access = QatAccess::catalogue($user);
         $scopeRows = DB::table('qat_classes')
             ->join('qat_catalogues', 'qat_catalogues.id', '=', 'qat_classes.qat_catalogue_id')
             ->join('qat_subjects', 'qat_subjects.qat_class_id', '=', 'qat_classes.id')
@@ -215,7 +228,7 @@ class QatCatalogueController extends Controller
             ]);
         abort_unless($subject, 404);
 
-        $access = AppUserAccess::resolve(auth()->user());
+        $access = QatAccess::catalogue(auth()->user());
         abort_unless(auth()->user()->isSchoolOwner() || AppUserAccess::allowsSubject(
             $access, (int) $subject->source_pattern_id, (int) $subject->source_class_id, (int) $subject->subject_id,
         ), 403);

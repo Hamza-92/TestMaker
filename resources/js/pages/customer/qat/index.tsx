@@ -45,10 +45,15 @@ function formatDate(value: string): string {
 export default function QatIndex({
     papers,
     filters,
+    view = 'combined',
 }: {
     papers: PageMeta & { data: SavedPaper[] };
     filters: { q: string };
+    view?: 'combined' | 'home' | 'papers';
 }) {
+    const recent = view === 'home';
+    const myPapers = view === 'papers';
+    const PapersHeading = myPapers ? 'h1' : 'h2';
     const [search, setSearch] = useState(filters.q);
     const [busy, setBusy] = useState(false);
     const [deletingPaper, setDeletingPaper] = useState<SavedPaper | null>(null);
@@ -107,7 +112,7 @@ export default function QatIndex({
 
     function navigate(page = 1, q = filters.q) {
         router.get(
-            '/qa-tests',
+            myPapers ? '/qa-tests/papers' : '/qa-tests',
             { q: q || undefined, page: page > 1 ? page : undefined },
             {
                 preserveState: true,
@@ -134,56 +139,71 @@ export default function QatIndex({
 
     return (
         <div className="relative w-full space-y-7 pb-4">
-            <Head title="QAT practice papers on the PEF pattern" />
-            <header className="relative isolate overflow-hidden rounded-[24px] border border-sky-100 bg-gradient-to-br from-white via-[#f2f8ff] to-[#edf9f4] px-6 py-6 dark:border-slate-800 dark:from-slate-900 dark:via-[#15243e] dark:to-[#15332e] sm:px-8">
-                <Sprinkles className="absolute inset-0 -z-10 size-full text-sky-400/60 dark:text-sky-400/40" />
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
-                    <div className="min-w-0 flex-1">
-                        <h1 className="text-[26px] font-bold leading-[1.25] tracking-tight text-brand-600 dark:text-sky-400 sm:text-[32px] xl:text-[36px]">
-                            <span className="block">QAT practice papers</span>
-                            <span className="block">on the PEF pattern</span>
-                        </h1>
-                        <svg
-                            aria-hidden="true"
-                            viewBox="0 0 154 10"
-                            className="mt-3 h-2 w-32 text-amber-400"
-                        >
-                            <path
-                                d="M3 7C38 1 84 1 151 4M16 9C61 5 107 5 139 7"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="3"
-                                strokeLinecap="round"
+            <Head
+                title={
+                    myPapers
+                        ? 'My Papers'
+                        : 'QAT practice papers on the PEF pattern'
+                }
+            />
+            {!myPapers && (
+                <>
+                    <header className="relative isolate overflow-hidden rounded-[24px] border border-sky-100 bg-gradient-to-br from-white via-[#f2f8ff] to-[#edf9f4] px-6 py-6 dark:border-slate-800 dark:from-slate-900 dark:via-[#15243e] dark:to-[#15332e] sm:px-8">
+                        <Sprinkles className="absolute inset-0 -z-10 size-full text-sky-400/60 dark:text-sky-400/40" />
+                        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
+                            <div className="min-w-0 flex-1">
+                                <h1 className="text-[26px] font-bold leading-[1.25] tracking-tight text-brand-600 dark:text-sky-400 sm:text-[32px] xl:text-[36px]">
+                                    <span className="block">
+                                        QAT practice papers
+                                    </span>
+                                    <span className="block">
+                                        on the PEF pattern
+                                    </span>
+                                </h1>
+                                <svg
+                                    aria-hidden="true"
+                                    viewBox="0 0 154 10"
+                                    className="mt-3 h-2 w-32 text-amber-400"
+                                >
+                                    <path
+                                        d="M3 7C38 1 84 1 151 4M16 9C61 5 107 5 139 7"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
+                            </div>
+                            <img
+                                src="/images/qat/generation-header.webp"
+                                alt=""
+                                aria-hidden="true"
+                                width={960}
+                                height={487}
+                                fetchPriority="high"
+                                decoding="async"
+                                className="mx-auto h-40 w-full max-w-72 shrink-0 select-none object-contain sm:w-[32%] sm:max-w-none"
                             />
-                        </svg>
-                    </div>
-                    <img
-                        src="/images/qat/generation-header.webp"
-                        alt=""
-                        aria-hidden="true"
-                        width={960}
-                        height={487}
-                        fetchPriority="high"
-                        decoding="async"
-                        className="mx-auto h-40 w-full max-w-72 shrink-0 select-none object-contain sm:w-[32%] sm:max-w-none"
-                    />
-                </div>
-                <p className="relative mt-5 w-full text-[13px] leading-6 text-[#526985] dark:text-slate-300">
-                    Testmaker creates Quality Assurance Test (QAT) practice
-                    papers for PEF partner schools (NSP, FAS, EVS, PSRP, NSSE).
-                    It provides papers for Classes 3–7 based on the PEF pattern.
-                    Papers are available chapter-wise, with answer keys, in both
-                    English and Urdu.
-                </p>
-            </header>
+                        </div>
+                        <p className="relative mt-5 w-full text-[13px] leading-6 text-[#526985] dark:text-slate-300">
+                            Testmaker creates Quality Assurance Test (QAT)
+                            practice papers for PEF partner schools (NSP, FAS,
+                            EVS, PSRP, NSSE). It provides papers for Classes 3–7
+                            based on the PEF pattern. Papers are available
+                            chapter-wise, with answer keys, in both English and
+                            Urdu.
+                        </p>
+                    </header>
 
-            <div
-                className="grid gap-4 md:grid-cols-2"
-                aria-label="Create a QAT paper"
-            >
-                <GenerationCard mode="auto" />
-                <GenerationCard mode="manual" />
-            </div>
+                    <div
+                        className="grid gap-4 md:grid-cols-2"
+                        aria-label="Create a QAT paper"
+                    >
+                        <GenerationCard mode="auto" />
+                        <GenerationCard mode="manual" />
+                    </div>
+                </>
+            )}
 
             <section
                 aria-labelledby="saved-qat-papers"
@@ -192,67 +212,87 @@ export default function QatIndex({
             >
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <h2
+                        <PapersHeading
                             id="saved-qat-papers"
                             className="text-xl font-bold tracking-tight text-[#112650] dark:text-slate-100 sm:text-2xl"
                         >
-                            Saved papers
+                            {recent
+                                ? 'Recent papers'
+                                : myPapers
+                                  ? 'My Papers'
+                                  : 'Saved papers'}
                             <span className="text-brand-500">.</span>
-                        </h2>
-                        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                            {papers.total} {filters.q ? 'matching' : 'saved'}{' '}
-                            {papers.total === 1 ? 'paper' : 'papers'}
-                        </p>
+                        </PapersHeading>
+                        {!recent && (
+                            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                {papers.total}{' '}
+                                {filters.q ? 'matching' : 'saved'}{' '}
+                                {papers.total === 1 ? 'paper' : 'papers'}
+                            </p>
+                        )}
                     </div>
-                    <form
-                        role="search"
-                        onSubmit={submitSearch}
-                        className="flex w-full items-center gap-2 sm:w-auto"
-                    >
-                        <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
-                            <SearchIcon
-                                aria-hidden="true"
-                                className="pointer-events-none absolute left-3 top-3 size-4 text-slate-400"
-                            />
-                            <input
-                                aria-label="Search saved QAT papers"
-                                placeholder="Search papers, class or subject"
-                                maxLength={150}
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-xs text-slate-800 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                            />
-                            {(search || filters.q) && (
-                                <button
-                                    type="button"
-                                    aria-label="Clear search"
-                                    disabled={busy}
-                                    onClick={clearSearch}
-                                    className="absolute right-1 top-1 flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-sky-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:hover:bg-slate-800"
-                                >
-                                    <XIcon
-                                        aria-hidden="true"
-                                        className="size-3.5"
-                                    />
-                                </button>
-                            )}
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={busy}
-                            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-60"
+                    {recent ? (
+                        <Link
+                            href="/qa-tests/papers"
+                            className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold text-brand-600 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-500 dark:text-sky-400 dark:hover:bg-slate-800"
                         >
-                            {busy && (
-                                <LoaderCircleIcon
+                            View all papers
+                            <ArrowRightIcon
+                                aria-hidden="true"
+                                className="size-4"
+                            />
+                        </Link>
+                    ) : (
+                        <form
+                            role="search"
+                            onSubmit={submitSearch}
+                            className="flex w-full items-center gap-2 sm:w-auto"
+                        >
+                            <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
+                                <SearchIcon
                                     aria-hidden="true"
-                                    className="size-3.5 animate-spin motion-reduce:animate-none"
+                                    className="pointer-events-none absolute left-3 top-3 size-4 text-slate-400"
                                 />
-                            )}
-                            Search
-                        </button>
-                    </form>
+                                <input
+                                    aria-label="Search saved QAT papers"
+                                    placeholder="Search papers, class or subject"
+                                    maxLength={150}
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                    className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-xs text-slate-800 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                />
+                                {(search || filters.q) && (
+                                    <button
+                                        type="button"
+                                        aria-label="Clear search"
+                                        disabled={busy}
+                                        onClick={clearSearch}
+                                        className="absolute right-1 top-1 flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-sky-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:hover:bg-slate-800"
+                                    >
+                                        <XIcon
+                                            aria-hidden="true"
+                                            className="size-3.5"
+                                        />
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={busy}
+                                className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-60"
+                            >
+                                {busy && (
+                                    <LoaderCircleIcon
+                                        aria-hidden="true"
+                                        className="size-3.5 animate-spin motion-reduce:animate-none"
+                                    />
+                                )}
+                                Search
+                            </button>
+                        </form>
+                    )}
                 </div>
                 {papers.data.length ? (
                     <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -385,7 +425,9 @@ export default function QatIndex({
                         <p className="mt-2 max-w-sm text-xs leading-6 text-slate-500 dark:text-slate-400">
                             {filters.q
                                 ? 'Try another paper name, class or subject.'
-                                : 'Create a paper above, then save it to keep it here.'}
+                                : myPapers
+                                  ? 'Generate and save a QAT paper to see it here.'
+                                  : 'Create a paper above, then save it to keep it here.'}
                         </p>
                         {filters.q && (
                             <button
@@ -399,11 +441,13 @@ export default function QatIndex({
                         )}
                     </div>
                 )}
-                <Pagination
-                    meta={papers}
-                    label="papers"
-                    onPageChange={(page) => navigate(page)}
-                />
+                {!recent && (
+                    <Pagination
+                        meta={papers}
+                        label="papers"
+                        onPageChange={(page) => navigate(page)}
+                    />
+                )}
             </section>
             <Modal
                 open={deletingPaper !== null}

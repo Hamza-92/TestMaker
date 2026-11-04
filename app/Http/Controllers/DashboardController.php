@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\UserType;
 use App\Support\CustomerDashboardData;
+use App\Support\Qat\QatAccess;
 use App\Support\SuperadminDashboardSummary;
 use Inertia\Inertia;
 
@@ -24,6 +25,10 @@ class DashboardController extends Controller
                 'expiringSubscriptions' => SuperadminDashboardSummary::expiringSubscriptionsFor($user),
                 'recentExpiredCustomers' => SuperadminDashboardSummary::recentExpiredCustomersFor($user),
             ]);
+        }
+
+        if (QatAccess::only($user)) {
+            return redirect()->route('customer.qat.index');
         }
 
         return Inertia::render(
