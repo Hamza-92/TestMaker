@@ -2,7 +2,6 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     BellIcon,
     ChevronDownIcon,
-    ExternalLinkIcon,
     LogOutIcon,
     MenuIcon,
     MonitorIcon,
@@ -207,7 +206,6 @@ export function CustomerHeader() {
             is_teacher_impersonating?: boolean;
             school_context?: { qat_only?: boolean } | null;
         };
-        legacyWebsiteUrl: string;
     }>();
     const user = page.props.auth.user;
     const qatOnly = page.props.auth.school_context?.qat_only ?? false;
@@ -232,23 +230,6 @@ export function CustomerHeader() {
                     {schoolName}
                 </span>
             </p>
-
-            {!qatOnly && page.props.legacyWebsiteUrl && (
-                <a
-                    href={page.props.legacyWebsiteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Visit Old Website"
-                    aria-label="Visit Old Website (opens in a new tab)"
-                    className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-brand-700 bg-brand-600 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 dark:border-brand-400 dark:bg-brand-500 dark:hover:bg-brand-600"
-                >
-                    <ExternalLinkIcon className="size-4 shrink-0" />
-                    <span className="hidden sm:inline">
-                        <span className="hidden lg:inline">Visit </span>
-                        Old Website
-                    </span>
-                </a>
-            )}
 
             {/* ── Search ─────────────────────────────────────────────────────── */}
             {qatOnly ? (
