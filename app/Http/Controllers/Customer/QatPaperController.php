@@ -6,8 +6,8 @@ use App\Enums\TeacherPermission;
 use App\Http\Controllers\Controller;
 use App\Models\QatPaper;
 use App\Support\AppUserAccess;
+use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatPaperBuilder;
-use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -355,7 +355,7 @@ class QatPaperController extends Controller
 
     public function show(Request $request, QatPaper $qatPaper, QatPaperBuilder $builder): Response
     {
-        abort_unless(in_array((int) $qatPaper->user_id, $this->visibleUserIds($request), true), 403);
+        abort_unless(in_array((int) $qatPaper->user_id, QatAccess::visiblePaperUserIds($request->user()), true), 403);
 
         $paperData = $qatPaper->paper_data;
         $sections = $paperData['sections'] ?? [];
@@ -437,26 +437,5 @@ class QatPaperController extends Controller
         abort_unless((int) ($entry['user_id'] ?? 0) === (int) $request->user()->id, 403);
 
         return $entry['papers'];
-    }
-
-    private function visibleUserIds(Request $request): array
-    {
-        $user = $request->user();
-        $ids = [(int) $user->id];
-        if ($user->isSchoolOwner()) {
-            return array_values(array_unique(array_map('intval', [
-                ...$ids, ...SchoolTeacherSummary::for($user)['ids'],
-            ])));
-        }
-        if ($user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
-            $owner = $user->schoolOwner();
-            if ($owner !== null) {
-                return array_values(array_unique(array_map('intval', [
-                    ...$ids, (int) $owner->id, ...SchoolTeacherSummary::for($user)['ids'],
-                ])));
-            }
-        }
-
-        return $ids;
     }
 }

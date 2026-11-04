@@ -3,9 +3,13 @@
 namespace App\Support\Qat;
 
 use App\Enums\AccountType;
+use App\Enums\TeacherPermission;
+use App\Models\QatPaper;
 use App\Models\User;
 use App\Support\AppUserAccess;
+use App\Support\SchoolTeacherSummary;
 use App\Support\SubscriptionAccess;
+use Illuminate\Database\Eloquent\Builder;
 
 final class QatAccess
 {
@@ -35,5 +39,31 @@ final class QatAccess
         }
 
         return $access;
+    }
+
+    /** @return Builder<QatPaper> */
+    public static function savedPapers(User $user): Builder
+    {
+        return QatPaper::query()
+            ->whereIn('user_id', self::visiblePaperUserIds($user))
+            ->where('is_draft', false);
+    }
+
+    /** @return list<int> */
+    public static function visiblePaperUserIds(User $user): array
+    {
+        $ids = [(int) $user->id];
+        if ($user->isSchoolOwner()) {
+            return array_values(array_unique([...$ids, ...SchoolTeacherSummary::for($user)['ids']]));
+        }
+
+        if ($user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
+            $owner = $user->schoolOwner();
+            if ($owner !== null) {
+                return array_values(array_unique([...$ids, (int) $owner->id, ...SchoolTeacherSummary::for($user)['ids']]));
+            }
+        }
+
+        return $ids;
     }
 }

@@ -8,7 +8,6 @@ use App\Models\QatPaper;
 use App\Support\AppUserAccess;
 use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatPaperBuilder;
-use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -32,10 +31,7 @@ class QatCatalogueController extends Controller
         $recent = $view === 'home';
         $filters = $recent ? [] : $request->validate(['q' => ['nullable', 'string', 'max:150']]);
         $search = trim($filters['q'] ?? '');
-        $visibleUserIds = $this->visibleUserIds($request);
-
-        $papers = QatPaper::query()->whereIn('user_id', $visibleUserIds)
-            ->where('is_draft', false)
+        $papers = QatAccess::savedPapers($user)
             ->when($search !== '', fn ($query) => $query->where(function ($searchQuery) use ($search): void {
                 $searchQuery->where('name', 'like', '%'.$search.'%')
                     ->orWhere('class_names', 'like', '%'.$search.'%')
@@ -174,7 +170,7 @@ class QatCatalogueController extends Controller
             $settings = $entry['papers'][0]['paper_data']['generation_settings'] ?? null;
         } elseif (! empty($data['paper'])) {
             $paper = QatPaper::query()->findOrFail($data['paper']);
-            abort_unless(in_array((int) $paper->user_id, $this->visibleUserIds($request), true), 403);
+            abort_unless(in_array((int) $paper->user_id, QatAccess::visiblePaperUserIds($request->user()), true), 403);
             $paperMode = $paper->mode;
             $settings = $paper->paper_data['generation_settings'] ?? null;
         } else {
@@ -184,27 +180,6 @@ class QatCatalogueController extends Controller
         abort_unless($paperMode === $mode && is_array($settings), 404);
 
         return $settings;
-    }
-
-    private function visibleUserIds(Request $request): array
-    {
-        $user = $request->user();
-        $ids = [(int) $user->id];
-        if ($user->isSchoolOwner()) {
-            return array_values(array_unique(array_map('intval', [
-                ...$ids, ...SchoolTeacherSummary::for($user)['ids'],
-            ])));
-        }
-        if ($user->hasTeacherPermission(TeacherPermission::ViewSchoolPapers->value)) {
-            $owner = $user->schoolOwner();
-            if ($owner !== null) {
-                return array_values(array_unique(array_map('intval', [
-                    ...$ids, (int) $owner->id, ...SchoolTeacherSummary::for($user)['ids'],
-                ])));
-            }
-        }
-
-        return $ids;
     }
 
     public function show(Request $request, int $qatSubject): Response

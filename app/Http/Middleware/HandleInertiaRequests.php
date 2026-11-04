@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\TeacherPermission;
 use App\Models\User;
 use App\Support\Qat\QatAccess;
 use App\Support\SchoolTeacherSummary;
@@ -44,6 +45,11 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'legacyWebsiteUrl' => config('app.legacy_website_url'),
+            'qatSavedPaperCount' => fn () => $user !== null
+                && QatAccess::only($user)
+                && ($user->isSchoolOwner() || $user->hasTeacherPermission(TeacherPermission::GeneratePapers->value))
+                    ? QatAccess::savedPapers($user)->count()
+                    : null,
             'auth' => [
                 'user' => $user?->isTeacher() ? $user->withoutRelations() : $user,
                 'permissions' => $user?->isSuperAdmin() ? $user->getPermissionNames() : [],

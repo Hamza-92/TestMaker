@@ -45,6 +45,7 @@ interface SchoolContext {
 }
 
 interface AuthPageProps {
+    qatSavedPaperCount?: number | null;
     auth: {
         user: Record<string, unknown>;
         teacher_permissions?: string[];
@@ -137,6 +138,7 @@ function NavLink({
     label,
     collapsed,
     active,
+    count,
     onNavigate,
 }: {
     href: string;
@@ -144,13 +146,19 @@ function NavLink({
     label: string;
     collapsed: boolean;
     active: boolean;
+    count?: number | null;
     onNavigate?: () => void;
 }) {
+    const accessibleLabel = count == null ? label : `${label} (${count})`;
+
     return (
         <Link
             href={href}
             onClick={onNavigate}
-            title={collapsed ? label : undefined}
+            aria-label={
+                collapsed || count != null ? accessibleLabel : undefined
+            }
+            title={collapsed ? accessibleLabel : undefined}
             className={[
                 'group flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors duration-150',
                 collapsed ? 'justify-center px-0 py-2' : 'px-2.5 py-[7px]',
@@ -168,6 +176,14 @@ function NavLink({
                 ].join(' ')}
             />
             {!collapsed && <span className="truncate">{label}</span>}
+            {!collapsed && count != null && (
+                <span
+                    aria-hidden="true"
+                    className="ml-auto min-w-5 shrink-0 rounded-full bg-white/15 px-1.5 text-center text-[10px] font-semibold tabular-nums leading-4 text-white"
+                >
+                    {count}
+                </span>
+            )}
         </Link>
     );
 }
@@ -306,6 +322,11 @@ function SidebarContent({
                                 label={item.label}
                                 collapsed={collapsed}
                                 active={activeHref === item.href}
+                                count={
+                                    item.href === '/qa-tests/papers'
+                                        ? page.props.qatSavedPaperCount
+                                        : undefined
+                                }
                                 onNavigate={onNavigate}
                             />
                         ))}

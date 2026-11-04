@@ -63,6 +63,7 @@ test('QAT-only home shows recent papers and My Papers supports search and pagina
     $this->actingAs($this->school)->get(route('customer.qat.index'))->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('auth.school_context.qat_only', true)
+            ->where('qatSavedPaperCount', 13)
             ->where('view', 'home')
             ->has('papers.data', 5)
             ->where('papers.data.0.id', $latest->id));
@@ -77,6 +78,7 @@ test('QAT-only home shows recent papers and My Papers supports search and pagina
     $this->get(route('customer.qat.papers.index', ['q' => 'English']))->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('filters.q', 'English')
+            ->where('qatSavedPaperCount', 13)
             ->has('papers.data', 1)
             ->where('papers.data.0.id', $first->id));
 });
@@ -150,6 +152,8 @@ test('school owners can delete their own QAT papers but cannot delete another ac
     $this->deleteJson(route('customer.qat.papers.destroy', $paper))->assertOk()->assertJson(['deleted' => true]);
     $this->assertModelMissing($paper);
     $this->assertModelExists($otherPaper);
+    $this->get(route('customer.qat.index'))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('qatSavedPaperCount', 0));
     $this->deleteJson(route('customer.qat.papers.destroy', $paper))->assertNotFound();
 });
 
@@ -163,7 +167,11 @@ test('viewing school QAT papers does not grant teachers deletion access', functi
 
     $this->actingAs($teacher)->get(route('customer.qat.index'))->assertOk()
         ->assertInertia(fn ($page) => $page->has('papers.data', 2)
+            ->where('qatSavedPaperCount', 2)
             ->where('papers.data', fn ($papers) => collect($papers)->every(fn ($paper) => ! $paper['can_delete'])));
+    $teacher->update(['teacher_permissions' => ['generate_papers']]);
+    $this->actingAs($teacher->fresh())->get(route('customer.qat.papers.index'))->assertOk()
+        ->assertInertia(fn ($page) => $page->has('papers.data', 1)->where('qatSavedPaperCount', 1));
     $this->deleteJson(route('customer.qat.papers.destroy', $teacherPaper))->assertForbidden();
     $teacher->update(['teacher_permissions' => ['generate_papers', 'view_school_papers', 'manage_own_papers']]);
     $this->actingAs($teacher->fresh())->deleteJson(route('customer.qat.papers.destroy', $schoolPaper))->assertForbidden();
