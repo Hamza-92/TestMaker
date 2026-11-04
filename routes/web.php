@@ -238,6 +238,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::middleware('master.superadmin')->group(function () {
             Route::get('superadmin/payments', [PaymentsController::class, 'index'])
                 ->name('superadmin.payments');
+            // Temporary payment reset page. Remove both routes and its Blade view after use.
+            Route::get('superadmin/payments/reset', function () {
+                $exitCode = Artisan::call('payments:reset-customer-history');
+
+                return response()->view('superadmin.maintenance.reset-customer-payments', [
+                    'applied' => false,
+                    'exitCode' => $exitCode,
+                    'output' => Artisan::output(),
+                ])->header('Cache-Control', 'no-store');
+            })->name('superadmin.payments.reset');
+            Route::post('superadmin/payments/reset', function (Request $request) {
+                $request->validate([
+                    'backup_confirmed' => ['accepted'],
+                    'confirmation' => ['required', 'in:CLEAR PAYMENTS'],
+                ]);
+
+                $exitCode = Artisan::call('payments:reset-customer-history', [
+                    '--execute' => true,
+                    '--backup-confirmed' => true,
+                ]);
+
+                return response()->view('superadmin.maintenance.reset-customer-payments', [
+                    'applied' => true,
+                    'exitCode' => $exitCode,
+                    'output' => Artisan::output(),
+                ])->header('Cache-Control', 'no-store');
+            })->name('superadmin.payments.reset.apply');
             Route::get('superadmin/payments/ledger', [PaymentLedgerController::class, 'index'])
                 ->name('superadmin.payments.ledger');
             Route::get('superadmin/payments/annual-report', [AnnualReportController::class, 'index'])

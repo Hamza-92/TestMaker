@@ -28,6 +28,7 @@ class ResetCustomerPayments extends Command
                 ->where('auditable_type', (new PaymentLog)->getMorphClass())
                 ->whereIn('auditable_id', (clone $customerPayments)->select('payment_logs.id'))
                 ->count()],
+            ['Subscriptions with nonzero amount', (clone $customerSubscriptions)->where('amount', '!=', 0)->count()],
             ['Subscriptions with commission', (clone $customerSubscriptions)->whereNotNull('commission_amount')->count()],
             ['Subscriptions with payment due dates', (clone $customerSubscriptions)->whereNotNull('payment_due_date')->count()],
             ['Customers with payment holds', User::query()->withTrashed()
@@ -66,7 +67,7 @@ class ResetCustomerPayments extends Command
 
             Subscription::query()
                 ->whereHas('user', fn ($query) => $query->withTrashed()->where('user_type', UserType::Customer->value))
-                ->update(['commission_amount' => null, 'payment_due_date' => null]);
+                ->update(['amount' => 0, 'commission_amount' => null, 'payment_due_date' => null]);
 
             User::query()->withTrashed()
                 ->where('user_type', UserType::Customer->value)
@@ -74,7 +75,7 @@ class ResetCustomerPayments extends Command
                 ->update(['payment_hold_at' => null]);
         });
 
-        $this->info('Customer payments and related payment state cleared. Subscription prices and access remain unchanged.');
+        $this->info('Customer payments cleared and subscription amounts set to zero. Subscription status, dates, and access remain unchanged.');
         $this->line('Stored receipt files remain on disk; this command only resets database records.');
 
         return self::SUCCESS;
