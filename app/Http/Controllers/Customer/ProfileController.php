@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Customer;
 
+use App\Enums\AccountType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\ProfileUpdateRequest;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +20,7 @@ class ProfileController extends Controller
                 'name', 'email', 'phone', 'school_name', 'address', 'city', 'province', 'logo', 'account_type',
             ]),
             'status' => $request->session()->get('status'),
+            'canUpdateProfile' => $request->user()->schoolOwner()?->account_type !== AccountType::Trial,
         ]);
     }
 

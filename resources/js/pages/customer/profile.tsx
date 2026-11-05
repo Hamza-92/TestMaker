@@ -20,6 +20,7 @@ type ProfileUser = {
 };
 
 type FormData = {
+    _method: 'PATCH';
     name: string;
     email: string;
     phone: string;
@@ -35,10 +36,11 @@ function FieldIcon({ icon: Icon }: { icon: LucideIcon }) {
     return <Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />;
 }
 
-export default function Profile({ user, status }: { user: ProfileUser; status?: string }) {
+export default function Profile({ user, status, canUpdateProfile }: { user: ProfileUser; status?: string; canUpdateProfile: boolean }) {
     const logoRef = useRef<HTMLInputElement>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(user.logo ? `/storage/${user.logo}` : null);
-    const { data, setData, patch, processing, errors } = useForm<FormData>({
+    const { data, setData, post, processing, errors } = useForm<FormData>({
+        _method: 'PATCH',
         name: user.name ?? '',
         email: user.email ?? '',
         phone: user.phone ?? '',
@@ -52,7 +54,11 @@ export default function Profile({ user, status }: { user: ProfileUser; status?: 
 
     function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0] ?? null;
-        if (!file) return;
+
+        if (!file) {
+            return;
+        }
+
         setData('logo', file);
         setData('remove_logo', false);
         setLogoPreview(URL.createObjectURL(file));
@@ -62,12 +68,20 @@ export default function Profile({ user, status }: { user: ProfileUser; status?: 
         setData('logo', null);
         setData('remove_logo', Boolean(user.logo));
         setLogoPreview(null);
-        if (logoRef.current) logoRef.current.value = '';
+
+        if (logoRef.current) {
+            logoRef.current.value = '';
+        }
     }
 
     function submit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        patch('/customer/profile', { preserveScroll: true, forceFormData: true });
+
+        if (!canUpdateProfile) {
+            return;
+        }
+
+        post('/customer/profile', { preserveScroll: true, forceFormData: true });
     }
 
     const initials = data.name
@@ -89,7 +103,7 @@ export default function Profile({ user, status }: { user: ProfileUser; status?: 
                         </Link>
                         <div>
                             <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Profile</h1>
-                            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Manage your account and school information.</p>
+                            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{canUpdateProfile ? 'Manage your account and school information.' : 'Your account and school information.'}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
@@ -104,6 +118,7 @@ export default function Profile({ user, status }: { user: ProfileUser; status?: 
                 {status && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">{status}</div>}
 
                 <form onSubmit={submit} encType="multipart/form-data" className="space-y-6">
+                    <fieldset disabled={!canUpdateProfile} className="min-w-0">
                     <div className="grid gap-6 lg:grid-cols-2">
                         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
                             <div className="flex items-center gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
@@ -129,11 +144,11 @@ export default function Profile({ user, status }: { user: ProfileUser; status?: 
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">School logo</p>
-                                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">PNG or JPG, up to 2MB.</p>
-                                        <div className="mt-2 flex flex-wrap gap-2">
+                                        {canUpdateProfile && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">PNG or JPG, up to 2MB.</p>}
+                                        {canUpdateProfile && <div className="mt-2 flex flex-wrap gap-2">
                                             <button type="button" onClick={() => logoRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"><Upload className="size-3.5" />{logoPreview ? 'Change logo' : 'Upload logo'}</button>
                                             {logoPreview && <button type="button" onClick={removeLogo} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"><Trash2 className="size-3.5" />Remove</button>}
-                                        </div>
+                                        </div>}
                                     </div>
                                     <input ref={logoRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleLogoChange} />
                                 </div>
@@ -145,10 +160,12 @@ export default function Profile({ user, status }: { user: ProfileUser; status?: 
                         </section>
                     </div>
 
-                    <div className="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-slate-200 pt-5 dark:border-slate-800 sm:flex-row sm:items-center">
+                    </fieldset>
+
+                    {canUpdateProfile && <div className="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-slate-200 pt-5 dark:border-slate-800 sm:flex-row sm:items-center">
                         <Link href="/dashboard" className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Cancel</Link>
                         <Button type="submit" disabled={processing} className="h-10 rounded-lg bg-brand-600 px-5 text-sm font-semibold text-white hover:bg-brand-700"><Save className="size-4" />{processing ? 'Saving…' : 'Save changes'}</Button>
-                    </div>
+                    </div>}
                 </form>
             </div>
         </>

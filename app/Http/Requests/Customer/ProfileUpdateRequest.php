@@ -3,12 +3,18 @@
 namespace App\Http\Requests\Customer;
 
 use App\Concerns\ProfileValidationRules;
+use App\Enums\AccountType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ProfileUpdateRequest extends FormRequest
 {
     use ProfileValidationRules;
+
+    public function authorize(): bool
+    {
+        return $this->user()?->schoolOwner()?->account_type !== AccountType::Trial;
+    }
 
     /**
      * @return array<string, array<int, ValidationRule|string>>
