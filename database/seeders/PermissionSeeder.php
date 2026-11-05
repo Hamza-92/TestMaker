@@ -46,6 +46,10 @@ class PermissionSeeder extends Seeder
             ['name' => 'subjects.edit',   'display_name' => 'Edit Subjects',   'group' => 'Subjects'],
             ['name' => 'subjects.delete', 'display_name' => 'Delete Subjects', 'group' => 'Subjects'],
 
+            // Arabic subject classification
+            ['name' => 'arabic_subjects.view', 'display_name' => 'View Arabic Subjects', 'group' => 'Arabic Subjects'],
+            ['name' => 'arabic_subjects.edit', 'display_name' => 'Edit Arabic Subjects', 'group' => 'Arabic Subjects'],
+
             // Question Types
             ['name' => 'question_types.view',   'display_name' => 'View Question Types',   'group' => 'Question Types'],
             ['name' => 'question_types.create', 'display_name' => 'Create Question Types', 'group' => 'Question Types'],

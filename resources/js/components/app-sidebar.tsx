@@ -124,6 +124,10 @@ export function AppSidebar() {
                       href: '/superadmin/subjects',
                       icon: BookOpenIcon,
                   },
+              ]
+            : []),
+        ...(can('arabic_subjects.view')
+            ? [
                   {
                       title: 'Arabic Subjects',
                       href: '/superadmin/arabic-subjects',

@@ -55,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
             'patterns.view', 'patterns.create', 'patterns.edit', 'patterns.delete',
             'classes.view', 'classes.create', 'classes.edit', 'classes.delete',
             'subjects.view', 'subjects.create', 'subjects.edit', 'subjects.delete',
+            'arabic_subjects.view', 'arabic_subjects.edit',
             'question_types.view', 'question_types.create', 'question_types.edit', 'question_types.delete',
             'questions.view', 'questions.create', 'questions.edit', 'questions.delete', 'questions.import',
             'users.view', 'users.create', 'users.edit', 'users.delete', 'users.manage_permissions',

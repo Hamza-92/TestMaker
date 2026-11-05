@@ -19,7 +19,7 @@ export default function ArabicSubjects({
     subjects: SubjectItem[];
 }) {
     const { can } = usePermission();
-    const canEdit = can('subjects.edit');
+    const canEdit = can('arabic_subjects.edit');
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<number[]>(() =>
         subjects
@@ -169,7 +169,6 @@ export default function ArabicSubjects({
 
 ArabicSubjects.layout = {
     breadcrumbs: [
-        { title: 'Subjects', href: '/superadmin/subjects' },
         { title: 'Arabic Subjects', href: '/superadmin/arabic-subjects' },
     ],
 };
