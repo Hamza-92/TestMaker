@@ -40,13 +40,15 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $schoolContext = $this->schoolContext($user);
+        $qatOnly = $schoolContext['qat_only'] ?? false;
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'legacyWebsiteUrl' => config('app.legacy_website_url'),
+            'legacyWebsiteUrl' => $qatOnly ? null : config('app.legacy_website_url'),
             'qatSavedPaperCount' => fn () => $user !== null
-                && QatAccess::only($user)
+                && $qatOnly
                 && ($user->isSchoolOwner() || $user->hasTeacherPermission(TeacherPermission::GeneratePapers->value))
                     ? QatAccess::savedPapers($user)->count()
                     : null,
@@ -55,7 +57,7 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $user?->isSuperAdmin() ? $user->getEffectivePermissionNames() : [],
                 'is_master' => $user?->isMasterSuperAdmin() ?? false,
                 'teacher_permissions' => $user?->isTeacher() ? (array) ($user->teacher_permissions ?? []) : [],
-                'school_context' => $this->schoolContext($user),
+                'school_context' => $schoolContext,
                 'is_impersonating' => $request->session()->has('impersonator_id') && $user?->isCustomer(),
                 'is_admin_impersonating' => $request->session()->has('superadmin_impersonator_id') && $user?->isSuperAdmin(),
                 'is_teacher_impersonating' => $request->session()->has('teacher_impersonator_id')

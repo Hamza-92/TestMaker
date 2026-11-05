@@ -207,7 +207,7 @@ export function CustomerHeader() {
             is_teacher_impersonating?: boolean;
             school_context?: { qat_only?: boolean } | null;
         };
-        legacyWebsiteUrl: string;
+        legacyWebsiteUrl: string | null;
     }>();
     const user = page.props.auth.user;
     const qatOnly = page.props.auth.school_context?.qat_only ?? false;

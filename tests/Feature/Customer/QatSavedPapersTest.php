@@ -111,6 +111,7 @@ test('only a paid school with an active QAT subscription and no pattern access e
 ]);
 
 test('QAT-only login lands on QAT home and standard routes reject direct requests', function () {
+    config(['app.legacy_website_url' => 'https://legacy.example.test']);
     $this->subscription->update(['allow_online_mcq_tests' => true, 'allow_teachers' => true]);
 
     $this->followingRedirects()->post(route('login.store'), [
@@ -118,6 +119,7 @@ test('QAT-only login lands on QAT home and standard routes reject direct request
         'password' => 'password',
     ])->assertOk()->assertInertia(fn ($page) => $page
         ->component('customer/qat/index')
+        ->where('legacyWebsiteUrl', null)
         ->where('view', 'home'));
 
     foreach ([
@@ -133,9 +135,12 @@ test('QAT-only login lands on QAT home and standard routes reject direct request
 });
 
 test('the combined QAT page stays available for mixed plans and the QAT list requires access', function () {
+    config(['app.legacy_website_url' => 'https://legacy.example.test']);
     $this->subscription->update(['access_scope' => null]);
     $this->actingAs($this->school)->get(route('customer.qat.index'))->assertOk()
-        ->assertInertia(fn ($page) => $page->where('view', 'combined'));
+        ->assertInertia(fn ($page) => $page
+            ->where('view', 'combined')
+            ->where('legacyWebsiteUrl', 'https://legacy.example.test'));
     $this->get(route('customer.papers.index'))->assertOk();
 
     $this->subscription->update(['allow_qat_tests' => false]);
