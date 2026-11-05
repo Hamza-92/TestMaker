@@ -101,7 +101,7 @@ it('shows all customers and their pages to a full access admin without opening p
     $this->get(route('superadmin.customers.edit', $this->otherCustomer))->assertOk();
     $this->get(route('superadmin.customers.subscriptions.show', [$this->otherCustomer, $subscription]))->assertOk();
     $this->get(route('superadmin.payments'))->assertForbidden();
-    $this->post(route('superadmin.customers.subscriptions.payment-logs.store', [$this->otherCustomer, $subscription]), [])->assertForbidden();
+    $this->post(route('superadmin.customers.subscriptions.payment-logs.store', [$this->otherCustomer, $subscription]), [])->assertSessionHasErrors(['amount', 'receipt']);
 });
 
 it('sums commission on the recorded payments for the current agent', function () {

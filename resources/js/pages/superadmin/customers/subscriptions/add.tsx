@@ -431,7 +431,7 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
                             />
                         </div>
 
-                        {can('subscriptions.manage_payments') && (
+                        {can('subscriptions.create') && (
                             <>
                         {/* ── Initial Payment sub-section ────────────────────── */}
                         <Separator />
@@ -555,7 +555,7 @@ export default function AddCustomerSubscription({ customer, planNames, patterns,
 
                                 {/* Row 3: Receipt | Notes */}
                                 <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field label="Receipt" error={errors.receipt as string | undefined}>
+                                    <Field label="Receipt" required error={errors.receipt as string | undefined}>
                                         <div
                                             onClick={() => receiptRef.current?.click()}
                                             className="border-input bg-muted/20 hover:bg-muted/40 flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 transition-colors"

@@ -9,6 +9,8 @@ use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -63,6 +65,14 @@ function makePaymentLog(Subscription $subscription, User $creator, array $overri
     ], $overrides));
 }
 
+function useTemporaryReceiptDisk(): void
+{
+    Storage::set('public', Storage::build([
+        'driver' => 'local',
+        'root' => sys_get_temp_dir().'/testmaker-payment-receipts-'.uniqid(),
+    ]));
+}
+
 it('creates a subscription without auto-creating a payment record', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
@@ -88,7 +98,7 @@ it('creates a subscription without auto-creating a payment record', function () 
     expect($subscription->payment_due_date)->toBeNull();
 });
 
-it('does not let a subscription creator bypass payment permission with an initial payment', function () {
+it('lets a subscription creator record an initial payment but not review it', function () {
     $this->seed(PermissionSeeder::class);
     $master = makeSuperAdmin();
     $admin = User::factory()->create([
@@ -102,6 +112,8 @@ it('does not let a subscription creator bypass payment permission with an initia
         'created_by' => $admin->id,
     ]);
 
+    useTemporaryReceiptDisk();
+
     $this->actingAs($admin)
         ->post(route('superadmin.customers.subscriptions.store', $customer), [
             'name' => 'Primary',
@@ -112,10 +124,20 @@ it('does not let a subscription creator bypass payment permission with an initia
             'has_payment' => true,
             'payment_paid' => 1200,
             'payment_method' => PaymentMethod::Online->value,
-        ])->assertForbidden();
+            'receipt' => UploadedFile::fake()->image('receipt.png'),
+        ])->assertSessionHasNoErrors();
 
-    expect(Subscription::count())->toBe(0)
-        ->and(PaymentLog::count())->toBe(0);
+    $subscription = Subscription::query()->sole();
+    $payment = PaymentLog::query()->sole();
+
+    expect($payment->status)->toBe(PaymentStatus::PendingReview)
+        ->and($payment->created_by)->toBe($admin->id)
+        ->and($payment->attachments)->toHaveCount(1);
+
+    $this->actingAs($admin)
+        ->patch(route('superadmin.customers.subscriptions.payment-logs.review', [$customer, $subscription, $payment]), [
+            'status' => PaymentStatus::Approved->value,
+        ])->assertForbidden();
 });
 
 it('accepts only the listed plan names for new subscriptions and renames', function () {
@@ -170,6 +192,7 @@ it('does not store commission on a subscription without a payment', function () 
 it('stores initial commission on its payment rather than the subscription', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
+    useTemporaryReceiptDisk();
 
     $this->actingAs($admin)
         ->post(route('superadmin.customers.subscriptions.store', $customer), [
@@ -183,6 +206,7 @@ it('stores initial commission on its payment rather than the subscription', func
             'payment_paid' => 1200,
             'payment_method' => PaymentMethod::Online->value,
             'next_payment_date' => '',
+            'receipt' => UploadedFile::fake()->image('receipt.png'),
         ])
         ->assertSessionHasNoErrors();
 
@@ -214,6 +238,7 @@ it('stores subscription payments in pending review status', function () {
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
     $subscription = makeSubscription($customer, $admin);
+    useTemporaryReceiptDisk();
 
     $response = $this
         ->actingAs($admin)
@@ -225,6 +250,7 @@ it('stores subscription payments in pending review status', function () {
             'account_number' => 'TXN-2002',
             'status' => PaymentStatus::Approved->value,
             'notes' => 'Uploaded by admin',
+            'receipt' => UploadedFile::fake()->image('receipt.png'),
         ]);
 
     $response->assertSessionHasNoErrors();
@@ -235,6 +261,63 @@ it('stores subscription payments in pending review status', function () {
         ->and($payment->payment_method)->toBe(PaymentMethod::Online)
         ->and($payment->commission_amount)->toBe(50)
         ->and((string) $payment->amount)->toBe('400.00');
+});
+
+it('lets a subscription editor record a payment while keeping review restricted', function () {
+    $this->seed(PermissionSeeder::class);
+    $master = makeSuperAdmin();
+    $editor = User::factory()->create([
+        'user_type' => UserType::SuperAdmin,
+        'created_by' => $master->id,
+    ]);
+    $editor->syncPermissions(['customers.paid.view', 'subscriptions.view', 'subscriptions.edit']);
+    $customer = User::factory()->create([
+        'user_type' => UserType::Customer,
+        'account_type' => 'paid',
+        'created_by' => $editor->id,
+    ]);
+    $subscription = makeSubscription($customer, $master);
+    useTemporaryReceiptDisk();
+
+    $this->actingAs($editor)
+        ->post(route('superadmin.customers.subscriptions.payment-logs.store', [$customer, $subscription]), [
+            'amount' => 400,
+            'payment_method' => PaymentMethod::Online->value,
+            'receipt' => UploadedFile::fake()->image('receipt.png'),
+        ])->assertSessionHasNoErrors();
+
+    $payment = PaymentLog::query()->sole();
+    expect($payment->created_by)->toBe($editor->id)
+        ->and($payment->status)->toBe(PaymentStatus::PendingReview);
+
+    $this->patch(route('superadmin.customers.subscriptions.payment-logs.review', [$customer, $subscription, $payment]), [
+        'status' => PaymentStatus::Approved->value,
+    ])->assertForbidden();
+});
+
+it('requires a receipt for both new and initial payment logs', function () {
+    $admin = makeSuperAdmin();
+    $customer = makeCustomer();
+    $subscription = makeSubscription($customer, $admin);
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.customers.subscriptions.payment-logs.store', [$customer, $subscription]), [
+            'amount' => 400,
+            'payment_method' => PaymentMethod::Cash->value,
+        ])->assertSessionHasErrors('receipt');
+
+    $this->post(route('superadmin.customers.subscriptions.store', $customer), [
+        'name' => 'Primary',
+        'amount' => 1200,
+        'started_at' => '2026-04-18',
+        'duration' => 30,
+        'status' => 'active',
+        'has_payment' => true,
+        'payment_paid' => 1200,
+        'payment_method' => PaymentMethod::Cash->value,
+    ])->assertSessionHasErrors('receipt');
+
+    expect(PaymentLog::count())->toBe(0);
 });
 
 it('rejects commission larger than the payment amount', function () {
@@ -356,6 +439,7 @@ it('does not allow tracking payments above the subscription amount', function ()
     $admin = makeSuperAdmin();
     $customer = makeCustomer();
     $subscription = makeSubscription($customer, $admin);
+    useTemporaryReceiptDisk();
 
     makePaymentLog($subscription, $admin, [
         'amount' => '700.00',
@@ -371,6 +455,7 @@ it('does not allow tracking payments above the subscription amount', function ()
             'amount' => '400',
             'payment_method' => PaymentMethod::Online->value,
             'account_number' => 'TXN-9009',
+            'receipt' => UploadedFile::fake()->image('receipt.png'),
         ])
         ->assertSessionHasErrors('amount');
 

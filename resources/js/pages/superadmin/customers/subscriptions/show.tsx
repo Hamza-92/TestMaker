@@ -541,8 +541,12 @@ export default function ShowSubscription({
     );
     const fileRef = useRef<HTMLInputElement>(null);
 
+    const canRecordPayment =
+        can('subscriptions.create') ||
+        can('subscriptions.edit') ||
+        can('subscriptions.manage_payments');
     const canAddPayment =
-        can('subscriptions.manage_payments') &&
+        canRecordPayment &&
         Number(paymentSummary.remaining_trackable_amount) > 0;
 
     function openAdd() {
@@ -577,6 +581,12 @@ export default function ShowSubscription({
     function submitPayment(e: React.FormEvent) {
         e.preventDefault();
 
+        if (!paymentForm.receipt) {
+            setPaymentErrors({ receipt: 'A receipt is required.' });
+
+            return;
+        }
+
         const fd = new FormData();
         fd.append('amount', paymentForm.amount);
         fd.append('commission_amount', paymentForm.commission_amount);
@@ -584,9 +594,7 @@ export default function ShowSubscription({
         fd.append('account_number', paymentForm.account_number);
         fd.append('notes', paymentForm.notes);
 
-        if (paymentForm.receipt) {
-            fd.append('receipt', paymentForm.receipt);
-        }
+        fd.append('receipt', paymentForm.receipt);
 
         setPaymentProcessing(true);
         router.post(
@@ -871,6 +879,11 @@ export default function ShowSubscription({
                         />
                     </div>
 
+                    {canRecordPayment && Number(paymentSummary.subscription_amount) === 0 && (
+                        <p className="px-5 pt-3 text-sm text-muted-foreground">
+                            Set a subscription amount before adding a payment.
+                        </p>
+                    )}
                     {paymentLogs.length === 0 ? (
                         <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
                             <CreditCardIcon className="size-8 opacity-20" />
@@ -1154,7 +1167,9 @@ export default function ShowSubscription({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>Receipt (optional)</Label>
+                            <Label>
+                                Receipt <span aria-hidden="true">*</span>
+                            </Label>
                             <div
                                 className="flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-input px-4 py-3 transition-colors hover:border-ring/50"
                                 onClick={() => fileRef.current?.click()}

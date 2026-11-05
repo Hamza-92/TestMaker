@@ -147,10 +147,10 @@ class CustomerSubscriptionController extends Controller
                 'amount' => $validated['amount'],
                 'commission_amount' => $validated['commission_amount'] ?? null,
                 'payment_method' => $validated['payment_method'],
-                'account_number' => $validated['account_number'] ?: null,
+                'account_number' => ($validated['account_number'] ?? null) ?: null,
                 'status' => PaymentStatus::PendingReview->value,
                 'attachments' => $attachments ?: null,
-                'notes' => $validated['notes'] ?: null,
+                'notes' => ($validated['notes'] ?? null) ?: null,
                 'created_by' => auth()->id(),
             ]);
 
@@ -432,7 +432,6 @@ class CustomerSubscriptionController extends Controller
     public function store(Request $request, User $customer)
     {
         CustomerAccess::ensureVisible($request->user(), $customer);
-        abort_if($request->boolean('has_payment') && ! $request->user()->can('subscriptions.manage_payments'), 403);
         abort_if(
             $customer->account_type?->value === 'trial',
             403,
@@ -480,7 +479,7 @@ class CustomerSubscriptionController extends Controller
                 ),
                 'nullable', 'date',
             ],
-            'receipt' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
+            'receipt' => [Rule::requiredIf(fn () => $request->boolean('has_payment')), 'nullable', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120'],
             'payment_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -615,7 +614,7 @@ class CustomerSubscriptionController extends Controller
             'account_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'receipt' => [
-                'nullable',
+                'required',
                 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:5120',
             ],
         ]);
