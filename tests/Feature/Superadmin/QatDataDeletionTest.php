@@ -4,6 +4,7 @@ use App\Enums\UserType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
@@ -46,6 +47,37 @@ function qatDeletionFixture(): array
 
     return compact('class', 'subject', 'chapter', 'topic', 'question');
 }
+
+test('removing monthly QAT records preserves the other month and the shared catalogue', function (string $kind) {
+    $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value, 'created_by' => null]);
+    $ids = qatDeletionFixture();
+    $catalogue = DB::table('qat_catalogues')->value('id');
+    DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $ids['chapter'], 'month' => 5]);
+    $year = "/superadmin/qat-catalogue/years/{$catalogue}";
+    $april = "{$year}/months/4";
+    $may = "{$year}/months/5";
+    $chapterContext = http_build_query(array_intersect_key($ids, array_flip(['class', 'subject', 'chapter'])));
+    $remove = "{$april}/records/{$kind}/{$ids[$kind]}";
+    $outsideYear = DB::table('qat_catalogues')->insertGetId(['academic_year' => '2027-28']);
+
+    $this->actingAs($admin)->delete(str_replace("/years/{$catalogue}/", "/years/{$outsideYear}/", $remove))
+        ->assertNotFound();
+    $this->get("{$april}?{$chapterContext}")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('rows.data.0.name', 'Leaves')->where('rows.data.0.count', 1));
+    $this->delete($remove)->assertRedirect(in_array($kind, ['topic', 'question'], true) ? $april : $year);
+    $this->get("{$may}?{$chapterContext}&view=questions")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('rows.data.0.id', $ids['question']));
+
+    if ($kind === 'topic' || $kind === 'question') {
+        $this->get("{$april}?{$chapterContext}&view=questions")->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('rows.data', 0));
+    } else {
+        $this->get($year)->assertOk()->assertInertia(fn (Assert $page) => $page->has('rows', 1)->where('rows.0.name', 'May'));
+    }
+    foreach (['class' => 'qat_classes', 'subject' => 'qat_subjects', 'chapter' => 'qat_chapters', 'topic' => 'qat_topics', 'question' => 'qat_questions'] as $item => $table) {
+        $this->assertDatabaseHas($table, ['id' => $ids[$item]]);
+    }
+})->with(['class', 'subject', 'chapter', 'topic', 'question']);
 
 test('superadmin can delete a QAT class and all of its copied data', function () {
     $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value, 'created_by' => null]);

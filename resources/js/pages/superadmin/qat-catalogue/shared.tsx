@@ -90,9 +90,11 @@ export function FilterBar({
     url,
     filters,
     options = [],
+    clearUrl = url,
 }: {
     url: string;
     filters: Filters;
+    clearUrl?: string;
     options?: {
         key: string;
         label: string;
@@ -153,7 +155,7 @@ export function FilterBar({
                     Apply
                 </Button>
                 <Button asChild variant="ghost">
-                    <Link href={url}>Clear</Link>
+                    <Link href={clearUrl}>Clear</Link>
                 </Button>
             </form>
         </Card>

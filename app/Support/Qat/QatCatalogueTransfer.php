@@ -116,21 +116,7 @@ class QatCatalogueTransfer
             ]);
 
             if (array_key_exists('description', $data)) {
-                $description = trim((string) $data['description']);
-                if ($description === '') {
-                    DB::table('qat_month_syllabi')
-                        ->where('qat_subject_id', $qatSubjectId)
-                        ->where('month', $month)
-                        ->delete();
-                } else {
-                    DB::table('qat_month_syllabi')->upsert([[
-                        'qat_subject_id' => $qatSubjectId,
-                        'month' => $month,
-                        'description' => $description,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ]], ['qat_subject_id', 'month'], ['description', 'updated_at']);
-                }
+                QatMonthlySyllabus::description($qatSubjectId, $month, $data['description']);
             }
 
             $report = ['chapters' => 0, 'topics' => 0, 'questions' => 0, 'month_assignments' => 0];
@@ -206,16 +192,32 @@ class QatCatalogueTransfer
                         }
                     });
                 $mapping = DB::table('qat_chapter_months')->where('qat_chapter_id', $qatChapterId)->where('month', $month);
-                $previous = $mapping->value('source_question_ids');
-                if (($data['sync_month'] ?? false) || $previous !== null) {
+                $saved = (clone $mapping)->lockForUpdate()->first(['source_question_ids', 'excluded_source_question_ids']);
+                $previous = $saved->source_question_ids;
+                $excluded = json_decode($saved->excluded_source_question_ids ?? '[]', true) ?: [];
+                if ($excluded !== []) {
+                    $excluded = ($data['sync_month'] ?? false) || $selectedQuestions === null
+                        ? [] : array_values(array_diff($excluded, array_keys($selectedQuestions)));
+                    $mapping->update(['excluded_source_question_ids' => $excluded === [] ? null : json_encode($excluded)]);
+                }
+                if (($data['sync_month'] ?? false) || $previous !== null || ($inserted > 0 && $selectedQuestions !== null)) {
                     $ids = Question::query()->where('chapter_id', $chapter->id)
                         ->when($selectedQuestions !== null, fn ($query) => $query->whereIn('id', array_keys($selectedQuestions)))
                         ->pluck('id')->map(fn ($id) => (int) $id)->all();
                     if (! ($data['sync_month'] ?? false)) {
-                        $ids = array_values(array_unique([...json_decode($previous, true), ...$ids]));
+                        $ids = array_values(array_unique([...(json_decode($previous ?? '[]', true) ?: []), ...$ids]));
                     }
                     $mapping->update(['source_question_ids' => json_encode($ids)]);
                 }
+                $restoredTopics = $selectedQuestions === null ? array_values($topicIds) : DB::table('qat_questions as question')
+                    ->leftJoin('qat_month_edits as edit', fn ($join) => $join->on('edit.record_id', '=', 'question.id')
+                        ->where('edit.kind', 'question')->where('edit.month', $month))
+                    ->where('question.qat_chapter_id', $qatChapterId)
+                    ->whereIn('question.source_question_id', array_keys($selectedQuestions))
+                    ->selectRaw('case when edit.id is null then question.qat_topic_id else edit.qat_topic_id end as topic_id')
+                    ->pluck('topic_id')->filter()->unique()->all();
+                DB::table('qat_month_edits')->where('kind', 'topic')->where('month', $month)
+                    ->where('is_removed', true)->whereIn('record_id', $restoredTopics)->update(['is_removed' => false]);
             }
 
             return $report;

@@ -149,6 +149,84 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
             'subject_id' => $qatSubjectId, 'syllabus' => 'qat', 'months' => [$month],
         ])->assertOk()->assertJsonPath('questions.total', 1)->assertJsonPath('questions.data.0.id', $qatQuestionId);
     }
+    $catalogueId = DB::table('qat_catalogues')->value('id');
+    $qatClassId = DB::table('qat_classes')->value('id');
+    $qatChapterId = DB::table('qat_chapters')->value('id');
+    $sharedQuestionId = DB::table('qat_questions')->where('source_question_id', $second->id)->value('id');
+    $yearUrl = "/superadmin/qat-catalogue/years/{$catalogueId}";
+    $april = "{$yearUrl}/months/4";
+    $may = "{$yearUrl}/months/5";
+    $subjectQuery = "class={$qatClassId}&subject={$qatSubjectId}";
+    $chapterQuery = "{$subjectQuery}&chapter={$qatChapterId}";
+    $this->actingAs($admin)->get($yearUrl)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('rows', 2)->where('rows.0.name', 'April')->where('rows.1.name', 'May'));
+    $this->get($april)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('rows.data.0.name', 'Class 6')->where('rows.data.0.count', 1));
+    $this->get("{$april}?class={$qatClassId}")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('rows.data.0.name', 'Science'));
+    $this->get("{$april}?{$chapterQuery}&view=questions")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('rows.data', 1)->where('rows.data.0.name', 'What do leaves do?'));
+
+    $this->post(route('superadmin.qat-transfer.store'), [
+        ...$withoutDescription, 'question_ids' => [$second->id],
+    ])->assertSessionHasNoErrors();
+    $this->patch("{$april}/records/chapter/{$qatChapterId}", [
+        'name' => 'April plants', 'status' => true, 'sort_id' => 2,
+    ])->assertSessionHasNoErrors();
+    $this->patch("{$april}/subjects/{$qatSubjectId}/description", [
+        'description' => '<p>April syllabus update</p>',
+    ])->assertSessionHasNoErrors();
+    $this->get("{$april}?{$subjectQuery}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('rows.data.0.name', 'April plants')
+        ->where('rows.data.0.count', 2)
+        ->where('syllabus.description', '<p>April syllabus update</p>'));
+    $this->get("{$may}?{$subjectQuery}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('rows.data.0.name', 'Plants')
+        ->where('rows.data.0.count', 1)
+        ->where('syllabus.description', '<p>May only</p>'));
+
+    $questionRoute = [$qatClassId, $qatSubjectId, $qatChapterId, $sharedQuestionId, 'month' => 4];
+    $this->putJson(route('superadmin.qat-catalogue.questions.update', $questionRoute), [
+        'question_type_id' => $type->id, 'chapter_id' => $qatChapterId, 'status' => true,
+        'content' => [
+            'prompt_en' => 'April version of the roots question',
+            'options' => [
+                ['text_en' => 'Absorb water', 'is_correct' => true],
+                ['text_en' => 'Produce seeds', 'is_correct' => false],
+            ],
+        ],
+    ])->assertOk();
+    $this->getJson(route('superadmin.qat-catalogue.questions.edit', $questionRoute))
+        ->assertOk()->assertJsonPath('question.content.prompt_en', 'April version of the roots question');
+
+    $this->actingAs($school)->postJson(route('customer.qat.questions'), [
+        'subject_id' => $qatSubjectId, 'syllabus' => 'qat', 'months' => [4],
+    ])->assertOk()->assertJsonPath('questions.data.1.statement_en', 'April version of the roots question')
+        ->assertJsonPath('chapters.0.name', 'April plants');
+    $this->postJson(route('customer.qat.questions'), [
+        'subject_id' => $qatSubjectId, 'syllabus' => 'qat', 'months' => [5],
+    ])->assertOk()->assertJsonPath('questions.data.0.statement_en', 'What do roots do?');
+    $generated = $this->postJson(route('customer.qat.papers.store'), [
+        'name' => 'April snapshot', 'mode' => 'auto', 'class_ids' => [$qatClassId],
+        'subject_id' => $qatSubjectId, 'syllabus' => 'qat', 'months' => [4],
+        'minutes' => 40, 'sections' => [['question_type_id' => $type->id, 'quantity' => 2, 'marks' => 1]],
+    ])->assertCreated();
+    $savedPaper = $this->postJson(route('customer.qat.previews.save', basename($generated->json('preview_url'))))
+        ->assertCreated()->json('paper_id');
+
+    $this->actingAs($admin)->delete("{$april}/records/question/{$sharedQuestionId}", [
+        'class' => $qatClassId, 'subject' => $qatSubjectId, 'chapter' => $qatChapterId, 'view' => 'questions',
+    ])->assertRedirect("{$april}?{$chapterQuery}&view=questions");
+    $this->getJson(route('superadmin.qat-catalogue.questions.edit', $questionRoute))->assertNotFound();
+    $this->getJson(route('superadmin.qat-transfer.syllabus-description', $scope))
+        ->assertOk()->assertJsonPath('question_ids', [$first->id]);
+    $this->get("{$may}?{$chapterQuery}&view=questions")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('rows.data.0.name', 'What do roots do?'));
+    $this->actingAs($school)->get(route('customer.qat.papers.show', $savedPaper))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('paper.paper_data.chapters.0.name', 'April plants')
+            ->where('paper.paper_data.sections.0.questions', fn ($questions) => collect($questions)->contains('statement_en', 'April version of the roots question')));
+
     $this->actingAs($admin)->post(route('superadmin.qat-transfer.store'), [
         ...$payload, 'sync_month' => true, 'month' => 5, 'description' => null, 'chapter_ids' => [], 'question_ids' => [],
     ])->assertSessionHasNoErrors();
@@ -194,8 +272,9 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     ]);
     $this->actingAs($admin)->get(route('superadmin.qat-catalogue'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('superadmin/qat-catalogue')
-        ->has('classes.data', 0)
+        ->component('superadmin/qat-catalogue/monthly')
+        ->where('level', 'year')
+        ->has('rows', 0)
         ->missing('sources')
         ->missing('report'));
     $this->actingAs($admin)->get(route('superadmin.qat-transfer'))
@@ -252,9 +331,10 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
         ->and((int) DB::table('qat_paper_templates')->value('status'))->toBe(0);
     $this->actingAs($admin)->get(route('superadmin.qat-catalogue'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('superadmin/qat-catalogue')
-        ->has('classes.data', 1)
-        ->where('classes.data.0.name', 'Class 5'));
+        ->component('superadmin/qat-catalogue/monthly')
+        ->has('rows', 1)
+        ->where('rows.0.name', '2026-27')
+        ->where('rows.0.count', 1));
     $this->actingAs($admin)->get(route('superadmin.qat-catalogue.classes.show', $qatClassId))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('superadmin/qat-catalogue/class')

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\QatPaper;
 use App\Support\AppUserAccess;
 use App\Support\Qat\QatAccess;
+use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Qat\QatPaperBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,8 +138,9 @@ class QatPaperController extends Controller
         if (! in_array((int) $subject->class_id, $classIds, true)) {
             throw ValidationException::withMessages(['class_ids' => 'The paper class must be selected.']);
         }
-        $allowedClasses = DB::table('qat_subjects as subject')
-            ->join('qat_classes as class', 'class.id', '=', 'subject.qat_class_id')
+        $month = $subject->syllabus_month ?? null;
+        $allowedClasses = QatMonthlySyllabus::query('qat_subjects', 'subject', $month, 'subject')
+            ->joinSub(QatMonthlySyllabus::query('qat_classes', 'class', $month, 'classes'), 'class', 'class.id', '=', 'subject.qat_class_id')
             ->whereIn('class.id', $classIds)
             ->where('class.status', true)->where('subject.status', true)
             ->get(['class.id', 'class.source_class_id', 'subject.source_pattern_id', 'subject.subject_id'])

@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\QatPaper;
 use App\Support\AppUserAccess;
 use App\Support\Qat\QatAccess;
-use App\Support\Qat\QatPaperBuilder;
+use App\Support\Qat\QatMonthlySyllabus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -79,11 +79,12 @@ class QatCatalogueController extends Controller
 
         $user = auth()->user();
         $access = QatAccess::catalogue($user);
-        $scopeRows = DB::table('qat_classes')
+        $scope = DB::table('qat_classes')
             ->join('qat_catalogues', 'qat_catalogues.id', '=', 'qat_classes.qat_catalogue_id')
-            ->join('qat_subjects', 'qat_subjects.qat_class_id', '=', 'qat_classes.id')
-            ->where('qat_classes.status', true)
-            ->where('qat_subjects.status', true)
+            ->join('qat_subjects', 'qat_subjects.qat_class_id', '=', 'qat_classes.id');
+        QatMonthlySyllabus::originalOrMonthActive($scope, 'class', 'qat_classes', $mode === 'auto');
+        QatMonthlySyllabus::originalOrMonthActive($scope, 'subject', 'qat_subjects', $mode === 'auto');
+        $scopeRows = $scope
             ->orderByDesc('qat_catalogues.academic_year')
             ->orderBy('qat_classes.name')
             ->get([
@@ -103,9 +104,9 @@ class QatCatalogueController extends Controller
                 'subject_count' => $rows->pluck('qat_subject_id')->unique()->count(),
             ])->values();
         $subjectRows = $scopeRows->keyBy('qat_subject_id');
-        $chapterRows = DB::table('qat_chapters')
-            ->whereIn('qat_subject_id', $subjectRows->keys())
-            ->where('status', true)
+        $chapterQuery = DB::table('qat_chapters')->whereIn('qat_subject_id', $subjectRows->keys());
+        QatMonthlySyllabus::originalOrMonthActive($chapterQuery, 'chapter', 'qat_chapters', $mode === 'auto');
+        $chapterRows = $chapterQuery
             ->orderBy('sort_id')->orderBy('id')
             ->get(['id', 'qat_subject_id', 'source_chapter_id', 'name'])
             ->filter(function ($chapter) use ($subjectRows, $user, $access): bool {
@@ -116,14 +117,13 @@ class QatCatalogueController extends Controller
                     (int) $subject->subject_id, (int) $chapter->source_chapter_id,
                 ));
             })->values();
-        $monthsByChapter = DB::table('qat_chapter_months')
-            ->whereIn('qat_chapter_id', $chapterRows->pluck('id'))
-            ->get(['qat_chapter_id', 'month'])->groupBy('qat_chapter_id');
+        $monthsByChapter = QatMonthlySyllabus::activeAssignments($chapterRows->pluck('id'))->get()->groupBy('qat_chapter_id');
         $chapters = $chapterRows->map(fn ($chapter) => [
             'id' => $chapter->id,
             'qat_subject_id' => $chapter->qat_subject_id,
             'name' => $chapter->name,
             'months' => $monthsByChapter->get($chapter->id, collect())->pluck('month')->sort()->values(),
+            'month_names' => $monthsByChapter->get($chapter->id, collect())->pluck('name', 'month'),
         ])->values();
         $chapterCounts = $chapters->countBy('qat_subject_id');
         $subjects = $scopeRows->map(fn ($row) => [
@@ -231,9 +231,9 @@ class QatCatalogueController extends Controller
         $chapterId = isset($filters['chapter']) ? (int) $filters['chapter'] : null;
         abort_if($chapterId !== null && ! $chapterIds->contains($chapterId), 404);
 
-        $baseQuestions = DB::table('qat_questions as q')
+        $baseQuestions = QatMonthlySyllabus::query('qat_questions', 'question', $month, 'q')
             ->join('qat_chapters as ch', 'ch.id', '=', 'q.qat_chapter_id')
-            ->leftJoin('qat_topics as topic', 'topic.id', '=', 'q.qat_topic_id')
+            ->leftJoinSub(QatMonthlySyllabus::query('qat_topics', 'topic', $month, 'topics'), 'topic', 'topic.id', '=', 'q.qat_topic_id')
             ->where('ch.qat_subject_id', $qatSubject)
             ->where('ch.status', true)->where('q.status', true)
             ->where(function ($query): void {
@@ -245,10 +245,6 @@ class QatCatalogueController extends Controller
                 fn ($months) => $months->selectRaw('1')->from('qat_chapter_months as cm')
                     ->whereColumn('cm.qat_chapter_id', 'ch.id')->where('cm.month', $month)
             ));
-
-        if ($month !== null) {
-            app(QatPaperBuilder::class)->applyMonthlySelection($baseQuestions, $chapterIds->all(), [$month], 'ch.id', 'q.source_question_id');
-        }
 
         $counts = (clone $baseQuestions)->select('ch.id as chapter_id', 'q.question_type_id')
             ->selectRaw('count(*) as total')->groupBy('ch.id', 'q.question_type_id')->get();

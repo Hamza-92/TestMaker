@@ -8,6 +8,7 @@ use App\Models\ClassSubject;
 use App\Models\Pattern;
 use App\Models\Question;
 use App\Support\Qat\QatCatalogueTransfer;
+use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -106,9 +107,8 @@ class QatCatalogueController extends Controller
             ->join('qat_chapter_months as month', 'month.qat_chapter_id', '=', 'chapter.id')
             ->where('chapter.qat_subject_id', $subject?->id ?? 0)->where('month.month', $data['month'])
             ->get(['chapter.id', 'chapter.source_chapter_id', 'month.source_question_ids']);
-        $savedQuestions = $savedChapters->flatMap(fn ($chapter) => $chapter->source_question_ids === null
-            ? DB::table('qat_questions')->where('qat_chapter_id', $chapter->id)->pluck('source_question_id')->all()
-            : (json_decode($chapter->source_question_ids, true) ?: []));
+        $savedQuestions = QatMonthlySyllabus::query('qat_questions', 'question', (int) $data['month'], 'questions')
+            ->whereIn('qat_chapter_id', $savedChapters->pluck('id'))->pluck('source_question_id');
         $chapters = $this->chapters($request)->getData(true);
         $chapterIds = array_map('intval', array_column($chapters, 'id'));
         $questionIds = collect($chapters)->flatMap(fn ($chapter) => array_column($chapter['questions'], 'id'))->map(fn ($id) => (int) $id);

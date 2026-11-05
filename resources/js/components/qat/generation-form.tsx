@@ -38,6 +38,7 @@ type QatChapter = {
     qat_subject_id: number;
     name: string;
     months: number[];
+    month_names?: Record<number, string>;
 };
 type QatMonthSyllabus = {
     qat_subject_id: number;
@@ -436,11 +437,16 @@ export default function QatGenerationForm({
     const coverage =
         syllabus === 'custom'
             ? selectedChapters
-            : chapters.filter(
-                  (item) =>
-                      selectedSubjectIds.includes(item.qat_subject_id) &&
-                      item.months.some((month) => months.includes(month)),
-              );
+            : chapters
+                  .filter(
+                      (item) =>
+                          selectedSubjectIds.includes(item.qat_subject_id) &&
+                          item.months.some((month) => months.includes(month)),
+                  )
+                  .map((item) => ({
+                      ...item,
+                      name: item.month_names?.[months[0]] ?? item.name,
+                  }));
     const targetSubject = targetSubjects[0] ?? null;
     const resolvedSubjectId = targetSubject?.id ?? null;
     const targetCoverage = coverage.filter(

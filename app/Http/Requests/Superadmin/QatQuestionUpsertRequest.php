@@ -4,6 +4,7 @@ namespace App\Http\Requests\Superadmin;
 
 use App\Models\Question;
 use App\Models\QuestionType;
+use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Support\Facades\DB;
@@ -31,11 +32,12 @@ class QatQuestionUpsertRequest extends QuestionUpsertRequest
     {
         $chapterId = (int) $this->route('qatChapter');
         $questionId = (int) $this->route('qatQuestion');
+        $month = QatMonthlySyllabus::requestedMonth($this);
 
         return [
-            'question_type_id' => ['required', 'integer', function ($attribute, $value, $fail) use ($chapterId, $questionId): void {
+            'question_type_id' => ['required', 'integer', function ($attribute, $value, $fail) use ($chapterId, $questionId, $month): void {
                 if (! QuestionType::query()->whereKey($value)->where('status', 1)->exists()
-                    && ! DB::table('qat_questions')->where('id', $questionId)->where('qat_chapter_id', $chapterId)
+                    && ! QatMonthlySyllabus::query('qat_questions', 'question', $month, 'questions')->where('id', $questionId)->where('qat_chapter_id', $chapterId)
                         ->where('question_type_id', $value)->exists()) {
                     $fail('Selected question type is invalid.');
                 }
@@ -53,9 +55,11 @@ class QatQuestionUpsertRequest extends QuestionUpsertRequest
     {
         $validator->after(function (Validator $validator): void {
             $chapterId = (int) $this->route('qatChapter');
-            $question = DB::table('qat_questions')->where('id', (int) $this->route('qatQuestion'))
+            $question = QatMonthlySyllabus::query('qat_questions', 'question', QatMonthlySyllabus::requestedMonth($this), 'questions')
+                ->where('id', (int) $this->route('qatQuestion'))
                 ->where('qat_chapter_id', $chapterId)->first();
-            if (! $question || $validator->errors()->has('question_type_id')) {
+            abort_unless($question, 404);
+            if ($validator->errors()->has('question_type_id')) {
                 return;
             }
 

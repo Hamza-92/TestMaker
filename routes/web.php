@@ -40,6 +40,7 @@ use App\Http\Controllers\Superadmin\PaymentLedgerController;
 use App\Http\Controllers\Superadmin\PaymentsController;
 use App\Http\Controllers\Superadmin\QatCatalogueController as SuperadminQatCatalogueController;
 use App\Http\Controllers\Superadmin\QatDataController as SuperadminQatDataController;
+use App\Http\Controllers\Superadmin\QatMonthlyDataController;
 use App\Http\Controllers\Superadmin\QatPaperTemplateController as SuperadminQatPaperTemplateController;
 use App\Http\Controllers\Superadmin\QuestionBrowseController;
 use App\Http\Controllers\Superadmin\QuestionController;
@@ -322,7 +323,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/customers/{customer}', [CustomerController::class, 'show'])->name('superadmin.customers.show')->middleware('permission:customers.view|customers.paid.view|customers.trial.view');
 
         // Data Transfer
-        Route::get('superadmin/qat-catalogue', [SuperadminQatDataController::class, 'index'])->name('superadmin.qat-catalogue')->middleware('permission:data_transfer.manage');
+        Route::prefix('superadmin/qat-catalogue')->middleware('permission:data_transfer.manage')->group(function () {
+            Route::get('/', [QatMonthlyDataController::class, 'years'])->name('superadmin.qat-catalogue');
+            Route::get('years/{catalogue}', [QatMonthlyDataController::class, 'months'])->whereNumber('catalogue')
+                ->name('superadmin.qat-catalogue.years.show');
+            Route::get('years/{catalogue}/months/{month}', [QatMonthlyDataController::class, 'show'])
+                ->whereNumber(['catalogue', 'month'])->name('superadmin.qat-catalogue.months.show');
+            Route::patch('years/{catalogue}/months/{month}/subjects/{subject}/description', [QatMonthlyDataController::class, 'updateDescription'])
+                ->whereNumber(['catalogue', 'month', 'subject'])->name('superadmin.qat-catalogue.months.description.update');
+            Route::patch('years/{catalogue}/months/{month}/records/{kind}/{record}', [QatMonthlyDataController::class, 'update'])
+                ->whereNumber(['catalogue', 'month', 'record'])->whereIn('kind', ['class', 'subject', 'chapter', 'topic'])
+                ->name('superadmin.qat-catalogue.months.records.update');
+            Route::delete('years/{catalogue}/months/{month}/records/{kind}/{record}', [QatMonthlyDataController::class, 'destroy'])
+                ->whereNumber(['catalogue', 'month', 'record'])->whereIn('kind', ['class', 'subject', 'chapter', 'topic', 'question'])
+                ->name('superadmin.qat-catalogue.months.records.destroy');
+        });
         Route::get('superadmin/qat-templates', [SuperadminQatPaperTemplateController::class, 'index'])->name('superadmin.qat-templates.index')->middleware('permission:data_transfer.manage');
         Route::post('superadmin/qat-templates', [SuperadminQatPaperTemplateController::class, 'store'])->name('superadmin.qat-templates.store')->middleware('permission:data_transfer.manage');
         Route::put('superadmin/qat-templates/{template}', [SuperadminQatPaperTemplateController::class, 'update'])->name('superadmin.qat-templates.update')->middleware('permission:data_transfer.manage');

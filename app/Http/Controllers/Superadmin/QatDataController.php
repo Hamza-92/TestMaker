@@ -8,6 +8,7 @@ use App\Models\Medium;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\QuestionType;
+use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Http\JsonResponse;
@@ -275,8 +276,8 @@ class QatDataController extends Controller
                 'status' => $data['status'],
                 'updated_at' => now(),
             ]);
-            DB::table('qat_chapter_months')->where('qat_chapter_id', $qatChapter)->delete();
-            DB::table('qat_chapter_months')->insert(array_map(
+            DB::table('qat_chapter_months')->where('qat_chapter_id', $qatChapter)->whereNotIn('month', $data['months'])->delete();
+            DB::table('qat_chapter_months')->insertOrIgnore(array_map(
                 fn ($month) => ['qat_chapter_id' => $qatChapter, 'month' => $month],
                 $data['months']
             ));
@@ -322,12 +323,13 @@ class QatDataController extends Controller
         return back();
     }
 
-    public function editQuestion(int $qatClass, int $qatSubject, int $qatChapter, int $qatQuestion): JsonResponse
+    public function editQuestion(Request $request, int $qatClass, int $qatSubject, int $qatChapter, int $qatQuestion): JsonResponse
     {
         $class = $this->classRow($qatClass);
         $subject = $this->subjectRow($qatClass, $qatSubject);
         $chapter = $this->chapterRow($qatSubject, $qatChapter);
-        $question = $this->questionRow($qatChapter, $qatQuestion);
+        $month = QatMonthlySyllabus::requestedMonth($request);
+        $question = $this->questionRow($qatChapter, $qatQuestion, $month);
         $data = json_decode($question->question_data, true) ?: [];
         $type = $this->snapshotType($question, $data);
         $sourceQuestion = new Question;
@@ -342,7 +344,7 @@ class QatDataController extends Controller
             )));
         $types = $types->reject(fn (array $item) => $item['id'] === (int) $question->question_type_id)
             ->prepend($this->typeOption($type))->values();
-        $topics = DB::table('qat_topics')->where('qat_chapter_id', $qatChapter)
+        $topics = QatMonthlySyllabus::query('qat_topics', 'topic', $month, 'topics')->where('qat_chapter_id', $qatChapter)
             ->orderBy('sort_id')->get(['id', 'name', 'name_ur', 'status']);
         $sourceSubject = DB::table('subjects')->where('id', $subject->subject_id)->first(['subject_type', 'name_ur']);
         $baseUrl = route('superadmin.qat-catalogue.questions.index', [$qatClass, $qatSubject, $qatChapter], false);
@@ -394,7 +396,8 @@ class QatDataController extends Controller
         $this->classRow($qatClass);
         $this->subjectRow($qatClass, $qatSubject);
         $this->chapterRow($qatSubject, $qatChapter);
-        $question = $this->questionRow($qatChapter, $qatQuestion);
+        $month = QatMonthlySyllabus::requestedMonth($request);
+        $question = $this->questionRow($qatChapter, $qatQuestion, $month);
         $input = $request->validated();
         $data = json_decode($question->question_data, true) ?: [];
         $type = (int) $input['question_type_id'] === (int) $question->question_type_id
@@ -423,13 +426,22 @@ class QatDataController extends Controller
                 ...$option, 'sort_order' => $index + 1,
             ], $data['options'], array_keys($data['options']));
         }
-        DB::table('qat_questions')->where('id', $qatQuestion)->update([
+        $attributes = [
             'question_data' => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'question_type_id' => $input['question_type_id'],
             'qat_topic_id' => $input['topic_id'] ?? null,
             'status' => $input['status'],
-            'updated_at' => now(),
-        ]);
+        ];
+        if ($month === null) {
+            DB::table('qat_questions')->where('id', $qatQuestion)->update([...$attributes, 'updated_at' => now()]);
+        } else {
+            DB::transaction(function () use ($qatChapter, $qatQuestion, $month, $attributes): void {
+                abort_unless(DB::table('qat_chapter_months')->where('qat_chapter_id', $qatChapter)
+                    ->where('month', $month)->lockForUpdate()->first(), 404);
+                $this->questionRow($qatChapter, $qatQuestion, $month);
+                QatMonthlySyllabus::edit('question', $qatQuestion, $month, $attributes);
+            });
+        }
 
         return response()->json(['id' => $qatQuestion]);
     }
@@ -444,9 +456,9 @@ class QatDataController extends Controller
         return back();
     }
 
-    private function questionRow(int $qatChapter, int $qatQuestion): object
+    private function questionRow(int $qatChapter, int $qatQuestion, ?int $month = null): object
     {
-        $question = DB::table('qat_questions')->where('id', $qatQuestion)
+        $question = QatMonthlySyllabus::query('qat_questions', 'question', $month, 'questions')->where('id', $qatQuestion)
             ->where('qat_chapter_id', $qatChapter)->first();
         abort_unless($question, 404);
 
