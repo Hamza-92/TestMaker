@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Customer;
 use App\Enums\AccountType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\ProfileUpdateRequest;
+use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +22,7 @@ class ProfileController extends Controller
             ]),
             'status' => $request->session()->get('status'),
             'canUpdateProfile' => $request->user()->schoolOwner()?->account_type !== AccountType::Trial,
+            'questionQuota' => SubscriptionQuestionQuota::summary($request->user()->activeSchoolSubscription()),
         ]);
     }
 

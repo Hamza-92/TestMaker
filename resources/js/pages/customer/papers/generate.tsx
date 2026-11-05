@@ -6379,9 +6379,8 @@ export default function GeneratePaper({
                 sections = federalized.sections;
             }
 
-            setQuestionPoolsByType(pools);
-            setGeneratedPaper({
-                id: `paper_${Date.now()}`,
+            const newPaper: GeneratedPaper = {
+                id: `paper_${crypto.randomUUID()}`,
                 selectedChapterNumbers,
                 header: {
                     schoolName: defaultSchoolName,
@@ -6423,7 +6422,27 @@ export default function GeneratePaper({
                         Boolean(objectiveAssignment.objective_bubbles),
                     showSections: defaultSettings.showSections,
                 },
+            };
+            const chargeResponse = await fetch('/papers/generate/charge', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN':
+                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ generation_key: newPaper.id, sections: newPaper.sections }),
             });
+
+            if (!chargeResponse.ok) {
+                const error = (await chargeResponse.json()) as { errors?: { paper?: string[] } };
+
+                throw new Error(error.errors?.paper?.[0] ?? 'Unable to check the remaining question allowance.');
+            }
+
+            setQuestionPoolsByType(pools);
+            setGeneratedPaper(newPaper);
             setPaperQuestionPickerTarget(null);
         } catch (error) {
             setPaperGenerationError(

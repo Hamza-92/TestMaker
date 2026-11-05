@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -73,12 +74,7 @@ class Paper extends Model
             return 0;
         }
 
-        return array_sum(array_map(
-            static fn ($section): int => is_array($section['questions'] ?? null)
-                ? count($section['questions'])
-                : 0,
-            $sections,
-        ));
+        return SubscriptionQuestionQuota::countSections($sections);
     }
 
     public function user(): BelongsTo

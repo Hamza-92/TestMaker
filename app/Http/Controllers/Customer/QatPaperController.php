@@ -9,6 +9,7 @@ use App\Support\AppUserAccess;
 use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Qat\QatPaperBuilder;
+use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -304,6 +305,11 @@ class QatPaperController extends Controller
         }
 
         $preview = (string) Str::uuid();
+        SubscriptionQuestionQuota::charge(
+            $user,
+            'qat_'.$preview,
+            array_sum(array_column($papers, 'question_count')),
+        );
         $request->session()->put('qat_preview', [
             'id' => $preview,
             'user_id' => (int) $user->id,

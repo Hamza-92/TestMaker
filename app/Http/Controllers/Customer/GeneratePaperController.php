@@ -21,6 +21,7 @@ use App\Support\CustomerPaperDefaults;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use App\Support\SubjectiveAnswerAccess;
+use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,21 @@ use Inertia\Inertia;
 
 class GeneratePaperController extends Controller
 {
+    public function chargeQuestions(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'generation_key' => ['required', 'string', 'max:100'],
+            'sections' => ['required', 'array'],
+        ]);
+
+        $count = SubscriptionQuestionQuota::countSections($data['sections']);
+
+        return response()->json([
+            'question_count' => $count,
+            'quota' => SubscriptionQuestionQuota::charge($request->user(), $data['generation_key'], $count),
+        ]);
+    }
+
     public static function pageData(): array
     {
         $user = auth()->user();

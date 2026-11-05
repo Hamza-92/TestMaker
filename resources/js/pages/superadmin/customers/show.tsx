@@ -39,6 +39,8 @@ interface Subscription {
     name: string;
     amount: string;
     allowed_questions: number | null;
+    remaining_questions: number | null;
+    is_question_based: boolean;
     started_at: string;
     expired_at: string | null;
     duration: number;
@@ -684,6 +686,8 @@ export default function ShowCustomer({
                                         const timeLeft = remainingDays(subscription.duration, subscription.expired_at);
                                         const timeRatio = ratio(timeLeft, subscription.duration);
                                         const expiryDays = daysLeft(subscription.expired_at);
+                                        const allowedQuestions = Math.max(0, subscription.allowed_questions ?? 0);
+                                        const remainingQuestions = Math.max(0, Math.min(allowedQuestions, subscription.remaining_questions ?? allowedQuestions));
 
                                         return (
                                             <div key={subscription.id} className="rounded-3xl border bg-background px-5 py-4">
@@ -704,10 +708,10 @@ export default function ShowCustomer({
                                                             ) : (
                                                                 <span className="font-medium text-emerald-600">Settled</span>
                                                             )}
-                                                            {subscription.allowed_questions != null && (
+                                                            {subscription.is_question_based && allowedQuestions > 0 && (
                                                                 <span className="flex items-center gap-1">
                                                                     <HashIcon className="size-3.5" />
-                                                                    {subscription.allowed_questions.toLocaleString()}
+                                                                    {remainingQuestions.toLocaleString()} remaining
                                                                 </span>
                                                             )}
                                                             <span>{subscription.duration} days</span>
@@ -743,6 +747,15 @@ export default function ShowCustomer({
                                                             style={{ width: `${timeRatio}%` }}
                                                         />
                                                     </div>
+                                                    {subscription.is_question_based && allowedQuestions > 0 && <>
+                                                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-sm">
+                                                            <span className="font-medium text-slate-700">Questions remaining</span>
+                                                            <span className="text-muted-foreground">{remainingQuestions.toLocaleString()} / {allowedQuestions.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Questions remaining" aria-valuenow={remainingQuestions} aria-valuemin={0} aria-valuemax={allowedQuestions}>
+                                                            <div className="h-full rounded-full bg-brand-600" style={{ width: `${allowedQuestions > 0 ? remainingQuestions * 100 / allowedQuestions : 0}%` }} />
+                                                        </div>
+                                                    </>}
                                                 </div>
                                             </div>
                                         );

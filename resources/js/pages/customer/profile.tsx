@@ -36,7 +36,7 @@ function FieldIcon({ icon: Icon }: { icon: LucideIcon }) {
     return <Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />;
 }
 
-export default function Profile({ user, status, canUpdateProfile }: { user: ProfileUser; status?: string; canUpdateProfile: boolean }) {
+export default function Profile({ user, status, canUpdateProfile, questionQuota }: { user: ProfileUser; status?: string; canUpdateProfile: boolean; questionQuota: { allowed: number; remaining: number; remaining_percent: number } | null }) {
     const logoRef = useRef<HTMLInputElement>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(user.logo ? `/storage/${user.logo}` : null);
     const { data, setData, post, processing, errors } = useForm<FormData>({
@@ -116,6 +116,11 @@ export default function Profile({ user, status, canUpdateProfile }: { user: Prof
                 </div>
 
                 {status && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">{status}</div>}
+
+                {questionQuota && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                    <div className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-800 dark:text-slate-100"><span>Remaining questions</span><span>{questionQuota.remaining.toLocaleString()} of {questionQuota.allowed.toLocaleString()}</span></div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Questions remaining" aria-valuenow={questionQuota.remaining} aria-valuemin={0} aria-valuemax={questionQuota.allowed}><div className="h-full rounded-full bg-brand-600" style={{ width: `${questionQuota.remaining_percent}%` }} /></div>
+                </section>}
 
                 <form onSubmit={submit} encType="multipart/form-data" className="space-y-6">
                     <fieldset disabled={!canUpdateProfile} className="min-w-0">

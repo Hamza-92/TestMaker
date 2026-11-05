@@ -41,6 +41,7 @@ interface Props {
         subscription_ends_at: string | null;
         days_remaining: number | null;
         subscription_remaining_percent: number;
+        question_quota: { allowed: number; remaining: number; remaining_percent: number } | null;
         total_teachers: number;
         total_classes: number;
     };
@@ -848,6 +849,17 @@ export default function CustomerDashboard({
                                         tone="bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
                                     />
                                 </div>
+                                {school.question_quota && (
+                                    <div className="mt-4 border-t border-brand-100 pt-3 dark:border-brand-900/60">
+                                        <div className="mb-2 flex justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
+                                            <span>Questions remaining</span>
+                                            <span>{school.question_quota.remaining.toLocaleString()} / {school.question_quota.allowed.toLocaleString()}</span>
+                                        </div>
+                                        <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Questions remaining" aria-valuenow={school.question_quota.remaining} aria-valuemin={0} aria-valuemax={school.question_quota.allowed}>
+                                            <div className="h-full rounded-full bg-brand-600" style={{ width: `${school.question_quota.remaining_percent}%` }} />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </Card>
 

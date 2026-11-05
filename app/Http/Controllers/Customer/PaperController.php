@@ -10,9 +10,11 @@ use App\Models\Paper;
 use App\Models\PaperFolder;
 use App\Support\SchoolTeacherSummary;
 use App\Support\SubjectiveAnswerAccess;
+use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -254,12 +256,31 @@ class PaperController extends Controller
             $data['paper_data'] = SubjectiveAnswerAccess::redactPaperData($data['paper_data']);
         }
 
-        $paper = auth()->user()->papers()->create($data);
-        $this->recordPaperActivity(
-            $paper,
-            AuditEvent::Created,
-            $paper->is_draft ? 'drafted' : 'generated',
-        );
+        $paper = DB::transaction(function () use ($data): Paper {
+            $count = Paper::countQuestions($data['paper_data']);
+            $key = data_get($data, 'paper_data.paper.id');
+            $key = is_string($key) && $key !== '' ? $key : (string) str()->uuid();
+            SubscriptionQuestionQuota::charge(
+                auth()->user(), $key, $count,
+            );
+
+            $usage = DB::table('subscription_question_usages')->where('generation_key', $key)->first();
+            if ($usage?->paper_id) {
+                return Paper::query()->whereKey($usage->paper_id)->where('user_id', auth()->id())->firstOrFail();
+            }
+
+            $paper = auth()->user()->papers()->create($data);
+            if ($usage) {
+                DB::table('subscription_question_usages')->where('id', $usage->id)->update(['paper_id' => $paper->id]);
+            }
+            $this->recordPaperActivity(
+                $paper,
+                AuditEvent::Created,
+                $paper->is_draft ? 'drafted' : 'generated',
+            );
+
+            return $paper;
+        });
 
         return response()->json([
             'id' => $paper->id,

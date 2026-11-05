@@ -353,6 +353,10 @@ class CustomerSubscriptionController extends Controller
 
         DB::transaction(function () use ($validated, $startedAt, $expiredAt, $paymentDueDate, $duration, $subscription, $oldValues, $accessScope, $summaryIds) {
             $isQuestionBased = $validated['is_question_based'] ?? false;
+            $newAllowed = $isQuestionBased ? (int) $validated['allowed_questions'] : null;
+            $usedQuestions = $subscription->is_question_based
+                ? max(0, (int) $subscription->allowed_questions - (int) ($subscription->remaining_questions ?? $subscription->allowed_questions))
+                : 0;
             $subscription->update([
                 'name' => $validated['name'],
                 'pattern_access' => $summaryIds['pattern_access'],
@@ -365,7 +369,8 @@ class CustomerSubscriptionController extends Controller
                 'allow_subjective_answers' => $validated['allow_subjective_answers'] ?? false,
                 'max_teachers' => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'is_question_based' => $isQuestionBased,
-                'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
+                'allowed_questions' => $newAllowed,
+                'remaining_questions' => $newAllowed === null ? null : max(0, $newAllowed - $usedQuestions),
                 'amount' => $validated['amount'],
                 'started_at' => $startedAt,
                 'duration' => $duration,
@@ -524,6 +529,7 @@ class CustomerSubscriptionController extends Controller
                 'max_teachers' => ($validated['allow_teachers'] ?? false) ? ($validated['max_teachers'] ?? null) : null,
                 'is_question_based' => $isQuestionBased,
                 'allowed_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
+                'remaining_questions' => $isQuestionBased ? ($validated['allowed_questions'] ?? null) : null,
                 'amount' => $validated['amount'],
                 'started_at' => $startedAt,
                 'duration' => $duration,

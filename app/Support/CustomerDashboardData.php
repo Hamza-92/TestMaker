@@ -64,6 +64,7 @@ class CustomerDashboardData
                 'subscription_ends_at' => $planEnd?->toISOString(),
                 'days_remaining' => $daysRemaining,
                 'subscription_remaining_percent' => $remainingPercent,
+                'question_quota' => SubscriptionQuestionQuota::summary($subscription),
                 'total_teachers' => $teacherCount,
                 'total_classes' => SchoolClass::query()
                     ->where('status', 1)

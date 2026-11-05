@@ -169,7 +169,7 @@ class CustomerController extends Controller
 
         $customer->load([
             'subscriptions' => fn ($q) => $q->latest('started_at')
-                ->select(['id', 'user_id', 'name', 'amount', 'allowed_questions', 'started_at', 'expired_at', 'duration', 'status']),
+                ->select(['id', 'user_id', 'name', 'amount', 'is_question_based', 'allowed_questions', 'remaining_questions', 'started_at', 'expired_at', 'duration', 'status']),
             'auditLogs' => fn ($q) => $q->with('changedBy:id,name')->latest('created_at'),
         ]);
 

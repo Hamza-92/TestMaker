@@ -161,6 +161,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
             Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
             Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
+            Route::post('papers/generate/charge', [GeneratePaperController::class, 'chargeQuestions'])->name('customer.papers.generate.charge');
             Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
         });
 
