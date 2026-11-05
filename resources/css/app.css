@@ -527,6 +527,29 @@ input[type='date']::-webkit-calendar-picker-indicator {
     font-weight: 700;
 }
 
+/* Rich question tables keep their authored grid after the CSS reset. */
+[data-print-paper] .paper-rich-text table[border]:not([border='0']) {
+    border-collapse: collapse;
+    border: 1px solid currentColor;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    margin-block: 0.35em;
+    transform: none;
+}
+
+[data-print-paper] .paper-rich-text table[border]:not([border='0']) :is(th, td) {
+    border: 1px solid currentColor;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    padding: 0.35em 0.3em;
+}
+
+[data-print-paper] .paper-rich-text table[border]:not([border='0']) :is(thead, tbody, tfoot, tr, th, td, strong) {
+    transform: none;
+}
+
 .paper-rich-text.inline,
 .paper-rich-text.inline :where(p, div) {
     display: inline;
