@@ -339,6 +339,33 @@ export default function QatMonthlyPage({
                                         )}
                                         <td className={cellClass}>
                                             <div className="flex items-center justify-end gap-2">
+                                                {level === 'chapter' &&
+                                                    baseUrl && (
+                                                        <Button
+                                                            asChild
+                                                            size="sm"
+                                                            className={
+                                                                blueAction
+                                                            }
+                                                        >
+                                                            <Link
+                                                                href={scopedUrl(
+                                                                    baseUrl,
+                                                                    {
+                                                                        ...context,
+                                                                        chapter:
+                                                                            row.id,
+                                                                        view: 'questions',
+                                                                    },
+                                                                )}
+                                                                aria-label={`View questions for ${name}`}
+                                                                className="whitespace-nowrap"
+                                                            >
+                                                                <ClipboardListIcon aria-hidden="true" />
+                                                                Questions
+                                                            </Link>
+                                                        </Button>
+                                                    )}
                                                 {row.url && (
                                                     <Button
                                                         asChild
