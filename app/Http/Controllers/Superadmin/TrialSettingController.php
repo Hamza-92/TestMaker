@@ -46,11 +46,16 @@ class TrialSettingController extends Controller
             'topic_access.*.*' => ['integer', 'distinct'],
         ]);
 
+        $settings = TrialSetting::current();
         $accessScope = SubscriptionAccess::normalizeScope($data['access_scope'] ?? null, $resources);
-        $chapterAccess = $this->validatedContentRules($data['chapter_access'] ?? [], 'chapter_access');
-        $topicAccess = $this->validatedContentRules($data['topic_access'] ?? [], 'topic_access', $chapterAccess);
+        $chapterAccess = $this->validatedContentRules(
+            $data['chapter_access'] ?? [], 'chapter_access', [], $settings->chapter_access ?? [],
+        );
+        $topicAccess = $this->validatedContentRules(
+            $data['topic_access'] ?? [], 'topic_access', $chapterAccess, $settings->topic_access ?? [],
+        );
 
-        TrialSetting::current()->update([
+        $settings->update([
             'trial_duration_days' => $data['trial_duration_days'],
             'allow_subjective_answers' => $data['allow_subjective_answers'] ?? false,
             'access_scope' => $accessScope,
@@ -98,7 +103,7 @@ class TrialSettingController extends Controller
         return response()->json(['chapters' => $chapters]);
     }
 
-    private function validatedContentRules(array $rules, string $field, array $chapterRules = []): array
+    private function validatedContentRules(array $rules, string $field, array $chapterRules = [], array $previousRules = []): array
     {
         $normalized = [];
 
@@ -114,6 +119,10 @@ class TrialSettingController extends Controller
                 ->where('class_id', $classId)
                 ->where('subject_id', $subjectId)
                 ->exists()) {
+                if (array_key_exists($key, $previousRules)) {
+                    continue;
+                }
+
                 throw ValidationException::withMessages([$field => 'Select an assigned subject.']);
             }
 
@@ -131,11 +140,19 @@ class TrialSettingController extends Controller
                 ->where('chapters.class_id', $classId)
                 ->where('chapters.subject_id', $subjectId);
 
-            if ($query->count() !== count($ids)) {
-                throw ValidationException::withMessages([$field => 'Select only active content within this subject.']);
+            $validIds = $query->pluck($field === 'chapter_access' ? 'chapters.id' : 'topics.id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            sort($validIds, SORT_NUMERIC);
+            $invalidIds = array_diff($ids, $validIds);
+            $previousIds = array_map('intval', $previousRules[$key] ?? []);
+            if (array_diff($invalidIds, $previousIds) !== []) {
+                throw ValidationException::withMessages([
+                    $field => "Content for {$key} has changed. Reopen this subject and select active chapters or topics.",
+                ]);
             }
 
-            $normalized[$key] = $ids;
+            $normalized[$key] = $validIds;
         }
 
         return $normalized;

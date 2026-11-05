@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { BookOpenCheckIcon, ClockIcon, SaveIcon } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { HierarchicalAccessControl } from '@/components/subscription-access-control';
 import { TrialSubjectContentDialog } from '@/components/trial-subject-content-dialog';
 import type { TrialContentRules } from '@/components/trial-subject-content-dialog';
@@ -79,7 +80,7 @@ export default function TrialSettingsPage({
     classSubjectMap,
 }: Props) {
     const { state: sidebarState } = useSidebar();
-    const { data, setData, put, processing, errors, isDirty } =
+    const { data, setData, setDefaults, put, processing, errors, isDirty } =
         useForm<FormData>({
             trial_duration_days: settings.trial_duration_days,
             allow_subjective_answers: settings.allow_subjective_answers,
@@ -130,7 +131,29 @@ export default function TrialSettingsPage({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put('/superadmin/trial-settings');
+        put('/superadmin/trial-settings', {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const saved = (
+                    page.props as unknown as { settings: TrialSettings }
+                ).settings;
+                const savedData: FormData = {
+                    trial_duration_days: saved.trial_duration_days,
+                    allow_subjective_answers: saved.allow_subjective_answers,
+                    access_scope: saved.access_scope,
+                    chapter_access: saved.chapter_access ?? {},
+                    topic_access: saved.topic_access ?? {},
+                };
+                setDefaults(savedData);
+                setData(savedData);
+                toast.success('Trial settings saved.');
+            },
+            onError: (saveErrors) =>
+                toast.error(
+                    Object.values(saveErrors)[0] ??
+                        'Unable to save trial settings. Please try again.',
+                ),
+        });
     };
 
     return (
@@ -267,7 +290,7 @@ export default function TrialSettingsPage({
                     {/* Actions */}
                     <div
                         className={cn(
-                            'fixed right-0 bottom-0 left-0 z-20 flex items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.35)] backdrop-blur transition-[left] duration-200 md:right-2 md:bottom-2 md:rounded-b-xl md:px-6',
+                            'fixed bottom-0 left-0 right-0 z-20 flex items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.35)] backdrop-blur transition-[left] duration-200 md:bottom-2 md:right-2 md:rounded-b-xl md:px-6',
                             sidebarState === 'collapsed'
                                 ? 'md:left-[calc(var(--sidebar-width-icon)+1rem)]'
                                 : 'md:left-[var(--sidebar-width)]',

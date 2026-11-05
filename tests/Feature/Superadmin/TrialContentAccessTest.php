@@ -70,6 +70,58 @@ it('rejects topics outside the selected trial chapters', function () {
     ])->assertRedirect(route('superadmin.trial-settings'))->assertSessionHasErrors('topic_access');
 });
 
+it('saves new trial selections when an older saved chapter or topic became inactive', function () {
+    $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value]);
+    $pattern = Pattern::create(['name' => 'Trial Pattern', 'status' => 1]);
+    $class = SchoolClass::create(['name' => 'Trial Class', 'status' => 1]);
+    $subject = Subject::create(['name_eng' => 'Trial Subject', 'subject_type' => 'chapter-wise', 'status' => 1]);
+    ClassSubject::create(['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id]);
+    $oldChapter = Chapter::create([
+        'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+        'name' => 'Inactive chapter', 'status' => 0,
+    ]);
+    $oldTopic = Topic::create(['chapter_id' => $oldChapter->id, 'name' => 'Inactive topic', 'status' => 0]);
+    $newChapter = Chapter::create([
+        'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+        'name' => 'Active chapter', 'status' => 1,
+    ]);
+    $newTopic = Topic::create(['chapter_id' => $newChapter->id, 'name' => 'Active topic', 'status' => 1]);
+    $key = "{$pattern->id}:{$class->id}:{$subject->id}";
+    TrialSetting::current()->update([
+        'chapter_access' => [$key => [$oldChapter->id]],
+        'topic_access' => [$key => [$oldTopic->id]],
+    ]);
+
+    $this->actingAs($admin)->put(route('superadmin.trial-settings.update'), [
+        'trial_duration_days' => 30,
+        'access_scope' => null,
+        'chapter_access' => [$key => [$oldChapter->id, $newChapter->id]],
+        'topic_access' => [$key => [$oldTopic->id, $newTopic->id]],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(TrialSetting::current()->refresh()->chapter_access)->toBe([$key => [$newChapter->id]])
+        ->and(TrialSetting::current()->refresh()->topic_access)->toBe([$key => [$newTopic->id]]);
+});
+
+it('still rejects newly submitted inactive trial chapters', function () {
+    $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value]);
+    $pattern = Pattern::create(['name' => 'Trial Pattern', 'status' => 1]);
+    $class = SchoolClass::create(['name' => 'Trial Class', 'status' => 1]);
+    $subject = Subject::create(['name_eng' => 'Trial Subject', 'subject_type' => 'chapter-wise', 'status' => 1]);
+    ClassSubject::create(['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id]);
+    $chapter = Chapter::create([
+        'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+        'name' => 'Inactive chapter', 'status' => 0,
+    ]);
+
+    $this->actingAs($admin)->from(route('superadmin.trial-settings'))->put(route('superadmin.trial-settings.update'), [
+        'trial_duration_days' => 30,
+        'access_scope' => null,
+        'chapter_access' => ["{$pattern->id}:{$class->id}:{$subject->id}" => [$chapter->id]],
+        'topic_access' => [],
+    ])->assertRedirect(route('superadmin.trial-settings'))->assertSessionHasErrors('chapter_access');
+});
+
 it('converts existing global trial selections into subject rules without losing selected ids', function () {
     $pattern = Pattern::create(['name' => 'Trial Pattern', 'status' => 1]);
     $class = SchoolClass::create(['name' => 'Trial Class', 'status' => 1]);

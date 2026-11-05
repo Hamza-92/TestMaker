@@ -97,11 +97,17 @@ export function TrialSubjectContentDialog({
 
     const chapters = resource?.chapters ?? [];
     const allChapterIds = chapters.map((chapter) => chapter.id);
-    const selectedChapterIds = draftChapters ?? allChapterIds;
+    const selectedChapterIds =
+        draftChapters === null
+            ? allChapterIds
+            : draftChapters.filter((id) => allChapterIds.includes(id));
     const availableTopicIds = chapters
         .filter((chapter) => selectedChapterIds.includes(chapter.id))
         .flatMap((chapter) => chapter.topics.map((topic) => topic.id));
-    const selectedTopicIds = draftTopics ?? availableTopicIds;
+    const selectedTopicIds =
+        draftTopics === null
+            ? availableTopicIds
+            : draftTopics.filter((id) => availableTopicIds.includes(id));
 
     function toggleChapter(chapter: TrialChapter, checked: boolean) {
         setDraftChapters(
@@ -161,7 +167,7 @@ export function TrialSubjectContentDialog({
             }}
         >
             <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-                <DialogHeader className="shrink-0 px-6 pt-6 pr-12 pb-3">
+                <DialogHeader className="shrink-0 px-6 pb-3 pr-12 pt-6">
                     <DialogTitle>
                         Chapters &amp; topics — {subjectName}
                     </DialogTitle>
