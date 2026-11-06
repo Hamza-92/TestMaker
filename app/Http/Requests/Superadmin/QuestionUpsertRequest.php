@@ -28,7 +28,6 @@ class QuestionUpsertRequest extends FormRequest
             'medium_id' => ['nullable', 'integer', Rule::exists('mediums', 'id')],
             'topic_id' => ['nullable', 'integer', Rule::exists('topics', 'id')],
             'content' => ['required', 'array'],
-            'content.verse_layout_override' => ['sometimes', 'nullable', Rule::in(['default', 'on', 'off'])],
             'source' => ['nullable', 'string', 'max:100', Rule::in(Question::sourceValues())],
             'status' => ['required', 'boolean'],
         ];
@@ -47,7 +46,10 @@ class QuestionUpsertRequest extends FormRequest
                 return;
             }
 
-            if ($questionType->is_objective && $this->input('content.verse_layout_override') === 'on') {
+            $verseOverride = $this->input('content.verse_layout_override');
+            if ($verseOverride !== null && ! in_array($verseOverride, ['default', 'on', 'off'], true)) {
+                $validator->errors()->add('content.verse_layout_override', 'Select a valid verse layout setting.');
+            } elseif ($questionType->is_objective && $verseOverride === 'on') {
                 $validator->errors()->add('content.verse_layout_override', 'Verse layout is available for subjective questions.');
             }
 

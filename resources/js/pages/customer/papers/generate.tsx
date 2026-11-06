@@ -67,6 +67,7 @@ import {
     pickBalancedQuestions,
     recordBalancedQuestion,
 } from './balanced-question-picker';
+import { createPaperGenerationId } from './paper-generation-id';
 import {
     AnswerKeySheet,
     SubjectiveAnswerSheet,
@@ -6383,7 +6384,7 @@ export default function GeneratePaper({
             }
 
             const newPaper: GeneratedPaper = {
-                id: `paper_${crypto.randomUUID()}`,
+                id: createPaperGenerationId(),
                 selectedChapterNumbers,
                 header: {
                     schoolName: defaultSchoolName,

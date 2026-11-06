@@ -250,7 +250,8 @@ it('stores and clears a subjective question verse layout override', function () 
         ->assertSessionHasNoErrors();
 
     $question = Question::query()->sole();
-    expect($question->content['verse_layout_override'])->toBe('off');
+    expect($question->content['verse_layout_override'])->toBe('off')
+        ->and($question->statement_ur)->toBe($payload['content']['prompt_ur']);
 
     $this->getJson(route('superadmin.questions.edit', $question))
         ->assertOk()
@@ -264,7 +265,8 @@ it('stores and clears a subjective question verse layout override', function () 
         ],
     ])->assertSessionHasNoErrors();
 
-    expect(array_key_exists('verse_layout_override', $question->fresh()->content))->toBeFalse();
+    expect(array_key_exists('verse_layout_override', $question->fresh()->content))->toBeFalse()
+        ->and($question->fresh()->statement_ur)->toBe($payload['content']['prompt_ur']);
 });
 
 it('sorts questions within one chapter topic and question type scope', function () {
