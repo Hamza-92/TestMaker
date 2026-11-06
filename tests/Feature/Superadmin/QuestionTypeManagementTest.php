@@ -141,6 +141,7 @@ it('creates a question type and normalizes dependent fields', function () {
             'is_single' => false,
             'is_objective' => false,
             'question_text_rtl' => true,
+            'verse_layout' => true,
             'column_per_row' => 3,
             'schema_key' => 'subjective_standard',
             'status' => true,
@@ -157,6 +158,7 @@ it('creates a question type and normalizes dependent fields', function () {
         ->and($questionType->description_label)->toBe('Guidance')
         ->and($questionType->objective_type_id)->toBeNull()
         ->and($questionType->question_text_rtl)->toBeTrue()
+        ->and($questionType->usesVerseLayout())->toBeTrue()
         ->and($questionType->column_per_row)->toBe(3);
 });
 

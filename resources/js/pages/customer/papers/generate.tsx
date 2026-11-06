@@ -654,6 +654,7 @@ type ContentMedium = 'English' | 'Urdu' | 'Both';
 
 interface ManualQuestion {
     id: number;
+    verseLayout?: boolean;
     summaryText: string;
     summaryTextEn?: string | null;
     summaryTextUr?: string | null;
@@ -1695,6 +1696,7 @@ function paperQuestionFromManual(
     return {
         id,
         sourceQuestionId: question.id,
+        verseLayout: question.verseLayout === true,
         optionsOnly: question.optionsOnly,
         text: question.optionsOnly
             ? ''

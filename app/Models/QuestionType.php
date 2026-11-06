@@ -26,6 +26,7 @@ class QuestionType extends Model
         'is_objective',
         'options_only',
         'question_text_rtl',
+        'verse_layout',
         'schema_key',
         'objective_type_id',
         'column_per_row',
@@ -44,9 +45,26 @@ class QuestionType extends Model
             'is_objective' => 'boolean',
             'options_only' => 'boolean',
             'question_text_rtl' => 'boolean',
+            'verse_layout' => 'boolean',
             'column_per_row' => 'integer',
             'status' => 'integer',
         ];
+    }
+
+    public function usesVerseLayout(): bool
+    {
+        if ($this->is_objective) {
+            return false;
+        }
+
+        if ($this->verse_layout !== null) {
+            return (bool) $this->verse_layout;
+        }
+
+        return preg_match(
+            '/اشعار|شعر|غزل|نظمیہ جزو|stanza/iu',
+            trim((string) $this->name.' '.(string) $this->name_ur),
+        ) === 1;
     }
 
     public function objectiveType(): BelongsTo

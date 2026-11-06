@@ -23,6 +23,8 @@ export interface GeneratedPaperPassageQuestion {
 export interface GeneratedPaperQuestion {
     id: string;
     sourceQuestionId: number | null;
+    /** Format verse lines without changing the saved question text. */
+    verseLayout?: boolean;
     optionsOnly?: boolean;
     text: string;
     /** Additional subjective content shown beneath the statement in Federal OR tables. */

@@ -46,6 +46,7 @@ export interface QuestionTypeFormData {
     is_objective: boolean;
     options_only: boolean;
     question_text_rtl: boolean;
+    verse_layout: boolean;
     column_per_row: number;
     schema_key: string;
     status: string;
@@ -238,6 +239,15 @@ export function QuestionTypeForm({
                             form.setData('question_text_rtl', checked)
                         }
                     />
+                    {!form.data.is_objective && (
+                        <SwitchRow
+                            checked={form.data.verse_layout}
+                            label="Verse layout"
+                            onCheckedChange={(checked) =>
+                                form.setData('verse_layout', checked)
+                            }
+                        />
+                    )}
                 </div>
             ) : null}
         </>

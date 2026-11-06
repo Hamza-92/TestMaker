@@ -109,6 +109,7 @@ export interface QuestionTypeOption {
     is_single: boolean;
     have_answer: boolean;
     supports_simple_import: boolean;
+    verse_layout: boolean;
     schema_key: string;
     schema: QuestionSchemaOption;
     scope_rules: {
@@ -178,6 +179,7 @@ export interface QuestionPairFormData {
 }
 
 export interface QuestionContentFormData {
+    verse_layout_override?: string;
     prompt_en: string;
     prompt_ur: string;
     shared_en: string;
@@ -397,6 +399,7 @@ export function createEmptyQuestionContent(
     schemaKey = 'subjective_standard',
 ): QuestionContentFormData {
     return {
+        verse_layout_override: 'default',
         prompt_en: '',
         prompt_ur: '',
         shared_en: '',
@@ -1911,6 +1914,42 @@ export function QuestionForm({
                                     </Select>
                                 )}
                             </Field>
+                            {selectedType && !selectedType.is_objective && (
+                                <Field label="Verse layout">
+                                    <Select
+                                        value={
+                                            form.data.content
+                                                .verse_layout_override ??
+                                            'default'
+                                        }
+                                        onValueChange={(value) =>
+                                            setContentValue(
+                                                'verse_layout_override',
+                                                value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="default">
+                                                Question type default (
+                                                {selectedType.verse_layout
+                                                    ? 'on'
+                                                    : 'off'}
+                                                )
+                                            </SelectItem>
+                                            <SelectItem value="on">
+                                                On
+                                            </SelectItem>
+                                            <SelectItem value="off">
+                                                Off
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </Field>
+                            )}
                         </div>
 
                         {selectedType && (

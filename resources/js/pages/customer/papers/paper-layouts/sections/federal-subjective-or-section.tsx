@@ -132,6 +132,7 @@ function FederalQuestionCell({
     const questionContent = (
         <BilingualTableContent
             value={displayText}
+            verseLayout={question.verseLayout}
             urduOnly={urduOnly}
             forceRtl={section.questionTextRtl}
         />

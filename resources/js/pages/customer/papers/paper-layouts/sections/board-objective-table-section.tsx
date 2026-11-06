@@ -238,6 +238,7 @@ export function BilingualTableContent({
     centered = false,
     collapseIdentical = false,
     showCorrectAnswer = false,
+    verseLayout = false,
 }: {
     value: string;
     urduOnly: boolean;
@@ -245,6 +246,7 @@ export function BilingualTableContent({
     centered?: boolean;
     collapseIdentical?: boolean;
     showCorrectAnswer?: boolean;
+    verseLayout?: boolean;
 }) {
     const parts = splitBilingualParts(value);
 
@@ -268,7 +270,11 @@ export function BilingualTableContent({
                 }
             >
                 <CorrectAnswerTick show={showCorrectAnswer} />{' '}
-                <QuestionContent value={parts.english} />
+                <QuestionContent
+                    value={parts.english}
+                    verseLayout={verseLayout}
+                    verseDirection={rtl ? 'rtl' : 'ltr'}
+                />
             </div>
         );
     }
@@ -284,7 +290,11 @@ export function BilingualTableContent({
                     className={centered ? 'text-center' : 'text-left'}
                 >
                     <CorrectAnswerTick show={showCorrectAnswer} />{' '}
-                    <QuestionContent value={parts.english} />
+                    <QuestionContent
+                        value={parts.english}
+                        verseLayout={verseLayout}
+                        verseDirection="ltr"
+                    />
                 </div>
                 <div
                     dir="rtl"
@@ -292,7 +302,11 @@ export function BilingualTableContent({
                     className={centered ? 'text-center' : 'text-right'}
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
-                    <QuestionContent value={parts.urdu} />
+                    <QuestionContent
+                        value={parts.urdu}
+                        verseLayout={verseLayout}
+                        verseDirection="rtl"
+                    />
                 </div>
             </div>
         );
@@ -311,7 +325,11 @@ export function BilingualTableContent({
             style={rtl ? { fontFamily: 'var(--paper-urdu-font)' } : undefined}
         >
             <CorrectAnswerTick show={showCorrectAnswer} />{' '}
-            <QuestionContent value={value} />
+            <QuestionContent
+                value={value}
+                verseLayout={verseLayout}
+                verseDirection={rtl ? 'rtl' : 'ltr'}
+            />
         </div>
     );
 }

@@ -39,6 +39,7 @@ class QuestionTypeUpsertRequest extends FormRequest
             'is_objective' => ['required', 'boolean'],
             'options_only' => ['sometimes', 'boolean'],
             'question_text_rtl' => ['sometimes', 'boolean'],
+            'verse_layout' => ['sometimes', 'boolean'],
             'column_per_row' => ['sometimes', 'integer', 'between:1,5'],
             'schema_key' => [
                 'required',
@@ -71,6 +72,7 @@ class QuestionTypeUpsertRequest extends FormRequest
             'is_objective' => $this->boolean('is_objective'),
             'options_only' => $this->boolean('options_only'),
             'question_text_rtl' => $this->boolean('question_text_rtl'),
+            ...($this->exists('verse_layout') ? ['verse_layout' => $this->boolean('verse_layout')] : []),
             'schema_key' => $this->normalizeNullableString(
                 $this->input('schema_key'),
             ) ?? QuestionTypeSchemaRegistry::infer(

@@ -108,6 +108,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                             )}
                             <QuestionContent
                                 value={question.text}
+                                verseLayout={question.verseLayout}
                                 inline
                                 className="align-baseline"
                             />
@@ -119,7 +120,7 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                             key={question.id}
                             data-paper-question
                             className={
-                                question.sameStatement
+                                question.sameStatement || question.verseLayout
                                     ? 'mr-4 inline-block w-full align-top'
                                     : 'mr-4 inline align-baseline'
                             }

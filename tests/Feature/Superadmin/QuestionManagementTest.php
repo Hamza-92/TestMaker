@@ -227,6 +227,46 @@ it('saves an edited question as JSON for the modal', function () {
     expect($question->fresh()->statement_en)->toBe('Updated question');
 });
 
+it('stores and clears a subjective question verse layout override', function () {
+    $admin = makeQuestionAdmin();
+    $questionType = makeObjectiveQuestionTypeForManagement($admin, [
+        'is_objective' => false,
+        'schema_key' => 'subjective_standard',
+        'verse_layout' => true,
+    ]);
+    $context = makeQuestionContextForManagement($admin);
+    $payload = [
+        'question_type_id' => $questionType->id,
+        'chapter_id' => $context['chapter']->id,
+        'status' => true,
+        'content' => [
+            'prompt_ur' => 'پہلا مصرع &emsp; دوسرا مصرع',
+            'verse_layout_override' => 'off',
+        ],
+    ];
+
+    $this->actingAs($admin)
+        ->post(route('superadmin.questions.store'), $payload)
+        ->assertSessionHasNoErrors();
+
+    $question = Question::query()->sole();
+    expect($question->content['verse_layout_override'])->toBe('off');
+
+    $this->getJson(route('superadmin.questions.edit', $question))
+        ->assertOk()
+        ->assertJsonPath('question.verse_layout_override', 'off');
+
+    $this->put(route('superadmin.questions.update', $question), [
+        ...$payload,
+        'content' => [
+            ...$payload['content'],
+            'verse_layout_override' => 'default',
+        ],
+    ])->assertSessionHasNoErrors();
+
+    expect(array_key_exists('verse_layout_override', $question->fresh()->content))->toBeFalse();
+});
+
 it('sorts questions within one chapter topic and question type scope', function () {
     $admin = makeQuestionAdmin();
     $questionType = makeObjectiveQuestionTypeForManagement($admin);

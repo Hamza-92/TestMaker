@@ -193,6 +193,7 @@ function SubjectiveQuestionItem({
         >
             <BilingualQuestionRow
                 value={question.text}
+                verseLayout={question.verseLayout}
                 indexLabel={formatQuestionLabel(
                     index,
                     numberingFormat,

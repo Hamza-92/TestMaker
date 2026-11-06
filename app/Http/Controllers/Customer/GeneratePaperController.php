@@ -648,6 +648,11 @@ class GeneratePaperController extends Controller
                     'descriptionTextEn' => $question->questionType->is_objective ? null : $question->description_en,
                     'descriptionTextUr' => $question->questionType->is_objective ? null : $question->description_ur,
                     'medium' => $displayMedium,
+                    'verseLayout' => $question->questionType->is_objective ? false : match ($content['verse_layout_override'] ?? null) {
+                        'on' => true,
+                        'off' => false,
+                        default => $question->questionType->usesVerseLayout(),
+                    },
                     'schemaKey' => $schema['key'],
                     'isObjective' => (bool) $question->questionType->is_objective,
                     'optionsOnly' => (bool) $question->questionType->options_only,

@@ -14,6 +14,7 @@ interface BilingualQuestionRowProps {
     hideMarks?: boolean;
     sameStatement?: string | null;
     spaceAfterIndex?: boolean;
+    verseLayout?: boolean;
 }
 
 export interface BilingualParts {
@@ -70,6 +71,7 @@ export function BilingualQuestionRow({
     hideMarks = false,
     sameStatement = null,
     spaceAfterIndex = false,
+    verseLayout = false,
 }: BilingualQuestionRowProps) {
     const parts = splitBilingualParts(value);
     const sharedParts = sameStatement
@@ -102,6 +104,8 @@ export function BilingualQuestionRow({
                     </span>{' '}
                     <QuestionContent
                         value={parts.english}
+                        verseLayout={verseLayout}
+                        verseDirection="ltr"
                         inline
                         className="min-w-0 flex-1 align-baseline"
                     />
@@ -110,6 +114,8 @@ export function BilingualQuestionRow({
                 <div dir="ltr" className="min-w-0 max-w-[18rem] text-center">
                     <QuestionContent
                         value={sharedParts?.english ?? sameStatement}
+                        verseLayout={verseLayout}
+                        verseDirection="ltr"
                         inline
                         className="align-baseline"
                     />
@@ -126,6 +132,8 @@ export function BilingualQuestionRow({
                     </span>{' '}
                     <QuestionContent
                         value={parts.urdu}
+                        verseLayout={verseLayout}
+                        verseDirection="rtl"
                         inline
                         className="min-w-0 flex-1 text-right align-baseline"
                     />
@@ -153,6 +161,8 @@ export function BilingualQuestionRow({
                 </span>{' '}
                 <QuestionContent
                     value={value}
+                    verseLayout={verseLayout}
+                    verseDirection={isRtl ? 'rtl' : 'ltr'}
                     inline
                     className={`min-w-0 flex-1 align-baseline ${isRtl ? 'text-right' : ''}`}
                 />
@@ -172,6 +182,7 @@ export function BilingualQuestionRow({
                 >
                     <QuestionContent
                         value={sameStatement}
+                        verseLayout={verseLayout}
                         inline
                         className="align-baseline"
                     />
@@ -195,6 +206,8 @@ export function BilingualQuestionRow({
                     </span>{' '}
                     <QuestionContent
                         value={value}
+                        verseLayout={verseLayout}
+                        verseDirection="rtl"
                         inline
                         className="min-w-0 flex-1 text-right align-baseline"
                     />
@@ -209,6 +222,8 @@ export function BilingualQuestionRow({
                 </span>{' '}
                 <QuestionContent
                     value={value}
+                    verseLayout={verseLayout}
+                    verseDirection="ltr"
                     inline
                     className="min-w-0 flex-1 align-baseline"
                 />
@@ -230,6 +245,8 @@ export function BilingualQuestionRow({
                 </span>{' '}
                 <QuestionContent
                     value={parts.english}
+                    verseLayout={verseLayout}
+                    verseDirection="ltr"
                     inline
                     className="min-w-0 flex-1 align-baseline"
                 />
@@ -252,6 +269,8 @@ export function BilingualQuestionRow({
                 </span>{' '}
                 <QuestionContent
                     value={parts.urdu}
+                    verseLayout={verseLayout}
+                    verseDirection="rtl"
                     inline
                     className="min-w-0 flex-1 text-right align-baseline"
                 />

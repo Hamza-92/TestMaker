@@ -4,12 +4,15 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { markArabicQuestionHtml } from './arabic-question-font';
 import { questionTextToHtml } from './question-html';
+import { formatVerseHtml } from './verse-html';
 
 interface QuestionContentProps {
     value: string;
     className?: string;
     inline?: boolean;
     as?: 'div' | 'span';
+    verseLayout?: boolean;
+    verseDirection?: 'ltr' | 'rtl';
 }
 
 const ArabicQuestionFontContext = createContext(false);
@@ -33,9 +36,14 @@ export function QuestionContent({
     className,
     inline = false,
     as: Component = 'div',
+    verseLayout = false,
+    verseDirection,
 }: QuestionContentProps) {
     const enableArabicFont = useContext(ArabicQuestionFontContext);
-    const html = questionTextToHtml(value);
+    const sourceHtml = questionTextToHtml(value);
+    const html = verseLayout
+        ? formatVerseHtml(sourceHtml, verseDirection)
+        : sourceHtml;
 
     return (
         <Component

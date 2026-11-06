@@ -718,6 +718,7 @@ class QuestionController extends Controller
                 'topic_id' => $question->topic_id,
                 'source' => $question->source,
                 'status' => $question->status,
+                'verse_layout_override' => $question->content['verse_layout_override'] ?? 'default',
                 'schema_key' => QuestionTypeSchemaRegistry::typeForQuestion(
                     $question,
                     $question->questionType,
@@ -852,6 +853,16 @@ class QuestionController extends Controller
             $effectiveType,
             $validated['content'] ?? [],
         );
+
+        $verseOverride = $validated['content']['verse_layout_override'] ?? null;
+        if (in_array($verseOverride, ['on', 'off'], true)) {
+            $questionPayload['content']['verse_layout_override'] = $verseOverride;
+        } elseif ($existingQuestion !== null && ! array_key_exists('verse_layout_override', $validated['content'] ?? [])) {
+            $existingOverride = $existingQuestion->content['verse_layout_override'] ?? null;
+            if (in_array($existingOverride, ['on', 'off'], true)) {
+                $questionPayload['content']['verse_layout_override'] = $existingOverride;
+            }
+        }
 
         return [[
             'question_type_id' => $questionType->id,
@@ -1068,6 +1079,7 @@ class QuestionController extends Controller
                 'schema_key',
                 'objective_type_id',
                 'column_per_row',
+                'verse_layout',
                 'status',
             ])
             ->map(fn (QuestionType $questionType) => $this->serializeQuestionType($questionType))
@@ -1082,7 +1094,7 @@ class QuestionController extends Controller
             ->get([
                 'id', 'name', 'heading_en', 'is_objective', 'options_only', 'is_single',
                 'have_answer', 'have_description', 'schema_key', 'objective_type_id',
-                'column_per_row', 'status',
+                'column_per_row', 'verse_layout', 'status',
             ]);
 
         return QuestionTypeHeadingResolver::apply(
@@ -1526,6 +1538,7 @@ class QuestionController extends Controller
             'is_single' => $questionType->is_single,
             'have_answer' => $questionType->have_answer,
             'supports_simple_import' => QuestionTypeSchemaRegistry::supportsSimpleImport($questionType),
+            'verse_layout' => $questionType->usesVerseLayout(),
             'schema_key' => $schema['key'],
             'schema' => $schema,
             'scope_rules' => $questionType->relationLoaded('headingRules')

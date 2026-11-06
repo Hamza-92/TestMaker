@@ -192,6 +192,7 @@ export function MultipartSection({
                             const questionRow = (
                                 <BilingualQuestionRow
                                     value={questionValue}
+                                    verseLayout={part.question.verseLayout}
                                     indexLabel={indexLabel}
                                     urduIndexLabel={urduIndexLabel}
                                     labelSuffix={singlePart ? '' : ')'}

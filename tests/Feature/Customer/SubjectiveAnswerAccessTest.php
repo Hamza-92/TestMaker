@@ -148,6 +148,31 @@ test('subjective answers are returned when trial access is enabled', function ()
         );
 });
 
+test('paper question responses apply the question verse override over the type default', function () {
+    $customer = subjectiveAnswerCustomer();
+    [$chapter, $questionType, $question] = subjectiveAnswerQuestionScope();
+    TrialSetting::current()->update(['access_scope' => null]);
+    $questionType->update(['verse_layout' => true]);
+    $url = route('customer.papers.generate.questions', [
+        'chapter_ids' => [$chapter->id],
+        'sources' => [Question::SOURCE_EXERCISE],
+        'question_type_id' => $questionType->id,
+    ]);
+
+    $this->actingAs($customer)->getJson($url)
+        ->assertOk()
+        ->assertJsonPath('questions.0.verseLayout', true);
+
+    $question->update(['content' => [
+        ...$question->content,
+        'verse_layout_override' => 'off',
+    ]]);
+
+    $this->getJson($url)
+        ->assertOk()
+        ->assertJsonPath('questions.0.verseLayout', false);
+});
+
 test('an active subscription overrides the trial subjective answer setting', function () {
     $customer = subjectiveAnswerCustomer();
     TrialSetting::current()->update(['allow_subjective_answers' => true]);

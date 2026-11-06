@@ -491,6 +491,7 @@ class QuestionTypeController extends Controller
                 'is_objective' => $questionType->is_objective,
                 'options_only' => $questionType->options_only,
                 'question_text_rtl' => $questionType->question_text_rtl,
+                'verse_layout' => $questionType->usesVerseLayout(),
                 'column_per_row' => $questionType->column_per_row,
                 'schema_key' => QuestionTypeSchemaRegistry::resolve(
                     $questionType->schema_key,
@@ -594,6 +595,9 @@ class QuestionTypeController extends Controller
             'is_objective' => $isObjective,
             'options_only' => $legacy['options_only'],
             'question_text_rtl' => (bool) ($validated['question_text_rtl'] ?? false),
+            'verse_layout' => $isObjective
+                ? false
+                : (bool) ($validated['verse_layout'] ?? $existing?->usesVerseLayout() ?? false),
             'schema_key' => $schema['key'],
             'objective_type_id' => $legacy['objective_type_id'],
             'column_per_row' => $isObjective
@@ -616,6 +620,7 @@ class QuestionTypeController extends Controller
             'is_objective' => $questionType->is_objective,
             'options_only' => $questionType->options_only,
             'question_text_rtl' => $questionType->question_text_rtl,
+            'verse_layout' => $questionType->usesVerseLayout(),
             'column_per_row' => $questionType->column_per_row,
             'schema' => QuestionTypeSchemaRegistry::resolve(
                 $questionType->schema_key,
