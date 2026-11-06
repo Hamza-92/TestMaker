@@ -1991,11 +1991,11 @@ function answerTextFromManual(question: ManualQuestion): string | null {
         const flag = String(content.correct_boolean ?? '').toLowerCase();
 
         if (flag === 'true') {
-            return 'True';
+            return localizedPaperHtml('True', 'درست', question.medium);
         }
 
         if (flag === 'false') {
-            return 'False';
+            return localizedPaperHtml('False', 'غلط', question.medium);
         }
 
         return null;
@@ -2028,6 +2028,7 @@ function createCustomPaperQuestion(id: string): GeneratedPaperQuestion {
 
 function paperOptionsFromManual(
     question: ManualQuestion,
+    medium = question.medium,
 ): PaperQuestionOption[] {
     if (question.schemaKey === 'objective_true_false') {
         const flag = String(
@@ -2037,12 +2038,12 @@ function paperOptionsFromManual(
         return [
             {
                 id: `${question.id}_true`,
-                text: 'True',
+                text: localizedPaperHtml('True', 'درست', medium),
                 isCorrect: flag === 'true',
             },
             {
                 id: `${question.id}_false`,
-                text: 'False',
+                text: localizedPaperHtml('False', 'غلط', medium),
                 isCorrect: flag === 'false',
             },
         ];
@@ -2064,7 +2065,7 @@ function manualPickerOptionsForMedium(
     }
 
     return question.schemaKey === 'objective_true_false'
-        ? paperOptionsFromManual(question)
+        ? paperOptionsFromManual(question, medium)
         : paperOptionsFromContent(
               question.content.options,
               `${question.id}_option`,
