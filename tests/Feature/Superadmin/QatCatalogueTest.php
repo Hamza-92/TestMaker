@@ -44,6 +44,7 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
     $first = Question::create([
         'question_type_id' => $type->id, 'chapter_id' => $chapter->id,
         'statement_en' => 'What do leaves do?', 'status' => 1,
+        'description_en' => '<p>Use <strong>the diagram</strong> and \(x^2\).</p>',
     ]);
     $second = Question::create([
         'question_type_id' => $type->id, 'chapter_id' => $chapter->id,
@@ -165,7 +166,9 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
     $this->get("{$april}?class={$qatClassId}")->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('rows.data.0.name', 'Science'));
     $this->get("{$april}?{$chapterQuery}&view=questions")->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->has('rows.data', 1)->where('rows.data.0.name', 'What do leaves do?'));
+        ->assertInertia(fn (Assert $page) => $page->has('rows.data', 1)
+            ->where('rows.data.0.statement_en', 'What do leaves do?')
+            ->where('rows.data.0.description_en', '<p>Use <strong>the diagram</strong> and \(x^2\).</p>'));
 
     $this->post(route('superadmin.qat-transfer.store'), [
         ...$withoutDescription, 'question_ids' => [$second->id],
@@ -214,9 +217,17 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
     $savedPaper = $this->postJson(route('customer.qat.previews.save', basename($generated->json('preview_url'))))
         ->assertCreated()->json('paper_id');
 
-    $this->actingAs($admin)->delete("{$april}/records/question/{$sharedQuestionId}", [
-        'class' => $qatClassId, 'subject' => $qatSubjectId, 'chapter' => $qatChapterId, 'view' => 'questions',
-    ])->assertRedirect("{$april}?{$chapterQuery}&view=questions");
+    $bulkUrl = "{$april}/chapters/{$qatChapterId}/questions/bulk";
+    $firstQatId = DB::table('qat_questions')->where('source_question_id', $first->id)->value('id');
+    $this->actingAs($admin)->post($bulkUrl, ['ids' => [$firstQatId, $sharedQuestionId + 999], 'action' => 'deactivate'])->assertNotFound();
+    $this->post($bulkUrl, ['ids' => [$firstQatId, $sharedQuestionId], 'action' => 'deactivate'])->assertRedirect();
+    $this->get("{$april}?{$chapterQuery}&view=questions&status=inactive")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('rows.data', 2)
+            ->where('rows.data.1.statement_en', 'April version of the roots question'));
+    $this->get("{$may}?{$chapterQuery}&view=questions&status=active")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('rows.data', 1));
+    $this->post($bulkUrl, ['ids' => [$firstQatId], 'action' => 'activate'])->assertRedirect();
+    $this->post($bulkUrl, ['ids' => [$sharedQuestionId], 'action' => 'remove'])->assertRedirect();
     $this->getJson(route('superadmin.qat-catalogue.questions.edit', $questionRoute))->assertNotFound();
     $this->getJson(route('superadmin.qat-transfer.syllabus-description', $scope))
         ->assertOk()->assertJsonPath('question_ids', [$first->id]);
@@ -260,6 +271,11 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     ]);
     QuestionOption::create(['question_id' => $question->id, 'text_en' => 'Make food', 'is_correct' => true, 'sort_order' => 1]);
     QuestionOption::create(['question_id' => $question->id, 'text_en' => 'Absorb sunlight', 'is_correct' => false, 'sort_order' => 2]);
+
+    $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.chapters', [
+        'source_pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
+    ]))->assertOk()->assertJsonPath('0.topics.0.id', $topic->id)
+        ->assertJsonPath('0.questions.0.topic_id', $topic->id);
 
     $payload = [
         'academic_year' => '2026-27', 'month' => 4, 'source_pattern_id' => $pattern->id,
@@ -446,6 +462,11 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $this->actingAs($admin)->getJson(route('superadmin.qat-catalogue.questions.edit', $questionRoute))
         ->assertJsonPath('question.schema_key', 'subjective_grouped')
         ->assertJsonPath('question.content.items.0.answer_en', 'Making food.');
+    $this->get(route('superadmin.qat-catalogue.months.show', [
+        'catalogue' => DB::table('qat_catalogues')->value('id'), 'month' => 4,
+        'class' => $qatClassId, 'subject' => $qatSubjectId, 'chapter' => $qatChapterId, 'view' => 'questions',
+    ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('rows.data.0.statement_en', 'Answer these questions about leaves.'));
     expect(Question::query()->findOrFail($question->id)->question_type_id)->toBe($type->id)
         ->and(QuestionOption::query()->where('question_id', $question->id)->count())->toBe(2);
 });

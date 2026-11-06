@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Superadmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\QuestionType;
 use App\Support\Qat\QatMonthlySyllabus;
+use App\Support\Questions\QuestionTypeSchemaRegistry;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -122,21 +124,35 @@ class QatMonthlyDataController extends Controller
         $topicOptions = isset($parents['chapter'])
             ? $this->records('topic', $catalogue, $month)->where('qat_chapter_id', $parents['chapter'])->orderBy('sort_id')->get(['id', 'name'])
             : collect();
-        $typeOptions = $level === 'question' ? DB::table('question_types')
+        $questionTypes = $level === 'question' ? QuestionType::query()
             ->whereIn('id', (clone $questions)->where('qat_chapter_id', $parents['chapter'])->select('question_type_id'))
-            ->orderBy('name')->get(['id', 'name']) : collect();
-        $typeNames = $typeOptions->pluck('name', 'id');
+            ->orderBy('name')->get()->keyBy('id') : collect();
+        $typeOptions = $questionTypes->map(fn (QuestionType $type) => $type->only('id', 'name'))->values();
         $topicNames = $topicOptions->pluck('name', 'id');
-        $rows->through(function ($row) use ($level, $parents, $base, $month, $typeNames, $topicNames) {
+        $rows->through(function ($row) use ($level, $parents, $base, $month, $questionTypes, $topicNames) {
             if (in_array($level, ['class', 'subject', 'chapter'], true)) {
                 $row->url = $base.'?'.http_build_query([...$parents, $level => $row->id]);
             } elseif ($level === 'topic') {
                 $row->url = $base.'?'.http_build_query([...$parents, 'view' => 'questions', 'topic' => $row->id]);
             } else {
                 $data = json_decode($row->question_data, true) ?: [];
-                $row->name = ($data['statement_en'] ?? '') ?: ($data['statement_ur'] ?? '');
-                $row->name = $row->name ?: ($data['content']['prompt_en'] ?? $data['content']['prompt_ur'] ?? $data['content']['intro_en'] ?? 'Question #'.$row->id);
-                $row->type_name = $data['question_type']['name'] ?? $typeNames->get($row->question_type_id) ?? 'Type '.$row->question_type_id;
+                $content = (array) ($data['content'] ?? []);
+                foreach (['en', 'ur'] as $language) {
+                    $row->{'statement_'.$language} = collect([
+                        $data['statement_'.$language] ?? null, $content['prompt_'.$language] ?? null,
+                        $content['passage_'.$language] ?? null, $content['intro_'.$language] ?? null,
+                        data_get($content, 'items.0.prompt_'.$language),
+                    ])->first(fn ($value) => is_string($value) && trim($value) !== '');
+                    $row->{'description_'.$language} = ($data['description_'.$language] ?? null)
+                        ?: ($content['shared_'.$language] ?? null) ?: ($content['guidance_'.$language] ?? null);
+                }
+                $type = $questionTypes->get($row->question_type_id);
+                $schemaType = filled($data['schema_key'] ?? null) || ! empty($data['question_type'])
+                    ? new QuestionType([...($type?->getAttributes() ?? []), ...(array) ($data['question_type'] ?? []), 'schema_key' => $data['schema_key'] ?? data_get($data, 'question_type.schema_key', $type?->schema_key)])
+                    : $type;
+                $row->summary_text = $schemaType ? QuestionTypeSchemaRegistry::summarize($schemaType, $content) : 'Question';
+                $row->name = $row->statement_en ?: ($row->statement_ur ?: $row->summary_text);
+                $row->type_name = $data['question_type']['name'] ?? $type?->name ?? 'Question';
                 $row->topic_name = $topicNames->get($row->qat_topic_id);
                 $row->edit_url = route('superadmin.qat-catalogue.questions.edit', [
                     'qatClass' => $parents['class'], 'qatSubject' => $parents['subject'], 'qatChapter' => $parents['chapter'],
@@ -195,6 +211,40 @@ class QatMonthlyDataController extends Controller
         $data = $request->validate($rules);
         $this->record($kind, $catalogue, $month, $record);
         QatMonthlySyllabus::edit($kind, $record, $month, $data);
+
+        return back();
+    }
+
+    public function bulkQuestions(Request $request, int $catalogue, int $month, int $chapter): RedirectResponse
+    {
+        $this->monthName($month);
+        $data = $request->validate([
+            'action' => ['required', 'in:activate,deactivate,remove'],
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['required', 'integer', 'distinct', 'min:1'],
+        ]);
+
+        DB::transaction(function () use ($catalogue, $month, $chapter, $data): void {
+            $this->record('chapter', $catalogue, $month, $chapter);
+            abort_unless(DB::table('qat_chapter_months')->where('qat_chapter_id', $chapter)
+                ->where('month', $month)->lockForUpdate()->first(), 404);
+            $questions = $this->records('question', $catalogue, $month)->where('qat_chapter_id', $chapter)
+                ->whereIn('id', $data['ids'])->get(['id', 'source_question_id']);
+            abort_unless($questions->count() === count($data['ids']), 404);
+
+            if ($data['action'] === 'remove') {
+                QatMonthlySyllabus::excludeQuestions($chapter, $month, $questions->pluck('source_question_id')->map(fn ($id) => (int) $id)->all());
+                $this->deleteEdits('question', $month, $data['ids']);
+
+                return;
+            }
+
+            foreach ($questions as $question) {
+                QatMonthlySyllabus::edit('question', $question->id, $month, [
+                    'status' => $data['action'] === 'activate',
+                ]);
+            }
+        });
 
         return back();
     }

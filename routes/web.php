@@ -332,6 +332,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->whereNumber(['catalogue', 'month'])->name('superadmin.qat-catalogue.months.show');
             Route::patch('years/{catalogue}/months/{month}/subjects/{subject}/description', [QatMonthlyDataController::class, 'updateDescription'])
                 ->whereNumber(['catalogue', 'month', 'subject'])->name('superadmin.qat-catalogue.months.description.update');
+            Route::post('years/{catalogue}/months/{month}/chapters/{chapter}/questions/bulk', [QatMonthlyDataController::class, 'bulkQuestions'])
+                ->whereNumber(['catalogue', 'month', 'chapter'])->name('superadmin.qat-catalogue.months.questions.bulk');
             Route::patch('years/{catalogue}/months/{month}/records/{kind}/{record}', [QatMonthlyDataController::class, 'update'])
                 ->whereNumber(['catalogue', 'month', 'record'])->whereIn('kind', ['class', 'subject', 'chapter', 'topic'])
                 ->name('superadmin.qat-catalogue.months.records.update');

@@ -5,6 +5,7 @@ import {
     Badge,
     Button,
     Card,
+    Checkbox,
     Input,
     PageHeader,
     SearchInput,
@@ -30,8 +31,10 @@ type Chapter = {
     name: string;
     chapter_number: number | null;
     status: number;
+    topics: { id: number; name: string; status: number }[] | null;
     questions: {
         id: number;
+        topic_id: number | null;
         type: string;
         summary: string;
         status: number;
@@ -64,6 +67,198 @@ const MONTHS = [
     'November',
     'December',
 ];
+
+type ChapterQuestionsProps = {
+    chapter: Chapter;
+    selectedIds: number[];
+    onToggleGroup: (questions: Chapter['questions'], checked: boolean) => void;
+};
+
+function ChapterQuestions({
+    chapter,
+    selectedIds,
+    onToggleGroup,
+}: ChapterQuestionsProps) {
+    const selected = new Set(selectedIds);
+
+    if (!chapter.questions.length && !chapter.topics?.length) {
+        return (
+            <p className="border-t border-slate-200 p-3 text-sm text-slate-500 dark:border-slate-700">
+                No questions in this chapter.
+            </p>
+        );
+    }
+
+    const list = (questions: Chapter['questions']) => (
+        <div className="max-h-64 space-y-1 overflow-y-auto">
+            {questions.map((question) => (
+                <label
+                    key={question.id}
+                    className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                >
+                    <input
+                        type="checkbox"
+                        className="mt-0.5 size-4 shrink-0 accent-brand-600"
+                        checked={selected.has(question.id)}
+                        onChange={(event) =>
+                            onToggleGroup([question], event.target.checked)
+                        }
+                    />
+                    <span className="min-w-0 flex-1 break-words">
+                        {question.summary}
+                    </span>
+                    <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {question.type}
+                    </span>
+                    {!question.status && <Badge tone="neutral">Inactive</Badge>}
+                </label>
+            ))}
+            {!questions.length && (
+                <p className="px-2 py-2 text-sm text-slate-500">
+                    No questions in this topic.
+                </p>
+            )}
+        </div>
+    );
+    const topicIds = new Set(chapter.topics?.map((topic) => topic.id));
+    const unassigned = chapter.questions.filter(
+        (question) =>
+            question.topic_id === null || !topicIds.has(question.topic_id),
+    );
+    const allSelected = chapter.questions.every((question) =>
+        selected.has(question.id),
+    );
+
+    return (
+        <div className="space-y-2 border-t border-slate-200 px-3 py-3 dark:border-slate-700">
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {chapter.topics
+                        ? 'Choose topics or expand one to select questions'
+                        : 'Select the questions to copy'}
+                </span>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={!chapter.questions.length}
+                    onClick={() =>
+                        onToggleGroup(chapter.questions, !allSelected)
+                    }
+                >
+                    {allSelected ? 'Clear questions' : 'Select all questions'}
+                </Button>
+            </div>
+            {chapter.topics ? (
+                <>
+                    {chapter.topics.map((topic) => {
+                        const questions = chapter.questions.filter(
+                            (question) => question.topic_id === topic.id,
+                        );
+
+                        return (
+                            <TransferTopic
+                                key={topic.id}
+                                name={topic.name}
+                                inactive={!topic.status}
+                                count={questions.length}
+                                selectedCount={
+                                    questions.filter((question) =>
+                                        selected.has(question.id),
+                                    ).length
+                                }
+                                onCheckedChange={(checked) =>
+                                    onToggleGroup(questions, checked)
+                                }
+                            >
+                                {list(questions)}
+                            </TransferTopic>
+                        );
+                    })}
+                    {unassigned.length > 0 && (
+                        <TransferTopic
+                            name="Questions without a topic"
+                            count={unassigned.length}
+                            selectedCount={
+                                unassigned.filter((question) =>
+                                    selected.has(question.id),
+                                ).length
+                            }
+                            onCheckedChange={(checked) =>
+                                onToggleGroup(unassigned, checked)
+                            }
+                        >
+                            {list(unassigned)}
+                        </TransferTopic>
+                    )}
+                </>
+            ) : (
+                list(chapter.questions)
+            )}
+        </div>
+    );
+}
+
+function TransferTopic({
+    name,
+    inactive,
+    count,
+    selectedCount,
+    onCheckedChange,
+    children,
+}: {
+    name: string;
+    inactive?: boolean;
+    count: number;
+    selectedCount: number;
+    onCheckedChange: (checked: boolean) => void;
+    children: React.ReactNode;
+}) {
+    const [expanded, setExpanded] = useState(false);
+    const allSelected = count > 0 && count === selectedCount;
+
+    return (
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 px-3 py-2">
+                <Checkbox
+                    label={`Select all questions in ${name}`}
+                    checked={allSelected}
+                    indeterminate={!allSelected && selectedCount > 0}
+                    disabled={!count}
+                    onCheckedChange={onCheckedChange}
+                />
+                <button
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={() => setExpanded(!expanded)}
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left text-sm font-medium hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500"
+                >
+                    {expanded ? (
+                        <ChevronDownIcon
+                            aria-hidden="true"
+                            className="size-4 shrink-0"
+                        />
+                    ) : (
+                        <ChevronRightIcon
+                            aria-hidden="true"
+                            className="size-4 shrink-0"
+                        />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{name}</span>
+                    {inactive && <Badge tone="neutral">Inactive</Badge>}
+                    <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                        {selectedCount}/{count} questions
+                    </span>
+                </button>
+            </div>
+            {expanded && (
+                <div className="border-t border-slate-200 p-2 dark:border-slate-700">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export default function QatTransfer({
     sources,
@@ -261,23 +456,22 @@ export default function QatTransfer({
             };
         });
     };
-    const toggleQuestion = (id: number) => {
-        setData(
-            'question_ids',
-            data.question_ids.includes(id)
-                ? data.question_ids.filter((item) => item !== id)
-                : [...data.question_ids, id],
-        );
-    };
-    const toggleAllQuestions = (chapter: Chapter) => {
-        const ids = chapter.questions.map((question) => question.id);
-        const allSelected = ids.every((id) => data.question_ids.includes(id));
-        setData(
-            'question_ids',
-            allSelected
-                ? data.question_ids.filter((id) => !ids.includes(id))
-                : [...new Set([...data.question_ids, ...ids])],
-        );
+    const setQuestionGroup = (
+        chapter: Chapter,
+        questions: Chapter['questions'],
+        checked: boolean,
+    ) => {
+        const ids = new Set(questions.map((question) => question.id));
+        setData((current) => ({
+            ...current,
+            chapter_ids:
+                checked && !current.chapter_ids.includes(chapter.id)
+                    ? [...current.chapter_ids, chapter.id]
+                    : current.chapter_ids,
+            question_ids: checked
+                ? [...new Set([...current.question_ids, ...ids])]
+                : current.question_ids.filter((id) => !ids.has(id)),
+        }));
     };
     const selectAllChapters = (checked: boolean) => {
         const visibleIds = new Set(
@@ -671,89 +865,22 @@ export default function QatTransfer({
                                                     </span>
                                                 </div>
                                                 {expanded && (
-                                                    <div className="border-t border-slate-200 px-3 py-3 dark:border-slate-700">
-                                                        <div className="mb-2 flex items-center justify-between gap-2">
-                                                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                                                                Select the
-                                                                questions to
-                                                                copy
-                                                            </span>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                disabled={
-                                                                    !included ||
-                                                                    !chapter
-                                                                        .questions
-                                                                        .length
-                                                                }
-                                                                onClick={() =>
-                                                                    toggleAllQuestions(
-                                                                        chapter,
-                                                                    )
-                                                                }
-                                                            >
-                                                                {selectedCount ===
-                                                                chapter
-                                                                    .questions
-                                                                    .length
-                                                                    ? 'Clear questions'
-                                                                    : 'Select all questions'}
-                                                            </Button>
-                                                        </div>
-                                                        <div className="max-h-64 space-y-1 overflow-y-auto">
-                                                            {chapter.questions.map(
-                                                                (question) => (
-                                                                    <label
-                                                                        key={
-                                                                            question.id
-                                                                        }
-                                                                        className={`flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60 ${included ? '' : 'opacity-50'}`}
-                                                                    >
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            className="mt-0.5 size-4 shrink-0 accent-brand-600"
-                                                                            checked={data.question_ids.includes(
-                                                                                question.id,
-                                                                            )}
-                                                                            disabled={
-                                                                                !included
-                                                                            }
-                                                                            onChange={() =>
-                                                                                toggleQuestion(
-                                                                                    question.id,
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                        <span className="min-w-0 flex-1 break-words">
-                                                                            {
-                                                                                question.summary
-                                                                            }
-                                                                        </span>
-                                                                        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                                                            {
-                                                                                question.type
-                                                                            }
-                                                                        </span>
-                                                                        {!question.status && (
-                                                                            <Badge tone="neutral">
-                                                                                Inactive
-                                                                            </Badge>
-                                                                        )}
-                                                                    </label>
-                                                                ),
-                                                            )}
-                                                            {!chapter.questions
-                                                                .length && (
-                                                                <p className="px-2 py-2 text-sm text-slate-500">
-                                                                    No questions
-                                                                    in this
-                                                                    chapter.
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                                                    <ChapterQuestions
+                                                        chapter={chapter}
+                                                        selectedIds={
+                                                            data.question_ids
+                                                        }
+                                                        onToggleGroup={(
+                                                            questions,
+                                                            checked,
+                                                        ) =>
+                                                            setQuestionGroup(
+                                                                chapter,
+                                                                questions,
+                                                                checked,
+                                                            )
+                                                        }
+                                                    />
                                                 )}
                                             </div>
                                         );

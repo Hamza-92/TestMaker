@@ -43,7 +43,8 @@ final class QatMonthlySyllabus
 
         foreach ($editable as $column) {
             $override = $column === 'subject_name' ? 'name' : $column;
-            $query->selectRaw("case when edit.id is null then original.$column else edit.$override end as $column");
+            $fallback = $kind === 'question' && $column !== 'status' ? 'edit.question_data is null' : 'edit.id is null';
+            $query->selectRaw("case when $fallback then original.$column else edit.$override end as $column");
         }
 
         if ($kind === 'topic') {
@@ -60,7 +61,7 @@ final class QatMonthlySyllabus
                     ->orWhereJsonDoesntContain('mapping.excluded_source_question_ids', $sourceId))
                 ->whereNotExists(DB::table('qat_month_edits as removed_topic')
                     ->where('removed_topic.kind', 'topic')->where('removed_topic.month', $month)->where('removed_topic.is_removed', true)
-                    ->whereRaw('removed_topic.record_id = case when edit.id is null then original.qat_topic_id else edit.qat_topic_id end'));
+                    ->whereRaw('removed_topic.record_id = case when edit.question_data is null then original.qat_topic_id else edit.qat_topic_id end'));
         }
 
         return $query;

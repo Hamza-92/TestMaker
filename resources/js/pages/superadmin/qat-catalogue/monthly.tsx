@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     ArrowRightIcon,
     ChevronRightIcon,
@@ -8,7 +8,16 @@ import {
     Trash2Icon,
 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
-import { Button, Input, Modal, PageHeader } from '@/components/tm';
+import {
+    Button,
+    Checkbox,
+    Input,
+    Modal,
+    PageHeader,
+    SelectionBar,
+} from '@/components/tm';
+import { QuestionPreview } from '../questions/question-preview';
+import type { QuestionPreviewRow } from '../questions/question-preview';
 import {
     EditModal,
     FilterBar,
@@ -36,7 +45,7 @@ type Level =
     | 'chapter'
     | 'topic'
     | 'question';
-type Row = {
+type Row = QuestionPreviewRow & {
     id: number;
     name: string;
     name_ur?: string | null;
@@ -64,16 +73,6 @@ const columns: Record<Level, string[]> = {
     topic: ['Topic', 'Questions', 'Status'],
     question: ['Question', 'Type', 'Topic', 'Status'],
 };
-
-function questionText(html: string, id: number) {
-    return (
-        html
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim() || `Question #${id}`
-    );
-}
 
 function scopedUrl(base: string, params: Filters) {
     const query = new URLSearchParams();
@@ -116,9 +115,48 @@ export default function QatMonthlyPage({
     const [removing, setRemoving] = useState<Row | null>(null);
     const [removeBusy, setRemoveBusy] = useState(false);
     const [editSyllabus, setEditSyllabus] = useState(false);
+    const { url } = usePage();
+    const [selection, setSelection] = useState<{ url: string; ids: number[] }>({
+        url,
+        ids: [],
+    });
+    const bulk = useForm<{
+        ids: number[];
+        action: 'activate' | 'deactivate' | 'remove';
+    }>({ ids: [], action: 'activate' });
+    const [confirmBulkRemove, setConfirmBulkRemove] = useState(false);
     const entries = Array.isArray(rows) ? rows : rows.data;
     const total = Array.isArray(rows) ? rows.length : rows.total;
     const listUrl = baseUrl ? scopedUrl(baseUrl, context) : undefined;
+    const questionList = level === 'question';
+    const selectedIds =
+        selection.url === url
+            ? entries
+                  .filter((row) => selection.ids.includes(row.id))
+                  .map((row) => row.id)
+            : [];
+    const allSelected =
+        entries.length > 0 && selectedIds.length === entries.length;
+    const setSelectedIds = (ids: number[]) => setSelection({ url, ids });
+    function applyBulk(action: typeof bulk.data.action) {
+        if (
+            !baseUrl ||
+            !context.chapter ||
+            !selectedIds.length ||
+            bulk.processing
+        ) {
+            return;
+        }
+
+        bulk.transform(() => ({ ids: selectedIds, action }));
+        bulk.post(`${baseUrl}/chapters/${context.chapter}/questions/bulk`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setSelectedIds([]);
+                setConfirmBulkRemove(false);
+            },
+        });
+    }
     const filterOptions = [
         { key: 'status', label: 'Status', choices: statusChoices },
     ];
@@ -241,6 +279,38 @@ export default function QatMonthlyPage({
                 />
             )}
 
+            {questionList && selectedIds.length > 0 && (
+                <SelectionBar
+                    count={selectedIds.length}
+                    onExit={() => setSelectedIds([])}
+                >
+                    <Button
+                        size="sm"
+                        type="button"
+                        disabled={bulk.processing}
+                        onClick={() => applyBulk('activate')}
+                    >
+                        Activate
+                    </Button>
+                    <Button
+                        size="sm"
+                        type="button"
+                        disabled={bulk.processing}
+                        onClick={() => applyBulk('deactivate')}
+                    >
+                        Deactivate
+                    </Button>
+                    <Button
+                        size="sm"
+                        type="button"
+                        className={redAction}
+                        disabled={bulk.processing}
+                        onClick={() => setConfirmBulkRemove(true)}
+                    >
+                        <Trash2Icon aria-hidden="true" /> Remove from {month}
+                    </Button>
+                </SelectionBar>
+            )}
             <section
                 aria-label={title}
                 className="overflow-hidden rounded-xl border border-blue-100 bg-white dark:border-slate-800 dark:bg-slate-900"
@@ -253,6 +323,31 @@ export default function QatMonthlyPage({
                         </caption>
                         <thead className="border-b border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/60 dark:text-blue-200">
                             <tr>
+                                {questionList && (
+                                    <th scope="col" className="w-12 px-4 py-3">
+                                        <Checkbox
+                                            label="Select all questions on this page"
+                                            checked={allSelected}
+                                            indeterminate={
+                                                !allSelected &&
+                                                selectedIds.length > 0
+                                            }
+                                            disabled={
+                                                bulk.processing ||
+                                                !entries.length
+                                            }
+                                            onCheckedChange={(checked) =>
+                                                setSelectedIds(
+                                                    checked
+                                                        ? entries.map(
+                                                              (row) => row.id,
+                                                          )
+                                                        : [],
+                                                )
+                                            }
+                                        />
+                                    </th>
+                                )}
                                 {columns[level].map((column) => (
                                     <th
                                         key={column}
@@ -272,10 +367,7 @@ export default function QatMonthlyPage({
                         </thead>
                         <tbody>
                             {entries.map((row) => {
-                                const name =
-                                    level === 'question'
-                                        ? questionText(row.name, row.id)
-                                        : row.name;
+                                const name = row.name;
                                 const editLabel = `Edit ${level} for ${month}`;
                                 const removeLabel = `Remove ${level} from ${month}`;
 
@@ -284,11 +376,44 @@ export default function QatMonthlyPage({
                                         key={row.id}
                                         className="transition-colors hover:bg-blue-50/60 dark:hover:bg-blue-950/30"
                                     >
+                                        {questionList && (
+                                            <td className={cellClass}>
+                                                <Checkbox
+                                                    label={`Select question ${name.replace(/<[^>]+>/g, ' ').trim()}`}
+                                                    checked={selectedIds.includes(
+                                                        row.id,
+                                                    )}
+                                                    disabled={bulk.processing}
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setSelectedIds(
+                                                            checked
+                                                                ? [
+                                                                      ...selectedIds,
+                                                                      row.id,
+                                                                  ]
+                                                                : selectedIds.filter(
+                                                                      (id) =>
+                                                                          id !==
+                                                                          row.id,
+                                                                  ),
+                                                        )
+                                                    }
+                                                />
+                                            </td>
+                                        )}
                                         <th
                                             scope="row"
                                             className={`${cellClass} font-semibold text-slate-900 dark:text-slate-100`}
                                         >
-                                            {row.url ? (
+                                            {questionList ? (
+                                                <div className="min-w-64">
+                                                    <QuestionPreview
+                                                        row={row}
+                                                    />
+                                                </div>
+                                            ) : row.url ? (
                                                 <Link
                                                     href={row.url}
                                                     className="text-blue-700 hover:underline dark:text-blue-300"
@@ -434,7 +559,10 @@ export default function QatMonthlyPage({
                             {!entries.length && (
                                 <tr>
                                     <td
-                                        colSpan={columns[level].length + 1}
+                                        colSpan={
+                                            columns[level].length +
+                                            (questionList ? 2 : 1)
+                                        }
                                         className="px-4 py-9 text-center text-slate-500 dark:text-slate-400"
                                     >
                                         No {title.toLowerCase()}{' '}
@@ -460,7 +588,7 @@ export default function QatMonthlyPage({
                             questionId={editing.id}
                             editUrl={editing.edit_url}
                             updateUrl={editing.update_url}
-                            title={`Edit question #${editing.id} for ${month}`}
+                            title={`Edit question for ${month}`}
                             scope={breadcrumbs.map((crumb) => crumb.label)}
                             onClose={() => setEditing(null)}
                             onSaved={() => router.reload()}
@@ -481,6 +609,39 @@ export default function QatMonthlyPage({
                     onClose={() => setEditSyllabus(false)}
                 />
             )}
+            <Modal
+                open={confirmBulkRemove}
+                onOpenChange={(open) => {
+                    if (!bulk.processing) {
+                        setConfirmBulkRemove(open);
+                    }
+                }}
+                title={`Remove selected questions from ${month}?`}
+                footer={
+                    <>
+                        <Button
+                            type="button"
+                            disabled={bulk.processing}
+                            onClick={() => setConfirmBulkRemove(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            disabled={bulk.processing}
+                            onClick={() => applyBulk('remove')}
+                        >
+                            Remove selected
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Remove {selectedIds.length} selected questions from the{' '}
+                    {month} syllabus.
+                </p>
+            </Modal>
             <Modal
                 open={removing !== null}
                 onOpenChange={(open) => {
@@ -524,7 +685,7 @@ export default function QatMonthlyPage({
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                     {removing &&
                         (level === 'question'
-                            ? `Question #${removing.id}`
+                            ? 'This question'
                             : removing.name)}{' '}
                     will be removed from the {month} syllabus. Other months and
                     saved papers keep their existing content.

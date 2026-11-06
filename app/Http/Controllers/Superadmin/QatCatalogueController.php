@@ -7,6 +7,8 @@ use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\Pattern;
 use App\Models\Question;
+use App\Models\Subject;
+use App\Models\Topic;
 use App\Support\Qat\QatCatalogueTransfer;
 use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
@@ -55,10 +57,18 @@ class QatCatalogueController extends Controller
             ->where('subject_id', $data['subject_id'])
             ->orderBy('sort_id')->orderBy('id')
             ->get(['id', 'name', 'chapter_number', 'status']);
+        $subjectType = ClassSubject::subjectTypeForScope(
+            $data['source_pattern_id'], $data['class_id'], $data['subject_id'],
+            Subject::query()->whereKey($data['subject_id'])->value('subject_type'),
+        );
+        $topics = $subjectType === 'topic-wise'
+            ? Topic::query()->whereIn('chapter_id', $chapters->pluck('id'))
+                ->orderBy('sort_id')->orderBy('id')->get(['id', 'chapter_id', 'name', 'status'])->groupBy('chapter_id')
+            : null;
         $questions = Question::query()->with('questionType')
             ->whereIn('chapter_id', $chapters->pluck('id'))
             ->orderBy('sort_order')->orderBy('id')
-            ->get(['id', 'chapter_id', 'question_type_id', 'statement_en', 'statement_ur', 'content', 'status'])
+            ->get(['id', 'chapter_id', 'topic_id', 'question_type_id', 'statement_en', 'statement_ur', 'content', 'status'])
             ->groupBy('chapter_id');
 
         return response()->json($chapters->map(fn (Chapter $chapter) => [
@@ -66,6 +76,7 @@ class QatCatalogueController extends Controller
             'name' => $chapter->name,
             'chapter_number' => $chapter->chapter_number,
             'status' => $chapter->status,
+            'topics' => $topics?->get($chapter->id, collect())->values(),
             'questions' => $questions->get($chapter->id, collect())->map(function (Question $question) {
                 $statement = $question->statement_en ?: $question->statement_ur;
                 if (! $statement && $question->questionType) {
@@ -76,6 +87,7 @@ class QatCatalogueController extends Controller
 
                 return [
                     'id' => $question->id,
+                    'topic_id' => $question->topic_id,
                     'type' => $question->questionType?->name ?? 'Question',
                     'summary' => Str::limit(trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($statement ?: 'Question #'.$question->id))) ?? ''), 180),
                     'status' => $question->status,

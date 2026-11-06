@@ -214,7 +214,7 @@ class QatCatalogueTransfer
                         ->where('edit.kind', 'question')->where('edit.month', $month))
                     ->where('question.qat_chapter_id', $qatChapterId)
                     ->whereIn('question.source_question_id', array_keys($selectedQuestions))
-                    ->selectRaw('case when edit.id is null then question.qat_topic_id else edit.qat_topic_id end as topic_id')
+                    ->selectRaw('case when edit.question_data is null then question.qat_topic_id else edit.qat_topic_id end as topic_id')
                     ->pluck('topic_id')->filter()->unique()->all();
                 DB::table('qat_month_edits')->where('kind', 'topic')->where('month', $month)
                     ->where('is_removed', true)->whereIn('record_id', $restoredTopics)->update(['is_removed' => false]);
