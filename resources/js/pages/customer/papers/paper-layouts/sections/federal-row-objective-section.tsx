@@ -574,6 +574,13 @@ function OptionCells({
             {options.map((option, index) => (
                 <td
                     key={option?.id ?? `empty-option-${index}`}
+                    dir={
+                        showInlineLabels
+                            ? urduOnly
+                                ? 'rtl'
+                                : 'ltr'
+                            : undefined
+                    }
                     data-paper-correct-option={
                         option?.isCorrect &&
                         showCorrectAnswers &&
@@ -581,12 +588,20 @@ function OptionCells({
                             ? true
                             : undefined
                     }
-                    className="px-1.5 py-1 text-center align-middle font-normal"
+                    className={
+                        showInlineLabels
+                            ? 'px-1.5 py-1 text-start align-middle font-normal'
+                            : 'px-1.5 py-1 text-center align-middle font-normal'
+                    }
                 >
                     {option && showOptionBubbles ? (
                         <div
                             dir={urduOnly ? 'rtl' : undefined}
-                            className="flex min-w-0 items-start justify-center gap-1"
+                            className={
+                                showInlineLabels
+                                    ? 'flex w-full min-w-0 items-start justify-start gap-1'
+                                    : 'flex min-w-0 items-start justify-center gap-1'
+                            }
                         >
                             <OptionBubbleLabel
                                 label={OPTION_LABELS[optionIndexes[index]]}
@@ -607,7 +622,7 @@ function OptionCells({
                     ) : option && showInlineLabels ? (
                         <div
                             dir={urduOnly ? 'rtl' : undefined}
-                            className="flex min-w-0 items-start justify-center gap-1"
+                            className="flex w-full min-w-0 items-start justify-start gap-1"
                         >
                             <span className="shrink-0 font-bold">
                                 (
