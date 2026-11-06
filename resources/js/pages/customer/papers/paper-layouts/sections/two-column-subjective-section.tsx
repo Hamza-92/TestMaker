@@ -189,7 +189,7 @@ function SubjectiveQuestionItem({
     return (
         <div
             data-paper-question
-            className="group/question relative text-sm leading-6"
+            className={`group/question relative text-sm leading-6 ${question.verseLayout ? 'pt-1.5' : ''}`}
         >
             <BilingualQuestionRow
                 value={question.text}
