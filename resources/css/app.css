@@ -943,6 +943,13 @@ input[type='date']::-webkit-calendar-picker-indicator {
     font-weight: 700;
 }
 
+/* Keep Federal-style fixed columns without drawing table or cell rules. */
+[data-print-paper] [data-paper-objective-table][data-paper-borderless-objectives],
+[data-print-paper] [data-paper-objective-table][data-paper-borderless-objectives] th,
+[data-print-paper] [data-paper-objective-table][data-paper-borderless-objectives] td {
+    border: 0;
+}
+
 /* Subject-assigned Federal objective row: Sr | Question | A-D | optional bubbles.
    Urdu-only papers render the same cells in reverse reading order. */
 [data-print-paper] [data-paper-federal-row-objectives] {

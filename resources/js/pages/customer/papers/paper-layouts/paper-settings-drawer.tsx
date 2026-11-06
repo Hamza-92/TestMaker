@@ -1009,6 +1009,22 @@ export function PaperSettingsPanel({
                         }
                     />
                 </div>
+                <CheckboxField
+                    className={inline ? 'sm:col-span-2' : 'mb-3'}
+                    label="Single-line objectives"
+                    checked={settings.objectiveLayout === 'pecta-single-line'}
+                    disabled={
+                        settings.objectiveLayout === 'federal-row' ||
+                        settings.objectiveLayout === 'board-table'
+                    }
+                    onChange={(checked) =>
+                        onChange({
+                            objectiveLayout: checked
+                                ? 'pecta-single-line'
+                                : 'standard',
+                        })
+                    }
+                />
                 <TypographyControls
                     inline={inline}
                     size={settings.questionSize}

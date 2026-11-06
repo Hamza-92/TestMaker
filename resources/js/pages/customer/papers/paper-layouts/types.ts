@@ -296,7 +296,11 @@ export type PaperQuestionNumberingFormat =
     | 'roman'
     | 'alpha';
 export type PaperQuestionLayout = 'default' | 'stacked' | 'columns' | 'inline';
-export type PaperObjectiveLayout = 'standard' | 'board-table' | 'federal-row';
+export type PaperObjectiveLayout =
+    | 'standard'
+    | 'board-table'
+    | 'federal-row'
+    | 'pecta-single-line';
 export type PaperLayout = 'standard' | 'federal-board';
 export type PaperOrGroupLayout = 'stacked' | 'side-by-side';
 export type PaperOrGroupDividerStyle = 'line' | 'badge' | 'plain';
@@ -523,6 +527,7 @@ const OBJECTIVE_LAYOUT_VALUES = new Set<PaperObjectiveLayout>([
     'standard',
     'board-table',
     'federal-row',
+    'pecta-single-line',
 ]);
 const PAPER_LAYOUT_VALUES = new Set<PaperLayout>(['standard', 'federal-board']);
 const OR_GROUP_LAYOUT_VALUES = new Set<PaperOrGroupLayout>([

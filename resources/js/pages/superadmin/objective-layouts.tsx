@@ -178,8 +178,8 @@ export default function ObjectiveLayouts({
                     <div>
                         <h1 className="h1-semibold">Objective Layouts</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Assign the one-line Federal objective table per
-                            subject and choose whether answer bubbles appear.
+                            Assign an objective layout per subject. Answer
+                            bubbles are available for the Federal table.
                         </p>
                     </div>
                     {canEdit && (
@@ -218,8 +218,8 @@ export default function ObjectiveLayouts({
                             </h2>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                                 Default preserves the current paper. The
-                                one-line layout prints one table row per MCQ;
-                                bubbles are controlled separately.
+                                borderless single-line layout keeps each option
+                                in its own column.
                             </p>
                         </div>
                     </div>
@@ -237,7 +237,7 @@ export default function ObjectiveLayouts({
                             );
                             const configuredCount = patternAssignments.filter(
                                 (item) =>
-                                    item.objective_layout === 'federal-row',
+                                    item.objective_layout !== 'standard',
                             ).length;
 
                             return (

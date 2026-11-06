@@ -73,7 +73,7 @@ it('shows subject-specific objective layout assignments', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('superadmin/objective-layouts')
-            ->has('layouts', 2)
+            ->has('layouts', 3)
             ->has('patterns', 1)
             ->where('patterns.0.id', $fixture['pattern']->id)
             ->where('patterns.0.classes.0.id', $fixture['class']->id)
@@ -85,6 +85,31 @@ it('shows subject-specific objective layout assignments', function () {
             ->where('patterns.0.classes.0.subjects.0.show_bubbles', true)
             ->where('patterns.0.classes.0.subjects.0.medium', 'Both'),
         );
+});
+
+it('saves the borderless single-line objective layout for a subject', function () {
+    $fixture = objectiveLayoutFixture();
+    $scope = [
+        'pattern_id' => $fixture['pattern']->id,
+        'class_id' => $fixture['class']->id,
+        'subject_id' => $fixture['subject']->id,
+    ];
+
+    $this->actingAs($fixture['admin'])
+        ->put(route('superadmin.objective-layouts.update'), [
+            'assignments' => [[
+                ...$scope,
+                'objective_layout' => ObjectiveLayoutAssignment::PECTA_SINGLE_LINE,
+                'show_bubbles' => true,
+            ]],
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('objective_layout_assignments', [
+        ...$scope,
+        'objective_layout' => ObjectiveLayoutAssignment::PECTA_SINGLE_LINE,
+        'show_bubbles' => 0,
+    ]);
 });
 
 it('saves only changed assignments while leaving other subjects untouched', function () {
@@ -181,4 +206,3 @@ it('rejects a subject outside the selected pattern and class scope', function ()
         'subject_id' => $unassignedSubject->id,
     ]);
 });
-

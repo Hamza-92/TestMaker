@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import { OptionBubbleLabel } from '../questions/bilingual-option-content';
 import { QuestionTypeHeading } from '../questions/question-type-heading';
 import type { SectionTemplateProps } from '../templates/template-props';
-import { objectiveQuestionCount } from '../types';
+import { formatQuestionLabel, objectiveQuestionCount } from '../types';
 import type {
     GeneratedPaperPassageQuestion,
     GeneratedPaperQuestion,
@@ -14,7 +14,13 @@ import { QuestionHoverActions, SectionControls } from './section-actions';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
 
-export function FederalRowObjectiveSection(props: SectionTemplateProps) {
+export function PectaSingleLineObjectiveSection(props: SectionTemplateProps) {
+    return <FederalRowObjectiveSection {...props} borderless />;
+}
+
+export function FederalRowObjectiveSection(
+    props: SectionTemplateProps & { borderless?: boolean },
+) {
     const { section } = props;
     const supportsTable = section.questions.every(
         (question) => !question.optionsOnly,
@@ -26,9 +32,10 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
 
     const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
     const optionIndexes = urduOnly ? [3, 2, 1, 0] : [0, 1, 2, 3];
-    const showBubbles = props.showObjectiveBubbles === true;
+    const borderless = props.borderless === true;
+    const showBubbles = !borderless && props.showObjectiveBubbles === true;
     const columnCount = showBubbles ? 10 : 6;
-    const showColumnHeadings = props.questionNumberOffset === 0;
+    const showColumnHeadings = !borderless && props.questionNumberOffset === 0;
 
     return (
         <section className="paper-section">
@@ -50,6 +57,7 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
             <table
                 data-paper-federal-row-objectives
                 data-paper-objective-table
+                data-paper-borderless-objectives={borderless || undefined}
                 dir="ltr"
             >
                 <FederalRowColumns
@@ -127,6 +135,7 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
                                                 urduOnly={urduOnly}
                                                 optionIndexes={optionIndexes}
                                                 showBubbles={showBubbles}
+                                                borderless={borderless}
                                                 props={props}
                                             />
                                         ),
@@ -143,6 +152,7 @@ export function FederalRowObjectiveSection(props: SectionTemplateProps) {
                                 urduOnly={urduOnly}
                                 optionIndexes={optionIndexes}
                                 showBubbles={showBubbles}
+                                borderless={borderless}
                                 props={props}
                             />
                         );
@@ -312,6 +322,7 @@ function FederalRow({
     urduOnly,
     optionIndexes,
     showBubbles,
+    borderless,
     props,
 }: {
     question: GeneratedPaperQuestion;
@@ -319,6 +330,7 @@ function FederalRow({
     urduOnly: boolean;
     optionIndexes: number[];
     showBubbles: boolean;
+    borderless: boolean;
     props: SectionTemplateProps;
 }) {
     const { section } = props;
@@ -342,9 +354,23 @@ function FederalRow({
                     forceRtl={section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
                     showOptionBubbles={props.showOptionBubbles === true}
+                    showInlineLabels={borderless}
                 />
             )}
-            {!urduOnly && <SerialCell number={number} />}
+            {!urduOnly && (
+                <SerialCell
+                    number={number}
+                    label={
+                        borderless
+                            ? formatQuestionLabel(
+                                  number - 1,
+                                  props.numberingFormat,
+                                  'numeric',
+                              )
+                            : undefined
+                    }
+                />
+            )}
             <td className="group/question relative px-1.5 py-1 align-middle font-normal">
                 <BilingualTableContent
                     value={question.text}
@@ -387,7 +413,20 @@ function FederalRow({
                     }
                 />
             </td>
-            {urduOnly && <SerialCell number={number} />}
+            {urduOnly && (
+                <SerialCell
+                    number={number}
+                    label={
+                        borderless
+                            ? formatQuestionLabel(
+                                  number - 1,
+                                  props.numberingFormat,
+                                  'numeric',
+                              )
+                            : undefined
+                    }
+                />
+            )}
             {!urduOnly && (
                 <OptionCells
                     options={options}
@@ -396,6 +435,7 @@ function FederalRow({
                     forceRtl={section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
                     showOptionBubbles={props.showOptionBubbles === true}
+                    showInlineLabels={borderless}
                 />
             )}
             {!urduOnly && showBubbles && (
@@ -414,6 +454,7 @@ function FederalPassageQuestionRow({
     urduOnly,
     optionIndexes,
     showBubbles,
+    borderless,
     props,
 }: {
     question: GeneratedPaperPassageQuestion;
@@ -421,6 +462,7 @@ function FederalPassageQuestionRow({
     urduOnly: boolean;
     optionIndexes: number[];
     showBubbles: boolean;
+    borderless: boolean;
     props: SectionTemplateProps;
 }) {
     const options = optionIndexes.map(
@@ -443,9 +485,23 @@ function FederalPassageQuestionRow({
                     forceRtl={props.section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
                     showOptionBubbles={props.showOptionBubbles === true}
+                    showInlineLabels={borderless}
                 />
             )}
-            {!urduOnly && <SerialCell number={number} />}
+            {!urduOnly && (
+                <SerialCell
+                    number={number}
+                    label={
+                        borderless
+                            ? formatQuestionLabel(
+                                  number - 1,
+                                  props.numberingFormat,
+                                  'numeric',
+                              )
+                            : undefined
+                    }
+                />
+            )}
             <td className="px-1.5 py-1 align-middle font-normal">
                 <BilingualTableContent
                     value={question.text}
@@ -453,7 +509,20 @@ function FederalPassageQuestionRow({
                     forceRtl={props.section.questionTextRtl}
                 />
             </td>
-            {urduOnly && <SerialCell number={number} />}
+            {urduOnly && (
+                <SerialCell
+                    number={number}
+                    label={
+                        borderless
+                            ? formatQuestionLabel(
+                                  number - 1,
+                                  props.numberingFormat,
+                                  'numeric',
+                              )
+                            : undefined
+                    }
+                />
+            )}
             {!urduOnly && (
                 <OptionCells
                     options={options}
@@ -462,6 +531,7 @@ function FederalPassageQuestionRow({
                     forceRtl={props.section.questionTextRtl}
                     showCorrectAnswers={props.showCorrectAnswers === true}
                     showOptionBubbles={props.showOptionBubbles === true}
+                    showInlineLabels={borderless}
                 />
             )}
             {!urduOnly && showBubbles && (
@@ -474,10 +544,10 @@ function FederalPassageQuestionRow({
     );
 }
 
-function SerialCell({ number }: { number: number }) {
+function SerialCell({ number, label }: { number: number; label?: string }) {
     return (
         <td className="px-0.5 py-1 text-center align-middle font-bold">
-            {number}
+            {label ?? number}
         </td>
     );
 }
@@ -489,6 +559,7 @@ function OptionCells({
     forceRtl,
     showCorrectAnswers,
     showOptionBubbles,
+    showInlineLabels = false,
 }: {
     options: Array<PaperQuestionOption | undefined>;
     optionIndexes: number[];
@@ -496,6 +567,7 @@ function OptionCells({
     forceRtl?: boolean;
     showCorrectAnswers: boolean;
     showOptionBubbles: boolean;
+    showInlineLabels?: boolean;
 }) {
     return (
         <>
@@ -529,6 +601,31 @@ function OptionCells({
                                     urduOnly={urduOnly}
                                     forceRtl={forceRtl}
                                     collapseIdentical
+                                />
+                            </div>
+                        </div>
+                    ) : option && showInlineLabels ? (
+                        <div
+                            dir={urduOnly ? 'rtl' : undefined}
+                            className="flex min-w-0 items-start justify-center gap-1"
+                        >
+                            <span className="shrink-0 font-bold">
+                                (
+                                {OPTION_LABELS[
+                                    optionIndexes[index]
+                                ].toLowerCase()}
+                                )
+                            </span>
+                            <div className="min-w-0">
+                                <BilingualTableContent
+                                    value={option.text}
+                                    urduOnly={urduOnly}
+                                    forceRtl={forceRtl}
+                                    collapseIdentical
+                                    showCorrectAnswer={
+                                        showCorrectAnswers &&
+                                        option.isCorrect === true
+                                    }
                                 />
                             </div>
                         </div>

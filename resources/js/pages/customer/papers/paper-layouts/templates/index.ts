@@ -1,5 +1,8 @@
 import { BoardObjectiveTableSection } from '../sections/board-objective-table-section';
-import { FederalRowObjectiveSection } from '../sections/federal-row-objective-section';
+import {
+    FederalRowObjectiveSection,
+    PectaSingleLineObjectiveSection,
+} from '../sections/federal-row-objective-section';
 import type {
     PaperObjectiveLayout,
     PaperQuestionLayout,
@@ -33,6 +36,10 @@ export function pickSectionTemplate(
     if (category === 'Objective Questions') {
         if (objectiveLayout === 'federal-row') {
             return FederalRowObjectiveSection;
+        }
+
+        if (objectiveLayout === 'pecta-single-line') {
+            return PectaSingleLineObjectiveSection;
         }
 
         if (objectiveLayout === 'board-table') {

@@ -11,6 +11,8 @@ class ObjectiveLayoutAssignment extends Model
 
     public const FEDERAL_ROW = 'federal-row';
 
+    public const PECTA_SINGLE_LINE = 'pecta-single-line';
+
     protected $fillable = [
         'pattern_id',
         'class_id',
@@ -34,6 +36,7 @@ class ObjectiveLayoutAssignment extends Model
         return [
             self::STANDARD => 'Default objective layout',
             self::FEDERAL_ROW => 'One-line Federal objective table',
+            self::PECTA_SINGLE_LINE => 'PECTA single-line objectives (borderless)',
         ];
     }
 

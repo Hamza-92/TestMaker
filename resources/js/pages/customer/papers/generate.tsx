@@ -178,7 +178,7 @@ interface ClassSubject {
     color?: string | null;
     name_ur?: string | null;
     medium?: ContentMedium | null;
-    objective_layout?: 'standard' | 'federal-row' | null;
+    objective_layout?: 'standard' | 'federal-row' | 'pecta-single-line' | null;
     objective_bubbles?: boolean | number | null;
     is_arabic: boolean;
 }
@@ -6413,8 +6413,10 @@ export default function GeneratePaper({
                     marginTop: defaultPaperTopMargin,
                     paperLayout: effectivePaperLayout,
                     objectiveLayout:
-                        objectiveAssignment?.objective_layout === 'federal-row'
-                            ? 'federal-row'
+                        objectiveAssignment?.objective_layout === 'federal-row' ||
+                        objectiveAssignment?.objective_layout ===
+                            'pecta-single-line'
+                            ? objectiveAssignment.objective_layout
                             : DEFAULT_PAPER_SETTINGS.objectiveLayout,
                     objectiveBubblesEnabled:
                         objectiveAssignment?.objective_layout ===
@@ -14634,7 +14636,7 @@ export function GeneratedPaperView({
         const Template = pickSectionTemplate(
             settings.questionLayout,
             section.category,
-            useFederalStructure && settings.objectiveLayout !== 'federal-row'
+            useFederalStructure && settings.objectiveLayout === 'standard'
                 ? 'board-table'
                 : settings.objectiveLayout,
         );
