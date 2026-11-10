@@ -29,7 +29,7 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
     ClassSubject::create(['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id]);
     $chapter = Chapter::create([
         'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
-        'name' => 'Plants', 'status' => 1,
+        'name' => 'Plants', 'name_ur' => 'پودے', 'status' => 1,
     ]);
     $otherChapter = Chapter::create([
         'pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
@@ -64,6 +64,8 @@ test('QAT transfer lists source questions and copies only the selected ones', fu
     $this->actingAs($admin)->getJson(route('superadmin.qat-transfer.chapters', [
         'source_pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id,
     ]))->assertOk()
+        ->assertJsonPath('0.name', 'Plants')
+        ->assertJsonPath('0.name_ur', 'پودے')
         ->assertJsonPath('0.questions.0.id', $first->id)
         ->assertJsonPath('0.questions.0.summary', 'What do leaves do?')
         ->assertJsonPath('0.questions.1.id', $second->id);

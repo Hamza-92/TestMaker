@@ -56,7 +56,7 @@ class QatCatalogueController extends Controller
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
             ->orderBy('sort_id')->orderBy('id')
-            ->get(['id', 'name', 'chapter_number', 'status']);
+            ->get(['id', 'name', 'name_ur', 'chapter_number', 'status']);
         $subjectType = ClassSubject::subjectTypeForScope(
             $data['source_pattern_id'], $data['class_id'], $data['subject_id'],
             Subject::query()->whereKey($data['subject_id'])->value('subject_type'),
@@ -74,6 +74,7 @@ class QatCatalogueController extends Controller
         return response()->json($chapters->map(fn (Chapter $chapter) => [
             'id' => $chapter->id,
             'name' => $chapter->name,
+            'name_ur' => $chapter->name_ur,
             'chapter_number' => $chapter->chapter_number,
             'status' => $chapter->status,
             'topics' => $topics?->get($chapter->id, collect())->values(),

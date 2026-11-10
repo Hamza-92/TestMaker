@@ -29,6 +29,7 @@ type Source = {
 type Chapter = {
     id: number;
     name: string;
+    name_ur: string | null;
     chapter_number: number | null;
     status: number;
     topics: { id: number; name: string; status: number }[] | null;
@@ -317,7 +318,9 @@ export default function QatTransfer({
         }
 
         return chapters.filter((chapter) =>
-            chapter.name.toLocaleLowerCase().includes(query),
+            [chapter.name, chapter.name_ur].some((name) =>
+                name?.toLocaleLowerCase().includes(query),
+            ),
         );
     }, [chapters, chapterSearch]);
 
@@ -846,8 +849,22 @@ export default function QatTransfer({
                                                         ) : (
                                                             <ChevronRightIcon className="size-4 shrink-0 text-slate-500" />
                                                         )}
-                                                        <span className="min-w-0 truncate text-sm font-medium">
-                                                            {chapter.name}
+                                                        <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 break-words text-sm font-medium">
+                                                            <span dir="auto">
+                                                                {chapter.name}
+                                                            </span>
+                                                            {chapter.name_ur?.trim() &&
+                                                                chapter.name_ur.trim() !==
+                                                                    chapter.name.trim() && (
+                                                                    <span
+                                                                        dir="rtl"
+                                                                        lang="ur"
+                                                                    >
+                                                                        {
+                                                                            chapter.name_ur
+                                                                        }
+                                                                    </span>
+                                                                )}
                                                         </span>
                                                         {!chapter.status && (
                                                             <Badge tone="neutral">
