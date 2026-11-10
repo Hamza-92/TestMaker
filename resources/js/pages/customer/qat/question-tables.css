@@ -1,0 +1,38 @@
+.qat-rich-text table {
+    width: max-content !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    table-layout: auto !important;
+    margin-inline: 0 !important;
+    border-collapse: collapse;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.qat-rich-text table[border]:not([border='0']),
+.qat-rich-text table[border]:not([border='0']) :is(th, td) {
+    border: 1px solid currentColor;
+}
+
+.qat-rich-text table[border]:not([border='0']) :is(th, td) {
+    padding: 0.35em 0.3em;
+}
+
+.qat-rich-text :is(colgroup, col, th, td) {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+}
+
+.qat-rich-text :is(th, td) {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+}
+
+.qat-rich-text table img {
+    max-width: 100%;
+    height: auto;
+}

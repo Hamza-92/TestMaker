@@ -5,6 +5,8 @@ import {
 } from '@/pages/customer/papers/paper-layouts/questions/bilingual-question-row';
 import { QuestionContent } from '@/pages/customer/papers/paper-layouts/questions/question-content';
 import { questionTextToHtml } from '@/pages/customer/papers/paper-layouts/questions/question-html';
+import { BilingualTableRow } from './bilingual-table-row';
+import './question-tables.css';
 
 export type QatQuestion = {
     id: number;
@@ -173,7 +175,13 @@ const QatRichText = memo(function QatRichText({
 }) {
     const content = useMemo(() => renderDelimitedLatex(value), [value]);
 
-    return <QuestionContent value={content} inline={inline} />;
+    return (
+        <QuestionContent
+            value={content}
+            inline={inline}
+            className="qat-rich-text"
+        />
+    );
 });
 
 function ObjectiveOptions({
@@ -354,10 +362,10 @@ function ObjectiveLine({
     if (bilingual || !options.length) {
         return (
             <div className="space-y-1.5">
-                <div className={bilingual ? 'grid grid-cols-2 gap-3' : ''}>
+                <BilingualTableRow className={bilingual ? '' : '!grid-cols-1'}>
                     {englishStatement}
                     {urduStatement}
-                </div>
+                </BilingualTableRow>
                 {options.length > 0 && (
                     <ObjectiveOptions
                         options={options}
@@ -441,7 +449,7 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
                 extraPassageUr ||
                 extraDetailEn ||
                 extraDetailUr) && (
-                <div className="grid grid-cols-2 gap-3 pl-6">
+                <BilingualTableRow className="pl-6">
                     <div dir="ltr" lang="en">
                         {extraPassageEn && (
                             <QatRichText value={extraPassageEn} />
@@ -454,7 +462,7 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
                         )}
                         {extraDetailUr && <QatRichText value={extraDetailUr} />}
                     </div>
-                </div>
+                </BilingualTableRow>
             )}
             {items.map((item, index) => (
                 <ObjectiveLine
@@ -491,8 +499,26 @@ function LocalizedText({
         return null;
     }
 
+    if (shared && /<table\b/i.test(shared)) {
+        return (
+            <div className="min-w-0 space-y-1">
+                <LocalizedText en={en} ur={ur} number={number} sideBySide />
+                <div
+                    dir="auto"
+                    lang={containsUrduScript(shared) ? 'ur' : 'en'}
+                    className="flex min-w-0 justify-center"
+                >
+                    <QatRichText value={shared} />
+                </div>
+            </div>
+        );
+    }
+
+    const Container =
+        !shared && sideBySide && en && ur ? BilingualTableRow : 'div';
+
     return (
-        <div
+        <Container
             className={
                 shared
                     ? 'grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3'
@@ -547,7 +573,7 @@ function LocalizedText({
                 </div>
             )}
             {shared && !ur && <div />}
-        </div>
+        </Container>
     );
 }
 
@@ -572,8 +598,8 @@ export const QatQuestionStatement = memo(function QatQuestionStatement({
         field(firstItem, 'prompt_ur');
 
     return (
-        <div
-            className={`${en && ur ? 'grid grid-cols-2 gap-4' : ''} text-sm leading-relaxed text-slate-800 dark:text-slate-200`}
+        <BilingualTableRow
+            className={`${en && ur ? 'gap-4' : '!grid-cols-1'} text-sm leading-relaxed text-slate-800 dark:text-slate-200`}
         >
             {en && (
                 <div className="min-w-0" lang="en">
@@ -585,7 +611,7 @@ export const QatQuestionStatement = memo(function QatQuestionStatement({
                     <QatRichText value={ur} />
                 </div>
             )}
-        </div>
+        </BilingualTableRow>
     );
 });
 
