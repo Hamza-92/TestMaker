@@ -52,6 +52,7 @@ use App\Http\Controllers\Superadmin\SiteMediaController;
 use App\Http\Controllers\Superadmin\SiteNavigationController;
 use App\Http\Controllers\Superadmin\SitePageController;
 use App\Http\Controllers\Superadmin\SitePricingController;
+use App\Http\Controllers\Superadmin\SmartSyllabusController;
 use App\Http\Controllers\Superadmin\SubjectController;
 use App\Http\Controllers\Superadmin\SubjectiveColumnSettingController;
 use App\Http\Controllers\Superadmin\SuperadminUserController;
@@ -463,6 +464,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/multipart-question-settings', [MultipartQuestionSettingController::class, 'index'])->name('superadmin.multipart-question-settings')->middleware('permission:question_types.view');
         Route::get('superadmin/subjective-column-settings', [SubjectiveColumnSettingController::class, 'index'])->name('superadmin.subjective-column-settings')->middleware('permission:question_types.view');
         Route::put('superadmin/subjective-column-settings', [SubjectiveColumnSettingController::class, 'update'])->name('superadmin.subjective-column-settings.update')->middleware('permission:question_types.edit');
+        Route::get('superadmin/smart-syllabus', [SmartSyllabusController::class, 'index'])->name('superadmin.smart-syllabus')->middleware('permission:patterns.view');
+        Route::get('superadmin/smart-syllabus/chapters', [SmartSyllabusController::class, 'chapters'])->name('superadmin.smart-syllabus.chapters')->middleware('permission:patterns.view');
+        Route::put('superadmin/smart-syllabus', [SmartSyllabusController::class, 'update'])->name('superadmin.smart-syllabus.update')->middleware('permission:patterns.edit');
         Route::post('superadmin/multipart-question-settings', [MultipartQuestionSettingController::class, 'store'])->name('superadmin.multipart-question-settings.store')->middleware('permission:question_types.edit');
         Route::patch('superadmin/multipart-question-settings/{setting}', [MultipartQuestionSettingController::class, 'update'])->name('superadmin.multipart-question-settings.update')->middleware('permission:question_types.edit');
         Route::delete('superadmin/multipart-question-settings/{setting}', [MultipartQuestionSettingController::class, 'destroy'])->name('superadmin.multipart-question-settings.destroy')->middleware('permission:question_types.edit');

@@ -20,6 +20,7 @@ use App\Support\AppUserAccess;
 use App\Support\CustomerPaperDefaults;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
+use App\Support\SmartSyllabus;
 use App\Support\SubjectiveAnswerAccess;
 use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\JsonResponse;
@@ -243,14 +244,18 @@ class GeneratePaperController extends Controller
         $subjectId = (int) $data['subject_id'];
         $chapterAccess = AppUserAccess::chapterIds($access, $patternId, $classId, $subjectId);
         $topicAccess = AppUserAccess::topicIds($access, $patternId, $classId, $subjectId);
+        $smartExcluded = SmartSyllabus::excludedForScope($patternId, $classId, $subjectId);
 
         $chapters = Chapter::query()
             ->where('pattern_id', $data['pattern_id'])
             ->where('class_id', $data['class_id'])
             ->where('subject_id', $data['subject_id'])
             ->where('status', 1)
-            ->withCount(['questions as question_count' => function ($query) use ($access, $patternId, $classId, $subjectId) {
+            ->withCount(['questions as question_count' => function ($query) use ($access, $patternId, $classId, $subjectId, $smartExcluded) {
                 $query->where('status', 1);
+                if ($smartExcluded['topics'] !== []) {
+                    $query->where(fn ($query) => $query->whereNull('topic_id')->orWhereNotIn('topic_id', $smartExcluded['topics']));
+                }
                 AppUserAccess::restrictQuestions($query, $access, $patternId, $classId, $subjectId);
             }])
             ->with(['topics' => function ($q) {
@@ -266,8 +271,9 @@ class GeneratePaperController extends Controller
             ->orderBy('sort_id')
             ->orderBy('id')
             ->get(['id', 'name', 'name_ur', 'chapter_number', 'group_name', 'group_heading'])
-            ->map(function (Chapter $c) use ($chapterAccess, $topicAccess, $displayMedium) {
-                $chapterLocked = $chapterAccess !== null && ! in_array($c->id, $chapterAccess, true);
+            ->map(function (Chapter $c) use ($chapterAccess, $topicAccess, $displayMedium, $smartExcluded) {
+                $chapterSmartExcluded = in_array($c->id, $smartExcluded['chapters'], true);
+                $chapterLocked = $chapterSmartExcluded || ($chapterAccess !== null && ! in_array($c->id, $chapterAccess, true));
 
                 return [
                     'id' => $c->id,
@@ -278,9 +284,11 @@ class GeneratePaperController extends Controller
                     'group_name' => $c->group_name,
                     'group_heading' => $c->group_heading,
                     'locked' => $chapterLocked,
-                    'question_count' => (int) ($c->question_count ?? 0),
-                    'topics' => $c->topics->map(function ($t) use ($chapterLocked, $topicAccess, $displayMedium) {
-                        $topicLocked = $chapterLocked || ($topicAccess !== null && ! in_array($t->id, $topicAccess, true));
+                    'smart_excluded' => $chapterSmartExcluded,
+                    'question_count' => $chapterLocked ? 0 : (int) ($c->question_count ?? 0),
+                    'topics' => $c->topics->map(function ($t) use ($chapterLocked, $chapterSmartExcluded, $topicAccess, $displayMedium, $smartExcluded) {
+                        $topicSmartExcluded = $chapterSmartExcluded || in_array($t->id, $smartExcluded['topics'], true);
+                        $topicLocked = $chapterLocked || $topicSmartExcluded || ($topicAccess !== null && ! in_array($t->id, $topicAccess, true));
 
                         return [
                             'id' => $t->id,
@@ -288,6 +296,7 @@ class GeneratePaperController extends Controller
                             'name_eng' => $t->name,
                             'name_ur' => $t->name_ur,
                             'locked' => $topicLocked,
+                            'smart_excluded' => $topicSmartExcluded,
                             'question_count' => $topicLocked ? 0 : (int) ($t->question_count ?? 0),
                         ];
                     })->values(),
@@ -728,6 +737,10 @@ class GeneratePaperController extends Controller
             ->values();
         abort_unless($scopeKeys->count() === 1, 422, 'Select chapters from one pattern, class, and subject.');
         $scope = $allowedChapters->first();
+        $smartExcluded = SmartSyllabus::excludedForScope(
+            (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id,
+        );
+        abort_if($chapterIds->intersect($smartExcluded['chapters'])->isNotEmpty(), 403);
 
         $topicIds = collect($data['topic_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
@@ -746,6 +759,7 @@ class GeneratePaperController extends Controller
                 ->whereIn('id', $topicIds)
                 ->whereIn('chapter_id', $chapterIds)
                 ->pluck('id');
+        abort_if($topicIds->intersect($smartExcluded['topics'])->isNotEmpty(), 403);
 
         abort_if($validTopicIds->contains(fn ($id) => ! AppUserAccess::allowsTopic(
             $access, (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id, (int) $id,
@@ -916,10 +930,16 @@ class GeneratePaperController extends Controller
     private function scopedQuestionsQuery($chapterIds, $validTopicIds, $sources, $scope, $difficulties = null)
     {
         $access = AppUserAccess::resolve(auth()->user());
+        $smartExcluded = SmartSyllabus::excludedForScope(
+            (int) $scope->pattern_id, (int) $scope->class_id, (int) $scope->subject_id,
+        );
         $query = Question::query()
             ->whereIn('questions.chapter_id', $chapterIds)
             ->where('questions.status', 1)
             ->whereIn('questions.source', $sources)
+            ->when($smartExcluded['topics'] !== [], fn ($query) => $query->where(
+                fn ($query) => $query->whereNull('questions.topic_id')->orWhereNotIn('questions.topic_id', $smartExcluded['topics']),
+            ))
             ->when($validTopicIds->isNotEmpty(), function ($query) use ($validTopicIds) {
                 $query->where(function ($query) use ($validTopicIds) {
                     $query->whereIn('questions.topic_id', $validTopicIds)

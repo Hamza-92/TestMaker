@@ -191,6 +191,7 @@ interface Topic {
     name_ur?: string | null;
     question_count?: number;
     locked?: boolean;
+    smart_excluded?: boolean;
 }
 
 interface Chapter {
@@ -203,6 +204,7 @@ interface Chapter {
     group_heading: string | null;
     question_count?: number;
     locked?: boolean;
+    smart_excluded?: boolean;
     topics: Topic[];
 }
 
@@ -10582,6 +10584,10 @@ function AddPaperSectionModal({
     }
 
     function toggleChapter(chapter: Chapter) {
+        if (!isChapterSelectable(chapter)) {
+            return;
+        }
+
         if (chapter.topics.length === 0) {
             setLocalChapterIds((current) => {
                 const next = new Set(current);
@@ -10598,7 +10604,7 @@ function AddPaperSectionModal({
             return;
         }
 
-        const chapterTopicIds = chapter.topics.map((topic) => topic.id);
+        const chapterTopicIds = selectableTopicIds(chapter);
         const allSelected = chapterTopicIds.every((id) =>
             localTopicIds.has(id),
         );
@@ -13926,7 +13932,8 @@ function ChapterTopicFilterPanel({
     return (
         <div className="grid gap-3 lg:grid-cols-2">
             {chapters.map((chapter) => {
-                const chapterTopicIds = chapter.topics.map((topic) => topic.id);
+                const chapterLocked = !isChapterSelectable(chapter);
+                const chapterTopicIds = selectableTopicIds(chapter);
                 const checked =
                     chapter.topics.length === 0
                         ? localChapterIds.has(chapter.id)
@@ -13945,7 +13952,8 @@ function ChapterTopicFilterPanel({
                         <button
                             type="button"
                             onClick={() => onToggleChapter(chapter)}
-                            className="flex w-full cursor-pointer items-center gap-3 text-left"
+                            disabled={chapterLocked}
+                            className="flex w-full cursor-pointer items-center gap-3 text-left disabled:cursor-not-allowed"
                         >
                             <span
                                 className={cn(
@@ -13970,13 +13978,21 @@ function ChapterTopicFilterPanel({
                                         }
                                         urdu={chapter.name_ur}
                                         medium={medium}
+                                        struckThrough={chapter.smart_excluded}
                                     />
                                 </span>
+                                {chapter.smart_excluded && (
+                                    <span className="block text-xs text-slate-500">
+                                        Out of syllabus
+                                    </span>
+                                )}
                                 {chapter.topics.length > 0 && (
                                     <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">
                                         {
-                                            chapter.topics.filter((topic) =>
-                                                localTopicIds.has(topic.id),
+                                            chapter.topics.filter(
+                                                (topic) =>
+                                                    !topic.locked &&
+                                                    localTopicIds.has(topic.id),
                                             ).length
                                         }{' '}
                                         selected
@@ -13991,6 +14007,7 @@ function ChapterTopicFilterPanel({
                                     const topicChecked = localTopicIds.has(
                                         topic.id,
                                     );
+                                    const topicLocked = chapterLocked || !!topic.locked;
 
                                     return (
                                         <button
@@ -13999,7 +14016,8 @@ function ChapterTopicFilterPanel({
                                             onClick={() =>
                                                 onToggleTopic(topic.id)
                                             }
-                                            className="flex cursor-pointer items-center gap-2 text-left text-sm text-slate-700 transition-colors hover:text-brand-700 dark:text-slate-300 dark:hover:text-brand-300"
+                                            disabled={topicLocked}
+                                            className="flex cursor-pointer items-center gap-2 text-left text-sm text-slate-700 transition-colors hover:text-brand-700 disabled:cursor-not-allowed disabled:text-slate-400 dark:text-slate-300 dark:hover:text-brand-300"
                                         >
                                             <span
                                                 className={cn(
@@ -14022,7 +14040,13 @@ function ChapterTopicFilterPanel({
                                                 }
                                                 urdu={topic.name_ur}
                                                 medium={medium}
+                                                struckThrough={topic.smart_excluded}
                                             />
+                                            {topic.smart_excluded && (
+                                                <span className="text-xs text-slate-500">
+                                                    Out of syllabus
+                                                </span>
+                                            )}
                                         </button>
                                     );
                                 })}
@@ -16583,11 +16607,13 @@ function BilingualPickerName({
     urdu,
     medium,
     className,
+    struckThrough = false,
 }: {
     english?: string | null;
     urdu?: string | null;
     medium: ContentMedium;
     className?: string;
+    struckThrough?: boolean;
 }) {
     const englishName = (english ?? '').trim();
     const urduName = (urdu ?? '').trim();
@@ -16603,14 +16629,20 @@ function BilingualPickerName({
                 )}
             >
                 <span
-                    className="min-w-0 flex-1 truncate"
+                    className={cn(
+                        'min-w-0 flex-1 truncate',
+                        struckThrough && 'line-through',
+                    )}
                     title={plainQuestionText(englishName)}
                 >
                     <RichTextLabel value={englishName} />
                 </span>
                 <span
                     dir="rtl"
-                    className="min-w-0 flex-1 truncate text-right text-base"
+                    className={cn(
+                        'min-w-0 flex-1 truncate text-right text-base',
+                        struckThrough && 'line-through',
+                    )}
                     title={plainQuestionText(urduName)}
                 >
                     <RichTextLabel value={urduName} />
@@ -16626,6 +16658,7 @@ function BilingualPickerName({
                 className={cn(
                     'min-w-0 flex-1 truncate text-right text-base',
                     className,
+                    struckThrough && 'line-through',
                 )}
                 title={plainQuestionText(urduValue)}
             >
@@ -16636,7 +16669,11 @@ function BilingualPickerName({
 
     return (
         <span
-            className={cn('min-w-0 flex-1 truncate', className)}
+            className={cn(
+                'min-w-0 flex-1 truncate',
+                className,
+                struckThrough && 'line-through',
+            )}
             title={plainQuestionText(englishValue)}
         >
             <RichTextLabel value={englishValue} />
@@ -16788,9 +16825,14 @@ function DirectChapterRow({
                     english={chapter.name_eng ?? chapter.name}
                     urdu={chapter.name_ur}
                     medium={medium}
+                    struckThrough={chapter.smart_excluded}
                 />
             </button>
-            {locked && (
+            {chapter.smart_excluded ? (
+                <span className="shrink-0 text-[11px] font-medium text-slate-500">
+                    Out of syllabus
+                </span>
+            ) : locked && (
                 <span
                     className="inline-flex shrink-0 items-center text-slate-500 dark:text-slate-400"
                     aria-label="Locked"
@@ -16855,9 +16897,14 @@ function ChapterCard({
                                 english={chapter.name_eng ?? chapter.name}
                                 urdu={chapter.name_ur}
                                 medium={medium}
+                                struckThrough={chapter.smart_excluded}
                             />
                         </h3>
-                        {locked && (
+                        {chapter.smart_excluded ? (
+                            <span className="text-[11px] font-medium text-slate-500">
+                                Out of syllabus
+                            </span>
+                        ) : locked && (
                             <span
                                 className="inline-flex shrink-0 items-center text-slate-500 dark:text-slate-400"
                                 aria-label="Locked"
@@ -16910,9 +16957,14 @@ function ChapterCard({
                                         english={topic.name_eng ?? topic.name}
                                         urdu={topic.name_ur}
                                         medium={medium}
+                                        struckThrough={topic.smart_excluded}
                                     />
                                 </button>
-                                {topicLocked && (
+                                {topic.smart_excluded ? (
+                                    <span className="shrink-0 text-[10px] font-medium text-slate-500">
+                                        Out of syllabus
+                                    </span>
+                                ) : topicLocked && (
                                     <LockKeyholeIcon
                                         className="size-3.5 shrink-0"
                                         aria-label="Locked"

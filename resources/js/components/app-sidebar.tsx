@@ -106,6 +106,11 @@ export function AppSidebar() {
                       href: '/superadmin/circular-labels',
                       icon: CircleDotIcon,
                   },
+                  {
+                      title: 'Smart Syllabus',
+                      href: '/superadmin/smart-syllabus',
+                      icon: BookOpenIcon,
+                  },
               ]
             : []),
         ...(can('classes.view')
