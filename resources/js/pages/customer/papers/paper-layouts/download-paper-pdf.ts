@@ -6,7 +6,7 @@ import { getPageDimensions } from './types';
 import type { PaperSettings } from './types';
 
 const PX_PER_MM = 96 / 25.4;
-const PIXEL_RATIO = 300 / 96;
+const FULL_PIXEL_RATIO = 300 / 96;
 const TRANSPARENT_IMAGE =
     'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 const IMAGE_LOAD_TIMEOUT_MS = 12000;
@@ -156,7 +156,9 @@ interface PaperQuestionGroupBorder {
     color: string;
 }
 
-function paperQuestionGroupBorders(root: HTMLElement): PaperQuestionGroupBorder[] {
+function paperQuestionGroupBorders(
+    root: HTMLElement,
+): PaperQuestionGroupBorder[] {
     const rootRect = root.getBoundingClientRect();
 
     return Array.from(
@@ -174,13 +176,15 @@ function paperQuestionGroupBorders(root: HTMLElement): PaperQuestionGroupBorder[
             return [];
         }
 
-        return [{
-            top: rect.top - rootRect.top,
-            bottom: rect.bottom - rootRect.top,
-            left: rect.left - rootRect.left,
-            width: rect.width,
-            color: style.borderTopColor,
-        }];
+        return [
+            {
+                top: rect.top - rootRect.top,
+                bottom: rect.bottom - rootRect.top,
+                left: rect.left - rootRect.left,
+                width: rect.width,
+                color: style.borderTopColor,
+            },
+        ];
     });
 }
 
@@ -315,6 +319,10 @@ interface ExportOptions {
     name: string;
     /** Number of pairs to print, with two full-size-text papers in each pair. */
     sideBySidePairs?: number;
+    /** Identical copies of each paper, without mounting their DOM again. */
+    copiesPerPaper?: number;
+    /** Use the quicker customer paper download path. */
+    fastPdf?: boolean;
     /** Receives each paired page before its capture canvas is released. */
     onSideBySidePage?: (
         canvas: HTMLCanvasElement,
@@ -332,6 +340,8 @@ export async function downloadPaperPdf({
     settings,
     name,
     sideBySidePairs = 0,
+    copiesPerPaper = 1,
+    fastPdf = false,
     onSideBySidePage,
     onProgress,
     onMissingImages,
@@ -387,8 +397,38 @@ export async function downloadPaperPdf({
     let pageCount = 0;
 
     try {
+        // Printed copies of a set use the same questions and layout. Capture
+        // that set once, then reuse its pages in the requested copy order.
+        const reusePdfPages = fastPdf && !onSideBySidePage;
+        const paperRuns: Array<{ source: HTMLElement; repetitions: number }> =
+            [];
+
+        papers.forEach((source) => {
+            const previous = paperRuns[paperRuns.length - 1];
+
+            if (
+                reusePdfPages &&
+                !paired &&
+                Number(source.dataset.paperCopyIndex) > 0 &&
+                source.dataset.paperSetIndex !== undefined &&
+                previous?.source.dataset.paperSetIndex ===
+                    source.dataset.paperSetIndex
+            ) {
+                previous.repetitions++;
+            } else {
+                paperRuns.push({
+                    source,
+                    repetitions: reusePdfPages
+                        ? paired
+                            ? pairCount
+                            : Math.max(1, Math.round(copiesPerPaper))
+                        : 1,
+                });
+            }
+        });
+
         // Freeze every selected set before the first asynchronous operation.
-        const clones = papers.map((source) => {
+        const clones = paperRuns.map(({ source }) => {
             const clone = cleanClone(source);
             clone.style.width = `${width}px`;
 
@@ -407,7 +447,9 @@ export async function downloadPaperPdf({
                     `${Math.min(settings.headerPaddingY, 3)}px`,
                 );
                 clone
-                    .querySelectorAll<HTMLInputElement>('[data-paper-header] input')
+                    .querySelectorAll<HTMLInputElement>(
+                        '[data-paper-header] input',
+                    )
                     .forEach((input) => {
                         const value = document.createElement('span');
                         value.textContent = input.value;
@@ -431,45 +473,74 @@ export async function downloadPaperPdf({
             onMissingImages?.(missingImages);
         }
 
-        // html-to-image rounds font sizes down by default. Preserve the
-        // measured typography so pagination and captured line wraps agree.
-        const fontSizes = Array.from(
-            holder.querySelectorAll<HTMLElement>('*'),
-        ).map(
-            (element) => [element, getComputedStyle(element).fontSize] as const,
-        );
-        fontSizes.forEach(([element, size]) =>
-            element.style.setProperty('font-size', size),
-        );
-        const captureStyleProperties = Array.from(
-            getComputedStyle(document.documentElement),
-        ).filter((property) => property !== 'font-size' && property !== 'font');
-        preserveSingleLineHeadings(holder);
+        let captureStyleProperties: string[] | undefined;
+        const prepareLegacyStyles = () => {
+            if (captureStyleProperties) {
+                return;
+            }
 
-        const fontEmbedCSS = await timeout(
-            getFontEmbedCSS(holder),
-            'Could not prepare the paper fonts. Please retry.',
-        );
-
-        if (/url\(\s*["']?(?:https?:|\/)/i.test(fontEmbedCSS)) {
-            throw new Error(
-                'A paper font could not be embedded. Please retry after it has loaded.',
+            // html-to-image rounds font sizes down by default. Preserve the
+            // measured typography so pagination and captured line wraps agree.
+            const fontSizes = Array.from(
+                holder.querySelectorAll<HTMLElement>('*'),
+            ).map(
+                (element) =>
+                    [element, getComputedStyle(element).fontSize] as const,
             );
-        }
+            fontSizes.forEach(([element, size]) =>
+                element.style.setProperty('font-size', size),
+            );
+            captureStyleProperties = Array.from(
+                getComputedStyle(document.documentElement),
+            ).filter(
+                (property) => property !== 'font-size' && property !== 'font',
+            );
+            preserveSingleLineHeadings(holder);
+        };
+        let fontEmbedCSS: string | undefined;
+        const prepareEmbeddedFonts = async () => {
+            if (fontEmbedCSS !== undefined) {
+                return fontEmbedCSS;
+            }
+
+            prepareLegacyStyles();
+            const css = await timeout(
+                getFontEmbedCSS(holder),
+                'Could not prepare the paper fonts. Please retry.',
+            );
+
+            if (/url\(\s*["']?(?:https?:|\/)/i.test(css)) {
+                throw new Error(
+                    'A paper font could not be embedded. Please retry after it has loaded.',
+                );
+            }
+
+            fontEmbedCSS = css;
+
+            return css;
+        };
+
+        await prepareEmbeddedFonts();
 
         const sharedWatermark = holder
             .querySelector('[data-paper-watermark]')
             ?.cloneNode(true) as HTMLElement | undefined;
 
         const renderRuns = clones.flatMap((clone, setIndex) =>
-            Array.from({ length: paired ? pairCount : 1 }, () => ({
-                clone,
-                setIndex,
-                copies: paired ? 2 : 1,
-            })),
+            Array.from(
+                { length: paired && !reusePdfPages ? pairCount : 1 },
+                () => ({
+                    clone,
+                    setIndex,
+                    copies: paired ? 2 : 1,
+                    repetitions: paperRuns[setIndex].repetitions,
+                }),
+            ),
         );
+        let capturedPageCount = 0;
 
-        for (const { clone, setIndex, copies } of renderRuns) {
+        for (const { clone, setIndex, copies, repetitions } of renderRuns) {
+            const pageImages: string[] = [];
             // Reuse the actual watermark on every exported page, including
             // secondary sets and copies.
             const watermark = (
@@ -479,10 +550,19 @@ export async function downloadPaperPdf({
                 .querySelectorAll('[data-paper-watermark]')
                 .forEach((element) => element.remove());
 
-            const geometry = measure(clone);
-            const tableBorders = paperTableBorders(clone);
-            const questionGroupBorders = paperQuestionGroupBorders(clone);
             const totalHeight = clone.getBoundingClientRect().height;
+            const needsPageBreak =
+                totalHeight > height - 0.5 ||
+                clone.querySelector(
+                    '[data-paper-section-page-break], [data-bubble-sheet-page="separate"]',
+                ) !== null;
+            const geometry = needsPageBreak
+                ? measure(clone)
+                : { blocks: [], lines: [], forcedBreaks: [] };
+            const tableBorders = needsPageBreak ? paperTableBorders(clone) : [];
+            const questionGroupBorders = needsPageBreak
+                ? paperQuestionGroupBorders(clone)
+                : [];
             const cloneRect = clone.getBoundingClientRect();
             const tableHeaders: Array<{
                 table: HTMLTableElement;
@@ -494,7 +574,7 @@ export async function downloadPaperPdf({
                 height: number;
             }> = [];
 
-            if (settings.repeatTableHeaders) {
+            if (needsPageBreak && settings.repeatTableHeaders) {
                 clone
                     .querySelectorAll<HTMLTableElement>(
                         '[data-paper-objective-table], [data-paper-federal-or-table]',
@@ -521,14 +601,18 @@ export async function downloadPaperPdf({
                     });
             }
 
-            const questionBounds = Array.from(
-                clone.querySelectorAll('[data-paper-question]'),
-            ).map((question) => {
-                const rect = question.getBoundingClientRect();
-                const top = clone.getBoundingClientRect().top;
+            const questionBounds = needsPageBreak
+                ? Array.from(
+                      clone.querySelectorAll('[data-paper-question]'),
+                  ).map((question) => {
+                      const rect = question.getBoundingClientRect();
 
-                return { top: rect.top - top, bottom: rect.bottom - top };
-            });
+                      return {
+                          top: rect.top - cloneRect.top,
+                          bottom: rect.bottom - cloneRect.top,
+                      };
+                  })
+                : [];
             let start = 0;
 
             while (start < totalHeight - 0.5) {
@@ -569,7 +653,9 @@ export async function downloadPaperPdf({
                 });
 
                 if (watermark) {
-                    const pageWatermark = watermark.cloneNode(true) as HTMLElement;
+                    const pageWatermark = watermark.cloneNode(
+                        true,
+                    ) as HTMLElement;
                     Object.assign(pageWatermark.style, {
                         top: '0',
                         right: '0',
@@ -611,19 +697,22 @@ export async function downloadPaperPdf({
                         });
                 }
 
-                content
-                    .querySelectorAll<HTMLElement>('[data-paper-question]')
-                    .forEach((question, index) => {
-                        const bounds = questionBounds[index];
+                if (needsPageBreak) {
+                    content
+                        .querySelectorAll<HTMLElement>('[data-paper-question]')
+                        .forEach((question, index) => {
+                            const bounds = questionBounds[index];
 
-                        if (
-                            bounds &&
-                            (bounds.bottom <= start + 0.5 ||
-                                bounds.top >= end - 0.5)
-                        ) {
-                            question.style.visibility = 'hidden';
-                        }
-                    });
+                            if (
+                                bounds &&
+                                (bounds.bottom <= start + 0.5 ||
+                                    bounds.top >= end - 0.5)
+                            ) {
+                                question.style.visibility = 'hidden';
+                            }
+                        });
+                }
+
                 viewport.append(content);
                 page.append(viewport);
 
@@ -660,12 +749,11 @@ export async function downloadPaperPdf({
                             tableAtStart,
                             repeatedTableHeaderHeight + bleed,
                         );
-                        questionGroupsAtBreak(questionGroupBorders, start).forEach(
-                            (group) =>
-                                appendBoundary(
-                                    group,
-                                    repeatedTableHeaderHeight,
-                                ),
+                        questionGroupsAtBreak(
+                            questionGroupBorders,
+                            start,
+                        ).forEach((group) =>
+                            appendBoundary(group, repeatedTableHeaderHeight),
                         );
                     }
 
@@ -682,8 +770,11 @@ export async function downloadPaperPdf({
                             tableBorderAt(tableBorders, end, 'end'),
                             bottomRuleTop,
                         );
-                        questionGroupsAtBreak(questionGroupBorders, end).forEach(
-                            (group) => appendBoundary(group, bottomRuleTop),
+                        questionGroupsAtBreak(
+                            questionGroupBorders,
+                            end,
+                        ).forEach((group) =>
+                            appendBoundary(group, bottomRuleTop),
                         );
                     }
                 }
@@ -716,59 +807,67 @@ export async function downloadPaperPdf({
 
                 holder.append(page);
                 onProgress?.(
-                    `${onSideBySidePage ? 'Preparing print' : 'Creating PDF'} page ${pageCount + 1}…`,
+                    `${onSideBySidePage ? 'Preparing print' : 'Creating PDF'} page ${capturedPageCount + 1}…`,
                 );
 
                 try {
-                    const canvas = await timeout(
-                        toCanvas(page, {
-                            width,
-                            height,
-                            pixelRatio: PIXEL_RATIO,
-                            backgroundColor: '#ffffff',
-                            imagePlaceholder: TRANSPARENT_IMAGE,
-                            onImageErrorHandler: () => undefined,
-                            fontEmbedCSS,
-                            includeStyleProperties: captureStyleProperties,
-                            preferredFontFormat: 'woff2',
-                            // The capture tree stays on-screen inside the serialized SVG.
-                            style: { margin: '0', transform: 'none' },
-                        }),
-                        'A PDF page took too long to render. Try fewer sets.',
-                    );
-
-                    if (pageCount > 0) {
-                        pdf.addPage(
-                            [dimensions.width, dimensions.height],
-                            settings.orientation,
+                    const captureWithEmbeddedFonts = async () =>
+                        timeout(
+                            toCanvas(page, {
+                                width,
+                                height,
+                                pixelRatio: FULL_PIXEL_RATIO,
+                                backgroundColor: '#ffffff',
+                                imagePlaceholder: TRANSPARENT_IMAGE,
+                                onImageErrorHandler: () => undefined,
+                                fontEmbedCSS: await prepareEmbeddedFonts(),
+                                includeStyleProperties: captureStyleProperties,
+                                preferredFontFormat: 'woff2',
+                                // The capture tree stays on-screen inside the serialized SVG.
+                                style: { margin: '0', transform: 'none' },
+                            }),
+                            'A PDF page took too long to render. Try fewer sets.',
                         );
-                    }
+                    const canvas = await captureWithEmbeddedFonts();
 
-                    pdf.addImage(
-                        canvas,
-                        'PNG',
-                        settings.marginLeft + (paired ? columnInsetMm : 0),
-                        settings.marginTop,
-                        columnWidthMm,
-                        height / PX_PER_MM,
-                        undefined,
-                        'FAST',
-                    );
+                    if (reusePdfPages) {
+                        pageImages.push(canvas.toDataURL('image/jpeg', 0.94));
+                    } else {
+                        if (pageCount > 0) {
+                            pdf.addPage(
+                                [dimensions.width, dimensions.height],
+                                settings.orientation,
+                            );
+                        }
 
-                    if (paired && copies === 2) {
                         pdf.addImage(
                             canvas,
                             'PNG',
-                            settings.marginLeft +
-                                columnInsetMm +
-                                columnWidthMm +
-                                gapMm,
+                            settings.marginLeft + (paired ? columnInsetMm : 0),
                             settings.marginTop,
                             columnWidthMm,
                             height / PX_PER_MM,
                             undefined,
                             'FAST',
                         );
+
+                        if (paired && copies === 2) {
+                            pdf.addImage(
+                                canvas,
+                                'PNG',
+                                settings.marginLeft +
+                                    columnInsetMm +
+                                    columnWidthMm +
+                                    gapMm,
+                                settings.marginTop,
+                                columnWidthMm,
+                                height / PX_PER_MM,
+                                undefined,
+                                'FAST',
+                            );
+                        }
+
+                        pageCount++;
                     }
 
                     if (paired) {
@@ -777,13 +876,56 @@ export async function downloadPaperPdf({
 
                     canvas.width = 0;
                     canvas.height = 0;
-                    pageCount++;
+                    capturedPageCount++;
                 } finally {
                     page.remove();
                 }
 
                 start = end;
                 await new Promise<void>((resolve) => setTimeout(resolve, 0));
+            }
+
+            if (reusePdfPages) {
+                for (let copy = 0; copy < repetitions; copy++) {
+                    pageImages.forEach((image, index) => {
+                        if (pageCount > 0) {
+                            pdf.addPage(
+                                [dimensions.width, dimensions.height],
+                                settings.orientation,
+                            );
+                        }
+
+                        const alias = `paper-${setIndex}-page-${index}`;
+                        pdf.addImage(
+                            image,
+                            'JPEG',
+                            settings.marginLeft + (paired ? columnInsetMm : 0),
+                            settings.marginTop,
+                            columnWidthMm,
+                            height / PX_PER_MM,
+                            alias,
+                            'FAST',
+                        );
+
+                        if (paired && copies === 2) {
+                            pdf.addImage(
+                                image,
+                                'JPEG',
+                                settings.marginLeft +
+                                    columnInsetMm +
+                                    columnWidthMm +
+                                    gapMm,
+                                settings.marginTop,
+                                columnWidthMm,
+                                height / PX_PER_MM,
+                                alias,
+                                'FAST',
+                            );
+                        }
+
+                        pageCount++;
+                    });
+                }
             }
 
             // Keep the original first-set watermark available for later sets.

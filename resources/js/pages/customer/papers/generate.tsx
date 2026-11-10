@@ -7063,13 +7063,15 @@ export default function GeneratePaper({
             const settings = normalizePaperSettings(generatedPaper.settings);
             const sideBySide = settings.sideBySideCopiesEnabled;
             const papers = printablePapers().filter(
-                (paper) => !sideBySide || paper.dataset.paperCopyIndex === '0',
+                (paper) => paper.dataset.paperCopyIndex === '0',
             );
             await downloadPaperPdf({
                 papers,
                 settings,
                 name,
                 sideBySidePairs: sideBySide ? settings.printCopies : 0,
+                copiesPerPaper: sideBySide ? 1 : settings.printCopies,
+                fastPdf: true,
                 onProgress: (message) =>
                     toast.loading(message, { id: progress }),
                 onMissingImages: (count) => {
@@ -14449,10 +14451,13 @@ export function GeneratedPaperView({
                         'Objective Questions'),
         );
     const printJobs = Array.from({ length: numSets }).flatMap((_, setIndex) =>
-        Array.from({ length: settings.printCopies }, (_, copyIndex) => ({
-            setIndex,
-            copyIndex,
-        })),
+        Array.from(
+            { length: isDownloadingPdf ? 1 : settings.printCopies },
+            (_, copyIndex) => ({
+                setIndex,
+                copyIndex,
+            }),
+        ),
     );
 
     useEffect(() => {
@@ -15963,6 +15968,7 @@ export function GeneratedPaperView({
                             type="button"
                             onClick={onDownloadPdf}
                             disabled={isDownloadingPdf}
+                            title="Direct PDF download with the full paper layout"
                             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
                         >
                             {isDownloadingPdf ? (
@@ -15972,17 +15978,18 @@ export function GeneratedPaperView({
                             )}
                             {isDownloadingPdf
                                 ? 'Preparing PDF'
-                                : 'Download PDF'}
+                                : 'Download PDF (Exact)'}
                         </button>
                         <button
                             type="button"
                             onClick={onPrintAllSets}
+                            title="Print now, or choose Save as PDF in the browser dialog"
                             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white"
                         >
                             <PrinterIcon className="size-3.5" />
                             {printJobs.length > 1
                                 ? `Print ${printJobs.length} Papers`
-                                : 'Print'}
+                                : 'Print / Save PDF'}
                         </button>
                     </div>
                 </div>
