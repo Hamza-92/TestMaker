@@ -15978,7 +15978,7 @@ export function GeneratedPaperView({
                             )}
                             {isDownloadingPdf
                                 ? 'Preparing PDF'
-                                : 'Download PDF (Exact)'}
+                                : 'Download PDF'}
                         </button>
                         <button
                             type="button"
