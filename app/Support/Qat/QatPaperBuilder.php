@@ -6,8 +6,10 @@ use App\Models\Question;
 use App\Models\User;
 use App\Support\AppUserAccess;
 use App\Support\Questions\QuestionTypeHeadingResolver;
+use App\Support\Questions\SubjectMediumResolver;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,13 +21,14 @@ final class QatPaperBuilder
         $subject = QatMonthlySyllabus::query('qat_subjects', 'subject', $month, 'subject')
             ->joinSub(QatMonthlySyllabus::query('qat_classes', 'class', $month, 'classes'), 'class', 'class.id', '=', 'subject.qat_class_id')
             ->join('qat_catalogues as catalogue', 'catalogue.id', '=', 'class.qat_catalogue_id')
+            ->leftJoin('subjects as source_subject', 'source_subject.id', '=', 'subject.subject_id')
             ->where('subject.id', $subjectId)
             ->where('subject.status', true)
             ->where('class.status', true)
             ->first([
                 'subject.id', 'subject.subject_name', 'subject.subject_id', 'subject.source_pattern_id',
                 'class.id as class_id', 'class.name as class_name', 'class.source_class_id',
-                'catalogue.academic_year',
+                'catalogue.academic_year', 'source_subject.name_ur as subject_name_ur',
             ]);
         abort_unless($subject, 404);
 
@@ -34,6 +37,14 @@ final class QatPaperBuilder
             $access, (int) $subject->source_pattern_id, (int) $subject->source_class_id,
             (int) $subject->subject_id,
         ), 403);
+
+        $subject->medium = SubjectMediumResolver::resolve(
+            (int) $subject->source_pattern_id, (int) $subject->source_class_id,
+            (int) $subject->subject_id, fallback: 'Both',
+        );
+        if ($subject->medium === 'Urdu' && filled($subject->subject_name_ur)) {
+            $subject->subject_name = $subject->subject_name_ur;
+        }
 
         $requested = array_values(array_unique(array_map('intval', $chapterIds)));
         $query = QatMonthlySyllabus::query('qat_chapters', 'chapter', $month, 'chapter')
@@ -49,11 +60,16 @@ final class QatPaperBuilder
         }
 
         $chapters = $query->orderBy('chapter.sort_id')->orderBy('chapter.id')
-            ->get(['chapter.id', 'chapter.name', 'chapter.chapter_number', 'chapter.source_chapter_id'])
+            ->get(['chapter.id', 'chapter.name', 'chapter.name_ur', 'chapter.chapter_number', 'chapter.source_chapter_id'])
             ->filter(fn ($chapter) => $user->isSchoolOwner() || AppUserAccess::allowsChapter(
                 $access, (int) $subject->source_pattern_id, (int) $subject->source_class_id,
                 (int) $subject->subject_id, (int) $chapter->source_chapter_id,
             ))->values();
+        if ($subject->medium === 'Urdu') {
+            foreach ($chapters as $chapter) {
+                $chapter->name = filled($chapter->name_ur) ? $chapter->name_ur : $chapter->name;
+            }
+        }
         if ($syllabus === 'custom' && $chapters->count() !== count($requested)) {
             throw ValidationException::withMessages(['chapter_ids' => 'Some selected chapters are unavailable.']);
         }
@@ -183,8 +199,8 @@ final class QatPaperBuilder
             (int) $subject->source_class_id,
             (int) $subject->subject_id,
         )->mapWithKeys(fn ($type) => [(int) $type->id => [
-            'heading_en' => trim((string) ($type->heading_en ?: $type->name)),
-            'heading_ur' => trim((string) ($type->heading_ur ?: $type->name_ur)),
+            'heading_en' => ($subject->medium ?? 'Both') === 'Urdu' ? '' : trim((string) ($type->heading_en ?: $type->name)),
+            'heading_ur' => ($subject->medium ?? 'Both') === 'English' ? '' : trim((string) ($type->heading_ur ?: $type->name_ur)),
         ]])->all();
     }
 
@@ -194,12 +210,39 @@ final class QatPaperBuilder
             'question.id', 'question.qat_chapter_id as chapter_id', 'question.question_type_id',
             'question.question_data', 'chapter.name as chapter_name', 'topic.name as topic_name',
             'type.name as type_name', 'type.is_objective',
+            'chapter.name_ur as chapter_name_ur', 'topic.name_ur as topic_name_ur', 'type.name_ur as type_name_ur',
         ];
+    }
+
+    public function availableQuestions(Builder $query, string $medium): Collection
+    {
+        $questions = $query->get($this->questionColumns());
+        if ($medium === 'Both') {
+            return $questions;
+        }
+
+        return $questions->filter(function ($question) use ($medium): bool {
+            $data = json_decode((string) $question->question_data, true) ?: [];
+            if (! QatQuestionLanguage::canRender($data, $medium)) {
+                return false;
+            }
+
+            $question->display_data = QatQuestionLanguage::project($data, $medium);
+            unset($question->question_data);
+
+            if ($medium === 'Urdu') {
+                $question->chapter_name = filled($question->chapter_name_ur) ? $question->chapter_name_ur : $question->chapter_name;
+                $question->topic_name = filled($question->topic_name_ur) ? $question->topic_name_ur : $question->topic_name;
+                $question->type_name = filled($question->type_name_ur) ? $question->type_name_ur : $question->type_name;
+            }
+
+            return true;
+        })->values();
     }
 
     public function presentQuestion(object $question, bool $includeAnswers = false): array
     {
-        $data = json_decode((string) $question->question_data, true) ?: [];
+        $data = $question->display_data ?? (json_decode((string) $question->question_data, true) ?: []);
         $content = $this->withoutAnswers((array) ($data['content'] ?? []));
         $options = $this->withoutAnswers((array) ($data['options'] ?? []));
         $schemaKey = trim((string) ($data['schema_key'] ?? ''));

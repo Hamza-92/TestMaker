@@ -44,23 +44,42 @@ class QatPaperController extends Controller
             $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules),
             $subject,
         );
-        $types = $builder->orderByType((clone $query)
-            ->select('question.question_type_id as id', 'type.name', 'type.is_objective')
-            ->selectRaw('count(*) as total')
-            ->groupBy('question.question_type_id', 'type.id', 'type.name', 'type.is_objective', 'type_order.sort_order'))
-            ->get();
-        $questions = ($data['include_questions'] ?? true)
-            ? $builder->orderByType((clone $query)
-                ->when(isset($data['type_id']), fn ($query) => $query->where('question.question_type_id', $data['type_id']))
-                ->when(filled($data['q'] ?? null), fn ($query) => $query->where('question.question_data', 'like', '%'.$data['q'].'%')))
-                ->orderBy('question.id')
-                ->get($builder->questionColumns())
-                ->map(fn ($question) => $builder->presentQuestion($question))
-            : collect();
+        $includeQuestions = $data['include_questions'] ?? true;
+        if ($subject->medium === 'Both') {
+            $types = $builder->orderByType((clone $query)
+                ->select('question.question_type_id as id', 'type.name', 'type.is_objective')
+                ->selectRaw('count(*) as total')
+                ->groupBy('question.question_type_id', 'type.id', 'type.name', 'type.is_objective', 'type_order.sort_order'))
+                ->get();
+            $questions = $includeQuestions
+                ? $builder->orderByType((clone $query)
+                    ->when(isset($data['type_id']), fn ($query) => $query->where('question.question_type_id', $data['type_id']))
+                    ->when(filled($data['q'] ?? null), fn ($query) => $query->where('question.question_data', 'like', '%'.$data['q'].'%')))
+                    ->orderBy('question.id')
+                    ->get($builder->questionColumns())
+                    ->map(fn ($question) => $builder->presentQuestion($question))
+                : collect();
+        } else {
+            $pool = $builder->availableQuestions($builder->orderByType($query)->orderBy('question.id'), $subject->medium);
+            $types = $pool->groupBy('question_type_id')->map(fn ($rows, $id) => (object) [
+                'id' => $id,
+                'name' => $rows->first()->type_name,
+                'is_objective' => $rows->first()->is_objective,
+                'total' => $rows->count(),
+            ])->values();
+            $questions = $includeQuestions
+                ? $pool->when(isset($data['type_id']), fn ($rows) => $rows->where('question_type_id', $data['type_id']))
+                    ->map(fn ($question) => $builder->presentQuestion($question))
+                    ->when(filled($data['q'] ?? null), fn ($rows) => $rows->filter(
+                        fn ($question) => mb_stripos(json_encode($question, JSON_UNESCAPED_UNICODE), $data['q']) !== false,
+                    ))->values()
+                : collect();
+        }
 
         $availableTypeIds = $types->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         return response()->json([
+            'medium' => $subject->medium,
             'hidden_type_ids' => $rules->hiddenTypeIds,
             'types' => $types->map(fn ($type) => [
                 'id' => (int) $type->id,
@@ -162,8 +181,10 @@ class QatPaperController extends Controller
             throw ValidationException::withMessages(['class_ids' => 'Some selected classes are unavailable.']);
         }
 
-        $pool = $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules)
-            ->get($builder->questionColumns())->keyBy('id');
+        $pool = $builder->availableQuestions(
+            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules),
+            $subject->medium,
+        )->keyBy('id');
         $typeIds = $pool->pluck('question_type_id')->map(fn ($id) => (int) $id)->unique()->all();
         $pairs = $rules->validatePairs($data['or_pairs'] ?? [], $typeIds);
         $typeHeadings = $builder->typeHeadings($subject, $typeIds);
@@ -303,6 +324,7 @@ class QatPaperController extends Controller
                     : $questions->sum('marks'), 2),
                 'question_count' => $questions->count(),
                 'paper_data' => [
+                    'medium' => $subject->medium,
                     'generation_settings' => $generationSettings,
                     'class_id' => (int) $subject->class_id,
                     'subject_id' => (int) $subject->id,

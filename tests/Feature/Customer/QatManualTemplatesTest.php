@@ -1,8 +1,13 @@
 <?php
 
 use App\Enums\UserType;
+use App\Models\ClassSubject;
+use App\Models\Medium;
+use App\Models\Pattern;
 use App\Models\QatPaper;
 use App\Models\QuestionType;
+use App\Models\SchoolClass;
+use App\Models\Subject;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -126,6 +131,92 @@ test('editing a manual template keeps custom chapters and marks the paper as non
     $this->get($response->json('preview_url'))->assertOk()->assertInertia(fn ($page) => $page
         ->where('paper.total_marks', 6)->where('paper.paper_data.is_pef_pattern', false));
 });
+
+test('QAT uses the source subject medium for selection and stores it with each paper', function (string $journey) {
+    $pattern = Pattern::create(['name' => 'Source pattern', 'status' => 1]);
+    $class = SchoolClass::create(['name' => '5th', 'status' => 1]);
+    $subject = Subject::create(['name_eng' => 'Mathematics', 'name_ur' => 'ریاضی', 'subject_type' => 'chapter-wise', 'status' => 1]);
+    $urdu = Medium::firstOrCreate(['name' => 'Urdu']);
+    $english = Medium::firstOrCreate(['name' => 'English']);
+    $both = Medium::firstOrCreate(['name' => 'Both']);
+    $assignment = ClassSubject::create([
+        'pattern_id' => $pattern->id, 'class_id' => $class->id,
+        'subject_id' => $subject->id, 'medium_id' => $urdu->id,
+    ]);
+    DB::table('qat_classes')->where('id', $this->classId)->update(['source_class_id' => $class->id]);
+    DB::table('qat_subjects')->where('id', $this->subjectId)->update([
+        'class_id' => $class->id, 'subject_id' => $subject->id, 'source_pattern_id' => $pattern->id,
+    ]);
+    DB::table('qat_chapters')->where('id', $this->chapterId)->update(['name_ur' => 'منتخب باب']);
+    $this->type->update(['name_ur' => 'معروضی سوالات', 'heading_ur' => 'سوالات کے جواب دیں۔', 'is_objective' => true]);
+    DB::table('qat_questions')->where('id', $this->questions[0])->update([
+        'question_data' => json_encode([
+            'statement_en' => 'Explain the rule.',
+            'statement_ur' => 'اصول بیان کریں۔',
+            'schema_key' => 'objective_passage_mcq',
+            'content' => ['items' => [[
+                'prompt_en' => 'Give an example.',
+                'prompt_ur' => 'ایک مثال دیں۔',
+                'options' => [
+                    ['text_en' => 'One', 'text_ur' => 'ایک'],
+                    ['text_en' => 'Two', 'text_ur' => 'دو', 'is_correct' => true],
+                    ['text_en' => null, 'text_ur' => null],
+                ],
+            ]]],
+        ]),
+    ]);
+    $scope = ['subject_id' => $this->subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$this->chapterId]];
+    $this->actingAs($this->school)->postJson(route('customer.qat.questions'), $scope)
+        ->assertOk()
+        ->assertJsonPath('medium', 'Urdu')
+        ->assertJsonPath('types.0.total', 1)
+        ->assertJsonPath('chapters.0.name', 'منتخب باب')
+        ->assertJsonPath('questions.data.0.statement_en', '')
+        ->assertJsonPath('questions.data.0.statement_ur', 'اصول بیان کریں۔')
+        ->assertJsonMissingPath('questions.data.0.content.items.0.prompt_en');
+    $this->postJson(route('customer.qat.papers.store'), [
+        ...$this->payload, 'selection_method' => 'manual',
+        'manual_questions' => [['id' => $this->questions[1], 'marks' => 3]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('manual_questions');
+
+    $payload = [...$this->payload, 'sections' => [
+        ['question_type_id' => $this->type->id, 'quantity' => 1, 'required_questions' => 1, 'marks' => 3],
+    ], 'manual_questions' => [['id' => $this->questions[0], 'marks' => 3]]];
+    if ($journey === 'manual') {
+        $payload['selection_method'] = 'manual';
+    } elseif ($journey === 'auto') {
+        DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $this->chapterId, 'month' => 4]);
+        $payload = [...$payload, 'mode' => 'auto', 'syllabus' => 'qat', 'months' => [4]];
+        $this->postJson(route('customer.qat.questions'), [
+            ...$scope, 'syllabus' => 'qat', 'months' => [4], 'include_questions' => false,
+        ])->assertOk()->assertJsonPath('types.0.total', 1)->assertJsonCount(0, 'questions.data');
+    }
+
+    $response = $this->postJson(route('customer.qat.papers.store'), $payload)->assertCreated();
+    $previewUrl = $response->json('preview_url');
+    $this->get($previewUrl)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('paper.subject_name', 'ریاضی')->where('paper.paper_data.medium', 'Urdu')
+        ->where('paper.paper_data.sections.0.heading_en', '')
+        ->where('paper.paper_data.sections.0.heading_ur', 'سوالات کے جواب دیں۔')
+        ->where('paper.paper_data.sections.0.questions.0.content.items.0.prompt_ur', 'ایک مثال دیں۔')
+        ->has('paper.paper_data.sections.0.questions.0.content.items.0.options', 2)
+        ->where('paper.paper_data.sections.0.questions.0.objective_answers.items.0', [1]));
+    $paperId = $this->postJson(route('customer.qat.previews.save', basename($previewUrl)))->assertCreated()->json('paper_id');
+
+    $assignment->update(['medium_id' => $english->id]);
+    $this->postJson(route('customer.qat.questions'), $scope)
+        ->assertOk()->assertJsonPath('medium', 'English')->assertJsonPath('types.0.total', 2)
+        ->assertJsonPath('questions.data.0.statement_ur', '')
+        ->assertJsonMissingPath('questions.data.0.content.items.0.prompt_ur');
+    $this->get(route('customer.qat.papers.show', $paperId))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('paper.paper_data.medium', 'Urdu'));
+
+    $assignment->update(['medium_id' => $both->id]);
+    $this->postJson(route('customer.qat.questions'), $scope)
+        ->assertOk()->assertJsonPath('medium', 'Both')
+        ->assertJsonPath('questions.data.0.statement_en', 'Explain the rule.')
+        ->assertJsonPath('questions.data.0.statement_ur', 'اصول بیان کریں۔');
+})->with(['manual', 'template', 'auto']);
 
 function addQatTypeToChapter(int $chapter, string $name, int $source, int $count): array
 {

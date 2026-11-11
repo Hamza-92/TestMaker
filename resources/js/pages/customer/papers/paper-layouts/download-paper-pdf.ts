@@ -541,6 +541,7 @@ export async function downloadPaperPdf({
 
         for (const { clone, setIndex, copies, repetitions } of renderRuns) {
             const pageImages: string[] = [];
+            const standardPaper = clone.hasAttribute('data-print-paper');
             // Reuse the actual watermark on every exported page, including
             // secondary sets and copies.
             const watermark = (
@@ -623,14 +624,17 @@ export async function downloadPaperPdf({
                 );
                 const repeatedTableHeaderHeight =
                     repeatedTableHeader?.height ?? 0;
-                // Preserve Nastaleeq ascenders at ordinary breaks. At a table
-                // row boundary, overlap would expose column borders from the
-                // previous row above the new page's horizontal border.
+                // Preserve Nastaleeq ascenders at ordinary breaks. Allow two
+                // lines of room for Urdu QAT prompts at the capture boundary.
+                // Do not overlap a standard paper's table row borders.
                 const tableAtStart =
                     start > 0
                         ? tableBorderAt(tableBorders, start, 'start')
                         : undefined;
-                const bleed = start > 0 && !tableAtStart ? 4 : 0;
+                const continuationInset =
+                    !standardPaper && clone.lang === 'ur' ? 48 : 4;
+                const bleed =
+                    start > 0 && !tableAtStart ? continuationInset : 0;
                 const capacity = height - repeatedTableHeaderHeight - bleed;
                 const end = nextPaperPageEnd(
                     start,
@@ -641,7 +645,13 @@ export async function downloadPaperPdf({
                     geometry.forcedBreaks,
                 );
                 const page = document.createElement('div');
-                page.setAttribute('data-print-paper', '');
+
+                // Keep capture styling consistent with the measured paper. QAT
+                // supplies its own typography and direction on the sheet.
+                if (standardPaper) {
+                    page.setAttribute('data-print-paper', '');
+                }
+
                 // Inherit the same typography and CSS variables as the preview.
                 page.style.cssText = clone.style.cssText;
                 Object.assign(page.style, {

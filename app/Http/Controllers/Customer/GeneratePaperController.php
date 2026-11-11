@@ -20,6 +20,7 @@ use App\Support\AppUserAccess;
 use App\Support\CustomerPaperDefaults;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
+use App\Support\Questions\SubjectMediumResolver;
 use App\Support\SmartSyllabus;
 use App\Support\SubjectiveAnswerAccess;
 use App\Support\SubscriptionQuestionQuota;
@@ -233,7 +234,7 @@ class GeneratePaperController extends Controller
             403,
         );
 
-        $displayMedium = $this->subjectMedium(
+        $displayMedium = SubjectMediumResolver::resolve(
             (int) $data['pattern_id'],
             (int) $data['class_id'],
             (int) $data['subject_id'],
@@ -768,56 +769,6 @@ class GeneratePaperController extends Controller
         return [$chapterIds, $validTopicIds, $sources, $difficulties, $requestedMedium, $scope];
     }
 
-    private function subjectMedium(int $patternId, int $classId, int $subjectId): string
-    {
-        $assigned = ClassSubject::query()
-            ->leftJoin('mediums', 'mediums.id', '=', 'class_subjects.medium_id')
-            ->where('class_subjects.pattern_id', $patternId)
-            ->where('class_subjects.class_id', $classId)
-            ->where('class_subjects.subject_id', $subjectId)
-            ->value('mediums.name');
-
-        if (in_array($assigned, ['English', 'Urdu', 'Both'], true)) {
-            return $assigned;
-        }
-
-        $questionScope = Question::query()
-            ->whereHas('chapter', fn ($query) => $query
-                ->where('pattern_id', $patternId)
-                ->where('class_id', $classId)
-                ->where('subject_id', $subjectId));
-
-        $hasEnglish = (clone $questionScope)
-            ->where(function ($query): void {
-                $query->whereNotNull('statement_en')
-                    ->orWhereNotNull('description_en')
-                    ->orWhereNotNull('answer_en')
-                    ->orWhereHas('options', fn ($optionQuery) => $optionQuery->whereNotNull('text_en'));
-            })
-            ->exists();
-        $hasUrdu = (clone $questionScope)
-            ->where(function ($query): void {
-                $query->whereNotNull('statement_ur')
-                    ->orWhereNotNull('description_ur')
-                    ->orWhereNotNull('answer_ur')
-                    ->orWhereHas('options', fn ($optionQuery) => $optionQuery->whereNotNull('text_ur'));
-            })
-            ->exists();
-
-        if (! $hasEnglish && ! $hasUrdu) {
-            $chapterScope = Chapter::query()
-                ->where('pattern_id', $patternId)
-                ->where('class_id', $classId)
-                ->where('subject_id', $subjectId);
-            $hasEnglish = (clone $chapterScope)->whereNotNull('name')->exists();
-            $hasUrdu = (clone $chapterScope)->whereNotNull('name_ur')->exists();
-        }
-
-        return $hasEnglish && $hasUrdu
-            ? 'Both'
-            : ($hasUrdu ? 'Urdu' : 'English');
-    }
-
     private function subjectMediumForChapters($chapterIds): string
     {
         $scope = Chapter::query()
@@ -825,7 +776,7 @@ class GeneratePaperController extends Controller
             ->first(['pattern_id', 'class_id', 'subject_id']);
 
         return $scope
-            ? $this->subjectMedium(
+            ? SubjectMediumResolver::resolve(
                 (int) $scope->pattern_id,
                 (int) $scope->class_id,
                 (int) $scope->subject_id,

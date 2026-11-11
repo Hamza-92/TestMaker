@@ -33,6 +33,8 @@ export type QatObjectiveSettings = {
     borders: boolean;
 };
 
+export type QatMedium = 'English' | 'Urdu' | 'Both';
+
 function field(data: Record<string, unknown>, key: string): string {
     return typeof data[key] === 'string' ? (data[key] as string) : '';
 }
@@ -330,6 +332,7 @@ function ObjectiveLine({
     options,
     correctOptions,
     settings,
+    displayMedium,
 }: {
     number: string;
     en: string;
@@ -337,15 +340,25 @@ function ObjectiveLine({
     options: Record<string, unknown>[];
     correctOptions?: number[];
     settings: QatObjectiveSettings;
+    displayMedium: QatMedium;
 }) {
     const bilingual = Boolean(en && ur);
-    const direction = ur && !en ? 'rtl' : 'ltr';
-    const medium = bilingual ? 'both' : ur ? 'urdu' : 'english';
+    const direction = displayMedium === 'Urdu' || (ur && !en) ? 'rtl' : 'ltr';
+    const medium =
+        displayMedium === 'Urdu'
+            ? 'urdu'
+            : displayMedium === 'English'
+              ? 'english'
+              : bilingual || (!en && !ur)
+                ? 'both'
+                : ur
+                  ? 'urdu'
+                  : 'english';
     const optionTable = options.length > 0 && (
         <ObjectiveOptions
             options={options}
             direction={direction}
-            medium={en || ur ? medium : 'both'}
+            medium={medium}
             correctOptions={correctOptions}
             settings={settings}
         />
@@ -381,8 +394,11 @@ function ObjectiveLine({
 
     if (!en && !ur && optionTable) {
         return (
-            <div className="flex items-start gap-2">
-                <span className="qat-question-number shrink-0 font-bold">
+            <div dir={direction} className="flex items-start gap-2">
+                <span
+                    dir="ltr"
+                    className="qat-question-number shrink-0 font-bold"
+                >
                     {number}.
                 </span>
                 {optionTable}
@@ -418,11 +434,13 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     number,
     showAnswers = false,
     settings,
+    displayMedium,
 }: {
     question: QatQuestion;
     number: number | string;
     showAnswers?: boolean;
     settings: QatObjectiveSettings;
+    displayMedium: QatMedium;
 }) {
     const content = question.content ?? {};
     const items = records(content.items);
@@ -463,6 +481,7 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
                 ur={primaryUr}
                 options={options.length ? options : trueFalseOptions}
                 settings={settings}
+                displayMedium={displayMedium}
                 correctOptions={
                     showAnswers ? question.objective_answers?.options : []
                 }
@@ -471,19 +490,29 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
                 extraPassageUr ||
                 extraDetailEn ||
                 extraDetailUr) && (
-                <BilingualTableRow className="pl-6">
-                    <div dir="ltr" lang="en">
-                        {extraPassageEn && (
-                            <QatRichText value={extraPassageEn} />
-                        )}
-                        {extraDetailEn && <QatRichText value={extraDetailEn} />}
-                    </div>
-                    <div dir="rtl" lang="ur" className="text-right">
-                        {extraPassageUr && (
-                            <QatRichText value={extraPassageUr} />
-                        )}
-                        {extraDetailUr && <QatRichText value={extraDetailUr} />}
-                    </div>
+                <BilingualTableRow
+                    className={`ps-6 ${displayMedium === 'Both' ? '' : '!grid-cols-1'}`}
+                >
+                    {displayMedium !== 'Urdu' && (
+                        <div dir="ltr" lang="en">
+                            {extraPassageEn && (
+                                <QatRichText value={extraPassageEn} />
+                            )}
+                            {extraDetailEn && (
+                                <QatRichText value={extraDetailEn} />
+                            )}
+                        </div>
+                    )}
+                    {displayMedium !== 'English' && (
+                        <div dir="rtl" lang="ur" className="text-right">
+                            {extraPassageUr && (
+                                <QatRichText value={extraPassageUr} />
+                            )}
+                            {extraDetailUr && (
+                                <QatRichText value={extraDetailUr} />
+                            )}
+                        </div>
+                    )}
                 </BilingualTableRow>
             )}
             {items.map((item, index) => (
@@ -494,6 +523,7 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
                     ur={field(item, 'prompt_ur') || field(item, 'statement_ur')}
                     options={records(item.options)}
                     settings={settings}
+                    displayMedium={displayMedium}
                     correctOptions={
                         showAnswers
                             ? question.objective_answers?.items[index]
@@ -607,18 +637,34 @@ export const QatQuestionStatement = memo(function QatQuestionStatement({
 }) {
     const content = question.content ?? {};
     const firstItem = records(content.items)[0] ?? {};
+    const firstPair = records(content.pairs)[0] ?? {};
+    const options = question.options.length
+        ? question.options
+        : records(content.options);
+    const firstOption = options[0] ?? {};
     const en =
         question.statement_en ||
         field(content, 'prompt_en') ||
         field(content, 'intro_en') ||
         field(content, 'passage_en') ||
-        field(firstItem, 'prompt_en');
+        field(firstItem, 'prompt_en') ||
+        field(firstItem, 'statement_en') ||
+        question.description_en ||
+        field(content, 'shared_en') ||
+        field(firstPair, 'left_en') ||
+        field(firstOption, 'text_en') ||
+        field(firstOption, 'text');
     const ur =
         question.statement_ur ||
         field(content, 'prompt_ur') ||
         field(content, 'intro_ur') ||
         field(content, 'passage_ur') ||
-        field(firstItem, 'prompt_ur');
+        field(firstItem, 'prompt_ur') ||
+        field(firstItem, 'statement_ur') ||
+        question.description_ur ||
+        field(content, 'shared_ur') ||
+        field(firstPair, 'left_ur') ||
+        field(firstOption, 'text_ur');
 
     return (
         <BilingualTableRow
@@ -641,9 +687,11 @@ export const QatQuestionStatement = memo(function QatQuestionStatement({
 export const QatQuestionContent = memo(function QatQuestionContent({
     question,
     number,
+    displayMedium = 'Both',
 }: {
     question: QatQuestion;
     number: string;
+    displayMedium?: QatMedium;
 }) {
     const content = question.content ?? {};
     const promptEn = field(content, 'prompt_en');
@@ -684,6 +732,7 @@ export const QatQuestionContent = memo(function QatQuestionContent({
         'shared_en' in content ||
         'shared_ur' in content;
     const sharedDescription =
+        displayMedium === 'Both' &&
         (visibleDetailEn || visibleDetailUr) &&
         (hasSharedStatement ||
             !visibleDetailEn ||
@@ -706,7 +755,10 @@ export const QatQuestionContent = memo(function QatQuestionContent({
                 shared={sharedDescription}
             />
             {!statementEn && !statementUr && (
-                <span className="qat-question-number font-semibold">
+                <span
+                    dir="ltr"
+                    className="qat-question-number inline-block font-semibold"
+                >
                     {number}.
                 </span>
             )}
@@ -744,7 +796,7 @@ export const QatQuestionContent = memo(function QatQuestionContent({
                 </div>
             )}
             {items.length > 0 && !promoteSingleItem && (
-                <ol className="list-[lower-alpha] space-y-2 pl-5">
+                <ol className="list-[lower-alpha] space-y-2 ps-5">
                     {items.map((item, index) => (
                         <li key={index}>
                             <LocalizedText
@@ -794,7 +846,9 @@ export const QatQuestionContent = memo(function QatQuestionContent({
             {pairs.length > 0 && (
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                        <strong className="text-xs">Column A</strong>
+                        <strong className="text-xs">
+                            {displayMedium === 'Urdu' ? 'کالم الف' : 'Column A'}
+                        </strong>
                         {pairs.map((pair, index) => (
                             <div key={index} className="flex gap-2">
                                 <span>{index + 1}.</span>
@@ -806,7 +860,9 @@ export const QatQuestionContent = memo(function QatQuestionContent({
                         ))}
                     </div>
                     <div className="space-y-2">
-                        <strong className="text-xs">Column B</strong>
+                        <strong className="text-xs">
+                            {displayMedium === 'Urdu' ? 'کالم ب' : 'Column B'}
+                        </strong>
                         {pairs.map((_, index) => {
                             const pair = pairs[(index + 1) % pairs.length];
 

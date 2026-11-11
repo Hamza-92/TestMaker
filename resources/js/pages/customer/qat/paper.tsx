@@ -22,7 +22,7 @@ import {
     PAPER_URDU_FONT_METRICS,
 } from '../papers/paper-layouts/types';
 import { QatObjectiveQuestion, QatQuestionContent } from './question';
-import type { QatObjectiveSettings, QatQuestion } from './question';
+import type { QatMedium, QatObjectiveSettings, QatQuestion } from './question';
 
 const toolbarHoverClass =
     'border border-sky-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300';
@@ -146,6 +146,7 @@ type QatPaperView = {
     question_count: number;
     created_at?: string;
     paper_data: {
+        medium?: QatMedium;
         academic_year: string;
         syllabus: 'custom' | 'qat';
         months: number[];
@@ -176,9 +177,18 @@ function csrf(): string {
     );
 }
 
-function formatDuration(minutes: number): string {
+function formatDuration(minutes: number, urdu: boolean): string {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
+
+    if (urdu) {
+        return [
+            hours ? `${hours} گھنٹے` : '',
+            remainingMinutes ? `${remainingMinutes} منٹ` : '',
+        ]
+            .filter(Boolean)
+            .join(' ');
+    }
 
     if (hours === 0) {
         return `${minutes} Minutes`;
@@ -226,14 +236,20 @@ function romanSection(number: number): string {
     return result;
 }
 
-function QatSectionHeading({ number }: { number: number }) {
+function QatSectionHeading({
+    number,
+    urdu,
+}: {
+    number: number;
+    urdu: boolean;
+}) {
     return (
         <h2
             data-paper-heading
             data-paper-section-heading
             className="qat-section-heading break-after-avoid text-center text-sm font-bold"
         >
-            Section {romanSection(number)}
+            {urdu ? 'حصہ' : 'Section'} <bdi>{romanSection(number)}</bdi>
         </h2>
     );
 }
@@ -241,14 +257,18 @@ function QatSectionHeading({ number }: { number: number }) {
 function QatTypeHeading({
     section,
     number,
+    medium,
 }: {
     section: PaperSection;
     number: number;
+    medium: QatMedium;
 }) {
+    const urduOnly = medium === 'Urdu';
     const english = section.heading_en?.trim() || section.title;
-    const urdu = section.heading_ur?.trim() || '';
+    const urdu = medium === 'English' ? '' : section.heading_ur?.trim() || '';
     const alternateEnglish = section.or_heading_en?.trim();
-    const alternateUrdu = section.or_heading_ur?.trim();
+    const alternateUrdu =
+        medium === 'English' ? '' : section.or_heading_ur?.trim();
     const count = section.questions.length;
     const required = Math.min(section.required_questions ?? count, count);
     const marksEach = Number(section.questions[0]?.marks ?? 0);
@@ -266,33 +286,40 @@ function QatTypeHeading({
     );
     const marksLabel = sameMarks
         ? `(${required}x${marksEach}=${marks})`
-        : `(${marks} Marks)`;
+        : `(${marks} ${urduOnly ? 'نمبر' : 'Marks'})`;
 
     return (
         <div
             data-paper-heading
             className={
-                urdu || alternateUrdu
+                !urduOnly && (urdu || alternateUrdu)
                     ? 'qat-type-heading grid break-after-avoid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
                     : 'qat-type-heading flex break-after-avoid items-center justify-between gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
             }
         >
-            <div dir="ltr" lang="en" className="min-w-0 text-left">
-                <span className="whitespace-nowrap">Q.{number}:-</span>{' '}
-                <QuestionContent value={english} inline />
-                {alternateEnglish && alternateEnglish !== english && (
-                    <div>
-                        OR <QuestionContent value={alternateEnglish} inline />
-                    </div>
-                )}
-            </div>
+            {!urduOnly && (
+                <div dir="ltr" lang="en" className="min-w-0 text-left">
+                    <span className="whitespace-nowrap">Q.{number}:-</span>{' '}
+                    <QuestionContent value={english} inline />
+                    {alternateEnglish && alternateEnglish !== english && (
+                        <div>
+                            OR{' '}
+                            <QuestionContent value={alternateEnglish} inline />
+                        </div>
+                    )}
+                </div>
+            )}
             <div className="shrink-0 text-center">
                 <span dir="ltr" className="block whitespace-nowrap">
                     {marksLabel}
                 </span>
             </div>
-            {(urdu || alternateUrdu) && (
-                <div dir="rtl" lang="ur" className="min-w-0 text-right">
+            {(urduOnly || urdu || alternateUrdu) && (
+                <div
+                    dir="rtl"
+                    lang="ur"
+                    className={`min-w-0 text-right ${urduOnly ? 'order-first' : ''}`}
+                >
                     <span className="whitespace-nowrap">
                         سوال نمبر {number}:-
                     </span>{' '}
@@ -313,11 +340,13 @@ function QatPaperQuestion({
     number,
     showAnswers,
     objectiveSettings,
+    medium,
 }: {
     question: PaperQuestion;
     number: string;
     showAnswers: boolean;
     objectiveSettings: QatObjectiveSettings;
+    medium: QatMedium;
 }) {
     const alternative = question.or_question;
     const renderQuestion = (item: QatQuestion) =>
@@ -327,9 +356,14 @@ function QatPaperQuestion({
                 number={number}
                 showAnswers={showAnswers}
                 settings={objectiveSettings}
+                displayMedium={medium}
             />
         ) : (
-            <QatQuestionContent question={item} number={number} />
+            <QatQuestionContent
+                question={item}
+                number={number}
+                displayMedium={medium}
+            />
         );
 
     return (
@@ -341,9 +375,11 @@ function QatPaperQuestion({
             {alternative && (
                 <>
                     <div className="my-1 flex items-center justify-center gap-2 text-xs font-bold">
-                        <span lang="en">OR</span>
-                        {(question.statement_ur ||
-                            alternative.statement_ur) && (
+                        {medium !== 'Urdu' && <span lang="en">OR</span>}
+                        {(medium === 'Urdu' ||
+                            (medium === 'Both' &&
+                                (question.statement_ur ||
+                                    alternative.statement_ur))) && (
                             <span lang="ur" dir="rtl">
                                 یا
                             </span>
@@ -382,6 +418,8 @@ export default function QatPaper({
     const [actionError, setActionError] = useState('');
     const paperVariants = variants.length ? variants : [initialPaper];
     const paper = paperVariants[activeVariant] ?? initialPaper;
+    const medium = paper.paper_data.medium ?? 'Both';
+    const urduPaper = medium === 'Urdu';
     const variantLabel = `Paper ${paper.paper_data.variant ?? String.fromCharCode(65 + activeVariant)}`;
     const schoolLogoUrl = storageAssetUrl(schoolDetails.logo);
     const objectiveSections = paper.paper_data.sections
@@ -538,6 +576,7 @@ export default function QatPaper({
             <style>{`
                 @page { size: A4; margin: 10mm; }
                 #qat-print-sheet { font-family: "Times New Roman", Times, serif; }
+                #qat-print-sheet[lang="ur"] > header, #qat-print-sheet[lang="ur"] .qat-section-heading { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
                 #qat-print-sheet .qat-objective-question, #qat-print-sheet .qat-question .space-y-2.text-sm { font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; }
                 #qat-print-sheet .qat-question [lang="ur"], #qat-print-sheet .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${qatQuestionSize * qatUrduMetrics.sizeScale}px !important; line-height: ${qatQuestionLineHeight * qatUrduMetrics.lineHeightScale} !important; }
                 #qat-print-sheet .qat-question [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
@@ -689,6 +728,14 @@ export default function QatPaper({
                     <div className="mx-auto w-[210mm] shrink-0 overflow-hidden bg-white shadow-sm print:w-full print:overflow-visible print:shadow-none">
                         <article
                             id="qat-print-sheet"
+                            dir={urduPaper ? 'rtl' : 'ltr'}
+                            lang={
+                                medium === 'Both'
+                                    ? undefined
+                                    : urduPaper
+                                      ? 'ur'
+                                      : 'en'
+                            }
                             className="min-h-[297mm] bg-white px-[10mm] py-[10mm] text-slate-900 print:min-h-0"
                         >
                             <header className="break-inside-avoid">
@@ -705,18 +752,27 @@ export default function QatPaper({
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-end gap-2 pb-1 text-xs font-semibold">
-                                    <span className="text-left">
-                                        <strong>Total Time:</strong>{' '}
+                                    <span className="text-start">
+                                        <strong>
+                                            {urduPaper
+                                                ? 'کل وقت:'
+                                                : 'Total Time:'}
+                                        </strong>{' '}
                                         {formatDuration(
                                             paper.paper_data.minutes,
+                                            urduPaper,
                                         )}
                                     </span>
                                     <h1 className="text-center font-bold">
-                                        {paper.subject_name} ({paper.class_name}
-                                        )
+                                        {paper.subject_name} (
+                                        <bdi>{paper.class_name}</bdi>)
                                     </h1>
-                                    <span className="text-right">
-                                        <strong>Total Marks:</strong>{' '}
+                                    <span className="text-end">
+                                        <strong>
+                                            {urduPaper
+                                                ? 'کل نمبر:'
+                                                : 'Total Marks:'}
+                                        </strong>{' '}
                                         {paper.total_marks}
                                     </span>
                                 </div>
@@ -729,14 +785,18 @@ export default function QatPaper({
                                             <td className="w-1/2 border border-slate-900 px-2 py-2">
                                                 <div className="flex items-end gap-2">
                                                     <span className="shrink-0 font-bold">
-                                                        Roll No:
+                                                        {urduPaper
+                                                            ? 'رول نمبر:'
+                                                            : 'Roll No:'}
                                                     </span>
                                                     <span
                                                         className="h-4 min-w-0 flex-1 border-b border-slate-700"
                                                         aria-hidden="true"
                                                     />
                                                     <span className="shrink-0 font-bold">
-                                                        Section:
+                                                        {urduPaper
+                                                            ? 'سیکشن:'
+                                                            : 'Section:'}
                                                     </span>
                                                     <span
                                                         className="h-4 min-w-0 flex-1 border-b border-slate-700"
@@ -747,7 +807,9 @@ export default function QatPaper({
                                             <td className="w-1/2 border border-slate-900 px-2 py-2">
                                                 <div className="flex items-end gap-2">
                                                     <span className="shrink-0 font-bold">
-                                                        Signature of Supervisor:
+                                                        {urduPaper
+                                                            ? 'نگران کے دستخط:'
+                                                            : 'Signature of Supervisor:'}
                                                     </span>
                                                     <span
                                                         className="h-4 min-w-0 flex-1 border-b border-slate-700"
@@ -760,7 +822,9 @@ export default function QatPaper({
                                             <td className="border border-slate-900 px-2 py-2">
                                                 <div className="flex items-end gap-2">
                                                     <span className="shrink-0 font-bold">
-                                                        Name:
+                                                        {urduPaper
+                                                            ? 'نام:'
+                                                            : 'Name:'}
                                                     </span>
                                                     <span
                                                         className="h-4 min-w-0 flex-1 border-b border-slate-700"
@@ -771,7 +835,9 @@ export default function QatPaper({
                                             <td className="border border-slate-900 px-2 py-2">
                                                 <div className="flex items-end gap-2">
                                                     <span className="shrink-0 font-bold">
-                                                        Father&apos;s Name:
+                                                        {urduPaper
+                                                            ? 'والد کا نام:'
+                                                            : "Father's Name:"}
                                                     </span>
                                                     <span
                                                         className="h-4 min-w-0 flex-1 border-b border-slate-700"
@@ -787,7 +853,9 @@ export default function QatPaper({
                                             >
                                                 <div className="flex items-start gap-2">
                                                     <span className="shrink-0 font-bold">
-                                                        Chapters:
+                                                        {urduPaper
+                                                            ? 'ابواب:'
+                                                            : 'Chapters:'}
                                                     </span>
                                                     <div
                                                         dir="auto"
@@ -809,7 +877,10 @@ export default function QatPaper({
                             <div className="mt-3 space-y-3">
                                 {objectiveQuestions.length > 0 && (
                                     <section>
-                                        <QatSectionHeading number={1} />
+                                        <QatSectionHeading
+                                            number={1}
+                                            urdu={urduPaper}
+                                        />
                                         <div className="mt-2 space-y-4">
                                             {objectiveSections.map(
                                                 (section, sectionIndex) => {
@@ -837,6 +908,7 @@ export default function QatPaper({
                                                             className="space-y-3"
                                                         >
                                                             <QatTypeHeading
+                                                                medium={medium}
                                                                 section={
                                                                     section
                                                                 }
@@ -851,6 +923,9 @@ export default function QatPaper({
                                                                     index,
                                                                 ) => (
                                                                     <QatPaperQuestion
+                                                                        medium={
+                                                                            medium
+                                                                        }
                                                                         key={
                                                                             question.id
                                                                         }
@@ -889,9 +964,11 @@ export default function QatPaper({
                                                 key={`${section.question_type_id}-${sectionIndex}`}
                                             >
                                                 <QatSectionHeading
+                                                    urdu={urduPaper}
                                                     number={sectionNumber}
                                                 />
                                                 <QatTypeHeading
+                                                    medium={medium}
                                                     section={section}
                                                     number={
                                                         objectiveSections.length +
@@ -903,6 +980,7 @@ export default function QatPaper({
                                                     {section.questions.map(
                                                         (question, index) => (
                                                             <QatPaperQuestion
+                                                                medium={medium}
                                                                 key={
                                                                     question.id
                                                                 }
