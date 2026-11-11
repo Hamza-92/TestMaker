@@ -718,6 +718,7 @@ class QuestionController extends Controller
                 'topic_id' => $question->topic_id,
                 'source' => $question->source,
                 'status' => $question->status,
+                'is_past_qat_paper' => $question->is_past_qat_paper,
                 'verse_layout_override' => $question->content['verse_layout_override'] ?? 'default',
                 'schema_key' => QuestionTypeSchemaRegistry::typeForQuestion(
                     $question,
@@ -881,6 +882,7 @@ class QuestionController extends Controller
             'content' => $questionPayload['content'],
             'source' => $validated['source'] ?? null,
             'status' => $validated['status'],
+            'is_past_qat_paper' => $validated['is_past_qat_paper'] ?? $existingQuestion?->is_past_qat_paper ?? false,
         ], $questionPayload['options']];
     }
 
@@ -1500,6 +1502,7 @@ class QuestionController extends Controller
             'source' => $question->source,
             'status' => $question->status,
             'schema' => $this->resolvedQuestionSchema($effectiveType)['label'],
+            'is_past_qat_paper' => $question->is_past_qat_paper,
             'summary_text' => QuestionTypeSchemaRegistry::summarize(
                 $effectiveType,
                 $content,

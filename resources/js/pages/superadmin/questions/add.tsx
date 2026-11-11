@@ -135,6 +135,7 @@ export default function AddQuestion({
         topic_id: initialTopicId,
         source: sticky.source ?? '',
         status: sticky.status ?? '1',
+        is_past_qat_paper: false,
         medium_id:
             sticky.medium_id ??
             String(
@@ -198,6 +199,7 @@ export default function AddQuestion({
                     topic_id,
                     source,
                     status,
+                    is_past_qat_paper: false,
                     content: createEmptyQuestionContent(),
                     medium_id,
                 });

@@ -25,6 +25,7 @@ interface EditPayload {
         topic_id: number | null;
         source: string | null;
         status: number;
+        is_past_qat_paper?: boolean;
         schema_key: string;
         schema: QuestionTypeOption['schema'];
         content: QuestionFormData['content'];
@@ -53,6 +54,7 @@ function initialValues({
                       '',
               ),
         status: String(question.status),
+        is_past_qat_paper: question.is_past_qat_paper ?? false,
         content: question.content,
     };
 }

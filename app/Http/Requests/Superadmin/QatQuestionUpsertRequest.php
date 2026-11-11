@@ -48,6 +48,7 @@ class QatQuestionUpsertRequest extends QuestionUpsertRequest
             'content' => ['required', 'array'],
             'source' => ['nullable', 'string', 'max:100', Rule::in(Question::sourceValues())],
             'status' => ['required', 'boolean'],
+            'is_past_qat_paper' => ['sometimes', 'boolean'],
         ];
     }
 

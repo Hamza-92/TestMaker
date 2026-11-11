@@ -108,6 +108,7 @@ it('creates an objective question with options', function () {
             'chapter_id' => $context['chapter']->id,
             'topic_id' => null,
             'source' => 'exercise',
+            'is_past_qat_paper' => true,
             'status' => true,
             'content' => [
                 'prompt_en' => 'Choose the correct option',
@@ -126,6 +127,7 @@ it('creates an objective question with options', function () {
     $response->assertRedirect(managementQuestionListUrl($context));
 
     expect($question->question_type_id)->toBe($questionType->id)
+        ->and($question->is_past_qat_paper)->toBeTrue()
         ->and($question->statement_en)->toBe('Choose the correct option')
         ->and($question->answer_en)->toBeNull()
         ->and($question->options)->toHaveCount(4)
@@ -140,6 +142,27 @@ it('creates an objective question with options', function () {
     $this->getJson(route('superadmin.questions.list-data', ['chapter_id' => $context['chapter']->id]))
         ->assertOk()->assertJsonPath('questions.0.id', $question->id)
         ->assertJsonPath('questions.0.options_count', 4);
+});
+
+it('edits the past QAT flag and preserves it when a caller omits the field', function () {
+    $admin = makeQuestionAdmin();
+    $type = makeObjectiveQuestionTypeForManagement($admin, ['is_objective' => false, 'schema_key' => 'subjective_standard']);
+    $context = makeQuestionContextForManagement($admin);
+    $payload = [
+        'question_type_id' => $type->id, 'chapter_id' => $context['chapter']->id,
+        'source' => 'exercise', 'status' => true, 'content' => ['prompt_en' => 'Answer this question.'],
+    ];
+    $this->actingAs($admin)->postJson(route('superadmin.questions.store'), $payload)->assertCreated();
+    $question = Question::query()->sole();
+    expect($question->is_past_qat_paper)->toBeFalse();
+    $editUrl = route('superadmin.questions.edit', $question);
+    $updateUrl = route('superadmin.questions.update', $question);
+    $this->putJson($updateUrl, [...$payload, 'is_past_qat_paper' => true])->assertOk();
+    $this->getJson($editUrl)->assertOk()->assertJsonPath('question.is_past_qat_paper', true);
+    $this->putJson($updateUrl, $payload)->assertOk();
+    expect($question->fresh()->is_past_qat_paper)->toBeTrue();
+    $this->putJson($updateUrl, [...$payload, 'is_past_qat_paper' => false])->assertOk();
+    $this->getJson($editUrl)->assertOk()->assertJsonPath('question.is_past_qat_paper', false);
 });
 
 it('allows enabled subjective answers to be omitted on create and edit', function (string $schemaKey, array $content) {

@@ -358,6 +358,7 @@ class QatDataController extends Controller
                 'topic_id' => $question->qat_topic_id,
                 'source' => $data['source'] ?? null,
                 'status' => $question->status,
+                'is_past_qat_paper' => (bool) $question->is_past_qat_paper,
                 'schema_key' => $schema['key'],
                 'schema' => $schema,
                 'content' => QuestionTypeSchemaRegistry::contentFromQuestion($sourceQuestion, $type),
@@ -432,16 +433,21 @@ class QatDataController extends Controller
             'qat_topic_id' => $input['topic_id'] ?? null,
             'status' => $input['status'],
         ];
-        if ($month === null) {
-            DB::table('qat_questions')->where('id', $qatQuestion)->update([...$attributes, 'updated_at' => now()]);
-        } else {
-            DB::transaction(function () use ($qatChapter, $qatQuestion, $month, $attributes): void {
+        DB::transaction(function () use ($qatChapter, $qatQuestion, $month, $attributes, $input): void {
+            if ($month === null) {
+                DB::table('qat_questions')->where('id', $qatQuestion)->update([...$attributes, 'updated_at' => now()]);
+            } else {
                 abort_unless(DB::table('qat_chapter_months')->where('qat_chapter_id', $qatChapter)
                     ->where('month', $month)->lockForUpdate()->first(), 404);
                 $this->questionRow($qatChapter, $qatQuestion, $month);
                 QatMonthlySyllabus::edit('question', $qatQuestion, $month, $attributes);
-            });
-        }
+            }
+            if (array_key_exists('is_past_qat_paper', $input)) {
+                DB::table('qat_questions')->where('id', $qatQuestion)->update([
+                    'is_past_qat_paper' => $input['is_past_qat_paper'], 'updated_at' => now(),
+                ]);
+            }
+        });
 
         return response()->json(['id' => $qatQuestion]);
     }

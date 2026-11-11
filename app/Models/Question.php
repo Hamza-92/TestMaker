@@ -39,6 +39,7 @@ class Question extends Model
         'answer_ur',
         'content',
         'source',
+        'is_past_qat_paper',
         'difficulty',
         'status',
         'sort_order',
@@ -49,6 +50,7 @@ class Question extends Model
     {
         return [
             'content' => 'array',
+            'is_past_qat_paper' => 'boolean',
             'status' => 'integer',
             'sort_order' => 'integer',
         ];

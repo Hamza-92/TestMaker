@@ -5,6 +5,7 @@ import {
     SigmaIcon,
 } from 'lucide-react';
 import type { QatReviewSelection } from '@/components/qat/generation-form';
+import { QatPastPaperCheckbox } from '@/components/qat/past-paper-checkbox';
 import { QatStepHeader } from '@/components/qat/step-header';
 
 const inputClass =
@@ -19,6 +20,8 @@ export function QatManualOverviewCard({
     error,
     onNameChange,
     onMinutesChange,
+    pastPaper,
+    onPastPaperChange,
 }: QatReviewSelection) {
     return (
         <section
@@ -78,6 +81,12 @@ export function QatManualOverviewCard({
                             className={inputClass}
                         />
                     </div>
+                </div>
+                <div className="flex flex-wrap justify-end">
+                    <QatPastPaperCheckbox
+                        checked={pastPaper}
+                        onChange={onPastPaperChange}
+                    />
                 </div>
                 <div className="overflow-hidden rounded-xl border border-sky-200/80 bg-white dark:border-sky-900 dark:bg-slate-900">
                     <h3 className="flex items-center gap-2 border-b border-sky-100 bg-gradient-to-r from-sky-100/80 to-violet-50 px-4 py-3 text-sm font-bold text-[#112650] dark:border-sky-900 dark:from-sky-950/80 dark:to-violet-950/40 dark:text-slate-100">

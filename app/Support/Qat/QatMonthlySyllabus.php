@@ -34,7 +34,7 @@ final class QatMonthlySyllabus
             'subject' => ['qat_subjects', ['qat_catalogue_id', 'qat_class_id', 'class_id', 'subject_id', 'source_pattern_id', 'source_pattern_name'], ['subject_name', 'status']],
             'chapter' => ['qat_chapters', ['qat_subject_id', 'source_chapter_id'], ['name', 'name_ur', 'status', 'sort_id', 'chapter_number']],
             'topic' => ['qat_topics', ['qat_chapter_id', 'source_topic_id'], ['name', 'name_ur', 'status', 'sort_id']],
-            'question' => ['qat_questions', ['qat_chapter_id', 'source_question_id'], ['question_type_id', 'qat_topic_id', 'question_data', 'status']],
+            'question' => ['qat_questions', ['qat_chapter_id', 'source_question_id', 'is_past_qat_paper'], ['question_type_id', 'qat_topic_id', 'question_data', 'status']],
         };
 
         $query = DB::table($table.' as original')

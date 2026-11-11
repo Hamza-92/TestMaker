@@ -215,8 +215,9 @@ export interface QuestionFormData {
     topic_id: string;
     source: string;
     status: string;
+    is_past_qat_paper?: boolean;
     content: QuestionContentFormData;
-    [key: string]: QuestionContentFormData | string;
+    [key: string]: QuestionContentFormData | string | boolean | undefined;
 }
 
 interface QuestionFormProps {
@@ -1913,6 +1914,27 @@ export function QuestionForm({
                                         </SelectContent>
                                     </Select>
                                 )}
+                            </Field>
+                            <Field
+                                label="QAT source"
+                                error={form.errors.is_past_qat_paper}
+                            >
+                                <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={
+                                            form.data.is_past_qat_paper ?? false
+                                        }
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'is_past_qat_paper',
+                                                event.target.checked,
+                                            )
+                                        }
+                                        className="size-4 rounded border-slate-300 accent-brand-600"
+                                    />
+                                    Past QAT paper question
+                                </label>
                             </Field>
                             {selectedType && !selectedType.is_objective && (
                                 <Field label="Verse layout">

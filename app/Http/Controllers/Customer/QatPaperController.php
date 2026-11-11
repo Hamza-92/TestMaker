@@ -33,6 +33,7 @@ class QatPaperController extends Controller
             'type_id' => ['nullable', 'integer'],
             'q' => ['nullable', 'string', 'max:150'],
             'include_questions' => ['nullable', 'boolean'],
+            'past_paper' => ['nullable', 'boolean'],
         ]);
         $this->validateSyllabus($data);
         [$subject, $chapters, $access] = $builder->resolve(
@@ -41,7 +42,7 @@ class QatPaperController extends Controller
         );
         $rules = QatQuestionTypeRules::forSubject((int) $subject->id);
         $query = $builder->withTypeOrder(
-            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules),
+            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules, (bool) ($data['past_paper'] ?? false)),
             $subject,
         );
         $includeQuestions = $data['include_questions'] ?? true;
@@ -118,6 +119,7 @@ class QatPaperController extends Controller
             'template_id' => ['nullable', 'integer'],
             'variants' => ['nullable', 'integer', 'between:1,4'],
             'allow_repeat' => ['nullable', 'boolean'],
+            'past_paper' => ['nullable', 'boolean'],
             'sections' => ['array', 'max:20'],
             'sections.*.question_type_id' => ['required', 'integer', 'distinct'],
             'sections.*.quantity' => ['required', 'integer', 'between:1,100'],
@@ -182,7 +184,7 @@ class QatPaperController extends Controller
         }
 
         $pool = $builder->availableQuestions(
-            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules),
+            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules, (bool) ($data['past_paper'] ?? false)),
             $subject->medium,
         )->keyBy('id');
         $typeIds = $pool->pluck('question_type_id')->map(fn ($id) => (int) $id)->unique()->all();
@@ -304,6 +306,7 @@ class QatPaperController extends Controller
             ])->all(),
             'variants' => $variants,
             'allow_repeat' => (bool) ($data['allow_repeat'] ?? false),
+            'past_paper' => (bool) ($data['past_paper'] ?? false),
             'manual_questions' => collect($data['manual_questions'] ?? [])->map(fn ($question) => [
                 'id' => (int) $question['id'], 'marks' => (float) $question['marks'],
             ])->all(),

@@ -270,6 +270,7 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $question = Question::create([
         'question_type_id' => $type->id, 'chapter_id' => $chapter->id, 'topic_id' => $topic->id,
         'statement_en' => 'What do leaves do?', 'source' => Question::SOURCE_EXERCISE, 'status' => 1,
+        'is_past_qat_paper' => true,
     ]);
     QuestionOption::create(['question_id' => $question->id, 'text_en' => 'Make food', 'is_correct' => true, 'sort_order' => 1]);
     QuestionOption::create(['question_id' => $question->id, 'text_en' => 'Absorb sunlight', 'is_correct' => false, 'sort_order' => 2]);
@@ -312,6 +313,7 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
         ->and(DB::table('qat_questions')->count())->toBe(1);
     $copy = json_decode(DB::table('qat_questions')->value('question_data'), true);
     expect($copy['statement_en'])->toBe('What do leaves do?')
+        ->and((bool) DB::table('qat_questions')->value('is_past_qat_paper'))->toBeTrue()
         ->and($copy['options'][0]['text_en'])->toBe('Make food')
         ->and($copy['question_type']['name'])->toBe('MCQ');
 
@@ -404,6 +406,7 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $this->actingAs($admin)->getJson(route('superadmin.qat-catalogue.questions.edit', $questionRoute))
         ->assertOk()
         ->assertJsonPath('question.content.prompt_en', 'What do leaves do?')
+        ->assertJsonPath('question.is_past_qat_paper', true)
         ->assertJsonPath('question.content.options.0.text_en', 'Make food')
         ->assertJsonPath('question.chapter_id', $qatChapterId)
         ->assertJsonPath('lockedChapterId', $qatChapterId);
@@ -413,6 +416,7 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
         'topic_id' => $qatTopicId,
         'medium_id' => null,
         'source' => Question::SOURCE_EXERCISE,
+        'is_past_qat_paper' => false,
         'status' => false,
         'content' => [
             'prompt_en' => 'How do leaves make food?',
@@ -429,6 +433,7 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
     $this->actingAs($admin)->putJson(route('superadmin.qat-catalogue.questions.update', $questionRoute), $editPayload)
         ->assertOk()->assertJsonPath('id', $qatQuestionId);
     expect(DB::table('qat_classes')->value('name'))->toBe('QAT Class 5')
+        ->and((bool) DB::table('qat_questions')->value('is_past_qat_paper'))->toBeFalse()
         ->and(DB::table('qat_subjects')->value('subject_name'))->toBe('QAT Science')
         ->and(DB::table('qat_chapters')->value('name'))->toBe('QAT Plants')
         ->and(DB::table('qat_topics')->value('name'))->toBe('QAT Leaves')
@@ -471,6 +476,13 @@ test('QAT transfer copies one scope once and can assign it to another month', fu
         ->where('rows.data.0.statement_en', 'Answer these questions about leaves.'));
     expect(Question::query()->findOrFail($question->id)->question_type_id)->toBe($type->id)
         ->and(QuestionOption::query()->where('question_id', $question->id)->count())->toBe(2);
+    $this->actingAs($admin)->putJson(route('superadmin.qat-catalogue.questions.update', [...$questionRoute, 'month' => 4]), [
+        ...$editPayload, 'is_past_qat_paper' => true,
+    ])->assertOk();
+    foreach ([4, 6] as $month) {
+        $this->getJson(route('superadmin.qat-catalogue.questions.edit', [...$questionRoute, 'month' => $month]))
+            ->assertOk()->assertJsonPath('question.is_past_qat_paper', true);
+    }
 });
 
 test('QAT catalogue requires subscription access', function () {

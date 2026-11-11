@@ -183,6 +183,7 @@ class QatCatalogueTransfer
                                 'qat_chapter_id' => $qatChapterId,
                                 'qat_topic_id' => $question->topic_id ? ($topicIds[$question->topic_id] ?? null) : null,
                                 'source_question_id' => $question->id,
+                                'is_past_qat_paper' => $question->is_past_qat_paper,
                                 'question_type_id' => $question->question_type_id,
                                 'status' => $question->status,
                                 'question_data' => json_encode($question->toArray(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),

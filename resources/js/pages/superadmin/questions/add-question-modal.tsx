@@ -70,6 +70,7 @@ function initialDefaults(
             ? sticky.source
             : '',
         status: sticky.status === '0' ? '0' : '1',
+        is_past_qat_paper: false,
         medium_id: options.mediumOptions.some(
             (medium) => String(medium.id) === sticky.medium_id,
         )
@@ -190,6 +191,7 @@ function QuestionComposer({
                     topic_id,
                     source,
                     status,
+                    is_past_qat_paper: false,
                     medium_id,
                     content: createEmptyQuestionContent(),
                 });

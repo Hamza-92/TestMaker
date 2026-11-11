@@ -73,6 +73,70 @@ test('manual QAT lists active templates for the accessible subjects', function (
         ->assertInertia(fn ($page) => $page->has('templates', 1)->where('templates.0.id', $this->templateId));
 });
 
+test('past QAT papers filter selection and generation in each journey and restore the setting', function (string $journey) {
+    DB::table('qat_questions')->whereIn('id', [$this->questions[0], $this->questions[1], $this->questions[2]])
+        ->update(['is_past_qat_paper' => true]);
+    $unmarked = DB::table('qat_questions')->insertGetId([
+        'qat_chapter_id' => $this->chapterId, 'source_question_id' => 50,
+        'question_type_id' => $this->type->id, 'status' => true,
+        'question_data' => json_encode(['statement_en' => 'An unmarked question']),
+    ]);
+    [$partner, $alternatives] = addQatTypeToChapter($this->chapterId, 'Past paper alternative', 60, 2);
+    $pair = ['type_id' => $this->type->id, 'partner_id' => $partner];
+    DB::table('qat_subjects')->where('id', $this->subjectId)->update([
+        'question_type_rules' => json_encode(['or_pairs' => [$pair]]),
+    ]);
+    DB::table('qat_questions')->whereIn('id', $alternatives)->update(['is_past_qat_paper' => true]);
+    DB::table('qat_chapter_months')->insert([
+        ['qat_chapter_id' => $this->chapterId, 'month' => 4],
+        ['qat_chapter_id' => $this->chapterId, 'month' => 5],
+    ]);
+    // A monthly content override must keep using the question's shared flag.
+    DB::table('qat_month_edits')->insert([
+        'kind' => 'question', 'record_id' => $this->questions[0], 'month' => 4,
+        'question_type_id' => $this->type->id, 'status' => true,
+        'question_data' => json_encode(['statement_en' => 'Edited for April']),
+    ]);
+    $payload = [...$this->payload, 'past_paper' => true, 'or_pairs' => [$pair]];
+    if ($journey === 'auto') {
+        $payload = [...$payload, 'mode' => 'auto', 'syllabus' => 'qat', 'months' => [4], 'chapter_ids' => []];
+    } else {
+        foreach ($alternatives as $id) {
+            $payload['manual_questions'][] = ['id' => $id, 'marks' => 3];
+        }
+    }
+    if ($journey === 'manual') {
+        $payload['selection_method'] = 'manual';
+        $payload['sections'] = [];
+    }
+    $scope = array_intersect_key($payload, array_flip(['subject_id', 'syllabus', 'months', 'chapter_ids']));
+    $pool = $this->actingAs($this->school)->postJson(route('customer.qat.questions'), [...$scope, 'past_paper' => true])
+        ->assertOk()->assertJsonCount(4, 'questions.data')->assertJsonPath('types.0.total', 2);
+    expect(array_column($pool->json('questions.data'), 'id'))->not->toContain($unmarked, $this->questions[2]);
+    $this->postJson(route('customer.qat.questions'), [...$scope, 'past_paper' => false])
+        ->assertOk()->assertJsonCount(5, 'questions.data');
+    $this->postJson(route('customer.qat.questions'), [...$scope, 'past_paper' => true, 'include_questions' => false])
+        ->assertOk()->assertJsonCount(0, 'questions.data')->assertJsonPath('types.0.total', 2);
+
+    if ($journey !== 'auto') {
+        $invalid = $payload;
+        $invalid['manual_questions'][0]['id'] = $unmarked;
+        $this->postJson(route('customer.qat.papers.store'), $invalid)
+            ->assertUnprocessable()->assertJsonValidationErrors('manual_questions');
+    }
+    $response = $this->postJson(route('customer.qat.papers.store'), $payload)->assertCreated();
+    $preview = basename($response->json('preview_url'));
+    $this->get($response->json('preview_url'))->assertOk()->assertInertia(fn ($page) => $page
+        ->where('paper.paper_data.generation_settings.past_paper', true)
+        ->has('paper.paper_data.sections.0.questions', 2)
+        ->where('paper.paper_data.sections.0.questions.0.or_question.question_type_id', $partner));
+    $saved = $this->postJson(route('customer.qat.previews.save', $preview))->assertCreated()->json('paper_id');
+    $this->get(route('customer.qat.create', ['mode' => $payload['mode'], 'paper' => $saved]))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('initialSelections.past_paper', true));
+    DB::table('qat_questions')->where('id', $this->questions[1])->update(['is_past_qat_paper' => false]);
+    $this->postJson(route('customer.qat.papers.store'), $payload)->assertUnprocessable();
+})->with(['manual', 'template', 'auto']);
+
 test('manual templates preserve custom chapters choices required counts and restore the journey', function () {
     $response = $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $this->payload)->assertCreated();
     $preview = basename($response->json('preview_url'));

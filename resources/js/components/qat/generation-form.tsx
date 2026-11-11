@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { OrPartnerOption } from '@/components/qat/or-partner-select';
+import { QatPastPaperCheckbox } from '@/components/qat/past-paper-checkbox';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
@@ -98,6 +99,7 @@ type GenerationSelections = {
     sections: QatTemplate['sections'];
     variants: number;
     allow_repeat: boolean;
+    past_paper?: boolean;
     manual_questions: { id: number; marks: number }[];
     or_pairs?: OrPair[];
 };
@@ -247,6 +249,7 @@ export type QatReviewSelection = {
     minutes: number;
     variants: number;
     allowRepeat: boolean;
+    pastPaper: boolean;
     isPefPattern: boolean;
     loading: boolean;
     orOptions: OrPartnerOption[];
@@ -270,6 +273,7 @@ export type QatReviewSelection = {
     onMinutesChange: (value: number) => void;
     onVariantsChange: (value: number) => void;
     onAllowRepeatChange: (value: boolean) => void;
+    onPastPaperChange: (value: boolean) => void;
     onSectionChange: (
         id: number,
         field: 'quantity' | 'required_questions' | 'marks',
@@ -376,6 +380,9 @@ export default function QatGenerationForm({
     const [allowRepeat, setAllowRepeat] = useState(
         initialSelections?.allow_repeat ?? false,
     );
+    const [pastPaper, setPastPaper] = useState(
+        initialSelections?.past_paper ?? false,
+    );
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
 
@@ -474,7 +481,7 @@ export default function QatGenerationForm({
     const paperMinutes = minutes;
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
-    const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
+    const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}|${pastPaper}`;
     const restoreScopeKey = useRef(questionScopeKey);
     const pendingManualChoices = useRef(
         initialSelections?.manual_questions ?? [],
@@ -891,6 +898,7 @@ export default function QatGenerationForm({
                                 ? monthKey.split(',').map(Number)
                                 : [],
                         include_questions: mode === 'manual',
+                        past_paper: pastPaper,
                     }),
                 });
                 const contentType = response.headers.get('content-type') ?? '';
@@ -974,6 +982,7 @@ export default function QatGenerationForm({
         syllabus,
         monthKey,
         mode,
+        pastPaper,
         questionScopeKey,
         poolScopeKey,
         initialSelections?.selection_method,
@@ -1178,6 +1187,7 @@ export default function QatGenerationForm({
                         : [],
                     variants: mode === 'auto' ? variants : 1,
                     allow_repeat: mode === 'auto' && allowRepeat,
+                    past_paper: pastPaper,
                     manual_questions:
                         mode === 'manual'
                             ? selectedManual.map(({ question, marks }) => ({
@@ -1329,6 +1339,7 @@ export default function QatGenerationForm({
                 minutes,
                 variants,
                 allowRepeat,
+                pastPaper,
                 isPefPattern,
                 loading: poolBusy,
                 orOptions,
@@ -1353,6 +1364,7 @@ export default function QatGenerationForm({
                 onMinutesChange: setMinutes,
                 onVariantsChange: setVariants,
                 onAllowRepeatChange: setAllowRepeat,
+                onPastPaperChange: setPastPaper,
                 onSectionChange: updateAutoSection,
                 onClear: () => {
                     setTemplateId(null);
@@ -2008,6 +2020,10 @@ export default function QatGenerationForm({
                                                     Allow repeats between
                                                     variants
                                                 </label>
+                                                <QatPastPaperCheckbox
+                                                    checked={pastPaper}
+                                                    onChange={setPastPaper}
+                                                />
                                             </div>
                                         )}
                                         {mode === 'auto' &&
