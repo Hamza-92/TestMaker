@@ -254,7 +254,7 @@ function ObjectiveOptions({
                                             correctOptions.includes(index) ||
                                             undefined
                                         }
-                                        className={`w-[4%] px-0.5 py-1 text-center align-middle ${border}`}
+                                        className={`w-[2.2em] px-0.5 py-1 text-center align-middle ${border}`}
                                     >
                                         <span
                                             className={`inline-grid size-[1.45em] place-items-center rounded-full align-middle text-[0.9em] font-bold leading-none ${border}`}
@@ -274,7 +274,7 @@ function ObjectiveOptions({
                                             correctOptions.includes(index) ||
                                             undefined
                                         }
-                                        className={`min-w-0 px-1 py-1 align-middle ${settings.layout === 'beside' ? 'w-[21%]' : ''} ${border}`}
+                                        className={`min-w-0 px-1 py-1 align-middle ${border}`}
                                     >
                                         <div
                                             className={`flex min-w-0 flex-wrap items-baseline gap-x-1 break-words ${sharedOptionIsUrdu ? 'justify-end' : 'justify-between'}`}
