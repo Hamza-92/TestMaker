@@ -28,6 +28,11 @@ export type QatQuestion = {
     objective_answers?: { options: number[]; items: number[][] };
 };
 
+export type QatObjectiveSettings = {
+    layout: 'beside' | 'four-per-row' | 'two-per-row';
+    borders: boolean;
+};
+
 function field(data: Record<string, unknown>, key: string): string {
     return typeof data[key] === 'string' ? (data[key] as string) : '';
 }
@@ -189,12 +194,26 @@ function ObjectiveOptions({
     direction,
     medium,
     correctOptions = [],
+    settings,
 }: {
     options: Record<string, unknown>[];
     direction: 'ltr' | 'rtl';
     medium: 'english' | 'urdu' | 'both';
     correctOptions?: number[];
+    settings: QatObjectiveSettings;
 }) {
+    const perRow =
+        settings.layout === 'two-per-row'
+            ? 2
+            : settings.layout === 'four-per-row'
+              ? 4
+              : options.length;
+    const rows = Array.from(
+        { length: Math.ceil(options.length / perRow) },
+        (_, row) => options.slice(row * perRow, (row + 1) * perRow),
+    );
+    const border = settings.borders ? 'border border-slate-700' : '';
+
     return (
         <table
             role="presentation"
@@ -202,97 +221,103 @@ function ObjectiveOptions({
             className="qat-objective-options w-full table-fixed border-collapse"
         >
             <tbody>
-                <tr>
-                    {options.map((option, index) => {
-                        const en =
-                            field(option, 'text_en') || field(option, 'text');
-                        const ur = field(option, 'text_ur');
-                        const sharedOption =
-                            medium === 'both' &&
-                            en &&
-                            ur &&
-                            (bilingualPartsHaveSameVisibleText({
-                                english: normalizeMathDescription(en),
-                                urdu: normalizeMathDescription(ur),
-                            }) ||
-                                reversedNumericProduct(en, ur)) &&
-                            (!/<(?:img|svg|math|iframe|video)\b/i.test(
-                                `${en}${ur}`,
-                            ) ||
-                                en.trim() === ur.trim());
-                        const sharedOptionIsUrdu =
-                            sharedOption && containsUrduScript(en);
+                {rows.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                        {row.map((option, offset) => {
+                            const index = rowIndex * perRow + offset;
+                            const en =
+                                field(option, 'text_en') ||
+                                field(option, 'text');
+                            const ur = field(option, 'text_ur');
+                            const sharedOption =
+                                medium === 'both' &&
+                                en &&
+                                ur &&
+                                (bilingualPartsHaveSameVisibleText({
+                                    english: normalizeMathDescription(en),
+                                    urdu: normalizeMathDescription(ur),
+                                }) ||
+                                    reversedNumericProduct(en, ur)) &&
+                                (!/<(?:img|svg|math|iframe|video)\b/i.test(
+                                    `${en}${ur}`,
+                                ) ||
+                                    en.trim() === ur.trim());
+                            const sharedOptionIsUrdu =
+                                sharedOption && containsUrduScript(en);
 
-                        return (
-                            <Fragment key={index}>
-                                <td
-                                    data-qat-correct-option={
-                                        correctOptions.includes(index) ||
-                                        undefined
-                                    }
-                                    className="w-[4%] border border-slate-700 px-0.5 py-1 text-center align-middle"
-                                >
-                                    <span
-                                        className="inline-grid size-[1.45em] place-items-center rounded-full border border-slate-700 align-middle text-[0.9em] font-bold leading-none"
-                                        style={{
-                                            fontFamily: 'Arial, sans-serif',
-                                        }}
+                            return (
+                                <Fragment key={index}>
+                                    <td
+                                        data-qat-correct-option={
+                                            correctOptions.includes(index) ||
+                                            undefined
+                                        }
+                                        className={`w-[4%] px-0.5 py-1 text-center align-middle ${border}`}
                                     >
-                                        <span className="translate-y-[0.08em]">
-                                            {String.fromCharCode(65 + index)}
+                                        <span
+                                            className={`inline-grid size-[1.45em] place-items-center rounded-full align-middle text-[0.9em] font-bold leading-none ${border}`}
+                                            style={{
+                                                fontFamily: 'Arial, sans-serif',
+                                            }}
+                                        >
+                                            <span className="translate-y-[0.08em]">
+                                                {String.fromCharCode(
+                                                    65 + index,
+                                                )}
+                                            </span>
                                         </span>
-                                    </span>
-                                </td>
-                                <td
-                                    data-qat-correct-option={
-                                        correctOptions.includes(index) ||
-                                        undefined
-                                    }
-                                    className="w-[21%] min-w-0 border border-slate-700 px-1 py-1 align-middle"
-                                >
-                                    <div
-                                        className={`flex min-w-0 flex-wrap items-baseline gap-x-1 break-words ${sharedOptionIsUrdu ? 'justify-end' : 'justify-between'}`}
+                                    </td>
+                                    <td
+                                        data-qat-correct-option={
+                                            correctOptions.includes(index) ||
+                                            undefined
+                                        }
+                                        className={`min-w-0 px-1 py-1 align-middle ${settings.layout === 'beside' ? 'w-[21%]' : ''} ${border}`}
                                     >
-                                        {en && medium !== 'urdu' && (
-                                            <div
-                                                dir={
-                                                    sharedOptionIsUrdu
-                                                        ? 'rtl'
-                                                        : 'ltr'
-                                                }
-                                                lang={
-                                                    sharedOptionIsUrdu
-                                                        ? 'ur'
-                                                        : 'en'
-                                                }
-                                                className={`w-max max-w-full shrink-0 ${sharedOptionIsUrdu ? 'text-right' : 'text-left'}`}
-                                            >
-                                                <QatRichText
-                                                    value={en}
-                                                    inline
-                                                />
-                                            </div>
-                                        )}
-                                        {ur &&
-                                            medium !== 'english' &&
-                                            !sharedOption && (
+                                        <div
+                                            className={`flex min-w-0 flex-wrap items-baseline gap-x-1 break-words ${sharedOptionIsUrdu ? 'justify-end' : 'justify-between'}`}
+                                        >
+                                            {en && medium !== 'urdu' && (
                                                 <div
-                                                    dir="rtl"
-                                                    lang="ur"
-                                                    className="w-max max-w-full shrink-0 text-right"
+                                                    dir={
+                                                        sharedOptionIsUrdu
+                                                            ? 'rtl'
+                                                            : 'ltr'
+                                                    }
+                                                    lang={
+                                                        sharedOptionIsUrdu
+                                                            ? 'ur'
+                                                            : 'en'
+                                                    }
+                                                    className={`w-max max-w-full shrink-0 ${sharedOptionIsUrdu ? 'text-right' : 'text-left'}`}
                                                 >
                                                     <QatRichText
-                                                        value={ur}
+                                                        value={en}
                                                         inline
                                                     />
                                                 </div>
                                             )}
-                                    </div>
-                                </td>
-                            </Fragment>
-                        );
-                    })}
-                </tr>
+                                            {ur &&
+                                                medium !== 'english' &&
+                                                !sharedOption && (
+                                                    <div
+                                                        dir="rtl"
+                                                        lang="ur"
+                                                        className="w-max max-w-full shrink-0 text-right"
+                                                    >
+                                                        <QatRichText
+                                                            value={ur}
+                                                            inline
+                                                        />
+                                                    </div>
+                                                )}
+                                        </div>
+                                    </td>
+                                </Fragment>
+                            );
+                        })}
+                    </tr>
+                ))}
             </tbody>
         </table>
     );
@@ -304,16 +329,27 @@ function ObjectiveLine({
     ur,
     options,
     correctOptions,
+    settings,
 }: {
     number: string;
     en: string;
     ur: string;
     options: Record<string, unknown>[];
     correctOptions?: number[];
+    settings: QatObjectiveSettings;
 }) {
     const bilingual = Boolean(en && ur);
     const direction = ur && !en ? 'rtl' : 'ltr';
     const medium = bilingual ? 'both' : ur ? 'urdu' : 'english';
+    const optionTable = options.length > 0 && (
+        <ObjectiveOptions
+            options={options}
+            direction={direction}
+            medium={en || ur ? medium : 'both'}
+            correctOptions={correctOptions}
+            settings={settings}
+        />
+    );
     const englishStatement = en && (
         <div
             dir="ltr"
@@ -343,37 +379,25 @@ function ObjectiveLine({
         </div>
     );
 
-    if (!en && !ur && options.length) {
+    if (!en && !ur && optionTable) {
         return (
             <div className="flex items-start gap-2">
                 <span className="qat-question-number shrink-0 font-bold">
                     {number}.
                 </span>
-                <ObjectiveOptions
-                    options={options}
-                    direction="ltr"
-                    medium="both"
-                    correctOptions={correctOptions}
-                />
+                {optionTable}
             </div>
         );
     }
 
-    if (bilingual || !options.length) {
+    if (bilingual || !optionTable || settings.layout !== 'beside') {
         return (
             <div className="space-y-1.5">
                 <BilingualTableRow className={bilingual ? '' : '!grid-cols-1'}>
                     {englishStatement}
                     {urduStatement}
                 </BilingualTableRow>
-                {options.length > 0 && (
-                    <ObjectiveOptions
-                        options={options}
-                        direction="ltr"
-                        medium={medium}
-                        correctOptions={correctOptions}
-                    />
-                )}
+                {optionTable}
             </div>
         );
     }
@@ -384,12 +408,7 @@ function ObjectiveLine({
             className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-start gap-2"
         >
             {englishStatement || urduStatement}
-            <ObjectiveOptions
-                options={options}
-                direction={direction}
-                medium={medium}
-                correctOptions={correctOptions}
-            />
+            {optionTable}
         </div>
     );
 }
@@ -398,10 +417,12 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     question,
     number,
     showAnswers = false,
+    settings,
 }: {
     question: QatQuestion;
     number: number | string;
     showAnswers?: boolean;
+    settings: QatObjectiveSettings;
 }) {
     const content = question.content ?? {};
     const items = records(content.items);
@@ -441,6 +462,7 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
                 en={primaryEn}
                 ur={primaryUr}
                 options={options.length ? options : trueFalseOptions}
+                settings={settings}
                 correctOptions={
                     showAnswers ? question.objective_answers?.options : []
                 }
@@ -471,6 +493,7 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
                     en={field(item, 'prompt_en') || field(item, 'statement_en')}
                     ur={field(item, 'prompt_ur') || field(item, 'statement_ur')}
                     options={records(item.options)}
+                    settings={settings}
                     correctOptions={
                         showAnswers
                             ? question.objective_answers?.items[index]

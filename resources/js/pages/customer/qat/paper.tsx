@@ -1,10 +1,13 @@
+import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeftIcon,
     CheckIcon,
+    ChevronDownIcon,
     DownloadIcon,
     FileTextIcon,
     KeyRoundIcon,
+    LayoutGridIcon,
     Loader2Icon,
     PrinterIcon,
     SaveIcon,
@@ -19,10 +22,103 @@ import {
     PAPER_URDU_FONT_METRICS,
 } from '../papers/paper-layouts/types';
 import { QatObjectiveQuestion, QatQuestionContent } from './question';
-import type { QatQuestion } from './question';
+import type { QatObjectiveSettings, QatQuestion } from './question';
 
 const toolbarHoverClass =
     'border border-sky-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300';
+
+const objectiveLayouts = [
+    { value: 'beside', label: 'Beside the statement' },
+    { value: 'four-per-row', label: 'Four options per row below' },
+    { value: 'two-per-row', label: 'Two options per row below' },
+] as const;
+const objectiveSettingsKey = 'qat-objective-settings';
+
+function loadObjectiveSettings(): QatObjectiveSettings {
+    try {
+        const stored = JSON.parse(
+            localStorage.getItem(objectiveSettingsKey) ?? '{}',
+        );
+
+        return {
+            layout:
+                objectiveLayouts.find(
+                    (option) => option.value === stored?.layout,
+                )?.value ?? 'beside',
+            borders: stored?.borders !== false,
+        };
+    } catch {
+        return { layout: 'beside', borders: true };
+    }
+}
+
+function QatObjectiveLayoutMenu({
+    settings,
+    onChange,
+}: {
+    settings: QatObjectiveSettings;
+    onChange: (settings: QatObjectiveSettings) => void;
+}) {
+    return (
+        <Popover>
+            <PopoverButton
+                as={Button}
+                variant="secondary"
+                size="sm"
+                className={`h-10 rounded-lg ${toolbarHoverClass}`}
+            >
+                <LayoutGridIcon
+                    aria-hidden="true"
+                    className="text-violet-500"
+                />
+                Objective layout
+                <ChevronDownIcon aria-hidden="true" className="opacity-60" />
+            </PopoverButton>
+            <PopoverPanel
+                anchor={{ to: 'bottom end', gap: 8, padding: 12 }}
+                className="z-50 w-64 max-w-[calc(100vw-1.5rem)] rounded-xl border border-sky-200 bg-white p-2 text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 print:hidden"
+            >
+                <fieldset>
+                    <legend className="sr-only">
+                        Objective option placement
+                    </legend>
+                    {objectiveLayouts.map(({ value, label }) => (
+                        <label
+                            key={value}
+                            className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-sky-50 dark:hover:bg-slate-800 ${settings.layout === value ? 'bg-violet-50 font-semibold text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : ''}`}
+                        >
+                            <input
+                                type="radio"
+                                name="qat-objective-layout"
+                                value={value}
+                                checked={settings.layout === value}
+                                onChange={() =>
+                                    onChange({ ...settings, layout: value })
+                                }
+                                className="size-4 shrink-0 accent-violet-600"
+                            />
+                            {label}
+                        </label>
+                    ))}
+                </fieldset>
+                <label
+                    htmlFor="qat-option-borders"
+                    className="mt-2 flex cursor-pointer items-center justify-between gap-2 border-t border-sky-100 px-3 pb-1 pt-3 text-sm font-medium dark:border-slate-700"
+                >
+                    Option borders
+                    <Switch
+                        id="qat-option-borders"
+                        checked={settings.borders}
+                        onCheckedChange={(borders) =>
+                            onChange({ ...settings, borders })
+                        }
+                        className="data-[state=checked]:bg-violet-600"
+                    />
+                </label>
+            </PopoverPanel>
+        </Popover>
+    );
+}
 
 type PaperQuestion = QatQuestion & {
     marks: number;
@@ -216,10 +312,12 @@ function QatPaperQuestion({
     question,
     number,
     showAnswers,
+    objectiveSettings,
 }: {
     question: PaperQuestion;
     number: string;
     showAnswers: boolean;
+    objectiveSettings: QatObjectiveSettings;
 }) {
     const alternative = question.or_question;
     const renderQuestion = (item: QatQuestion) =>
@@ -228,6 +326,7 @@ function QatPaperQuestion({
                 question={item}
                 number={number}
                 showAnswers={showAnswers}
+                settings={objectiveSettings}
             />
         ) : (
             <QatQuestionContent question={item} number={number} />
@@ -277,6 +376,9 @@ export default function QatPaper({
     const [saving, setSaving] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [showAnswers, setShowAnswers] = useState(showAnswerKey);
+    const [objectiveSettings, setObjectiveSettings] = useState(
+        loadObjectiveSettings,
+    );
     const [actionError, setActionError] = useState('');
     const paperVariants = variants.length ? variants : [initialPaper];
     const paper = paperVariants[activeVariant] ?? initialPaper;
@@ -301,6 +403,13 @@ export default function QatPaper({
     const objectiveQuestions = objectiveSections.flatMap(
         (section) => section.questions,
     );
+    const hasObjectiveOptions =
+        objectiveQuestions.length > 0 ||
+        subjectiveSections.some((section) =>
+            section.questions.some(
+                (question) => question.or_question?.is_objective,
+            ),
+        );
     const chapters = paper.paper_data.chapters ?? [];
     const chapterNumbers = [
         ...new Set(
@@ -470,6 +579,23 @@ export default function QatPaper({
                     ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    {hasObjectiveOptions && (
+                        <QatObjectiveLayoutMenu
+                            settings={objectiveSettings}
+                            onChange={(settings) => {
+                                setObjectiveSettings(settings);
+
+                                try {
+                                    localStorage.setItem(
+                                        objectiveSettingsKey,
+                                        JSON.stringify(settings),
+                                    );
+                                } catch {
+                                    // The current paper still uses the selected settings.
+                                }
+                            }}
+                        />
+                    )}
                     <label
                         htmlFor="qat-answer-key"
                         className={`relative inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-xs font-semibold ${toolbarHoverClass}`}
@@ -739,6 +865,9 @@ export default function QatPaper({
                                                                         showAnswers={
                                                                             showAnswers
                                                                         }
+                                                                        objectiveSettings={
+                                                                            objectiveSettings
+                                                                        }
                                                                     />
                                                                 ),
                                                             )}
@@ -785,6 +914,9 @@ export default function QatPaper({
                                                                 ).toLowerCase()}
                                                                 showAnswers={
                                                                     showAnswers
+                                                                }
+                                                                objectiveSettings={
+                                                                    objectiveSettings
                                                                 }
                                                             />
                                                         ),
