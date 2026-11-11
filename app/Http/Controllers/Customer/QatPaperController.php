@@ -9,6 +9,7 @@ use App\Support\AppUserAccess;
 use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Qat\QatPaperBuilder;
+use App\Support\Qat\QatQuestionTypeRules;
 use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,8 +39,9 @@ class QatPaperController extends Controller
             $request->user(), (int) $data['subject_id'], $data['syllabus'],
             $data['chapter_ids'] ?? [], $data['months'] ?? [],
         );
+        $rules = QatQuestionTypeRules::forSubject((int) $subject->id);
         $query = $builder->withTypeOrder(
-            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access),
+            $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules),
             $subject,
         );
         $types = $builder->orderByType((clone $query)
@@ -56,12 +58,17 @@ class QatPaperController extends Controller
                 ->map(fn ($question) => $builder->presentQuestion($question))
             : collect();
 
+        $availableTypeIds = $types->pluck('id')->map(fn ($id) => (int) $id)->all();
+
         return response()->json([
+            'hidden_type_ids' => $rules->hiddenTypeIds,
             'types' => $types->map(fn ($type) => [
                 'id' => (int) $type->id,
                 'name' => $type->name ?: 'Question type '.$type->id,
                 'is_objective' => (bool) $type->is_objective,
                 'total' => (int) $type->total,
+                'or_partner_id' => in_array($rules->partner((int) $type->id), $availableTypeIds, true)
+                    ? $rules->partner((int) $type->id) : null,
             ]),
             'questions' => [
                 'data' => $questions,
@@ -97,7 +104,8 @@ class QatPaperController extends Controller
             'sections.*.quantity' => ['required', 'integer', 'between:1,100'],
             'sections.*.required_questions' => ['sometimes', 'required', 'integer', 'between:1,100'],
             'sections.*.marks' => ['required', 'numeric', 'between:0.5,20'],
-            'manual_questions' => ['array', 'max:100'],
+            ...QatQuestionTypeRules::PAIR_RULES,
+            'manual_questions' => ['array', 'max:200'],
             'manual_questions.*.id' => ['required', 'integer', 'distinct'],
             'manual_questions.*.marks' => ['required', 'numeric', 'between:0.5,20'],
         ]);
@@ -107,6 +115,7 @@ class QatPaperController extends Controller
             $user, (int) $data['subject_id'], $data['syllabus'],
             $data['chapter_ids'] ?? [], $data['months'] ?? [],
         );
+        $rules = QatQuestionTypeRules::forSubject((int) $subject->id);
         $template = null;
         $templateSections = [];
         $isPefPattern = false;
@@ -122,7 +131,8 @@ class QatPaperController extends Controller
                 }
                 $templateSections = json_decode($template->sections, true) ?: [];
             }
-            $data['sections'] = $data['sections'] ?? $templateSections;
+            $data['sections'] = $data['sections'] ?? array_values(array_filter($templateSections,
+                fn ($section) => ! in_array((int) $section['question_type_id'], $rules->hiddenTypeIds, true)));
             $data['minutes'] = $data['minutes'] ?? $template?->minutes;
             $normalize = fn (array $sections) => collect($sections)->map(fn ($section) => [
                 'question_type_id' => (int) $section['question_type_id'],
@@ -130,7 +140,7 @@ class QatPaperController extends Controller
                 'required_questions' => (int) ($section['required_questions'] ?? $section['quantity']),
                 'marks' => (float) $section['marks'],
             ])->sortBy('question_type_id')->values()->all();
-            $isPefPattern = $template !== null && (int) $data['minutes'] === (int) $template->minutes && $normalize($data['sections']) === $normalize($templateSections);
+            $isPefPattern = $template !== null && empty($data['or_pairs']) && (int) $data['minutes'] === (int) $template->minutes && $normalize($data['sections']) === $normalize($templateSections);
         }
         if (empty($data['minutes'])) {
             throw ValidationException::withMessages(['minutes' => 'Enter the paper duration.']);
@@ -152,20 +162,30 @@ class QatPaperController extends Controller
             throw ValidationException::withMessages(['class_ids' => 'Some selected classes are unavailable.']);
         }
 
-        $pool = $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access)
+        $pool = $builder->questionQuery($subject, $chapters->pluck('id')->all(), $access, $rules)
             ->get($builder->questionColumns())->keyBy('id');
-        $typeHeadings = $builder->typeHeadings($subject, $pool->pluck('question_type_id')->unique()->all());
+        $typeIds = $pool->pluck('question_type_id')->map(fn ($id) => (int) $id)->unique()->all();
+        $pairs = $rules->validatePairs($data['or_pairs'] ?? [], $typeIds);
+        $typeHeadings = $builder->typeHeadings($subject, $typeIds);
+        $distribution = collect($data['sections'] ?? [])->keyBy('question_type_id');
+        if ($usesTemplate) {
+            foreach ($pairs as ['type_id' => $type, 'partner_id' => $partner]) {
+                if (! $distribution->has($type) || $distribution->has($partner)) {
+                    throw ValidationException::withMessages(['or_pairs' => 'Set the question distribution for the main type only in each OR pair.']);
+                }
+                $distribution->put($partner, [...$distribution->get($type), 'question_type_id' => $partner]);
+            }
+        }
         $variants = $data['mode'] === 'auto' ? (int) ($data['variants'] ?? 1) : 1;
         $prepared = [];
         if ($data['mode'] === 'auto') {
-            $sections = $data['sections'] ?? [];
-            if ($sections === [] || collect($sections)->sum('quantity') > 100) {
+            if ($distribution->isEmpty() || collect($data['sections'])->sum('quantity') > 100) {
                 throw ValidationException::withMessages(['sections' => 'Choose up to 100 questions across the paper sections.']);
             }
             $used = [];
             foreach (range(1, $variants) as $variant) {
                 $paperSections = [];
-                foreach ($sections as $section) {
+                foreach ($distribution as $section) {
                     $typeId = (int) $section['question_type_id'];
                     $quantity = (int) $section['quantity'];
                     $required = (int) ($section['required_questions'] ?? $quantity);
@@ -202,7 +222,7 @@ class QatPaperController extends Controller
             if ($pool->only($ids)->count() !== count($ids)) {
                 throw ValidationException::withMessages(['manual_questions' => 'Some selected questions are unavailable.']);
             }
-            $manualSections = collect($data['sections'] ?? [])->keyBy('question_type_id');
+            $manualSections = $distribution;
             if ($usesTemplate) {
                 $groups = collect($manual)->groupBy(fn ($item) => $pool->get($item['id'])->question_type_id);
                 if ($manualSections->isEmpty() || $manualSections->count() !== $groups->count()) {
@@ -231,8 +251,12 @@ class QatPaperController extends Controller
                 ])->values()->all();
         }
 
-        $typeRanks = $builder->typeRanks($subject, $pool->pluck('question_type_id')->unique()->all());
+        $typeRanks = $builder->typeRanks($subject, $typeIds);
         foreach ($prepared as &$paperSections) {
+            $paperSections = $builder->pairSections($paperSections, $pairs);
+            if (collect($paperSections)->sum(fn ($section) => count($section['questions'])) > 100) {
+                throw ValidationException::withMessages(['sections' => 'Choose up to 100 questions across the paper sections.']);
+            }
             usort($paperSections, fn ($left, $right) => ($typeRanks[$left['question_type_id']] ?? PHP_INT_MAX)
                 <=> ($typeRanks[$right['question_type_id']] ?? PHP_INT_MAX));
         }
@@ -250,6 +274,7 @@ class QatPaperController extends Controller
             'months' => $data['syllabus'] === 'qat' ? $data['months'] : [],
             'minutes' => (int) $data['minutes'],
             'template_id' => $template ? (int) $template->id : null,
+            'or_pairs' => $pairs,
             'sections' => collect($data['sections'] ?? [])->map(fn ($section) => [
                 'question_type_id' => (int) $section['question_type_id'],
                 'quantity' => (int) $section['quantity'],
@@ -308,7 +333,8 @@ class QatPaperController extends Controller
         SubscriptionQuestionQuota::charge(
             $user,
             'qat_'.$preview,
-            array_sum(array_column($papers, 'question_count')),
+            collect($prepared)->sum(fn ($sections) => collect($sections)
+                ->sum(fn ($section) => collect($section['questions'])->sum(fn ($question) => isset($question['or_question']) ? 2 : 1))),
         );
         $request->session()->put('qat_preview', [
             'id' => $preview,

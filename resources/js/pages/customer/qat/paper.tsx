@@ -24,13 +24,20 @@ import type { QatQuestion } from './question';
 const toolbarHoverClass =
     'border border-sky-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300';
 
+type PaperQuestion = QatQuestion & {
+    marks: number;
+    or_question?: QatQuestion & { marks: number };
+};
+
 type PaperSection = {
     question_type_id: number;
     title: string;
     heading_en?: string | null;
     heading_ur?: string | null;
+    or_heading_en?: string | null;
+    or_heading_ur?: string | null;
     required_questions?: number;
-    questions: (QatQuestion & { marks: number })[];
+    questions: PaperQuestion[];
 };
 
 type QatPaperView = {
@@ -144,6 +151,8 @@ function QatTypeHeading({
 }) {
     const english = section.heading_en?.trim() || section.title;
     const urdu = section.heading_ur?.trim() || '';
+    const alternateEnglish = section.or_heading_en?.trim();
+    const alternateUrdu = section.or_heading_ur?.trim();
     const count = section.questions.length;
     const required = Math.min(section.required_questions ?? count, count);
     const marksEach = Number(section.questions[0]?.marks ?? 0);
@@ -167,7 +176,7 @@ function QatTypeHeading({
         <div
             data-paper-heading
             className={
-                urdu
+                urdu || alternateUrdu
                     ? 'qat-type-heading grid break-after-avoid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
                     : 'qat-type-heading flex break-after-avoid items-center justify-between gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
             }
@@ -175,19 +184,74 @@ function QatTypeHeading({
             <div dir="ltr" lang="en" className="min-w-0 text-left">
                 <span className="whitespace-nowrap">Q.{number}:-</span>{' '}
                 <QuestionContent value={english} inline />
+                {alternateEnglish && alternateEnglish !== english && (
+                    <div>
+                        OR <QuestionContent value={alternateEnglish} inline />
+                    </div>
+                )}
             </div>
             <div className="shrink-0 text-center">
                 <span dir="ltr" className="block whitespace-nowrap">
                     {marksLabel}
                 </span>
             </div>
-            {urdu && (
+            {(urdu || alternateUrdu) && (
                 <div dir="rtl" lang="ur" className="min-w-0 text-right">
                     <span className="whitespace-nowrap">
                         سوال نمبر {number}:-
                     </span>{' '}
-                    <QuestionContent value={urdu} inline />
+                    {urdu && <QuestionContent value={urdu} inline />}
+                    {alternateUrdu && alternateUrdu !== urdu && (
+                        <div>
+                            یا <QuestionContent value={alternateUrdu} inline />
+                        </div>
+                    )}
                 </div>
+            )}
+        </div>
+    );
+}
+
+function QatPaperQuestion({
+    question,
+    number,
+    showAnswers,
+}: {
+    question: PaperQuestion;
+    number: string;
+    showAnswers: boolean;
+}) {
+    const alternative = question.or_question;
+    const renderQuestion = (item: QatQuestion) =>
+        item.is_objective ? (
+            <QatObjectiveQuestion
+                question={item}
+                number={number}
+                showAnswers={showAnswers}
+            />
+        ) : (
+            <QatQuestionContent question={item} number={number} />
+        );
+
+    return (
+        <div
+            data-paper-question
+            className={`qat-question px-2 ${alternative ? 'break-inside-avoid' : ''}`}
+        >
+            {renderQuestion(question)}
+            {alternative && (
+                <>
+                    <div className="my-1 flex items-center justify-center gap-2 text-xs font-bold">
+                        <span lang="en">OR</span>
+                        {(question.statement_ur ||
+                            alternative.statement_ur) && (
+                            <span lang="ur" dir="rtl">
+                                یا
+                            </span>
+                        )}
+                    </div>
+                    {renderQuestion(alternative)}
+                </>
             )}
         </div>
     );
@@ -660,27 +724,22 @@ export default function QatPaper({
                                                                     question,
                                                                     index,
                                                                 ) => (
-                                                                    <div
+                                                                    <QatPaperQuestion
                                                                         key={
                                                                             question.id
                                                                         }
-                                                                        data-paper-question
-                                                                        className="qat-question px-2"
-                                                                    >
-                                                                        <QatObjectiveQuestion
-                                                                            showAnswers={
-                                                                                showAnswers
-                                                                            }
-                                                                            question={
-                                                                                question
-                                                                            }
-                                                                            number={
-                                                                                preceding +
+                                                                        question={
+                                                                            question
+                                                                        }
+                                                                        number={String(
+                                                                            preceding +
                                                                                 index +
-                                                                                1
-                                                                            }
-                                                                        />
-                                                                    </div>
+                                                                                1,
+                                                                        )}
+                                                                        showAnswers={
+                                                                            showAnswers
+                                                                        }
+                                                                    />
                                                                 ),
                                                             )}
                                                         </div>
@@ -714,23 +773,20 @@ export default function QatPaper({
                                                 <div className="mt-2 space-y-2">
                                                     {section.questions.map(
                                                         (question, index) => (
-                                                            <div
+                                                            <QatPaperQuestion
                                                                 key={
                                                                     question.id
                                                                 }
-                                                                data-paper-question
-                                                                className="qat-question px-2"
-                                                            >
-                                                                <QatQuestionContent
-                                                                    question={
-                                                                        question
-                                                                    }
-                                                                    number={romanSection(
-                                                                        index +
-                                                                            1,
-                                                                    ).toLowerCase()}
-                                                                />
-                                                            </div>
+                                                                question={
+                                                                    question
+                                                                }
+                                                                number={romanSection(
+                                                                    index + 1,
+                                                                ).toLowerCase()}
+                                                                showAnswers={
+                                                                    showAnswers
+                                                                }
+                                                            />
                                                         ),
                                                     )}
                                                 </div>

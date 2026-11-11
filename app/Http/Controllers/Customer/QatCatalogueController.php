@@ -8,6 +8,7 @@ use App\Models\QatPaper;
 use App\Support\AppUserAccess;
 use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatMonthlySyllabus;
+use App\Support\Qat\QatQuestionTypeRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -141,14 +142,20 @@ class QatCatalogueController extends Controller
             ->get(['qat_subject_id', 'month', 'description'])
             ->filter(fn ($syllabus) => $visibleMonthKeys->has($syllabus->qat_subject_id.':'.$syllabus->month))
             ->values();
+        $typeRules = DB::table('qat_subjects')->whereIn('id', $subjects->pluck('id'))
+            ->pluck('question_type_rules', 'id');
         $templates = DB::table('qat_paper_templates')->whereIn('qat_subject_id', $subjects->pluck('id'))
             ->where('status', true)->orderBy('name')
             ->get(['id', 'qat_subject_id', 'name', 'category', 'minutes', 'sections'])
-            ->map(function ($template) {
-                $template->sections = json_decode($template->sections, true) ?: [];
+            ->map(function ($template) use ($typeRules) {
+                $sections = json_decode($template->sections, true) ?: [];
+                $rules = new QatQuestionTypeRules($typeRules->get($template->qat_subject_id));
+                $template->sections = array_values(array_filter($sections,
+                    fn ($section) => ! in_array((int) $section['question_type_id'], $rules->hiddenTypeIds, true)));
+                $template->has_hidden_types = count($template->sections) !== count($sections);
 
                 return $template;
-            });
+            })->filter(fn ($template) => $template->sections !== [])->values();
 
         return Inertia::render('customer/qat/create', [
             'mode' => $mode,
@@ -235,6 +242,7 @@ class QatCatalogueController extends Controller
             ->join('qat_chapters as ch', 'ch.id', '=', 'q.qat_chapter_id')
             ->leftJoinSub(QatMonthlySyllabus::query('qat_topics', 'topic', $month, 'topics'), 'topic', 'topic.id', '=', 'q.qat_topic_id')
             ->where('ch.qat_subject_id', $qatSubject)
+            ->whereNotIn('q.question_type_id', QatQuestionTypeRules::forSubject($qatSubject)->hiddenTypeIds)
             ->where('ch.status', true)->where('q.status', true)
             ->where(function ($query): void {
                 $query->whereNull('q.qat_topic_id')->orWhere('topic.status', true);

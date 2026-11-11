@@ -16,6 +16,7 @@ import {
     Trash2Icon,
 } from 'lucide-react';
 import type { QatReviewSelection } from '@/components/qat/generation-form';
+import { QatOrPartnerSelect } from '@/components/qat/or-partner-select';
 import { QatStepHeader } from '@/components/qat/step-header';
 
 const fieldClass =
@@ -39,6 +40,8 @@ export function QatReviewCard({
     allowRepeat,
     isPefPattern,
     loading,
+    orOptions,
+    onPairChange,
     rows,
     totalQuestions,
     totalMarks,
@@ -285,6 +288,10 @@ export function QatReviewCard({
                                     </thead>
                                     <tbody>
                                         {rows.map((row, index) => {
+                                            const partner = orOptions.find(
+                                                (option) =>
+                                                    option.typeId === row.id,
+                                            );
                                             const tone =
                                                 rowTones[
                                                     index % rowTones.length
@@ -299,13 +306,27 @@ export function QatReviewCard({
                                                         scope="row"
                                                         className="px-4 py-3 text-xs font-semibold text-[#112650] dark:text-slate-100"
                                                     >
-                                                        <span className="flex items-center gap-2">
-                                                            <FileTextIcon
-                                                                aria-hidden="true"
-                                                                className={`size-4 shrink-0 ${tone.icon}`}
-                                                            />
-                                                            {row.name}
-                                                        </span>
+                                                        <div className="flex items-center justify-between gap-2 [&>[data-slot=select-trigger]]:max-w-[60%]">
+                                                            <span className="flex min-w-0 items-center gap-2">
+                                                                <FileTextIcon
+                                                                    aria-hidden="true"
+                                                                    className={`size-4 shrink-0 ${tone.icon}`}
+                                                                />
+                                                                <span className="min-w-0 break-words">
+                                                                    {row.name}
+                                                                </span>
+                                                            </span>
+                                                            {partner && (
+                                                                <QatOrPartnerSelect
+                                                                    option={
+                                                                        partner
+                                                                    }
+                                                                    onChange={
+                                                                        onPairChange
+                                                                    }
+                                                                />
+                                                            )}
+                                                        </div>
                                                     </th>
                                                     <td className="px-2 py-2.5">
                                                         <input

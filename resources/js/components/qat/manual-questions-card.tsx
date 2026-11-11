@@ -5,6 +5,7 @@ import {
     SearchIcon,
 } from 'lucide-react';
 import type { QatManualSelection } from '@/components/qat/generation-form';
+import { QatOrPartnerSelect } from '@/components/qat/or-partner-select';
 import { QatStepHeader } from '@/components/qat/step-header';
 import { Switch } from '@/components/ui/switch';
 import { QatQuestionStatement } from '@/pages/customer/qat/question';
@@ -18,6 +19,9 @@ export function QatManualQuestionsCard({
     loading,
     error,
     types,
+    orOptions,
+    pairError,
+    onPairChange,
     questions,
     selected,
     search,
@@ -93,6 +97,32 @@ export function QatManualQuestionsCard({
                         />
                     </div>
                 </div>
+                {ready && orOptions.length > 0 && (
+                    <div className="flex flex-wrap gap-2 rounded-xl border border-violet-100 bg-white/70 p-2.5 dark:border-violet-900 dark:bg-slate-900/70">
+                        {orOptions.map((option) => (
+                            <div
+                                key={option.typeId}
+                                className="flex min-w-0 max-w-full items-center gap-2 rounded-lg bg-violet-50 px-2 py-1 dark:bg-violet-950/50 [&>[data-slot=select-trigger]]:max-w-[60%]"
+                            >
+                                <span className="min-w-0 break-words text-xs font-semibold text-violet-900 dark:text-violet-200">
+                                    {option.typeName}
+                                </span>
+                                <QatOrPartnerSelect
+                                    option={option}
+                                    onChange={onPairChange}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+                {ready && pairError && (
+                    <p
+                        role="status"
+                        className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+                    >
+                        {pairError}
+                    </p>
+                )}
                 {error ? (
                     <div
                         role="alert"

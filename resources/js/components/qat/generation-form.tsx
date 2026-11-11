@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import type { OrPartnerOption } from '@/components/qat/or-partner-select';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
@@ -50,8 +51,10 @@ type PoolType = {
     name: string;
     is_objective: boolean;
     total: number;
+    or_partner_id: number | null;
 };
 type Pool = {
+    hidden_type_ids: number[];
     types: PoolType[];
     questions: {
         data: QatQuestion[];
@@ -64,6 +67,7 @@ type QatTemplate = {
     name: string;
     category: string | null;
     minutes: number;
+    has_hidden_types?: boolean;
     sections: {
         question_type_id: number;
         quantity: number;
@@ -72,6 +76,7 @@ type QatTemplate = {
     }[];
 };
 type ManualChoice = { question: QatQuestion; marks: number };
+type OrPair = { type_id: number; partner_id: number };
 type AutoSection = {
     question_type_id: number;
     quantity: number;
@@ -94,6 +99,7 @@ type GenerationSelections = {
     variants: number;
     allow_repeat: boolean;
     manual_questions: { id: number; marks: number }[];
+    or_pairs?: OrPair[];
 };
 
 function normalizedSections(sections: QatTemplate['sections']) {
@@ -221,6 +227,9 @@ export type QatManualSelection = {
     loading: boolean;
     error: string;
     types: PoolType[];
+    orOptions: OrPartnerOption[];
+    pairError: string;
+    onPairChange: (typeId: number, partnerId: number | null) => void;
     questions: QatQuestion[];
     selected: Record<number, number>;
     search: string;
@@ -240,6 +249,8 @@ export type QatReviewSelection = {
     allowRepeat: boolean;
     isPefPattern: boolean;
     loading: boolean;
+    orOptions: OrPartnerOption[];
+    onPairChange: (typeId: number, partnerId: number | null) => void;
     rows: {
         id: number;
         name: string;
@@ -334,6 +345,9 @@ export default function QatGenerationForm({
     const [questionSearch, setQuestionSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
     const [selectedOnly, setSelectedOnly] = useState(false);
+    const [orPairs, setOrPairs] = useState<OrPair[]>(
+        initialSelections?.or_pairs ?? [],
+    );
     const [templateId, setTemplateId] = useState<number | null>(
         initialSelections?.template_id ?? null,
     );
@@ -465,6 +479,52 @@ export default function QatGenerationForm({
     const pendingManualChoices = useRef(
         initialSelections?.manual_questions ?? [],
     );
+    const currentPool = poolScopeKey === questionScopeKey ? pool : null;
+    const poolTypes = currentPool?.types ?? [];
+    const typesById = useMemo(
+        () =>
+            new Map((currentPool?.types ?? []).map((type) => [type.id, type])),
+        [currentPool],
+    );
+    const activePairs = useMemo(
+        () =>
+            orPairs.filter(
+                (pair) =>
+                    typesById.get(pair.type_id)?.or_partner_id ===
+                    pair.partner_id,
+            ),
+        [orPairs, typesById],
+    );
+    const partnersByPrimary = useMemo(
+        () =>
+            new Map(activePairs.map((pair) => [pair.type_id, pair.partner_id])),
+        [activePairs],
+    );
+    const suppressedTypes = useMemo(
+        () => new Set(activePairs.map((pair) => pair.partner_id)),
+        [activePairs],
+    );
+    const orOptions = poolTypes.flatMap((type) => {
+        const partner = typesById.get(type.or_partner_id ?? 0);
+
+        if (!partner || suppressedTypes.has(type.id)) {
+            return [];
+        }
+
+        return [
+            {
+                typeId: type.id,
+                typeName: type.name,
+                partnerId: partner.id,
+                partnerName: partner.name,
+                selected: partnersByPrimary.get(type.id) === partner.id,
+            },
+        ];
+    });
+    const filterTypeId = typesById.has(Number(typeFilter))
+        ? Number(typeFilter)
+        : 0;
+    const filterPartnerId = partnersByPrimary.get(filterTypeId);
     const typeRanks = useMemo(
         () =>
             new Map((pool?.types ?? []).map((type, index) => [type.id, index])),
@@ -507,9 +567,9 @@ export default function QatGenerationForm({
                 ? selectedManual.map(({ question }) => question)
                 : (pool?.questions.data ?? []).filter(
                       (question) =>
-                          (!typeFilter ||
-                              question.question_type_id ===
-                                  Number(typeFilter)) &&
+                          (!filterTypeId ||
+                              question.question_type_id === filterTypeId ||
+                              question.question_type_id === filterPartnerId) &&
                           (!searchTerm ||
                               questionSearchIndex
                                   .get(question.id)
@@ -519,47 +579,102 @@ export default function QatGenerationForm({
             selectedOnly,
             selectedManual,
             pool,
-            typeFilter,
+            filterTypeId,
+            filterPartnerId,
             searchTerm,
             questionSearchIndex,
         ],
     );
-    const autoRows = [
-        ...autoSections,
-        ...(pool?.types ?? [])
-            .filter(
-                (type) =>
-                    !autoSections.some(
-                        (row) => row.question_type_id === type.id,
-                    ),
-            )
-            .map((type) => ({
-                question_type_id: type.id,
-                quantity: 0,
-                required_questions: 0,
-                marks: type.is_objective ? 1 : 2,
-            })),
-    ]
-        .map((section) => {
-            const type = pool?.types.find(
-                (item) => item.id === section.question_type_id,
-            );
+    const allAutoRows = useMemo(
+        () =>
+            [
+                ...autoSections.filter(
+                    (row) =>
+                        !currentPool?.hidden_type_ids.includes(
+                            row.question_type_id,
+                        ),
+                ),
+                ...(currentPool?.types ?? [])
+                    .filter(
+                        (type) =>
+                            !autoSections.some(
+                                (row) => row.question_type_id === type.id,
+                            ),
+                    )
+                    .map((type) => ({
+                        question_type_id: type.id,
+                        quantity: 0,
+                        required_questions: 0,
+                        marks: type.is_objective ? 1 : 2,
+                    })),
+            ]
+                .map((section) => {
+                    const type = typesById.get(section.question_type_id);
 
-            return {
-                ...section,
-                id: section.question_type_id,
-                name: type?.name ?? `Question type ${section.question_type_id}`,
-                available: type?.total ?? 0,
-            };
-        })
-        .sort(
-            (left, right) =>
-                (typeRanks.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
-                (typeRanks.get(right.id) ?? Number.MAX_SAFE_INTEGER),
-        );
-    const activeAutoRows = autoRows.filter((row) => row.quantity > 0);
+                    return {
+                        ...section,
+                        id: section.question_type_id,
+                        name:
+                            type?.name ??
+                            `Question type ${section.question_type_id}`,
+                        available: type?.total ?? 0,
+                    };
+                })
+                .sort(
+                    (left, right) =>
+                        (typeRanks.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+                        (typeRanks.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+                ),
+        [autoSections, currentPool, typeRanks, typesById],
+    );
+    const autoRows = useMemo(
+        () =>
+            allAutoRows
+                .filter((row) => !suppressedTypes.has(row.id))
+                .map((row) => {
+                    const partnerId = partnersByPrimary.get(row.id);
+                    const partner =
+                        partnerId === undefined
+                            ? null
+                            : typesById.get(partnerId);
+
+                    return partner
+                        ? {
+                              ...row,
+                              available: Math.min(row.available, partner.total),
+                          }
+                        : row;
+                }),
+        [allAutoRows, partnersByPrimary, suppressedTypes, typesById],
+    );
+    const activeAutoRows = useMemo(
+        () => autoRows.filter((row) => row.quantity > 0),
+        [autoRows],
+    );
+    const distributionPairs = useMemo(
+        () =>
+            activePairs.filter((pair) =>
+                activeAutoRows.some((row) => row.id === pair.type_id),
+            ),
+        [activeAutoRows, activePairs],
+    );
+    const expandedAutoRows = useMemo(
+        () => [
+            ...activeAutoRows,
+            ...distributionPairs.flatMap((pair) => {
+                const row = activeAutoRows.find(
+                    (item) => item.id === pair.type_id,
+                );
+
+                return row ? [{ ...row, id: pair.partner_id }] : [];
+            }),
+        ],
+        [activeAutoRows, distributionPairs],
+    );
     const isPefPattern =
         selectedTemplate !== null &&
+        !selectedTemplate.has_hidden_types &&
+        distributionPairs.length === 0 &&
         minutes === selectedTemplate.minutes &&
         JSON.stringify(normalizedSections(autoRows)) ===
             JSON.stringify(normalizedSections(selectedTemplate.sections));
@@ -586,22 +701,52 @@ export default function QatGenerationForm({
             (row) =>
                 row.available >= row.quantity * (allowRepeat ? 1 : variants),
         );
-    const manualRows = [
-        ...new Set(
-            selectedManual.map(({ question }) => question.question_type_id),
-        ),
-    ].map((typeId) => {
-        const items = selectedManual.filter(
-            ({ question }) => question.question_type_id === typeId,
-        );
+    const choicesByType = new Map<number, ManualChoice[]>();
 
-        return {
-            id: typeId,
-            name: items[0]?.question.type_name ?? 'Question type',
-            count: items.length,
-            marks: items.reduce((total, item) => total + item.marks, 0),
-        };
-    });
+    for (const choice of selectedManual) {
+        const id = choice.question.question_type_id;
+        const items = choicesByType.get(id) ?? [];
+        items.push(choice);
+        choicesByType.set(id, items);
+    }
+
+    const manualPairError =
+        activePairs
+            .map(({ type_id, partner_id }) => {
+                const primary = choicesByType.get(type_id) ?? [];
+                const alternative = choicesByType.get(partner_id) ?? [];
+                const names = `${typesById.get(type_id)?.name} and ${typesById.get(partner_id)?.name}`;
+
+                if (primary.length !== alternative.length) {
+                    return `Select the same number of questions for ${names}.`;
+                }
+
+                if (
+                    primary.some(
+                        (item, index) =>
+                            Math.abs(item.marks - alternative[index].marks) >
+                            0.00001,
+                    )
+                ) {
+                    return `Match the marks for each pair of ${names} questions.`;
+                }
+
+                return '';
+            })
+            .find(Boolean) ?? '';
+    const manualRows = [...choicesByType]
+        .filter(([id]) => !suppressedTypes.has(id))
+        .map(([typeId, items]) => {
+            const partner = typesById.get(partnersByPrimary.get(typeId) ?? 0);
+            const name = items[0].question.type_name;
+
+            return {
+                id: typeId,
+                name: partner ? `${name} OR ${partner.name}` : name,
+                count: items.length,
+                marks: items.reduce((total, item) => total + item.marks, 0),
+            };
+        });
     const reviewRows = usesDistribution
         ? autoRows.map((type) => ({
               id: type.id,
@@ -617,7 +762,7 @@ export default function QatGenerationForm({
         : manualRows.map((row) => ({ ...row, required: row.count }));
     const totalQuestions = usesDistribution
         ? autoRows.reduce((total, type) => total + type.quantity, 0)
-        : selectedManual.length;
+        : manualRows.reduce((total, row) => total + row.count, 0);
     const totalMarks = Number(
         (usesDistribution
             ? autoRows.reduce(
@@ -626,7 +771,7 @@ export default function QatGenerationForm({
                       (type.required_questions ?? type.quantity) * type.marks,
                   0,
               )
-            : selectedManual.reduce((total, item) => total + item.marks, 0)
+            : manualRows.reduce((total, row) => total + row.marks, 0)
         ).toFixed(2),
     );
     useEffect(() => {
@@ -667,7 +812,7 @@ export default function QatGenerationForm({
         setTemplateChoices((current) => {
             const next: Record<number, ManualChoice> = {};
 
-            for (const row of activeAutoRows) {
+            for (const row of expandedAutoRows) {
                 const candidates = pool.questions.data.filter(
                     (question) => question.question_type_id === row.id,
                 );
@@ -708,7 +853,7 @@ export default function QatGenerationForm({
         poolScopeKey,
         questionScopeKey,
         templateRevision,
-        activeAutoRows,
+        expandedAutoRows,
     ]);
 
     useEffect(() => {
@@ -840,7 +985,7 @@ export default function QatGenerationForm({
         value: number,
     ) {
         setTemplateRevision((revision) => revision + 1);
-        const rows = autoRows.map((row) => ({
+        const rows = allAutoRows.map((row) => ({
             question_type_id: row.id,
             quantity: row.quantity,
             required_questions: row.required_questions,
@@ -885,6 +1030,7 @@ export default function QatGenerationForm({
         setMonths([]);
         setTemplateId(null);
         setAutoSections([]);
+        setOrPairs([]);
         setTypeFilter('');
         setQuestionSearch('');
     }
@@ -910,10 +1056,31 @@ export default function QatGenerationForm({
         setTemplateRevision((revision) => revision + 1);
         setTemplateId(template?.id ?? null);
         setAutoSections(normalizedSections(template?.sections ?? []));
+        setOrPairs([]);
 
         if (template || mode === 'auto') {
             setMinutes(template?.minutes ?? 40);
         }
+    }
+
+    function updateOrPair(typeId: number, partnerId: number | null) {
+        setOrPairs((current) => {
+            const remaining = current.filter(
+                (pair) =>
+                    ![typeId, partnerId].includes(pair.type_id) &&
+                    ![typeId, partnerId].includes(pair.partner_id),
+            );
+
+            return partnerId === null
+                ? remaining
+                : [...remaining, { type_id: typeId, partner_id: partnerId }];
+        });
+
+        if (partnerId !== null) {
+            setTypeFilter(String(typeId));
+        }
+
+        setTemplateRevision((revision) => revision + 1);
     }
 
     function toggleChapter(id: number) {
@@ -938,7 +1105,7 @@ export default function QatGenerationForm({
         targetCoverage.length > 0 &&
         totalQuestions > 0 &&
         (mode !== 'manual' ||
-            (selectedManual.length <= 100 &&
+            (totalQuestions <= 100 &&
                 selectedManual.every(
                     (item) =>
                         Number.isFinite(item.marks) &&
@@ -950,9 +1117,11 @@ export default function QatGenerationForm({
         poolScopeKey === questionScopeKey &&
         (!usesDistribution ||
             (templateHasEnoughQuestions && variantsHaveEnoughQuestions)) &&
+        (usesDistribution || !manualPairError) &&
         (!manualTemplate ||
-            (selectedManual.length === totalQuestions &&
-                activeAutoRows.every((row) => {
+            (selectedManual.length ===
+                expandedAutoRows.reduce((sum, row) => sum + row.quantity, 0) &&
+                expandedAutoRows.every((row) => {
                     const items = selectedManual.filter(
                         (item) => item.question.question_type_id === row.id,
                     );
@@ -999,6 +1168,11 @@ export default function QatGenerationForm({
                     months: syllabus === 'qat' ? months : [],
                     minutes: paperMinutes,
                     template_id: usesDistribution ? selectedTemplate?.id : null,
+                    or_pairs: usesDistribution
+                        ? distributionPairs
+                        : activePairs.filter((pair) =>
+                              choicesByType.has(pair.type_id),
+                          ),
                     sections: usesDistribution
                         ? normalizedSections(activeAutoRows)
                         : [],
@@ -1081,7 +1255,24 @@ export default function QatGenerationForm({
                     !poolError &&
                     (poolBusy || !summaryHasCurrentQuestions),
                 error: poolError,
-                types: summaryHasCurrentQuestions ? (pool?.types ?? []) : [],
+                types: poolTypes
+                    .filter((type) => !suppressedTypes.has(type.id))
+                    .map((type) => {
+                        const partner = typesById.get(
+                            partnersByPrimary.get(type.id) ?? 0,
+                        );
+
+                        return partner
+                            ? {
+                                  ...type,
+                                  name: `${type.name} OR ${partner.name}`,
+                                  total: type.total + partner.total,
+                              }
+                            : type;
+                    }),
+                orOptions,
+                pairError: manualPairError,
+                onPairChange: updateOrPair,
                 questions: summaryHasCurrentQuestions ? listedQuestions : [],
                 selected: summaryHasCurrentQuestions
                     ? Object.fromEntries(
@@ -1092,7 +1283,7 @@ export default function QatGenerationForm({
                       )
                     : {},
                 search: questionSearch,
-                typeFilter,
+                typeFilter: filterTypeId ? String(filterTypeId) : '',
                 selectedOnly,
                 onSearchChange: setQuestionSearch,
                 onTypeChange: setTypeFilter,
@@ -1140,6 +1331,8 @@ export default function QatGenerationForm({
                 allowRepeat,
                 isPefPattern,
                 loading: poolBusy,
+                orOptions,
+                onPairChange: updateOrPair,
                 rows:
                     poolScopeKey === questionScopeKey
                         ? reviewRows.map((row) => ({
@@ -1164,6 +1357,7 @@ export default function QatGenerationForm({
                 onClear: () => {
                     setTemplateId(null);
                     setAutoSections([]);
+                    setOrPairs([]);
                     setTemplateRevision((revision) => revision + 1);
                     setMinutes(40);
                 },

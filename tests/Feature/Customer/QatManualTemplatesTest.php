@@ -12,11 +12,11 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->school = User::factory()->create(['user_type' => UserType::Customer->value, 'account_type' => 'paid']);
-    $admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value, 'created_by' => null]);
+    $this->admin = User::factory()->create(['user_type' => UserType::SuperAdmin->value, 'created_by' => null]);
     Subscription::create([
         'user_id' => $this->school->id, 'name' => 'QAT', 'amount' => 1000, 'started_at' => now()->subDay(),
         'duration' => 30, 'expired_at' => now()->addDays(29), 'status' => 'active',
-        'created_by' => $admin->id, 'access_scope' => [], 'allow_qat_tests' => true,
+        'created_by' => $this->admin->id, 'access_scope' => [], 'allow_qat_tests' => true,
     ]);
     $this->type = QuestionType::create([
         'name' => 'Short Question', 'heading_en' => 'Answer the questions.', 'have_exercise' => false,
@@ -126,3 +126,106 @@ test('editing a manual template keeps custom chapters and marks the paper as non
     $this->get($response->json('preview_url'))->assertOk()->assertInertia(fn ($page) => $page
         ->where('paper.total_marks', 6)->where('paper.paper_data.is_pef_pattern', false));
 });
+
+function addQatTypeToChapter(int $chapter, string $name, int $source, int $count): array
+{
+    $type = QuestionType::create([
+        'name' => $name, 'heading_en' => "Answer $name.", 'have_exercise' => false,
+        'have_statement' => true, 'have_description' => false, 'have_answer' => false,
+        'is_single' => true, 'is_objective' => false, 'column_per_row' => 1, 'status' => 1,
+    ]);
+    $ids = [];
+    for ($index = 0; $index < $count; $index++) {
+        $ids[] = DB::table('qat_questions')->insertGetId([
+            'qat_chapter_id' => $chapter, 'source_question_id' => $source + $index,
+            'question_type_id' => $type->id, 'status' => true,
+            'question_data' => json_encode(['statement_en' => "$name $index", 'statement_ur' => 'سوال']),
+        ]);
+    }
+
+    return [$type->id, $ids];
+}
+
+test('subject question type settings control the customer pool and templates in every month', function () {
+    [$partner] = addQatTypeToChapter($this->chapterId, 'Translation', 20, 1);
+    [$hidden, [$hiddenQuestion]] = addQatTypeToChapter($this->chapterId, 'Extra type', 30, 1);
+    DB::table('qat_chapter_months')->insert([
+        ['qat_chapter_id' => $this->chapterId, 'month' => 4],
+        ['qat_chapter_id' => $this->chapterId, 'month' => 5],
+    ]);
+    $scope = ['catalogue_id' => DB::table('qat_catalogues')->value('id'), 'class_id' => $this->classId, 'subject_id' => $this->subjectId];
+    $route = route('superadmin.qat-question-types.update', $this->subjectId);
+    $pair = ['type_id' => $this->type->id, 'partner_id' => $partner];
+    $settings = ['hidden_type_ids' => [$hidden], 'or_pairs' => [$pair]];
+
+    $this->actingAs($this->admin)->get(route('superadmin.qat-question-types.index', $scope))->assertOk()
+        ->assertInertia(fn ($page) => $page->component('superadmin/qat-question-types')
+            ->where('scope', $scope)->has('types', 3)->where('hiddenTypeIds', []));
+    $delegate = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->admin->id]);
+    $this->actingAs($delegate)->putJson($route, $settings)->assertForbidden();
+    $this->actingAs($this->school)->postJson(route('customer.qat.questions'), [
+        'subject_id' => $this->subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$this->chapterId],
+    ])->assertOk()->assertJsonCount(3, 'types');
+    $this->actingAs($this->admin)->putJson($route, [
+        ...$settings, 'or_pairs' => [$pair, ['type_id' => $partner, 'partner_id' => $hidden]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('or_pairs');
+    $this->put($route, $settings)->assertRedirect()->assertSessionHasNoErrors();
+
+    DB::table('qat_paper_templates')->where('id', $this->templateId)->update([
+        'sections' => json_encode([...$this->sections, ['question_type_id' => $hidden, 'quantity' => 1, 'marks' => 1]]),
+    ]);
+    $this->actingAs($this->school)->get(route('customer.qat.create', 'auto'))->assertOk()
+        ->assertInertia(fn ($page) => $page->has('templates.0.sections', 1)->where('templates.0.has_hidden_types', true));
+    foreach ([4, 5] as $month) {
+        $pool = $this->postJson(route('customer.qat.questions'), [
+            'subject_id' => $this->subjectId, 'syllabus' => 'qat', 'months' => [$month],
+        ])->assertOk()->assertJsonCount(2, 'types');
+        expect(collect($pool->json('types'))->pluck('or_partner_id', 'id')->all())
+            ->toMatchArray([$this->type->id => $partner, $partner => $this->type->id]);
+        expect(array_column($pool->json('questions.data'), 'id'))->not->toContain($hiddenQuestion);
+    }
+
+    $this->postJson(route('customer.qat.papers.store'), [
+        ...$this->payload, 'selection_method' => 'manual',
+        'manual_questions' => [['id' => $hiddenQuestion, 'marks' => 1]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('manual_questions');
+});
+
+test('QAT OR pairs generate one numbered choice and count marks once in each mode', function (string $journey) {
+    [$partner, $alternatives] = addQatTypeToChapter($this->chapterId, 'Translation', 20, 2);
+    $pair = ['type_id' => $this->type->id, 'partner_id' => $partner];
+    $this->actingAs($this->admin)->put(route('superadmin.qat-question-types.update', $this->subjectId), [
+        'hidden_type_ids' => [], 'or_pairs' => [$pair],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $payload = $this->payload;
+    $payload['or_pairs'] = [$pair];
+    if ($journey === 'auto') {
+        DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $this->chapterId, 'month' => 4]);
+        $payload = [...$payload, 'mode' => 'auto', 'syllabus' => 'qat', 'months' => [4], 'chapter_ids' => []];
+    } else {
+        foreach ($alternatives as $id) {
+            $payload['manual_questions'][] = ['id' => $id, 'marks' => 3];
+        }
+    }
+    if ($journey === 'manual') {
+        $payload['selection_method'] = 'manual';
+        $payload['sections'] = [];
+        $invalid = $payload;
+        $invalid['manual_questions'][2]['marks'] = 4;
+        $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $invalid)
+            ->assertUnprocessable()->assertJsonValidationErrors('or_pairs');
+    }
+
+    $response = $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $payload)->assertCreated();
+    $preview = basename($response->json('preview_url'));
+    $this->get($response->json('preview_url'))->assertOk()->assertInertia(fn ($page) => $page
+        ->where('paper.total_marks', $journey === 'manual' ? 6 : 3)
+        ->where('paper.question_count', 2)->has('paper.paper_data.sections', 1)
+        ->where('paper.paper_data.sections.0.questions.0.or_question.question_type_id', $partner)
+        ->where('paper.paper_data.sections.0.questions.1.or_question.marks', 3)
+        ->where('paper.paper_data.is_pef_pattern', false));
+    $saved = $this->postJson(route('customer.qat.previews.save', $preview))->assertCreated()->json('paper_id');
+    $this->get(route('customer.qat.create', ['mode' => $payload['mode'], 'paper' => $saved]))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('initialSelections.or_pairs', [$pair]));
+})->with(['manual', 'template', 'auto']);

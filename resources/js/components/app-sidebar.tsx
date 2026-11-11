@@ -159,6 +159,10 @@ export function AppSidebar() {
                               title: 'QAT Templates',
                               href: '/superadmin/qat-templates',
                           },
+                          {
+                              title: 'Question Types',
+                              href: '/superadmin/qat-question-types',
+                          },
                       ],
                   },
                   {

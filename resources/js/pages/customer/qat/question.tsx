@@ -400,7 +400,7 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     showAnswers = false,
 }: {
     question: QatQuestion;
-    number: number;
+    number: number | string;
     showAnswers?: boolean;
 }) {
     const content = question.content ?? {};
