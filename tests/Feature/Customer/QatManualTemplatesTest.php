@@ -73,6 +73,27 @@ test('manual QAT lists active templates for the accessible subjects', function (
         ->assertInertia(fn ($page) => $page->has('templates', 1)->where('templates.0.id', $this->templateId));
 });
 
+test('QAT keeps template and saved section names when no past-paper questions qualify', function () {
+    [$customType, [$customQuestion]] = addQatTypeToChapter($this->chapterId, 'Custom section type', 60, 1);
+    $scope = ['subject_id' => $this->subjectId, 'syllabus' => 'custom', 'chapter_ids' => [$this->chapterId]];
+    $this->actingAs($this->school)->postJson(route('customer.qat.questions'), [...$scope, 'past_paper' => true])
+        ->assertOk()->assertJsonPath('types', [])->assertJsonPath('questions.total', 0);
+    $this->get(route('customer.qat.create', 'manual'))->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('questionTypeNames.'.$this->type->id, $this->type->name)
+            ->missing('questionTypeNames.'.$customType));
+
+    $response = $this->postJson(route('customer.qat.papers.store'), [
+        ...$this->payload,
+        'sections' => [['question_type_id' => $customType, 'quantity' => 1, 'required_questions' => 1, 'marks' => 3]],
+        'manual_questions' => [['id' => $customQuestion, 'marks' => 3]],
+    ])->assertCreated();
+    $saved = $this->postJson(route('customer.qat.previews.save', basename($response->json('preview_url'))))
+        ->assertCreated()->json('paper_id');
+    $this->get(route('customer.qat.create', ['mode' => 'manual', 'paper' => $saved]))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('questionTypeNames.'.$customType, 'Custom section type'));
+});
+
 test('past QAT papers filter selection and generation in each journey and restore the setting', function (string $journey) {
     DB::table('qat_questions')->whereIn('id', [$this->questions[0], $this->questions[1], $this->questions[2]])
         ->update(['is_past_qat_paper' => true]);

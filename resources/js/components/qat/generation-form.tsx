@@ -83,6 +83,7 @@ type AutoSection = {
     quantity: number;
     required_questions: number;
     marks: number;
+    name?: string;
 };
 
 type GenerationSelections = {
@@ -167,6 +168,7 @@ export type QatGenerationFormProps = {
     chapters: QatChapter[];
     monthSyllabi: QatMonthSyllabus[];
     templates: QatTemplate[];
+    questionTypeNames: Record<number, string>;
     initialSelections?: GenerationSelections | null;
 };
 
@@ -315,6 +317,7 @@ export default function QatGenerationForm({
     chapters,
     monthSyllabi,
     templates,
+    questionTypeNames,
     initialSelections = null,
     render,
 }: QatGenerationFormProps & {
@@ -613,6 +616,7 @@ export default function QatGenerationForm({
                         quantity: 0,
                         required_questions: 0,
                         marks: type.is_objective ? 1 : 2,
+                        name: type.name,
                     })),
             ]
                 .map((section) => {
@@ -623,7 +627,9 @@ export default function QatGenerationForm({
                         id: section.question_type_id,
                         name:
                             type?.name ??
-                            `Question type ${section.question_type_id}`,
+                            questionTypeNames[section.question_type_id] ??
+                            section.name ??
+                            'Unavailable question type',
                         available: type?.total ?? 0,
                     };
                 })
@@ -632,7 +638,7 @@ export default function QatGenerationForm({
                         (typeRanks.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
                         (typeRanks.get(right.id) ?? Number.MAX_SAFE_INTEGER),
                 ),
-        [autoSections, currentPool, typeRanks, typesById],
+        [autoSections, currentPool, questionTypeNames, typeRanks, typesById],
     );
     const autoRows = useMemo(
         () =>
@@ -999,6 +1005,7 @@ export default function QatGenerationForm({
             quantity: row.quantity,
             required_questions: row.required_questions,
             marks: row.marks,
+            name: row.name,
         }));
         setAutoSections(
             rows.map((row) => {
@@ -1399,19 +1406,16 @@ export default function QatGenerationForm({
                     minutes: template.minutes,
                     ready: template.sections.every(
                         (section) =>
-                            (pool?.types.find(
-                                (type) => type.id === section.question_type_id,
-                            )?.total ?? 0) >= section.quantity,
+                            (typesById.get(section.question_type_id)?.total ??
+                                0) >= section.quantity,
                     ),
                     rows: template.sections
                         .map((section) => ({
                             id: section.question_type_id,
                             name:
-                                pool?.types.find(
-                                    (type) =>
-                                        type.id === section.question_type_id,
-                                )?.name ??
-                                `Question type ${section.question_type_id}`,
+                                typesById.get(section.question_type_id)?.name ??
+                                questionTypeNames[section.question_type_id] ??
+                                'Unavailable question type',
                             total: section.quantity,
                             required:
                                 section.required_questions ?? section.quantity,
@@ -1749,10 +1753,8 @@ export default function QatGenerationForm({
                                                         template.sections
                                                             .map((section) => ({
                                                                 ...section,
-                                                                type: pool.types.find(
-                                                                    (type) =>
-                                                                        type.id ===
-                                                                        section.question_type_id,
+                                                                type: typesById.get(
+                                                                    section.question_type_id,
                                                                 ),
                                                             }))
                                                             .sort(
@@ -1850,7 +1852,11 @@ export default function QatGenerationForm({
                                                                                 {row
                                                                                     .type
                                                                                     ?.name ??
-                                                                                    `Question type ${row.question_type_id}`}{' '}
+                                                                                    questionTypeNames[
+                                                                                        row
+                                                                                            .question_type_id
+                                                                                    ] ??
+                                                                                    'Unavailable question type'}{' '}
                                                                                 ·{' '}
                                                                                 {
                                                                                     row.quantity

@@ -156,6 +156,10 @@ class QatCatalogueController extends Controller
 
                 return $template;
             })->filter(fn ($template) => $template->sections !== [])->values();
+        $sectionTypeIds = $templates->pluck('sections')->collapse()->pluck('question_type_id')
+            ->merge(array_column($initialSelections['sections'] ?? [], 'question_type_id'))
+            ->unique()->values();
+        $questionTypeNames = DB::table('question_types')->whereIn('id', $sectionTypeIds)->pluck('name', 'id');
 
         return Inertia::render('customer/qat/create', [
             'mode' => $mode,
@@ -165,6 +169,7 @@ class QatCatalogueController extends Controller
             'chapters' => $chapters,
             'monthSyllabi' => $monthSyllabi,
             'templates' => $templates,
+            'questionTypeNames' => $questionTypeNames,
         ]);
     }
 
