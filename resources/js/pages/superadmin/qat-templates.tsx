@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button, Card, Modal, PageHeader } from '@/components/tm';
 import {
+    DeleteAction,
     FilterBar,
     Pager,
     StatusBadge,
@@ -240,13 +241,20 @@ export default function QatTemplates({
                                         <StatusBadge active={item.status} />
                                     </td>
                                     <td className={tdClass}>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => start(item)}
-                                        >
-                                            Edit
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => start(item)}
+                                            >
+                                                Edit
+                                            </Button>
+                                            <DeleteAction
+                                                url={`/superadmin/qat-templates/${item.id}`}
+                                                label={item.name}
+                                                consequence="This permanently removes the template from paper generation. Saved papers remain available."
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

@@ -85,6 +85,14 @@ class QatPaperTemplateController extends Controller
         return back()->with('success', 'QAT template updated.');
     }
 
+    public function destroy(int $template): RedirectResponse
+    {
+        $deleted = DB::table('qat_paper_templates')->where('id', $template)->delete();
+        abort_unless($deleted, 404);
+
+        return back()->with('success', 'QAT template deleted.');
+    }
+
     private function validated(Request $request): array
     {
         $data = $request->validate([

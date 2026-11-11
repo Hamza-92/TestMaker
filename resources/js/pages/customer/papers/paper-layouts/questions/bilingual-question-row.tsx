@@ -77,6 +77,10 @@ export function BilingualQuestionRow({
     const sharedParts = sameStatement
         ? splitBilingualParts(sameStatement)
         : null;
+    const sharedValue = sharedParts?.english ?? sameStatement;
+    const sharedTable = Boolean(
+        sharedValue && /<table\b/i.test(questionTextToHtml(sharedValue)),
+    );
     const indexClassName = spaceAfterIndex
         ? 'me-1.5 shrink-0 font-bold'
         : 'shrink-0 font-bold';
@@ -94,7 +98,13 @@ export function BilingualQuestionRow({
 
     if (sameStatement && parts) {
         return (
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3">
+            <div
+                className={
+                    sharedTable
+                        ? 'grid min-w-0 grid-cols-2 items-start gap-x-3 gap-y-1'
+                        : 'grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3'
+                }
+            >
                 <div
                     dir="ltr"
                     className="flex min-w-0 items-baseline text-left"
@@ -111,12 +121,20 @@ export function BilingualQuestionRow({
                     />
                 </div>
 
-                <div dir="ltr" className="min-w-0 max-w-[18rem] text-center">
+                <div
+                    dir="ltr"
+                    data-paper-shared-table={sharedTable || undefined}
+                    className={
+                        sharedTable
+                            ? 'col-span-2 row-start-2 min-w-0 text-center'
+                            : 'min-w-0 max-w-[18rem] text-center'
+                    }
+                >
                     <QuestionContent
                         value={sharedParts?.english ?? sameStatement}
                         verseLayout={verseLayout}
                         verseDirection="ltr"
-                        inline
+                        inline={!sharedTable}
                         className="align-baseline"
                     />
                 </div>
@@ -124,7 +142,7 @@ export function BilingualQuestionRow({
                 <div
                     dir="rtl"
                     data-paper-urdu-content
-                    className="flex min-w-0 items-baseline text-right"
+                    className={`flex min-w-0 items-baseline text-right ${sharedTable ? 'col-start-2 row-start-1' : ''}`}
                     style={{ fontFamily: 'var(--paper-urdu-font)' }}
                 >
                     <span className={indexClassName}>
@@ -168,6 +186,25 @@ export function BilingualQuestionRow({
                 />
             </div>
         );
+
+        if (sharedTable) {
+            return (
+                <div className="min-w-0 space-y-1">
+                    {question}
+                    <div
+                        dir="auto"
+                        data-paper-shared-table
+                        data-paper-urdu-content={isRtl ? true : undefined}
+                        className="min-w-0 text-center"
+                    >
+                        <QuestionContent
+                            value={sameStatement}
+                            verseLayout={verseLayout}
+                        />
+                    </div>
+                </div>
+            );
+        }
 
         return (
             <div

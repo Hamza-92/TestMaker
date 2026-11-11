@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserType;
+use App\Models\QatPaper;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -90,6 +91,31 @@ test('superadmin can delete a QAT class and all of its copied data', function ()
         expect(DB::table($table)->count())->toBe(0);
     }
     expect(DB::table('qat_catalogues')->count())->toBe(1);
+});
+
+test('deleting a QAT template requires permission and preserves saved papers', function () {
+    $admin = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => null]);
+    $delegate = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $admin->id]);
+    $customer = User::factory()->create(['user_type' => UserType::Customer]);
+    $ids = qatDeletionFixture();
+    $template = DB::table('qat_paper_templates')->value('id');
+    $paperData = ['generation_settings' => ['template_id' => $template]];
+    $paper = QatPaper::create([
+        'user_id' => $customer->id, 'name' => 'Saved practice paper', 'mode' => 'auto',
+        'class_ids' => [$ids['class']], 'paper_data' => $paperData,
+    ]);
+    $url = route('superadmin.qat-templates.destroy', $template);
+    $index = route('superadmin.qat-templates.index');
+
+    $this->actingAs($delegate)->delete($url)->assertForbidden();
+    $this->assertDatabaseHas('qat_paper_templates', ['id' => $template]);
+
+    $this->actingAs($admin)->from($index)->delete($url)
+        ->assertRedirect($index)->assertSessionHas('success', 'QAT template deleted.');
+    $this->assertDatabaseMissing('qat_paper_templates', ['id' => $template]);
+    expect($paper->fresh()?->paper_data)->toBe($paperData);
+    $this->get($index)->assertInertia(fn (Assert $page) => $page->has('templates.data', 0));
+    $this->delete($url)->assertNotFound();
 });
 
 test('superadmin can delete each nested QAT record at its own level', function (string $level, string $table) {

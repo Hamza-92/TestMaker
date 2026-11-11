@@ -499,7 +499,7 @@ function LocalizedText({
         return null;
     }
 
-    if (shared && /<table\b/i.test(shared)) {
+    if (shared && /<table\b/i.test(questionTextToHtml(shared))) {
         return (
             <div className="min-w-0 space-y-1">
                 <LocalizedText en={en} ur={ur} number={number} sideBySide />

@@ -345,6 +345,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('superadmin/qat-templates', [SuperadminQatPaperTemplateController::class, 'index'])->name('superadmin.qat-templates.index')->middleware('permission:data_transfer.manage');
         Route::post('superadmin/qat-templates', [SuperadminQatPaperTemplateController::class, 'store'])->name('superadmin.qat-templates.store')->middleware('permission:data_transfer.manage');
         Route::put('superadmin/qat-templates/{template}', [SuperadminQatPaperTemplateController::class, 'update'])->name('superadmin.qat-templates.update')->middleware('permission:data_transfer.manage');
+        Route::delete('superadmin/qat-templates/{template}', [SuperadminQatPaperTemplateController::class, 'destroy'])->whereNumber('template')->name('superadmin.qat-templates.destroy')->middleware('permission:data_transfer.manage');
         Route::get('superadmin/qat-catalogue/classes/{qatClass}', [SuperadminQatDataController::class, 'showClass'])->name('superadmin.qat-catalogue.classes.show')->middleware('permission:data_transfer.manage');
         Route::patch('superadmin/qat-catalogue/classes/{qatClass}', [SuperadminQatDataController::class, 'updateClass'])->name('superadmin.qat-catalogue.classes.update')->middleware('permission:data_transfer.manage');
         Route::delete('superadmin/qat-catalogue/classes/{qatClass}', [SuperadminQatDataController::class, 'destroyClass'])->name('superadmin.qat-catalogue.classes.destroy')->middleware('permission:data_transfer.manage');

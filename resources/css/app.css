@@ -528,6 +528,25 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 /* Rich question tables keep their authored grid after the CSS reset. */
+[data-paper-shared-table] .paper-rich-text table {
+    width: max-content !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: auto !important;
+    margin-inline: auto !important;
+}
+
+[data-paper-shared-table] .paper-rich-text :is(colgroup, col, th, td) {
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+}
+
+[data-paper-shared-table] .paper-rich-text :is(th, td) {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+}
+
 [data-print-paper] .paper-rich-text table[border]:not([border='0']) {
     border-collapse: collapse;
     border: 1px solid currentColor;
@@ -538,7 +557,10 @@ input[type='date']::-webkit-calendar-picker-indicator {
     transform: none;
 }
 
-[data-print-paper] .paper-rich-text table[border]:not([border='0']) :is(th, td) {
+[data-print-paper]
+    .paper-rich-text
+    table[border]:not([border='0'])
+    :is(th, td) {
     border: 1px solid currentColor;
     font-family: inherit;
     font-size: inherit;
@@ -546,7 +568,10 @@ input[type='date']::-webkit-calendar-picker-indicator {
     padding: 0.35em 0.3em;
 }
 
-[data-print-paper] .paper-rich-text table[border]:not([border='0']) :is(thead, tbody, tfoot, tr, th, td, strong) {
+[data-print-paper]
+    .paper-rich-text
+    table[border]:not([border='0'])
+    :is(thead, tbody, tfoot, tr, th, td, strong) {
     transform: none;
 }
 
@@ -978,9 +1003,14 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 /* Keep Federal-style fixed columns without drawing table or cell rules. */
-[data-print-paper] [data-paper-objective-table][data-paper-borderless-objectives],
-[data-print-paper] [data-paper-objective-table][data-paper-borderless-objectives] th,
-[data-print-paper] [data-paper-objective-table][data-paper-borderless-objectives] td {
+[data-print-paper]
+    [data-paper-objective-table][data-paper-borderless-objectives],
+[data-print-paper]
+    [data-paper-objective-table][data-paper-borderless-objectives]
+    th,
+[data-print-paper]
+    [data-paper-objective-table][data-paper-borderless-objectives]
+    td {
     border: 0;
 }
 
