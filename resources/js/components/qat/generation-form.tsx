@@ -386,7 +386,7 @@ export default function QatGenerationForm({
         initialSelections?.allow_repeat ?? false,
     );
     const [pastPaper, setPastPaper] = useState(
-        initialSelections?.past_paper ?? false,
+        initialSelections?.past_paper ?? true,
     );
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -486,7 +486,7 @@ export default function QatGenerationForm({
     const paperMinutes = minutes;
     const targetChapterKey = targetCoverage.map((item) => item.id).join(',');
     const monthKey = months.join(',');
-    const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}|${pastPaper}`;
+    const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
     const restoreScopeKey = useRef(questionScopeKey);
     const pendingManualChoices = useRef(
         initialSelections?.manual_questions ?? [],
@@ -906,7 +906,6 @@ export default function QatGenerationForm({
                                 ? monthKey.split(',').map(Number)
                                 : [],
                         include_questions: mode === 'manual',
-                        past_paper: pastPaper,
                     }),
                 });
                 const contentType = response.headers.get('content-type') ?? '';
@@ -990,7 +989,6 @@ export default function QatGenerationForm({
         syllabus,
         monthKey,
         mode,
-        pastPaper,
         questionScopeKey,
         poolScopeKey,
         initialSelections?.selection_method,

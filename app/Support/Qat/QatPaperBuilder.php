@@ -101,7 +101,7 @@ final class QatPaperBuilder
         return $paperData;
     }
 
-    public function questionQuery(object $subject, array $chapterIds, array $access, QatQuestionTypeRules $rules, bool $pastPaper = false): Builder
+    public function questionQuery(object $subject, array $chapterIds, array $access, QatQuestionTypeRules $rules): Builder
     {
         $topicIds = AppUserAccess::topicIds(
             $access, (int) $subject->source_pattern_id, (int) $subject->source_class_id,
@@ -119,7 +119,6 @@ final class QatPaperBuilder
             ->whereNotIn('question.question_type_id', $rules->hiddenTypeIds)
             ->where('chapter.status', true)
             ->where('question.status', true)
-            ->when($pastPaper, fn (Builder $query) => $query->where('question.is_past_qat_paper', true))
             ->where(function (Builder $query): void {
                 $query->whereNull('question.qat_topic_id')->orWhere('topic.status', true);
             })
