@@ -117,7 +117,7 @@ class QatPaperController extends Controller
             'months.*' => ['integer', 'between:1,12', 'distinct'],
             'minutes' => ['nullable', 'integer', 'between:10,240'],
             'template_id' => ['nullable', 'integer'],
-            'variants' => ['nullable', 'integer', 'between:1,4'],
+            'variants' => ['nullable', 'integer', 'between:1,2'],
             'allow_repeat' => ['nullable', 'boolean'],
             'past_paper' => ['nullable', 'boolean'],
             'sections' => ['array', 'max:20'],

@@ -379,7 +379,9 @@ export default function QatGenerationForm({
         initialSelections?.name ?? 'QAT Practice Paper',
     );
     const [minutes, setMinutes] = useState(initialSelections?.minutes ?? 40);
-    const [variants, setVariants] = useState(initialSelections?.variants ?? 1);
+    const [variants, setVariants] = useState(
+        Math.min(initialSelections?.variants ?? 1, 2),
+    );
     const [allowRepeat, setAllowRepeat] = useState(
         initialSelections?.allow_repeat ?? false,
     );
@@ -1986,29 +1988,27 @@ export default function QatGenerationForm({
                                                         Paper variants
                                                     </legend>
                                                     <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-                                                        {[1, 2, 3, 4].map(
-                                                            (count) => (
-                                                                <button
-                                                                    key={count}
-                                                                    type="button"
-                                                                    aria-pressed={
-                                                                        variants ===
-                                                                        count
-                                                                    }
-                                                                    onClick={() =>
-                                                                        setVariants(
-                                                                            count,
-                                                                        )
-                                                                    }
-                                                                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
-                                                                >
-                                                                    {count}{' '}
-                                                                    {count === 1
-                                                                        ? 'Paper'
-                                                                        : 'Papers'}
-                                                                </button>
-                                                            ),
-                                                        )}
+                                                        {[1, 2].map((count) => (
+                                                            <button
+                                                                key={count}
+                                                                type="button"
+                                                                aria-pressed={
+                                                                    variants ===
+                                                                    count
+                                                                }
+                                                                onClick={() =>
+                                                                    setVariants(
+                                                                        count,
+                                                                    )
+                                                                }
+                                                                className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
+                                                            >
+                                                                {count}{' '}
+                                                                {count === 1
+                                                                    ? 'Paper'
+                                                                    : 'Papers'}
+                                                            </button>
+                                                        ))}
                                                     </div>
                                                 </fieldset>
                                                 <label className="flex items-end gap-2 pb-2 text-sm">

@@ -301,11 +301,16 @@ test('QAT paper generation uses only selected monthly chapters and saves a print
         ->where('initialSelections.manual_questions', [['id' => $aprilQuestionId, 'marks' => 3]]));
 
     DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $aprilId, 'month' => 5]);
-    $variantSave = $saveGenerated([
+    $variantPayload = [
         'name' => 'Two variants', 'mode' => 'auto', 'class_ids' => [$classId],
         'subject_id' => $subjectId, 'syllabus' => 'qat', 'months' => [5],
         'template_id' => $templateId, 'variants' => 2,
-    ]);
+    ];
+    foreach ([3, 4] as $count) {
+        $this->actingAs($school)->postJson(route('customer.qat.papers.store'), [...$variantPayload, 'variants' => $count])
+            ->assertUnprocessable()->assertJsonValidationErrors('variants');
+    }
+    $variantSave = $saveGenerated($variantPayload);
     expect($variantSave['paper_ids'])->toHaveCount(2);
     $this->actingAs($school)->get(route('customer.qat.create', ['mode' => 'auto', 'paper' => $variantSave['paper_ids'][1]]))
         ->assertOk()->assertInertia(fn ($page) => $page

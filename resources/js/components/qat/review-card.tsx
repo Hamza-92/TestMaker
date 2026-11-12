@@ -152,8 +152,8 @@ export function QatReviewCard({
                                         />
                                         Paper variants
                                     </legend>
-                                    <div className="grid grid-cols-4 gap-1 rounded-xl border border-sky-100 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800/80">
-                                        {[1, 2, 3, 4].map((count) => (
+                                    <div className="grid grid-cols-2 gap-1 rounded-xl border border-sky-100 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800/80">
+                                        {[1, 2].map((count) => (
                                             <button
                                                 key={count}
                                                 type="button"
