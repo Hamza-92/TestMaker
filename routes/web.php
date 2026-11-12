@@ -19,6 +19,7 @@ use App\Http\Controllers\PublicPricingController;
 use App\Http\Controllers\PublicSiteMediaController;
 use App\Http\Controllers\PublicSitePageController;
 use App\Http\Controllers\QuestionImageController;
+use App\Http\Controllers\SiteSwitchController;
 use App\Http\Controllers\Superadmin\AnnouncementController;
 use App\Http\Controllers\Superadmin\AnnualReportController;
 use App\Http\Controllers\Superadmin\ArabicSubjectController;
@@ -88,7 +89,14 @@ Route::get('/site-media/{media}', [PublicSiteMediaController::class, 'show'])->n
 Route::get('question-images/{image}', [QuestionImageController::class, 'show'])
     ->whereUuid('image')->name('question-images.show');
 
+Route::get('site-switch/from-old', [SiteSwitchController::class, 'fromOld'])
+    ->name('site-switch.new.complete');
+Route::get('site-switch/prepare-from-old', [SiteSwitchController::class, 'prepareFromOld'])
+    ->name('site-switch.new.prepare');
+
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('site-switch/to-old', [SiteSwitchController::class, 'toOld'])
+        ->name('site-switch.old.start');
 
     Route::post('impersonation/stop', [CustomerController::class, 'stopImpersonation'])->name('impersonation.stop');
     Route::post('superadmin-impersonation/stop', [SuperadminUserController::class, 'stopImpersonation'])

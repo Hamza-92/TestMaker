@@ -235,7 +235,7 @@ export function CustomerHeader() {
 
             {!qatOnly && page.props.legacyWebsiteUrl && (
                 <a
-                    href={page.props.legacyWebsiteUrl}
+                    href="/site-switch/to-old"
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Visit Old Website"
