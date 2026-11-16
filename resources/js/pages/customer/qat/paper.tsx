@@ -552,7 +552,7 @@ export default function QatPaper({
                 settings: {
                     ...DEFAULT_PAPER_SETTINGS,
                     paperSize: 'A4',
-                    marginTop: 10,
+                    marginTop: 2,
                     marginRight: 10,
                     marginBottom: 10,
                     marginLeft: 10,
@@ -574,7 +574,7 @@ export default function QatPaper({
         <div className="w-full space-y-4 pb-20 print:space-y-0 print:pb-0">
             <Head title={paper.name} />
             <style>{`
-                @page { size: A4; margin: 10mm; }
+                @page { size: A4; margin: 2mm 10mm 10mm; }
                 #qat-print-sheet { font-family: "Times New Roman", Times, serif; }
                 #qat-print-sheet[lang="ur"] > header, #qat-print-sheet[lang="ur"] .qat-section-heading { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
                 #qat-print-sheet .qat-objective-question, #qat-print-sheet .qat-question .space-y-2.text-sm { font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; }
@@ -736,7 +736,7 @@ export default function QatPaper({
                                       ? 'ur'
                                       : 'en'
                             }
-                            className="min-h-[297mm] bg-white px-[10mm] py-[10mm] text-slate-900 print:min-h-0"
+                            className="min-h-[297mm] bg-white px-[10mm] pt-[2mm] pb-[10mm] text-slate-900 print:min-h-0"
                         >
                             <header className="break-inside-avoid">
                                 <div className="mb-3 flex items-center justify-center gap-3 text-center">
