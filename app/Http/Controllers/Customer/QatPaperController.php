@@ -310,6 +310,7 @@ class QatPaperController extends Controller
                 'id' => (int) $question['id'], 'marks' => (float) $question['marks'],
             ])->all(),
         ];
+        $sectionLayout = json_decode(DB::table('qat_subjects')->where('id', $subject->id)->value('paper_section_layout') ?? 'null', true);
         $papers = [];
         foreach ($prepared as $index => $sections) {
             $name = trim($data['name']).(count($prepared) > 1 ? ' — Paper '.chr(65 + $index) : '');
@@ -349,6 +350,7 @@ class QatPaperController extends Controller
                     ] : null,
                     'variant' => count($prepared) > 1 ? chr(65 + $index) : null,
                     'sections' => $sections,
+                    'section_layout' => ! empty($sectionLayout['is_active']) ? $sectionLayout : null,
                 ],
             ];
         }

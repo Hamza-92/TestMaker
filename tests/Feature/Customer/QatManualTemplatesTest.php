@@ -317,6 +317,57 @@ function addQatTypeToChapter(int $chapter, string $name, int $source, int $count
     return [$type->id, $ids];
 }
 
+test('QAT paper sections can be configured per subject and are captured on generated papers', function (string $journey) {
+    [$otherType, [$otherQuestion]] = addQatTypeToChapter($this->chapterId, 'Long Question', 100, 1);
+    [$objective] = addQatTypeToChapter($this->chapterId, 'Objective question', 110, 1);
+    QuestionType::query()->whereKey($objective)->update(['is_objective' => true]);
+    DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $this->chapterId, 'month' => 4]);
+    $scope = ['catalogue_id' => DB::table('qat_catalogues')->value('id'), 'class_id' => $this->classId, 'subject_id' => $this->subjectId];
+    $update = route('superadmin.qat-paper-sections.update', $this->subjectId);
+    $settings = [
+        'is_active' => true, 'show_objective_section' => false,
+        'objective_label_en' => 'Multiple choice', 'objective_label_ur' => 'معروضی سوالات',
+        'groups' => [[
+            'label_en' => 'Written questions', 'label_ur' => 'تحریری سوالات',
+            'question_type_ids' => [$otherType, $this->type->id],
+        ]],
+    ];
+
+    $delegate = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->admin->id]);
+    $this->actingAs($delegate)->putJson($update, $settings)->assertForbidden();
+    $this->actingAs($this->admin)->get(route('superadmin.qat-paper-sections.index', $scope))->assertOk()
+        ->assertInertia(fn ($page) => $page->component('superadmin/qat-paper-sections')
+            ->where('scope', $scope)->has('types', 2)->where('settings', null));
+    $this->putJson($update, [...$settings, 'groups' => [['question_type_ids' => [$objective]]]])
+        ->assertUnprocessable()->assertJsonValidationErrors('groups.0.question_type_ids');
+    $this->putJson($update, [...$settings, 'groups' => [...$settings['groups'], ['question_type_ids' => [$otherType]]]])
+        ->assertUnprocessable()->assertJsonValidationErrors('groups.1.question_type_ids.0');
+    $this->put($update, $settings)->assertRedirect()->assertSessionHasNoErrors();
+    $this->get(route('superadmin.qat-paper-sections.index', $scope))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('settings', $settings));
+
+    $payload = [...$this->payload,
+        'sections' => [...$this->sections, ['question_type_id' => $otherType, 'quantity' => 1, 'marks' => 3]],
+        'manual_questions' => [...$this->payload['manual_questions'], ['id' => $otherQuestion, 'marks' => 3]],
+    ];
+    if ($journey === 'auto') {
+        $payload = [...$payload, 'mode' => 'auto', 'syllabus' => 'qat', 'months' => [4], 'chapter_ids' => []];
+    }
+    if ($journey === 'manual') {
+        $payload = [...$payload, 'selection_method' => 'manual', 'sections' => []];
+    }
+    $preview = $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $payload)->assertCreated()->json('preview_url');
+    $this->get($preview)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('paper.paper_data.section_layout', $settings)->has('paper.paper_data.sections', 2)
+        ->where('paper.question_count', 3));
+    $saved = $this->postJson(route('customer.qat.previews.save', basename($preview)))->assertCreated()->json('paper_id');
+    $this->actingAs($this->admin)->put($update, [...$settings, 'is_active' => false])->assertRedirect();
+    $this->actingAs($this->school)->get(route('customer.qat.papers.show', $saved))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('paper.paper_data.section_layout', $settings));
+    $default = $this->postJson(route('customer.qat.papers.store'), $payload)->assertCreated()->json('preview_url');
+    $this->get($default)->assertOk()->assertInertia(fn ($page) => $page->where('paper.paper_data.section_layout', null));
+})->with(['manual', 'template', 'auto']);
+
 test('subject question type settings control the customer pool and templates in every month', function () {
     [$partner] = addQatTypeToChapter($this->chapterId, 'Translation', 20, 1);
     [$hidden, [$hiddenQuestion]] = addQatTypeToChapter($this->chapterId, 'Extra type', 30, 1);

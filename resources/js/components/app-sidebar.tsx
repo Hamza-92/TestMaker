@@ -163,6 +163,10 @@ export function AppSidebar() {
                               title: 'Question Types',
                               href: '/superadmin/qat-question-types',
                           },
+                          {
+                              title: 'Paper Sections',
+                              href: '/superadmin/qat-paper-sections',
+                          },
                       ],
                   },
                   {

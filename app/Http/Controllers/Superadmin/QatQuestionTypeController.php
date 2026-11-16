@@ -64,17 +64,7 @@ class QatQuestionTypeController extends Controller
 
     private function types(int $subject): Collection
     {
-        $questions = DB::table('qat_questions as question')
-            ->join('qat_chapters as chapter', 'chapter.id', '=', 'question.qat_chapter_id')
-            ->where('chapter.qat_subject_id', $subject);
-        $base = (clone $questions)->select('question.question_type_id');
-        $monthly = $questions->join('qat_month_edits as edit', 'edit.record_id', '=', 'question.id')
-            ->where('edit.kind', 'question')->whereNotNull('edit.question_type_id')->select('edit.question_type_id');
-        $available = DB::query()->fromSub($base->union($monthly), 'available');
-
-        return $available->leftJoin('question_types as type', 'type.id', '=', 'available.question_type_id')
-            ->orderByDesc('type.is_objective')->orderBy('type.name')->orderBy('available.question_type_id')
-            ->get(['available.question_type_id as id', 'type.name'])
+        return QatQuestionTypeRules::availableTypes($subject)
             ->map(fn ($row) => ['id' => (int) $row->id, 'name' => $row->name ?: 'Question type '.$row->id]);
     }
 }

@@ -136,6 +136,21 @@ type PaperSection = {
     questions: PaperQuestion[];
 };
 
+type PaperSectionGroup = {
+    label_en?: string | null;
+    label_ur?: string | null;
+    sections: PaperSection[];
+};
+
+type PaperSectionLayout = {
+    show_objective_section: boolean;
+    objective_label_en?: string | null;
+    objective_label_ur?: string | null;
+    groups: (Pick<PaperSectionGroup, 'label_en' | 'label_ur'> & {
+        question_type_ids: number[];
+    })[];
+};
+
 type QatPaperView = {
     id: number | null;
     name: string;
@@ -158,6 +173,7 @@ type QatPaperView = {
             chapter_number: number | null;
         }[];
         sections: PaperSection[];
+        section_layout?: PaperSectionLayout | null;
     };
 };
 
@@ -238,20 +254,81 @@ function romanSection(number: number): string {
 
 function QatSectionHeading({
     number,
-    urdu,
+    medium,
+    labelEnglish,
+    labelUrdu,
 }: {
     number: number;
-    urdu: boolean;
+    medium: QatMedium;
+    labelEnglish?: string | null;
+    labelUrdu?: string | null;
 }) {
+    const numeral = romanSection(number);
+    const showUrdu =
+        medium === 'Urdu' ||
+        (medium === 'Both' && Boolean(labelEnglish || labelUrdu));
+
     return (
         <h2
             data-paper-heading
             data-paper-section-heading
-            className="qat-section-heading break-after-avoid text-center text-sm font-bold"
+            className="qat-section-heading flex break-after-avoid flex-wrap items-baseline justify-center gap-x-3 text-center text-sm font-bold"
         >
-            {urdu ? 'حصہ' : 'Section'} <bdi>{romanSection(number)}</bdi>
+            {medium !== 'Urdu' && (
+                <span dir="ltr" lang="en">
+                    {labelEnglish || (
+                        <>
+                            Section <bdi>{numeral}</bdi>
+                        </>
+                    )}
+                </span>
+            )}
+            {showUrdu && (
+                <span dir="rtl" lang="ur">
+                    {labelUrdu || (
+                        <>
+                            حصہ <bdi>{numeral}</bdi>
+                        </>
+                    )}
+                </span>
+            )}
         </h2>
     );
+}
+
+function groupSubjectiveSections(
+    sections: PaperSection[],
+    layout?: PaperSectionLayout | null,
+): PaperSectionGroup[] {
+    if (!layout) {
+        return sections.map((section) => ({ sections: [section] }));
+    }
+
+    const unassigned = new Set(sections);
+    const groups: PaperSectionGroup[] = [];
+
+    for (const group of layout.groups) {
+        const members = sections.filter(
+            (section) =>
+                unassigned.has(section) &&
+                group.question_type_ids.includes(section.question_type_id),
+        );
+
+        if (members.length) {
+            members.forEach((section) => unassigned.delete(section));
+            groups.push({
+                label_en: group.label_en,
+                label_ur: group.label_ur,
+                sections: members,
+            });
+        }
+    }
+
+    if (unassigned.size > 0) {
+        groups.push({ sections: [...unassigned] });
+    }
+
+    return groups;
 }
 
 function QatTypeHeading({
@@ -441,6 +518,22 @@ export default function QatPaper({
     const objectiveQuestions = objectiveSections.flatMap(
         (section) => section.questions,
     );
+    const sectionLayout = paper.paper_data.section_layout;
+    const showObjectiveHeading =
+        objectiveQuestions.length > 0 &&
+        sectionLayout?.show_objective_section !== false;
+    const subjectiveGroups = groupSubjectiveSections(
+        subjectiveSections,
+        sectionLayout,
+    );
+    const subjectiveTypeNumbers = new Map(
+        subjectiveGroups
+            .flatMap(({ sections }) => sections)
+            .map((section, index) => [
+                section,
+                objectiveSections.length + index + 1,
+            ]),
+    );
     const hasObjectiveOptions =
         objectiveQuestions.length > 0 ||
         subjectiveSections.some((section) =>
@@ -577,6 +670,7 @@ export default function QatPaper({
                 @page { size: A4; margin: 2mm 10mm 10mm; }
                 #qat-print-sheet { font-family: "Times New Roman", Times, serif; }
                 #qat-print-sheet[lang="ur"] > header, #qat-print-sheet[lang="ur"] .qat-section-heading { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
+                #qat-print-sheet .qat-section-heading [lang="ur"] { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
                 #qat-print-sheet .qat-objective-question, #qat-print-sheet .qat-question .space-y-2.text-sm { font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; }
                 #qat-print-sheet .qat-question [lang="ur"], #qat-print-sheet .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${qatQuestionSize * qatUrduMetrics.sizeScale}px !important; line-height: ${qatQuestionLineHeight * qatUrduMetrics.lineHeightScale} !important; }
                 #qat-print-sheet .qat-question [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
@@ -736,7 +830,7 @@ export default function QatPaper({
                                       ? 'ur'
                                       : 'en'
                             }
-                            className="min-h-[297mm] bg-white px-[10mm] pt-[2mm] pb-[10mm] text-slate-900 print:min-h-0"
+                            className="min-h-[297mm] bg-white px-[10mm] pb-[10mm] pt-[2mm] text-slate-900 print:min-h-0"
                         >
                             <header className="break-inside-avoid">
                                 <div className="mb-3 flex items-center justify-center gap-3 text-center">
@@ -877,10 +971,18 @@ export default function QatPaper({
                             <div className="mt-3 space-y-3">
                                 {objectiveQuestions.length > 0 && (
                                     <section>
-                                        <QatSectionHeading
-                                            number={1}
-                                            urdu={urduPaper}
-                                        />
+                                        {showObjectiveHeading && (
+                                            <QatSectionHeading
+                                                number={1}
+                                                medium={medium}
+                                                labelEnglish={
+                                                    sectionLayout?.objective_label_en
+                                                }
+                                                labelUrdu={
+                                                    sectionLayout?.objective_label_ur
+                                                }
+                                            />
+                                        )}
                                         <div className="mt-2 space-y-4">
                                             {objectiveSections.map(
                                                 (section, sectionIndex) => {
@@ -953,57 +1055,70 @@ export default function QatPaper({
                                         </div>
                                     </section>
                                 )}
-                                {subjectiveSections.map(
-                                    (section, sectionIndex) => {
-                                        const sectionNumber =
-                                            sectionIndex +
-                                            (objectiveQuestions.length ? 2 : 1);
-
-                                        return (
-                                            <section
-                                                key={`${section.question_type_id}-${sectionIndex}`}
-                                            >
-                                                <QatSectionHeading
-                                                    urdu={urduPaper}
-                                                    number={sectionNumber}
-                                                />
-                                                <QatTypeHeading
-                                                    medium={medium}
-                                                    section={section}
-                                                    number={
-                                                        objectiveSections.length +
-                                                        sectionIndex +
-                                                        1
+                                {subjectiveGroups.map((group, index) => (
+                                    <section
+                                        key={group.sections[0].question_type_id}
+                                    >
+                                        <QatSectionHeading
+                                            medium={medium}
+                                            number={
+                                                index +
+                                                (showObjectiveHeading ? 2 : 1)
+                                            }
+                                            labelEnglish={group.label_en}
+                                            labelUrdu={group.label_ur}
+                                        />
+                                        <div className="space-y-3">
+                                            {group.sections.map((section) => (
+                                                <div
+                                                    key={
+                                                        section.question_type_id
                                                     }
-                                                />
-                                                <div className="mt-2 space-y-2">
-                                                    {section.questions.map(
-                                                        (question, index) => (
-                                                            <QatPaperQuestion
-                                                                medium={medium}
-                                                                key={
-                                                                    question.id
-                                                                }
-                                                                question={
-                                                                    question
-                                                                }
-                                                                number={romanSection(
-                                                                    index + 1,
-                                                                ).toLowerCase()}
-                                                                showAnswers={
-                                                                    showAnswers
-                                                                }
-                                                                objectiveSettings={
-                                                                    objectiveSettings
-                                                                }
-                                                            />
-                                                        ),
-                                                    )}
+                                                >
+                                                    <QatTypeHeading
+                                                        medium={medium}
+                                                        section={section}
+                                                        number={
+                                                            subjectiveTypeNumbers.get(
+                                                                section,
+                                                            )!
+                                                        }
+                                                    />
+                                                    <div className="mt-2 space-y-2">
+                                                        {section.questions.map(
+                                                            (
+                                                                question,
+                                                                index,
+                                                            ) => (
+                                                                <QatPaperQuestion
+                                                                    medium={
+                                                                        medium
+                                                                    }
+                                                                    key={
+                                                                        question.id
+                                                                    }
+                                                                    question={
+                                                                        question
+                                                                    }
+                                                                    number={romanSection(
+                                                                        index +
+                                                                            1,
+                                                                    ).toLowerCase()}
+                                                                    showAnswers={
+                                                                        showAnswers
+                                                                    }
+                                                                    objectiveSettings={
+                                                                        objectiveSettings
+                                                                    }
+                                                                />
+                                                            ),
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </section>
-                                        );
-                                    },
-                                )}
+                                            ))}
+                                        </div>
+                                    </section>
+                                ))}
                             </div>
                         </article>
                     </div>

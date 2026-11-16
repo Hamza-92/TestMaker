@@ -2,6 +2,7 @@
 
 namespace App\Support\Qat;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -34,6 +35,21 @@ final class QatQuestionTypeRules
     public static function forSubject(int $subject): self
     {
         return new self(DB::table('qat_subjects')->where('id', $subject)->value('question_type_rules'));
+    }
+
+    public static function availableTypes(int $subject): Collection
+    {
+        $questions = DB::table('qat_questions as question')
+            ->join('qat_chapters as chapter', 'chapter.id', '=', 'question.qat_chapter_id')
+            ->where('chapter.qat_subject_id', $subject);
+        $base = (clone $questions)->select('question.question_type_id');
+        $monthly = $questions->join('qat_month_edits as edit', 'edit.record_id', '=', 'question.id')
+            ->where('edit.kind', 'question')->whereNotNull('edit.question_type_id')->select('edit.question_type_id');
+
+        return DB::query()->fromSub($base->union($monthly), 'available')
+            ->leftJoin('question_types as type', 'type.id', '=', 'available.question_type_id')
+            ->orderByDesc('type.is_objective')->orderBy('type.name')->orderBy('available.question_type_id')
+            ->get(['available.question_type_id as id', 'type.name', 'type.is_objective']);
     }
 
     public function partner(int $type): ?int
