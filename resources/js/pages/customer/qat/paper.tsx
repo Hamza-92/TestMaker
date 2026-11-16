@@ -11,6 +11,7 @@ import {
     Loader2Icon,
     PrinterIcon,
     SaveIcon,
+    SlidersHorizontalIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/tm';
@@ -19,38 +20,24 @@ import { useCustomerSidebar } from '@/layouts/customer/customer-layout';
 import { QuestionContent } from '../papers/paper-layouts/questions/question-content';
 import {
     DEFAULT_PAPER_SETTINGS,
+    getPageDimensions,
     PAPER_URDU_FONT_METRICS,
 } from '../papers/paper-layouts/types';
+import {
+    loadQatObjectiveSettings,
+    loadQatPaperSettings,
+    qatEnglishFonts,
+    QatObjectiveControls,
+    QatPaperSettingsDrawer,
+    qatUrduFonts,
+    storeQatObjectiveSettings,
+    storeQatPaperSettings,
+} from './paper-settings';
 import { QatObjectiveQuestion, QatQuestionContent } from './question';
 import type { QatMedium, QatObjectiveSettings, QatQuestion } from './question';
 
 const toolbarHoverClass =
     'border border-sky-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/10 dark:hover:text-brand-300';
-
-const objectiveLayouts = [
-    { value: 'beside', label: 'Beside the statement' },
-    { value: 'four-per-row', label: 'Four options per row below' },
-    { value: 'two-per-row', label: 'Two options per row below' },
-] as const;
-const objectiveSettingsKey = 'qat-objective-settings';
-
-function loadObjectiveSettings(): QatObjectiveSettings {
-    try {
-        const stored = JSON.parse(
-            localStorage.getItem(objectiveSettingsKey) ?? '{}',
-        );
-
-        return {
-            layout:
-                objectiveLayouts.find(
-                    (option) => option.value === stored?.layout,
-                )?.value ?? 'beside',
-            borders: stored?.borders !== false,
-        };
-    } catch {
-        return { layout: 'beside', borders: true };
-    }
-}
 
 function QatObjectiveLayoutMenu({
     settings,
@@ -78,43 +65,7 @@ function QatObjectiveLayoutMenu({
                 anchor={{ to: 'bottom end', gap: 8, padding: 12 }}
                 className="z-50 w-64 max-w-[calc(100vw-1.5rem)] rounded-xl border border-sky-200 bg-white p-2 text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 print:hidden"
             >
-                <fieldset>
-                    <legend className="sr-only">
-                        Objective option placement
-                    </legend>
-                    {objectiveLayouts.map(({ value, label }) => (
-                        <label
-                            key={value}
-                            className={`flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-sky-50 dark:hover:bg-slate-800 ${settings.layout === value ? 'bg-violet-50 font-semibold text-violet-800 dark:bg-violet-950/50 dark:text-violet-200' : ''}`}
-                        >
-                            <input
-                                type="radio"
-                                name="qat-objective-layout"
-                                value={value}
-                                checked={settings.layout === value}
-                                onChange={() =>
-                                    onChange({ ...settings, layout: value })
-                                }
-                                className="size-4 shrink-0 accent-violet-600"
-                            />
-                            {label}
-                        </label>
-                    ))}
-                </fieldset>
-                <label
-                    htmlFor="qat-option-borders"
-                    className="mt-2 flex cursor-pointer items-center justify-between gap-2 border-t border-sky-100 px-3 pb-1 pt-3 text-sm font-medium dark:border-slate-700"
-                >
-                    Option borders
-                    <Switch
-                        id="qat-option-borders"
-                        checked={settings.borders}
-                        onCheckedChange={(borders) =>
-                            onChange({ ...settings, borders })
-                        }
-                        className="data-[state=checked]:bg-violet-600"
-                    />
-                </label>
+                <QatObjectiveControls settings={settings} onChange={onChange} />
             </PopoverPanel>
         </Popover>
     );
@@ -181,10 +132,6 @@ type SchoolDetails = {
     name: string;
     logo: string | null;
 };
-
-const qatQuestionSize = DEFAULT_PAPER_SETTINGS.questionSize;
-const qatQuestionLineHeight = DEFAULT_PAPER_SETTINGS.questionLineHeight;
-const qatUrduMetrics = PAPER_URDU_FONT_METRICS[DEFAULT_PAPER_SETTINGS.urduFont];
 
 function csrf(): string {
     return (
@@ -489,10 +436,25 @@ export default function QatPaper({
     const [saving, setSaving] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [showAnswers, setShowAnswers] = useState(showAnswerKey);
+    const [paperSettings, setPaperSettings] = useState(loadQatPaperSettings);
     const [objectiveSettings, setObjectiveSettings] = useState(
-        loadObjectiveSettings,
+        loadQatObjectiveSettings,
     );
     const [actionError, setActionError] = useState('');
+    const { width, height } = getPageDimensions(
+        paperSettings.paperSize,
+        paperSettings.orientation,
+    );
+    const pageMargins = `${paperSettings.marginTop}mm ${paperSettings.marginRight}mm ${paperSettings.marginBottom}mm ${paperSettings.marginLeft}mm`;
+    const englishFont = qatEnglishFonts[paperSettings.englishFont].family;
+    const urduFont = qatUrduFonts[paperSettings.urduFont].family;
+    const urduMetrics = PAPER_URDU_FONT_METRICS[paperSettings.urduFont];
+    const {
+        questionSize,
+        questionLineHeight,
+        headingSize,
+        sectionHeadingSize,
+    } = paperSettings;
     const paperVariants = variants.length ? variants : [initialPaper];
     const paper = paperVariants[activeVariant] ?? initialPaper;
     const medium = paper.paper_data.medium ?? 'Both';
@@ -620,6 +582,11 @@ export default function QatPaper({
         }
     }
 
+    function changeObjectiveSettings(settings: QatObjectiveSettings) {
+        setObjectiveSettings(settings);
+        storeQatObjectiveSettings(settings);
+    }
+
     async function downloadPdf() {
         if (downloading) {
             return;
@@ -635,21 +602,11 @@ export default function QatPaper({
         setActionError('');
 
         try {
-            const [{ downloadPaperPdf }, { DEFAULT_PAPER_SETTINGS }] =
-                await Promise.all([
-                    import('../papers/paper-layouts/download-paper-pdf'),
-                    import('../papers/paper-layouts/types'),
-                ]);
+            const { downloadPaperPdf } =
+                await import('../papers/paper-layouts/download-paper-pdf');
             await downloadPaperPdf({
                 papers: [sheet],
-                settings: {
-                    ...DEFAULT_PAPER_SETTINGS,
-                    paperSize: 'A4',
-                    marginTop: 2,
-                    marginRight: 10,
-                    marginBottom: 10,
-                    marginLeft: 10,
-                },
+                settings: { ...DEFAULT_PAPER_SETTINGS, ...paperSettings },
                 name: paper.name,
             });
         } catch (error) {
@@ -667,25 +624,24 @@ export default function QatPaper({
         <div className="w-full space-y-4 pb-20 print:space-y-0 print:pb-0">
             <Head title={paper.name} />
             <style>{`
-                @page { size: A4; margin: 2mm 10mm 10mm; }
-                #qat-print-sheet { font-family: "Times New Roman", Times, serif; }
-                #qat-print-sheet[lang="ur"] > header, #qat-print-sheet[lang="ur"] .qat-section-heading { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
-                #qat-print-sheet .qat-section-heading [lang="ur"] { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif; }
-                #qat-print-sheet .qat-objective-question, #qat-print-sheet .qat-question .space-y-2.text-sm { font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; }
-                #qat-print-sheet .qat-question [lang="ur"], #qat-print-sheet .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${qatQuestionSize * qatUrduMetrics.sizeScale}px !important; line-height: ${qatQuestionLineHeight * qatUrduMetrics.lineHeightScale} !important; }
-                #qat-print-sheet .qat-question [lang="ur"] { transform: translateY(${qatUrduMetrics.verticalOffsetEm}em); }
-                #qat-print-sheet .qat-question-number { font-family: "Times New Roman", Times, serif; font-size: ${qatQuestionSize}px; line-height: ${qatQuestionLineHeight}; transform: none; }
-                #qat-print-sheet .qat-section-heading { font-size: ${DEFAULT_PAPER_SETTINGS.sectionHeadingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.sectionHeadingLineHeight}; }
-                #qat-print-sheet .qat-type-heading { font-size: ${DEFAULT_PAPER_SETTINGS.headingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                #qat-print-sheet .qat-type-heading [lang="ur"], #qat-print-sheet .qat-type-heading [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: "Jameel Noori Nastaleeq", "Urdu Typesetting", "Noto Nastaliq Urdu", serif !important; font-size: ${DEFAULT_PAPER_SETTINGS.headingSize * qatUrduMetrics.sizeScale}px !important; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight * qatUrduMetrics.lineHeightScale} !important; }
-                #qat-print-sheet .paper-rich-text img, #qat-print-sheet .qat-objective-question img { max-width: 100%; height: auto; }
-                #qat-print-sheet .qat-objective-options .paper-rich-text img { display: inline-block; vertical-align: middle; break-inside: avoid; }
+                @page { size: ${width}mm ${height}mm; margin: ${pageMargins}; }
+                [data-qat-sheet] { font-family: ${englishFont}; }
+                [data-qat-sheet][lang="ur"] > header, [data-qat-sheet][lang="ur"] .qat-section-heading, [data-qat-sheet] .qat-section-heading [lang="ur"] { font-family: ${urduFont}; }
+                [data-qat-sheet] .qat-objective-question, [data-qat-sheet] .qat-question .space-y-2.text-sm { font-size: ${questionSize}px; line-height: ${questionLineHeight}; }
+                [data-qat-sheet] .qat-question [lang="ur"], [data-qat-sheet] .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: ${urduFont} !important; font-size: ${questionSize * urduMetrics.sizeScale}px !important; line-height: ${questionLineHeight * urduMetrics.lineHeightScale} !important; }
+                [data-qat-sheet] .qat-question [lang="ur"] { transform: translateY(${urduMetrics.verticalOffsetEm}em); }
+                [data-qat-sheet] .qat-question-number { font-family: ${englishFont}; font-size: ${questionSize}px; line-height: ${questionLineHeight}; transform: none; }
+                [data-qat-sheet] .qat-section-heading { font-size: ${sectionHeadingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.sectionHeadingLineHeight}; }
+                [data-qat-sheet] .qat-type-heading { font-size: ${headingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                [data-qat-sheet] .qat-type-heading [lang="ur"], [data-qat-sheet] .qat-type-heading [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: ${urduFont} !important; font-size: ${headingSize * urduMetrics.sizeScale}px !important; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight * urduMetrics.lineHeightScale} !important; }
+                [data-qat-sheet] .paper-rich-text img, [data-qat-sheet] .qat-objective-question img { max-width: 100%; height: auto; }
+                [data-qat-sheet] .qat-objective-options .paper-rich-text img { display: inline-block; vertical-align: middle; break-inside: avoid; }
                 [data-qat-correct-option] { background-color: #dcfce7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 @media print {
                     body * { visibility: hidden !important; }
-                    #qat-print-sheet, #qat-print-sheet * { visibility: visible !important; }
-                    #qat-print-sheet { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; }
-                    #qat-print-sheet .qat-question { break-inside: avoid; page-break-inside: avoid; }
+                    [data-qat-sheet], [data-qat-sheet] * { visibility: visible !important; }
+                    [data-qat-sheet] { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; }
+                    [data-qat-sheet] .qat-question { break-inside: avoid; page-break-inside: avoid; }
                 }
             `}</style>
             <div
@@ -712,21 +668,36 @@ export default function QatPaper({
                     ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    <QatPaperSettingsDrawer
+                        trigger={
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className={`h-10 rounded-lg ${toolbarHoverClass}`}
+                            >
+                                <SlidersHorizontalIcon
+                                    aria-hidden="true"
+                                    className="text-brand-500"
+                                />
+                                Settings
+                            </Button>
+                        }
+                        medium={medium}
+                        settings={paperSettings}
+                        onChange={(settings) => {
+                            setPaperSettings(settings);
+                            storeQatPaperSettings(settings);
+                        }}
+                        objectiveSettings={
+                            hasObjectiveOptions ? objectiveSettings : undefined
+                        }
+                        onObjectiveChange={changeObjectiveSettings}
+                    />
                     {hasObjectiveOptions && (
                         <QatObjectiveLayoutMenu
                             settings={objectiveSettings}
-                            onChange={(settings) => {
-                                setObjectiveSettings(settings);
-
-                                try {
-                                    localStorage.setItem(
-                                        objectiveSettingsKey,
-                                        JSON.stringify(settings),
-                                    );
-                                } catch {
-                                    // The current paper still uses the selected settings.
-                                }
-                            }}
+                            onChange={changeObjectiveSettings}
                         />
                     )}
                     <label
@@ -810,7 +781,7 @@ export default function QatPaper({
                         Paper preview
                     </h2>
                     <span className="rounded-md border border-sky-100 bg-white/80 px-2 py-1 text-[11px] font-semibold text-brand-600 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300">
-                        A4 · {variantLabel}
+                        {paperSettings.paperSize} · {variantLabel}
                     </span>
                 </div>
                 <div
@@ -819,9 +790,13 @@ export default function QatPaper({
                     tabIndex={0}
                     className="overflow-x-auto p-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 sm:p-6 print:overflow-visible print:p-0"
                 >
-                    <div className="mx-auto w-[210mm] shrink-0 overflow-hidden bg-white shadow-sm print:w-full print:overflow-visible print:shadow-none">
+                    <div
+                        className="mx-auto shrink-0 overflow-hidden bg-white shadow-sm print:!w-full print:overflow-visible print:shadow-none"
+                        style={{ width: `${width}mm` }}
+                    >
                         <article
                             id="qat-print-sheet"
+                            data-qat-sheet=""
                             dir={urduPaper ? 'rtl' : 'ltr'}
                             lang={
                                 medium === 'Both'
@@ -830,7 +805,11 @@ export default function QatPaper({
                                       ? 'ur'
                                       : 'en'
                             }
-                            className="min-h-[297mm] bg-white px-[10mm] pb-[10mm] pt-[2mm] text-slate-900 print:min-h-0"
+                            className="bg-white text-slate-900"
+                            style={{
+                                minHeight: `${height}mm`,
+                                padding: pageMargins,
+                            }}
                         >
                             <header className="break-inside-avoid">
                                 <div className="mb-3 flex items-center justify-center gap-3 text-center">
