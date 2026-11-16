@@ -115,7 +115,7 @@ const objectiveLayouts = [
 ] as const;
 
 export const defaultQatObjectiveSettings: QatObjectiveSettings = {
-    layout: 'beside',
+    layout: 'two-per-row',
     borders: true,
 };
 
