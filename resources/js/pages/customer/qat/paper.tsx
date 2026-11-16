@@ -961,7 +961,7 @@ export default function QatPaper({
                                                 <div className="flex items-start gap-2">
                                                     <span className="shrink-0 font-bold">
                                                         {urduPaper
-                                                            ? 'ابواب:'
+                                                            ? 'اسباق:'
                                                             : 'Chapters:'}
                                                     </span>
                                                     <div
