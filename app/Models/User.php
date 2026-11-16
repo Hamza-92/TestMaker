@@ -24,6 +24,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'school_name', 'logo',
     'user_type', 'school_id', 'status', 'account_type', 'created_by',
     'teacher_permissions', 'access_scope', 'teacher_expires_on',
+    'qat_trial_ends_on',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
@@ -44,6 +45,8 @@ class User extends Authenticatable
             'teacher_permissions' => 'array',
             'access_scope' => 'array',
             'teacher_expires_on' => 'date',
+            'qat_trial_ends_on' => 'date',
+            'qat_trial_papers_used' => 'integer',
             'payment_hold_at' => 'datetime',
         ];
     }

@@ -5,6 +5,7 @@ import {
     useEffect,
     useState,
 } from 'react';
+import { QatTrialBanner } from '@/components/qat/trial-status';
 import { CustomerHeader } from './customer-header';
 import { CustomerSidebar } from './customer-sidebar';
 
@@ -77,6 +78,7 @@ export default function CustomerLayout({
                         data-customer-content
                         className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6"
                     >
+                        <QatTrialBanner />
                         {children}
                     </main>
                 </div>

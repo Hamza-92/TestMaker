@@ -15,6 +15,10 @@ final class QatAccess
 {
     public static function only(User $user): bool
     {
+        if (QatTrial::school($user) !== null) {
+            return true;
+        }
+
         $owner = $user->schoolOwner();
         if ($owner?->account_type !== AccountType::Paid) {
             return false;

@@ -10,6 +10,7 @@ use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Qat\QatPaperBuilder;
 use App\Support\Qat\QatQuestionTypeRules;
+use App\Support\Qat\QatTrial;
 use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -356,16 +357,23 @@ class QatPaperController extends Controller
         }
 
         $preview = (string) Str::uuid();
-        SubscriptionQuestionQuota::charge(
-            $user,
-            'qat_'.$preview,
-            collect($prepared)->sum(fn ($sections) => collect($sections)
-                ->sum(fn ($section) => collect($section['questions'])->sum(fn ($question) => isset($question['or_question']) ? 2 : 1))),
-        );
+        $trialSchool = QatTrial::school($user);
+        $finalTrialPreview = false;
+        if ($trialSchool !== null) {
+            $finalTrialPreview = QatTrial::charge($trialSchool, count($papers));
+        } else {
+            SubscriptionQuestionQuota::charge(
+                $user,
+                'qat_'.$preview,
+                collect($prepared)->sum(fn ($sections) => collect($sections)
+                    ->sum(fn ($section) => collect($section['questions'])->sum(fn ($question) => isset($question['or_question']) ? 2 : 1))),
+            );
+        }
         $request->session()->put('qat_preview', [
             'id' => $preview,
             'user_id' => (int) $user->id,
             'papers' => $papers,
+            'trial_final' => $finalTrialPreview,
         ]);
 
         return response()->json([
@@ -376,13 +384,17 @@ class QatPaperController extends Controller
     public function preview(Request $request, string $preview, QatPaperBuilder $builder): Response
     {
         $papers = $this->previewPapers($request, $preview);
+        $finalTrialPreview = $request->session()->get('qat_preview.trial_final', false)
+            && QatTrial::school($request->user()) !== null;
         $papers = array_map(fn ($paper) => [...$paper, 'paper_data' => $builder->withChapters($builder->withObjectiveAnswers($paper['paper_data']))], $papers);
 
         return Inertia::render('customer/qat/paper', [
             'paper' => $papers[0],
             'variants' => $papers,
             'previewId' => $preview,
-            'backUrl' => route('customer.qat.create', ['mode' => $papers[0]['mode'], 'preview' => $preview]),
+            'backUrl' => $finalTrialPreview ? route('customer.qat.upgrade')
+                : route('customer.qat.create', ['mode' => $papers[0]['mode'], 'preview' => $preview]),
+            'finalTrialPreview' => $finalTrialPreview,
             'schoolDetails' => $this->schoolDetails($request),
         ]);
     }
@@ -390,6 +402,8 @@ class QatPaperController extends Controller
     public function savePreview(Request $request, string $preview): JsonResponse
     {
         $papers = $this->previewPapers($request, $preview);
+        $finalTrialPreview = $request->session()->get('qat_preview.trial_final', false)
+            && QatTrial::school($request->user()) !== null;
         $userId = (int) $request->user()->id;
         $saved = DB::transaction(fn () => array_map(function (array $paper) use ($userId): QatPaper {
             return QatPaper::create([
@@ -410,6 +424,7 @@ class QatPaperController extends Controller
             'paper_id' => $saved[0]->id,
             'paper_ids' => array_map(fn (QatPaper $paper) => $paper->id, $saved),
             'paper_url' => route('customer.qat.papers.show', $saved[0]),
+            'stay_on_preview' => $finalTrialPreview,
         ], 201);
     }
 

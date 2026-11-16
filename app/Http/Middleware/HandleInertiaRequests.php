@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Enums\TeacherPermission;
 use App\Models\User;
 use App\Support\Qat\QatAccess;
+use App\Support\Qat\QatTrial;
 use App\Support\SchoolTeacherSummary;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -42,6 +43,7 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $schoolContext = $this->schoolContext($user);
         $qatOnly = $schoolContext['qat_only'] ?? false;
+        $trialLocked = $schoolContext['qat_trial']['locked'] ?? false;
 
         return [
             ...parent::share($request),
@@ -49,6 +51,7 @@ class HandleInertiaRequests extends Middleware
             'legacyWebsiteUrl' => $qatOnly ? null : config('app.legacy_website_url'),
             'qatSavedPaperCount' => fn () => $user !== null
                 && $qatOnly
+                && ! $trialLocked
                 && ($user->isSchoolOwner() || $user->hasTeacherPermission(TeacherPermission::GeneratePapers->value))
                     ? QatAccess::savedPapers($user)->count()
                     : null,
@@ -88,6 +91,7 @@ class HandleInertiaRequests extends Middleware
         }
 
         $subscription = $user->activeSchoolSubscription();
+        $trialSchool = QatTrial::school($user);
         $teacherCount = $user->isTeacher() ? 1 : SchoolTeacherSummary::for($user)['total'];
 
         return [
@@ -95,7 +99,8 @@ class HandleInertiaRequests extends Middleware
             'is_owner' => $user->isSchoolOwner(),
             'allow_teachers' => (bool) ($subscription?->allow_teachers ?? false),
             'allow_online_mcq_tests' => (bool) ($subscription?->allow_online_mcq_tests ?? false),
-            'allow_qat_tests' => (bool) ($subscription?->allow_qat_tests ?? false),
+            'allow_qat_tests' => $trialSchool !== null || (bool) ($subscription?->allow_qat_tests ?? false),
+            'qat_trial' => $trialSchool ? QatTrial::summary($trialSchool) : null,
             'qat_only' => QatAccess::only($user),
             'max_teachers' => $user->isSchoolOwner() ? $subscription?->max_teachers : null,
             'teachers_used' => $teacherCount,

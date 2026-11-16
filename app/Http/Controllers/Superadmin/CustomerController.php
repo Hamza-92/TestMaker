@@ -11,6 +11,7 @@ use App\Models\PaymentLog;
 use App\Models\TrialSetting;
 use App\Models\User;
 use App\Support\CustomerAccess;
+use App\Support\Qat\QatTrial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -61,7 +62,7 @@ class CustomerController extends Controller
             ])
             ->orderByRaw('COALESCE(updated_at, created_at) DESC')
             ->orderByDesc('id')
-            ->get(['id', 'name', 'email', 'phone', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at', 'updated_at', 'created_by'])
+            ->get(['id', 'name', 'email', 'phone', 'school_name', 'logo', 'city', 'province', 'status', 'account_type', 'created_at', 'updated_at', 'created_by', 'qat_trial_ends_on'])
             ->map(function (User $customer) use ($today, $todayStr, $nearExpiryThresholdDays, $trialDurationDays, $currentUserId) {
                 $activeSubscription = $customer->subscriptions->first(
                     fn ($subscription) => $subscription->status?->value === 'active'
@@ -70,7 +71,7 @@ class CustomerController extends Controller
                 $subscription = $activeSubscription ?? $customer->subscriptions->first();
                 $subscriptionStatus = $subscription?->status?->value;
                 $trialExpiresAt = $subscription === null && $customer->account_type === AccountType::Trial
-                    ? $customer->created_at?->copy()->addDays($trialDurationDays)
+                    ? ($customer->qat_trial_ends_on ?? $customer->created_at?->copy()->addDays($trialDurationDays))
                     : null;
                 $expiresAt = $subscription?->expired_at ?? $trialExpiresAt;
                 $daysToExpiry = $expiresAt
@@ -250,12 +251,16 @@ class CustomerController extends Controller
 
         return Inertia::render('superadmin/customers/edit', [
             'allowedAccountTypes' => $this->allowedAccountTypes(auth()->user()),
-            'customer' => $customer->only([
-                'id', 'name', 'email', 'phone',
-                'school_name', 'logo',
-                'address', 'city', 'province', 'is_show_address',
-                'status', 'account_type',
-            ]),
+            'qatTrialPaperLimit' => QatTrial::LIMIT,
+            'customer' => [
+                ...$customer->only([
+                    'id', 'name', 'email', 'phone',
+                    'school_name', 'logo',
+                    'address', 'city', 'province', 'is_show_address',
+                    'status', 'account_type',
+                ]),
+                'qat_trial_ends_on' => $customer->qat_trial_ends_on?->toDateString(),
+            ],
         ]);
     }
 
@@ -265,6 +270,7 @@ class CustomerController extends Controller
 
         return Inertia::render('superadmin/customers/add', [
             'allowedAccountTypes' => $allowedAccountTypes,
+            'qatTrialPaperLimit' => QatTrial::LIMIT,
             'preferredAccountType' => in_array($request->query('account_type'), $allowedAccountTypes, true)
                 ? $request->query('account_type')
                 : $allowedAccountTypes[0],
@@ -280,6 +286,7 @@ class CustomerController extends Controller
             'password' => ['required', 'string', 'min:3', 'confirmed'],
             'status' => ['required', 'in:active,inactive,suspended'],
             'account_type' => ['required', 'in:trial,paid'],
+            'qat_trial_ends_on' => ['exclude_unless:account_type,trial', 'nullable', 'date_format:Y-m-d'],
             'school_name' => ['nullable', 'string', 'max:255'],
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -308,6 +315,7 @@ class CustomerController extends Controller
                 'email' => $customer->email,
                 'phone' => $customer->phone,
                 'status' => $customer->status->value,
+                'qat_trial_ends_on' => $customer->qat_trial_ends_on?->toDateString(),
             ],
             actor: auth()->user(),
             notes: 'Customer account created.',
@@ -327,6 +335,7 @@ class CustomerController extends Controller
             'phone' => ['required', 'string', 'max:30'],
             'status' => ['required', 'in:active,inactive,suspended'],
             'account_type' => ['required', 'in:trial,paid'],
+            'qat_trial_ends_on' => ['exclude_unless:account_type,trial', 'nullable', 'date_format:Y-m-d'],
             'school_name' => ['nullable', 'string', 'max:255'],
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -344,6 +353,7 @@ class CustomerController extends Controller
             'phone' => $customer->phone,
             'status' => $customer->status->value,
             'account_type' => $customer->account_type?->value,
+            'qat_trial_ends_on' => $customer->qat_trial_ends_on?->toDateString(),
             'school_name' => $customer->school_name,
             'address' => $customer->address,
             'city' => $customer->city,
@@ -377,7 +387,11 @@ class CustomerController extends Controller
             $newValues = [];
             foreach (array_keys($changes) as $field) {
                 $value = $customer->{$field};
-                $newValues[$field] = $value instanceof \BackedEnum ? $value->value : $value;
+                $newValues[$field] = match (true) {
+                    $value instanceof \BackedEnum => $value->value,
+                    $field === 'qat_trial_ends_on' => $value?->toDateString(),
+                    default => $value,
+                };
             }
 
             $oldChangedValues = [];
@@ -579,6 +593,7 @@ class CustomerController extends Controller
             'phone' => 'phone number',
             'status' => 'status',
             'account_type' => 'account type',
+            'qat_trial_ends_on' => 'QAT trial expiry',
             'school_name' => 'school name',
             'address' => 'address',
             'city' => 'city',

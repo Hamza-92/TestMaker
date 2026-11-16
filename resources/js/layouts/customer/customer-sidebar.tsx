@@ -7,6 +7,7 @@ import {
     HomeIcon,
     LayoutDashboardIcon,
     LayoutTemplateIcon,
+    LockKeyholeIcon,
     PenLineIcon,
     SettingsIcon,
     SparklesIcon,
@@ -15,6 +16,7 @@ import {
     XIcon,
     ZapIcon,
 } from 'lucide-react';
+import { useQatTrial } from '@/components/qat/trial-status';
 import { CONTACT_EMAIL, PUBLIC_CONTACT_PHONES } from '@/lib/contact';
 import { useCustomerSidebar } from './customer-layout';
 
@@ -223,6 +225,7 @@ function SidebarContent({
     const schoolContext = page.props.auth.school_context ?? null;
     const isOwner = schoolContext?.is_owner ?? false;
     const qatOnly = schoolContext?.qat_only ?? false;
+    const trialLocked = useQatTrial()?.locked ?? false;
     const qatItems =
         isOwner || teacherPermissions.includes('generate_papers')
             ? QAT_NAV
@@ -270,7 +273,9 @@ function SidebarContent({
     }).filter((g): g is NavGroup => g !== null);
 
     const allHrefs = qatOnly
-        ? qatItems.map((item) => item.href)
+        ? trialLocked
+            ? ['/qa-tests/upgrade']
+            : qatItems.map((item) => item.href)
         : [
               '/dashboard',
               ...visibleGroups.flatMap((g) => g.items.map((i) => i.href)),
@@ -314,22 +319,58 @@ function SidebarContent({
             >
                 {qatOnly ? (
                     <div className="space-y-0.5">
-                        {qatItems.map((item) => (
-                            <NavLink
-                                key={item.href}
-                                href={item.href}
-                                icon={item.icon}
-                                label={item.label}
-                                collapsed={collapsed}
-                                active={activeHref === item.href}
-                                count={
-                                    item.href === '/qa-tests/papers'
-                                        ? page.props.qatSavedPaperCount
-                                        : undefined
-                                }
-                                onNavigate={onNavigate}
-                            />
-                        ))}
+                        {qatItems.map((item) =>
+                            trialLocked && item.href !== '/qa-tests' ? (
+                                <span
+                                    key={item.href}
+                                    role="link"
+                                    aria-disabled="true"
+                                    aria-label={`${item.label} (locked)`}
+                                    title={`${item.label} (locked)`}
+                                    className={`flex items-center gap-2.5 rounded-md py-[7px] text-[13px] font-medium text-brand-200/45 ${collapsed ? 'justify-center' : 'px-2.5'}`}
+                                >
+                                    <item.icon
+                                        aria-hidden="true"
+                                        className="size-4 shrink-0"
+                                    />
+                                    {!collapsed && (
+                                        <>
+                                            <span className="truncate">
+                                                {item.label}
+                                            </span>
+                                            <LockKeyholeIcon
+                                                aria-hidden="true"
+                                                className="ml-auto size-3 shrink-0"
+                                            />
+                                        </>
+                                    )}
+                                </span>
+                            ) : (
+                                <NavLink
+                                    key={item.href}
+                                    href={
+                                        trialLocked
+                                            ? '/qa-tests/upgrade'
+                                            : item.href
+                                    }
+                                    icon={item.icon}
+                                    label={item.label}
+                                    collapsed={collapsed}
+                                    active={
+                                        activeHref ===
+                                        (trialLocked
+                                            ? '/qa-tests/upgrade'
+                                            : item.href)
+                                    }
+                                    count={
+                                        item.href === '/qa-tests/papers'
+                                            ? page.props.qatSavedPaperCount
+                                            : undefined
+                                    }
+                                    onNavigate={onNavigate}
+                                />
+                            ),
+                        )}
                     </div>
                 ) : (
                     <NavLink

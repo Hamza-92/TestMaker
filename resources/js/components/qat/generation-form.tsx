@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { OrPartnerOption } from '@/components/qat/or-partner-select';
 import { QatPastPaperCheckbox } from '@/components/qat/past-paper-checkbox';
+import { useQatTrial } from '@/components/qat/trial-status';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
@@ -324,6 +325,8 @@ export default function QatGenerationForm({
     render?: (selection: QatGenerationViewState) => ReactNode;
 }) {
     const { collapsed: sidebarCollapsed } = useCustomerSidebar();
+    const trial = useQatTrial();
+    const maxVariants = Math.max(1, Math.min(2, trial?.remaining ?? 2));
     const [selectionMethod, setSelectionMethod] = useState<
         'manual' | 'template'
     >(initialSelections?.selection_method ?? 'manual');
@@ -380,7 +383,7 @@ export default function QatGenerationForm({
     );
     const [minutes, setMinutes] = useState(initialSelections?.minutes ?? 40);
     const [variants, setVariants] = useState(
-        Math.min(initialSelections?.variants ?? 1, 2),
+        Math.min(initialSelections?.variants ?? 1, maxVariants),
     );
     const [allowRepeat, setAllowRepeat] = useState(
         initialSelections?.allow_repeat ?? false,
@@ -1116,6 +1119,8 @@ export default function QatGenerationForm({
     }
 
     const canGenerate =
+        !trial?.locked &&
+        variants <= maxVariants &&
         classIds.length === 1 &&
         subjectIds.length === 1 &&
         targetCoverage.length > 0 &&
@@ -1206,18 +1211,25 @@ export default function QatGenerationForm({
             });
             const body = await response.json();
 
+            if (response.status === 423 && body.redirect_url) {
+                router.visit(body.redirect_url, { replace: true });
+
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error(firstError(body));
             }
 
-            router.visit(body.preview_url);
+            router.visit(body.preview_url, {
+                onFinish: () => setSaving(false),
+            });
         } catch (error) {
             setSaveError(
                 error instanceof Error
                     ? error.message
                     : 'Could not generate the paper.',
             );
-        } finally {
             setSaving(false);
         }
     }
@@ -1986,27 +1998,33 @@ export default function QatGenerationForm({
                                                         Paper variants
                                                     </legend>
                                                     <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-                                                        {[1, 2].map((count) => (
-                                                            <button
-                                                                key={count}
-                                                                type="button"
-                                                                aria-pressed={
-                                                                    variants ===
-                                                                    count
-                                                                }
-                                                                onClick={() =>
-                                                                    setVariants(
-                                                                        count,
-                                                                    )
-                                                                }
-                                                                className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
-                                                            >
-                                                                {count}{' '}
-                                                                {count === 1
-                                                                    ? 'Paper'
-                                                                    : 'Papers'}
-                                                            </button>
-                                                        ))}
+                                                        {[1, 2]
+                                                            .filter(
+                                                                (count) =>
+                                                                    count <=
+                                                                    maxVariants,
+                                                            )
+                                                            .map((count) => (
+                                                                <button
+                                                                    key={count}
+                                                                    type="button"
+                                                                    aria-pressed={
+                                                                        variants ===
+                                                                        count
+                                                                    }
+                                                                    onClick={() =>
+                                                                        setVariants(
+                                                                            count,
+                                                                        )
+                                                                    }
+                                                                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 sm:px-4 ${variants === count ? 'bg-white text-brand-700 shadow-sm dark:bg-slate-700 dark:text-brand-300' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700/70 dark:hover:text-slate-100'}`}
+                                                                >
+                                                                    {count}{' '}
+                                                                    {count === 1
+                                                                        ? 'Paper'
+                                                                        : 'Papers'}
+                                                                </button>
+                                                            ))}
                                                     </div>
                                                 </fieldset>
                                                 <label className="flex items-end gap-2 pb-2 text-sm">

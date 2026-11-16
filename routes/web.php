@@ -63,6 +63,7 @@ use App\Http\Controllers\Superadmin\TopicController;
 use App\Http\Controllers\Superadmin\TrialSettingController;
 use App\Http\Controllers\Superadmin\UserPermissionController;
 use App\Http\Controllers\Superadmin\UserTransferController;
+use App\Http\Middleware\EnforceQatTrial;
 use App\Http\Middleware\RedirectQatOnlyCustomers;
 use App\Support\PricingPageContent;
 use App\Support\SiteNavigation;
@@ -95,7 +96,7 @@ Route::get('site-switch/from-old', [SiteSwitchController::class, 'fromOld'])
 Route::get('site-switch/prepare-from-old', [SiteSwitchController::class, 'prepareFromOld'])
     ->name('site-switch.new.prepare');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', EnforceQatTrial::class])->group(function () {
     Route::get('site-switch/to-old', [SiteSwitchController::class, 'toOld'])
         ->name('site-switch.old.start');
 
@@ -134,6 +135,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('qa-tests', [CustomerQatCatalogueController::class, 'index'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.index');
+        Route::get('qa-tests/upgrade', [CustomerQatCatalogueController::class, 'upgrade'])
+            ->middleware('school.feature:allow_qat_tests')
+            ->block(10, 10)
+            ->name('customer.qat.upgrade');
         Route::get('qa-tests/papers', [CustomerQatCatalogueController::class, 'papers'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
             ->name('customer.qat.papers.index');
@@ -146,14 +151,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('customer.qat.questions');
         Route::post('qa-tests/papers', [CustomerQatPaperController::class, 'store'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->block(10, 10)
             ->name('customer.qat.papers.store');
         Route::get('qa-tests/previews/{preview}', [CustomerQatPaperController::class, 'preview'])
             ->whereUuid('preview')
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->block(10, 10)
             ->name('customer.qat.previews.show');
         Route::post('qa-tests/previews/{preview}/save', [CustomerQatPaperController::class, 'savePreview'])
             ->whereUuid('preview')
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])
+            ->block(10, 10)
             ->name('customer.qat.previews.save');
         Route::get('qa-tests/papers/{qatPaper}', [CustomerQatPaperController::class, 'show'])
             ->middleware(['school.feature:allow_qat_tests', 'teacher.feature:generate_papers'])

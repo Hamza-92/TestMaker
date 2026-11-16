@@ -9,6 +9,7 @@ use App\Support\AppUserAccess;
 use App\Support\Qat\QatAccess;
 use App\Support\Qat\QatMonthlySyllabus;
 use App\Support\Qat\QatQuestionTypeRules;
+use App\Support\Qat\QatTrial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -29,6 +30,16 @@ class QatCatalogueController extends Controller
     public function papers(Request $request): Response
     {
         return $this->renderPapers($request, 'papers');
+    }
+
+    public function upgrade(Request $request): Response
+    {
+        $school = QatTrial::school($request->user());
+        abort_if($school === null, 404);
+
+        return Inertia::render('customer/qat/upgrade', [
+            'schoolName' => $school->school_name ?: $school->name,
+        ]);
     }
 
     private function renderPapers(Request $request, string $view): Response

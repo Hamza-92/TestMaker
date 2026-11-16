@@ -28,6 +28,7 @@ interface FormData {
     password_confirmation: string;
     status: string;
     account_type: string;
+    qat_trial_ends_on: string;
     school_name: string;
     logo: File | null;
     address: string;
@@ -118,8 +119,14 @@ function InputWithIcon({ icon, ...props }: React.ComponentProps<'input'> & { ico
     );
 }
 
-export default function AddCustomer({ allowedAccountTypes, preferredAccountType }: {
-    allowedAccountTypes: ('trial' | 'paid')[]; preferredAccountType: 'trial' | 'paid';
+export default function AddCustomer({
+    allowedAccountTypes,
+    preferredAccountType,
+    qatTrialPaperLimit,
+}: {
+    allowedAccountTypes: ('trial' | 'paid')[];
+    preferredAccountType: 'trial' | 'paid';
+    qatTrialPaperLimit: number;
 }) {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm]   = useState(false);
@@ -134,6 +141,7 @@ export default function AddCustomer({ allowedAccountTypes, preferredAccountType 
         password_confirmation: '',
         status:                'active',
         account_type:          preferredAccountType,
+        qat_trial_ends_on: '',
         school_name:           '',
         logo:                  null,
         address:               '',
@@ -314,6 +322,29 @@ export default function AddCustomer({ allowedAccountTypes, preferredAccountType 
                                 </Select>
                             </Field>
                         </FieldGroup>
+                        {data.account_type === 'trial' && (
+                            <Field
+                                label="QAT-only trial expiry"
+                                error={errors.qat_trial_ends_on}
+                            >
+                                <Input
+                                    type="date"
+                                    aria-label="QAT-only trial expiry"
+                                    value={data.qat_trial_ends_on}
+                                    onChange={(e) =>
+                                        setData(
+                                            'qat_trial_ends_on',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                <p className="text-xs text-slate-500">
+                                    Set an expiry date for a trial with{' '}
+                                    {qatTrialPaperLimit} QAT papers. Leave it
+                                    blank for a standard trial.
+                                </p>
+                            </Field>
+                        )}
                     </div>
 
                     {/* ── Section 2: Location & Logo ───────────────────────── */}

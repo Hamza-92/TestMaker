@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Qat\QatTrial;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,6 +21,10 @@ class EnsureSchoolSubscriptionFeature
         $subscription = $user->activeSchoolSubscription();
 
         foreach ($features as $feature) {
+            if ($feature === 'allow_qat_tests' && QatTrial::school($user) !== null) {
+                return $next($request);
+            }
+
             if ($subscription && (bool) data_get($subscription, $feature)) {
                 return $next($request);
             }

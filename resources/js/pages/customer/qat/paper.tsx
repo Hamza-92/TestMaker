@@ -14,6 +14,7 @@ import {
     SlidersHorizontalIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useQatTrial } from '@/components/qat/trial-status';
 import { Button } from '@/components/tm';
 import { Switch } from '@/components/ui/switch';
 import { useCustomerSidebar } from '@/layouts/customer/customer-layout';
@@ -422,6 +423,7 @@ export default function QatPaper({
     previewId = null,
     backUrl = '/qa-tests',
     showAnswerKey = false,
+    finalTrialPreview = false,
     schoolDetails,
 }: {
     paper: QatPaperView;
@@ -429,11 +431,14 @@ export default function QatPaper({
     previewId?: string | null;
     backUrl?: string;
     showAnswerKey?: boolean;
+    finalTrialPreview?: boolean;
     schoolDetails: SchoolDetails;
 }) {
     const { collapsed: sidebarCollapsed } = useCustomerSidebar();
+    const trial = useQatTrial();
     const [activeVariant, setActiveVariant] = useState(0);
     const [saving, setSaving] = useState(false);
+    const [savedInPreview, setSavedInPreview] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [showAnswers, setShowAnswers] = useState(showAnswerKey);
     const [paperSettings, setPaperSettings] = useState(loadQatPaperSettings);
@@ -441,6 +446,7 @@ export default function QatPaper({
         loadQatObjectiveSettings,
     );
     const [actionError, setActionError] = useState('');
+
     const { width, height } = getPageDimensions(
         paperSettings.paperSize,
         paperSettings.orientation,
@@ -534,7 +540,7 @@ export default function QatPaper({
           ];
 
     async function savePaper() {
-        if (!previewId || saving) {
+        if (!previewId || saving || savedInPreview) {
             return;
         }
 
@@ -567,8 +573,21 @@ export default function QatPaper({
 
             const body = await response.json();
 
+            if (response.status === 423 && body.redirect_url) {
+                router.visit(body.redirect_url, { replace: true });
+
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error(body.message ?? 'Could not save the paper.');
+            }
+
+            if (body.stay_on_preview) {
+                setSavedInPreview(true);
+                setSaving(false);
+
+                return;
             }
 
             router.visit(body.paper_url);
@@ -731,17 +750,21 @@ export default function QatPaper({
                         variant="secondary"
                         size="sm"
                         onClick={() => void savePaper()}
-                        disabled={!previewId || saving}
+                        disabled={!previewId || saving || savedInPreview}
                         className={`h-10 rounded-lg ${toolbarHoverClass}`}
                     >
                         {saving ? (
                             <Loader2Icon className="animate-spin" />
-                        ) : previewId ? (
+                        ) : previewId && !savedInPreview ? (
                             <SaveIcon className="text-violet-500" />
                         ) : (
                             <CheckIcon className="text-emerald-500" />
                         )}
-                        {saving ? 'Saving…' : previewId ? 'Save' : 'Saved'}
+                        {saving
+                            ? 'Saving…'
+                            : previewId && !savedInPreview
+                              ? 'Save'
+                              : 'Saved'}
                     </Button>
                     <Button
                         type="button"
@@ -805,12 +828,23 @@ export default function QatPaper({
                                       ? 'ur'
                                       : 'en'
                             }
-                            className="bg-white text-slate-900"
+                            className="relative bg-white text-slate-900"
                             style={{
                                 minHeight: `${height}mm`,
                                 padding: pageMargins,
                             }}
                         >
+                            {trial && (
+                                <div
+                                    aria-hidden="true"
+                                    data-paper-watermark=""
+                                    className="pointer-events-none absolute inset-0 z-10 grid place-items-center overflow-hidden print:fixed"
+                                >
+                                    <span className="-rotate-[28deg] whitespace-nowrap font-sans text-5xl font-black uppercase tracking-wider text-slate-500/20">
+                                        QAT Trial
+                                    </span>
+                                </div>
+                            )}
                             <header className="break-inside-avoid">
                                 <div className="mb-3 flex items-center justify-center gap-3 text-center">
                                     {schoolLogoUrl && (
@@ -1112,7 +1146,8 @@ export default function QatPaper({
                     className={`h-10 rounded-lg ${toolbarHoverClass}`}
                 >
                     <Link href={backUrl}>
-                        <ArrowLeftIcon /> Back
+                        <ArrowLeftIcon />{' '}
+                        {finalTrialPreview ? 'Back to Home' : 'Back'}
                     </Link>
                 </Button>
             </div>
