@@ -404,6 +404,66 @@ test('heading visibility is scoped and captured on each generated QAT paper', fu
         ->assertInertia(fn ($page) => $page->missing('paper.paper_data.sections.1.hide_heading'));
 });
 
+test('QAT heading text stays in its catalogue scope and is captured for both sides of an OR pair', function () {
+    [$partner, $alternatives] = addQatTypeToChapter($this->chapterId, 'Translation', 140, 2);
+    [$unused] = addQatTypeToChapter($this->chapterId, 'Unassigned type', 150, 0);
+    $this->type->update(['heading_ur' => 'مختصر جواب دیں۔']);
+    $pair = ['type_id' => $this->type->id, 'partner_id' => $partner];
+    $scope = ['catalogue_id' => DB::table('qat_catalogues')->value('id'), 'class_id' => $this->classId, 'subject_id' => $this->subjectId];
+    $index = route('superadmin.qat-question-heading-text.index', $scope);
+    $update = route('superadmin.qat-question-heading-text.update', $this->subjectId);
+    $headings = [
+        ['question_type_id' => $this->type->id, 'heading_en' => '  Give short answers.  ', 'heading_ur' => ''],
+        ['question_type_id' => $partner, 'heading_ur' => 'ترجمہ کریں۔'],
+    ];
+    $delegate = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->admin->id]);
+    $this->actingAs($delegate)->get($index)->assertForbidden();
+    $this->putJson($update, ['overrides' => $headings])->assertForbidden();
+    $this->actingAs($this->admin)->get($index)->assertOk()->assertInertia(fn ($page) => $page
+        ->component('superadmin/qat-question-heading-text')->where('scope', $scope)
+        ->where("defaultHeadings.{$this->type->id}.heading_en", 'Answer the questions.'));
+    $this->putJson($update, ['overrides' => [['question_type_id' => $unused, 'heading_en' => 'Unavailable']]])
+        ->assertUnprocessable()->assertJsonValidationErrors('overrides');
+    $this->put($update, ['overrides' => $headings])->assertRedirect()->assertSessionHasNoErrors();
+    $this->put(route('superadmin.qat-question-types.update', $this->subjectId), [
+        'hidden_type_ids' => [], 'or_pairs' => [$pair],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    $this->get($index)->assertOk()->assertInertia(fn ($page) => $page
+        ->where("overrides.{$this->type->id}.heading_en", 'Give short answers.')
+        ->missing("overrides.{$this->type->id}.heading_ur"));
+    expect($this->type->fresh()->heading_en)->toBe('Answer the questions.');
+
+    $otherYear = DB::table('qat_catalogues')->insertGetId(['academic_year' => '2027-28']);
+    $otherClass = DB::table('qat_classes')->insertGetId(['qat_catalogue_id' => $otherYear, 'source_class_id' => 10, 'name' => '5th']);
+    $otherSubject = DB::table('qat_subjects')->insertGetId([
+        'qat_class_id' => $otherClass, 'qat_catalogue_id' => $otherYear, 'class_id' => 10,
+        'class_name' => '5th', 'subject_id' => 20, 'subject_name' => 'Mathematics',
+        'source_pattern_id' => 30, 'source_pattern_name' => 'Source',
+    ]);
+    $this->get(route('superadmin.qat-question-heading-text.index', [
+        'catalogue_id' => $otherYear, 'class_id' => $otherClass, 'subject_id' => $otherSubject,
+    ]))->assertOk()->assertInertia(fn ($page) => $page->where('overrides', []));
+
+    $payload = [...$this->payload, 'or_pairs' => [$pair], 'manual_questions' => [
+        ...$this->payload['manual_questions'],
+        ...array_map(fn ($id) => ['id' => $id, 'marks' => 3], $alternatives),
+    ]];
+    $preview = $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $payload)
+        ->assertCreated()->json('preview_url');
+    $this->get($preview)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('paper.paper_data.sections.0.heading_en', 'Give short answers.')
+        ->where('paper.paper_data.sections.0.heading_ur', 'مختصر جواب دیں۔')
+        ->where('paper.paper_data.sections.0.or_heading_en', 'Answer Translation.')
+        ->where('paper.paper_data.sections.0.or_heading_ur', 'ترجمہ کریں۔'));
+    $saved = $this->postJson(route('customer.qat.previews.save', basename($preview)))->assertCreated()->json('paper_id');
+    $this->actingAs($this->admin)->put($update, ['overrides' => []])->assertRedirect()->assertSessionHasNoErrors();
+    $this->actingAs($this->school)->get(route('customer.qat.papers.show', $saved))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('paper.paper_data.sections.0.heading_en', 'Give short answers.'));
+    $newPreview = $this->postJson(route('customer.qat.papers.store'), $payload)->assertCreated()->json('preview_url');
+    $this->get($newPreview)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('paper.paper_data.sections.0.heading_en', 'Answer the questions.'));
+});
+
 test('subject question type settings control the customer pool and templates in every month', function () {
     [$partner] = addQatTypeToChapter($this->chapterId, 'Translation', 20, 1);
     [$hidden, [$hiddenQuestion]] = addQatTypeToChapter($this->chapterId, 'Extra type', 30, 1);

@@ -171,6 +171,10 @@ export function AppSidebar() {
                               title: 'Question Headings',
                               href: '/superadmin/qat-question-headings',
                           },
+                          {
+                              title: 'Heading Text',
+                              href: '/superadmin/qat-question-heading-text',
+                          },
                       ],
                   },
                   {

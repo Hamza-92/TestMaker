@@ -184,7 +184,7 @@ final class QatPaperBuilder
         return array_flip($this->orderByType($query)->pluck('type.id')->map(fn ($id) => (int) $id)->all());
     }
 
-    public function typeHeadings(object $subject, array $typeIds): array
+    public function typeHeadings(object $subject, array $typeIds, array $overrides = []): array
     {
         if ($typeIds === []) {
             return [];
@@ -199,8 +199,10 @@ final class QatPaperBuilder
             (int) $subject->source_class_id,
             (int) $subject->subject_id,
         )->mapWithKeys(fn ($type) => [(int) $type->id => [
-            'heading_en' => ($subject->medium ?? 'Both') === 'Urdu' ? '' : trim((string) ($type->heading_en ?: $type->name)),
-            'heading_ur' => ($subject->medium ?? 'Both') === 'English' ? '' : trim((string) ($type->heading_ur ?: $type->name_ur)),
+            'heading_en' => ($subject->medium ?? 'Both') === 'Urdu' ? ''
+                : ($overrides[(int) $type->id]['heading_en'] ?? trim((string) ($type->heading_en ?: $type->name))),
+            'heading_ur' => ($subject->medium ?? 'Both') === 'English' ? ''
+                : ($overrides[(int) $type->id]['heading_ur'] ?? trim((string) ($type->heading_ur ?: $type->name_ur))),
         ]])->all();
     }
 

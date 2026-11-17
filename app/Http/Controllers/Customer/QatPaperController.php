@@ -189,7 +189,10 @@ class QatPaperController extends Controller
         )->keyBy('id');
         $typeIds = $pool->pluck('question_type_id')->map(fn ($id) => (int) $id)->unique()->all();
         $pairs = $rules->validatePairs($data['or_pairs'] ?? [], $typeIds);
-        $typeHeadings = $builder->typeHeadings($subject, $typeIds);
+        $layout = DB::table('qat_subjects')->where('id', $subject->id)
+            ->first(['paper_section_layout', 'hidden_type_headings', 'heading_text_overrides']);
+        $headingOverrides = json_decode($layout?->heading_text_overrides ?? '[]', true) ?: [];
+        $typeHeadings = $builder->typeHeadings($subject, $typeIds, $headingOverrides);
         $distribution = collect($data['sections'] ?? [])->keyBy('question_type_id');
         if ($usesTemplate) {
             foreach ($pairs as ['type_id' => $type, 'partner_id' => $partner]) {
@@ -311,7 +314,6 @@ class QatPaperController extends Controller
                 'id' => (int) $question['id'], 'marks' => (float) $question['marks'],
             ])->all(),
         ];
-        $layout = DB::table('qat_subjects')->where('id', $subject->id)->first(['paper_section_layout', 'hidden_type_headings']);
         $sectionLayout = json_decode($layout?->paper_section_layout ?? 'null', true);
         $hiddenTypeHeadings = json_decode($layout?->hidden_type_headings ?? '[]', true) ?: [];
         $papers = [];
