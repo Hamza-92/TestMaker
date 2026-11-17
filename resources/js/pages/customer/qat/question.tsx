@@ -325,8 +325,41 @@ function ObjectiveOptions({
     );
 }
 
+function QatQuestionNumber({
+    number,
+    typeNumber,
+    urdu = false,
+    bold = false,
+}: {
+    number?: string;
+    typeNumber?: number;
+    urdu?: boolean;
+    bold?: boolean;
+}) {
+    if (number === undefined && typeNumber === undefined) {
+        return null;
+    }
+
+    return (
+        <span
+            dir={typeNumber === undefined ? 'ltr' : urdu ? 'rtl' : 'ltr'}
+            className={`qat-question-number inline-block shrink-0 whitespace-nowrap ${bold ? 'font-bold' : 'font-semibold'}`}
+        >
+            {typeNumber !== undefined && (
+                <span className={urdu ? 'qat-urdu-type-number' : undefined}>
+                    {urdu ? 'سوال نمبر ' : 'Q.'}
+                    {typeNumber}:-
+                </span>
+            )}
+            {typeNumber !== undefined && number !== undefined && ' '}
+            {number !== undefined && <bdi dir="ltr">{number}.</bdi>}
+        </span>
+    );
+}
+
 function ObjectiveLine({
     number,
+    typeNumber,
     en,
     ur,
     options,
@@ -334,7 +367,8 @@ function ObjectiveLine({
     settings,
     displayMedium,
 }: {
-    number: string;
+    number?: string;
+    typeNumber?: number;
     en: string;
     ur: string;
     options: Record<string, unknown>[];
@@ -369,9 +403,7 @@ function ObjectiveLine({
             lang="en"
             className="flex min-w-0 items-start gap-1.5 text-left"
         >
-            <span className="qat-question-number shrink-0 font-bold">
-                {number}.
-            </span>
+            <QatQuestionNumber number={number} typeNumber={typeNumber} bold />
             <div className="min-w-0 flex-1">
                 <QatRichText value={en} />
             </div>
@@ -383,9 +415,12 @@ function ObjectiveLine({
             lang="ur"
             className="flex min-w-0 items-start gap-1.5 text-right"
         >
-            <span dir="ltr" className="qat-question-number shrink-0 font-bold">
-                {number}.
-            </span>
+            <QatQuestionNumber
+                number={number}
+                typeNumber={typeNumber}
+                urdu
+                bold
+            />
             <div className="min-w-0 flex-1">
                 <QatRichText value={ur} />
             </div>
@@ -395,12 +430,12 @@ function ObjectiveLine({
     if (!en && !ur && optionTable) {
         return (
             <div dir={direction} className="flex items-start gap-2">
-                <span
-                    dir="ltr"
-                    className="qat-question-number shrink-0 font-bold"
-                >
-                    {number}.
-                </span>
+                <QatQuestionNumber
+                    number={number}
+                    typeNumber={typeNumber}
+                    urdu={direction === 'rtl'}
+                    bold
+                />
                 {optionTable}
             </div>
         );
@@ -432,12 +467,14 @@ function ObjectiveLine({
 export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     question,
     number,
+    typeNumber,
     showAnswers = false,
     settings,
     displayMedium,
 }: {
     question: QatQuestion;
-    number: number | string;
+    number?: number | string;
+    typeNumber?: number;
     showAnswers?: boolean;
     settings: QatObjectiveSettings;
     displayMedium: QatMedium;
@@ -472,14 +509,17 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     const detailUr = field(content, 'shared_ur') || question.description_ur;
     const extraDetailEn = sameText(detailEn, primaryEn) ? '' : detailEn;
     const extraDetailUr = sameText(detailUr, primaryUr) ? '' : detailUr;
+    const primaryOptions = options.length ? options : trueFalseOptions;
+    const startWithItem = !primaryEn && !primaryUr && !primaryOptions.length;
 
     return (
         <div className="qat-objective-question space-y-2">
             <ObjectiveLine
-                number={String(number)}
+                number={number === undefined ? undefined : String(number)}
+                typeNumber={startWithItem ? undefined : typeNumber}
                 en={primaryEn}
                 ur={primaryUr}
-                options={options.length ? options : trueFalseOptions}
+                options={primaryOptions}
                 settings={settings}
                 displayMedium={displayMedium}
                 correctOptions={
@@ -518,7 +558,10 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
             {items.map((item, index) => (
                 <ObjectiveLine
                     key={index}
-                    number={`${number}.${String.fromCharCode(97 + index)}`}
+                    number={`${number === undefined ? '' : `${number}.`}${String.fromCharCode(97 + index)}`}
+                    typeNumber={
+                        startWithItem && index === 0 ? typeNumber : undefined
+                    }
                     en={field(item, 'prompt_en') || field(item, 'statement_en')}
                     ur={field(item, 'prompt_ur') || field(item, 'statement_ur')}
                     options={records(item.options)}
@@ -539,12 +582,14 @@ function LocalizedText({
     en,
     ur,
     number,
+    typeNumber,
     sideBySide = false,
     shared,
 }: {
     en?: string;
     ur?: string;
     number?: string;
+    typeNumber?: number;
     sideBySide?: boolean;
     shared?: string;
 }) {
@@ -555,7 +600,13 @@ function LocalizedText({
     if (shared && /<table\b/i.test(questionTextToHtml(shared))) {
         return (
             <div className="min-w-0 space-y-1">
-                <LocalizedText en={en} ur={ur} number={number} sideBySide />
+                <LocalizedText
+                    en={en}
+                    ur={ur}
+                    number={number}
+                    typeNumber={typeNumber}
+                    sideBySide
+                />
                 <div
                     dir="auto"
                     lang={containsUrduScript(shared) ? 'ur' : 'en'}
@@ -586,11 +637,10 @@ function LocalizedText({
                     lang="en"
                     className="flex min-w-0 items-start gap-1.5 text-left"
                 >
-                    {number !== undefined && (
-                        <span className="qat-question-number shrink-0 font-semibold">
-                            {number}.
-                        </span>
-                    )}
+                    <QatQuestionNumber
+                        number={number}
+                        typeNumber={typeNumber}
+                    />
                     <div className="min-w-0 flex-1">
                         <QatRichText value={en} />
                     </div>
@@ -612,14 +662,11 @@ function LocalizedText({
                     lang="ur"
                     className="flex min-w-0 items-start gap-1.5 text-right"
                 >
-                    {number !== undefined && (
-                        <span
-                            dir="ltr"
-                            className="qat-question-number shrink-0 font-semibold"
-                        >
-                            {number}.
-                        </span>
-                    )}
+                    <QatQuestionNumber
+                        number={number}
+                        typeNumber={typeNumber}
+                        urdu
+                    />
                     <div className="min-w-0 flex-1">
                         <QatRichText value={ur} />
                     </div>
@@ -687,10 +734,12 @@ export const QatQuestionStatement = memo(function QatQuestionStatement({
 export const QatQuestionContent = memo(function QatQuestionContent({
     question,
     number,
+    typeNumber,
     displayMedium = 'Both',
 }: {
     question: QatQuestion;
-    number: string;
+    number?: string;
+    typeNumber?: number;
     displayMedium?: QatMedium;
 }) {
     const content = question.content ?? {};
@@ -751,16 +800,16 @@ export const QatQuestionContent = memo(function QatQuestionContent({
                 en={statementEn}
                 ur={statementUr}
                 number={number}
+                typeNumber={typeNumber}
                 sideBySide
                 shared={sharedDescription}
             />
             {!statementEn && !statementUr && (
-                <span
-                    dir="ltr"
-                    className="qat-question-number inline-block font-semibold"
-                >
-                    {number}.
-                </span>
+                <QatQuestionNumber
+                    number={number}
+                    typeNumber={typeNumber}
+                    urdu={displayMedium === 'Urdu'}
+                />
             )}
             {(secondaryEn || secondaryUr) && (
                 <LocalizedText en={secondaryEn} ur={secondaryUr} sideBySide />

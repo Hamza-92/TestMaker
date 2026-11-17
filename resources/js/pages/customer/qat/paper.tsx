@@ -85,6 +85,7 @@ type PaperSection = {
     or_heading_en?: string | null;
     or_heading_ur?: string | null;
     required_questions?: number;
+    hide_heading?: boolean;
     questions: PaperQuestion[];
 };
 
@@ -279,21 +280,7 @@ function groupSubjectiveSections(
     return groups;
 }
 
-function QatTypeHeading({
-    section,
-    number,
-    medium,
-}: {
-    section: PaperSection;
-    number: number;
-    medium: QatMedium;
-}) {
-    const urduOnly = medium === 'Urdu';
-    const english = section.heading_en?.trim() || section.title;
-    const urdu = medium === 'English' ? '' : section.heading_ur?.trim() || '';
-    const alternateEnglish = section.or_heading_en?.trim();
-    const alternateUrdu =
-        medium === 'English' ? '' : section.or_heading_ur?.trim();
+function typeMarksLabel(section: PaperSection, medium: QatMedium) {
     const count = section.questions.length;
     const required = Math.min(section.required_questions ?? count, count);
     const marksEach = Number(section.questions[0]?.marks ?? 0);
@@ -309,9 +296,27 @@ function QatTypeHeading({
               )
         ).toFixed(2),
     );
-    const marksLabel = sameMarks
+
+    return sameMarks
         ? `(${required}x${marksEach}=${marks})`
-        : `(${marks} ${urduOnly ? 'نمبر' : 'Marks'})`;
+        : `(${marks} ${medium === 'Urdu' ? 'نمبر' : 'Marks'})`;
+}
+
+function QatTypeHeading({
+    section,
+    number,
+    medium,
+}: {
+    section: PaperSection;
+    number: number;
+    medium: QatMedium;
+}) {
+    const urduOnly = medium === 'Urdu';
+    const english = section.heading_en?.trim() || section.title;
+    const urdu = medium === 'English' ? '' : section.heading_ur?.trim() || '';
+    const alternateEnglish = section.or_heading_en?.trim();
+    const alternateUrdu =
+        medium === 'English' ? '' : section.or_heading_ur?.trim();
 
     return (
         <div
@@ -336,7 +341,7 @@ function QatTypeHeading({
             )}
             <div className="shrink-0 text-center">
                 <span dir="ltr" className="block whitespace-nowrap">
-                    {marksLabel}
+                    {typeMarksLabel(section, medium)}
                 </span>
             </div>
             {(urduOnly || urdu || alternateUrdu) && (
@@ -363,22 +368,27 @@ function QatTypeHeading({
 function QatPaperQuestion({
     question,
     number,
+    typeNumber,
+    marksLabel,
     showAnswers,
     objectiveSettings,
     medium,
 }: {
     question: PaperQuestion;
-    number: string;
+    number?: string;
+    typeNumber?: number;
+    marksLabel?: string;
     showAnswers: boolean;
     objectiveSettings: QatObjectiveSettings;
     medium: QatMedium;
 }) {
     const alternative = question.or_question;
-    const renderQuestion = (item: QatQuestion) =>
+    const renderQuestion = (item: QatQuestion, mainNumber?: number) =>
         item.is_objective ? (
             <QatObjectiveQuestion
                 question={item}
                 number={number}
+                typeNumber={mainNumber}
                 showAnswers={showAnswers}
                 settings={objectiveSettings}
                 displayMedium={medium}
@@ -387,6 +397,7 @@ function QatPaperQuestion({
             <QatQuestionContent
                 question={item}
                 number={number}
+                typeNumber={mainNumber}
                 displayMedium={medium}
             />
         );
@@ -396,7 +407,21 @@ function QatPaperQuestion({
             data-paper-question
             className={`qat-question px-2 ${alternative ? 'break-inside-avoid' : ''}`}
         >
-            {renderQuestion(question)}
+            {marksLabel ? (
+                <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                        {renderQuestion(question, typeNumber)}
+                    </div>
+                    <span
+                        dir="ltr"
+                        className="shrink-0 whitespace-nowrap text-xs font-bold"
+                    >
+                        {marksLabel}
+                    </span>
+                </div>
+            ) : (
+                renderQuestion(question, typeNumber)
+            )}
             {alternative && (
                 <>
                     <div className="my-1 flex items-center justify-center gap-2 text-xs font-bold">
@@ -413,6 +438,73 @@ function QatPaperQuestion({
                     {renderQuestion(alternative)}
                 </>
             )}
+        </div>
+    );
+}
+
+function QatPaperType({
+    section,
+    typeNumber,
+    precedingObjectiveQuestions,
+    showAnswers,
+    objectiveSettings,
+    medium,
+}: {
+    section: PaperSection;
+    typeNumber: number;
+    precedingObjectiveQuestions?: number;
+    showAnswers: boolean;
+    objectiveSettings: QatObjectiveSettings;
+    medium: QatMedium;
+}) {
+    const isObjective = precedingObjectiveQuestions !== undefined;
+    const hideHeading = section.hide_heading === true;
+
+    return (
+        <div className={isObjective ? 'space-y-3' : undefined}>
+            {!hideHeading && (
+                <QatTypeHeading
+                    section={section}
+                    number={typeNumber}
+                    medium={medium}
+                />
+            )}
+            <div
+                className={
+                    isObjective
+                        ? 'space-y-3'
+                        : hideHeading
+                          ? 'space-y-2'
+                          : 'mt-2 space-y-2'
+                }
+            >
+                {section.questions.map((question, index) => {
+                    const startsType = hideHeading && index === 0;
+                    const number =
+                        hideHeading && section.questions.length === 1
+                            ? undefined
+                            : isObjective
+                              ? String(precedingObjectiveQuestions + index + 1)
+                              : romanSection(index + 1).toLowerCase();
+
+                    return (
+                        <QatPaperQuestion
+                            key={question.id}
+                            question={question}
+                            number={number}
+                            typeNumber={startsType ? typeNumber : undefined}
+                            marksLabel={
+                                startsType
+                                    ? typeMarksLabel(section, medium)
+                                    : undefined
+                            }
+                            showAnswers={showAnswers}
+                            objectiveSettings={objectiveSettings}
+                            medium={medium}
+                        />
+                    );
+                })}
+            </div>
         </div>
     );
 }
@@ -650,6 +742,7 @@ export default function QatPaper({
                 [data-qat-sheet] .qat-question [lang="ur"], [data-qat-sheet] .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: ${urduFont} !important; font-size: ${questionSize * urduMetrics.sizeScale}px !important; line-height: ${questionLineHeight * urduMetrics.lineHeightScale} !important; }
                 [data-qat-sheet] .qat-question [lang="ur"] { transform: translateY(${urduMetrics.verticalOffsetEm}em); }
                 [data-qat-sheet] .qat-question-number { font-family: ${englishFont}; font-size: ${questionSize}px; line-height: ${questionLineHeight}; transform: none; }
+                [data-qat-sheet] .qat-urdu-type-number { font-family: ${urduFont}; }
                 [data-qat-sheet] .qat-section-heading { font-size: ${sectionHeadingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.sectionHeadingLineHeight}; }
                 [data-qat-sheet] .qat-type-heading { font-size: ${headingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 [data-qat-sheet] .qat-type-heading [lang="ur"], [data-qat-sheet] .qat-type-heading [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: ${urduFont} !important; font-size: ${headingSize * urduMetrics.sizeScale}px !important; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight * urduMetrics.lineHeightScale} !important; }
@@ -1018,50 +1111,23 @@ export default function QatPaper({
                                                             );
 
                                                     return (
-                                                        <div
+                                                        <QatPaperType
                                                             key={`${section.question_type_id}-${sectionIndex}`}
-                                                            className="space-y-3"
-                                                        >
-                                                            <QatTypeHeading
-                                                                medium={medium}
-                                                                section={
-                                                                    section
-                                                                }
-                                                                number={
-                                                                    sectionIndex +
-                                                                    1
-                                                                }
-                                                            />
-                                                            {section.questions.map(
-                                                                (
-                                                                    question,
-                                                                    index,
-                                                                ) => (
-                                                                    <QatPaperQuestion
-                                                                        medium={
-                                                                            medium
-                                                                        }
-                                                                        key={
-                                                                            question.id
-                                                                        }
-                                                                        question={
-                                                                            question
-                                                                        }
-                                                                        number={String(
-                                                                            preceding +
-                                                                                index +
-                                                                                1,
-                                                                        )}
-                                                                        showAnswers={
-                                                                            showAnswers
-                                                                        }
-                                                                        objectiveSettings={
-                                                                            objectiveSettings
-                                                                        }
-                                                                    />
-                                                                ),
-                                                            )}
-                                                        </div>
+                                                            section={section}
+                                                            typeNumber={
+                                                                sectionIndex + 1
+                                                            }
+                                                            precedingObjectiveQuestions={
+                                                                preceding
+                                                            }
+                                                            showAnswers={
+                                                                showAnswers
+                                                            }
+                                                            objectiveSettings={
+                                                                objectiveSettings
+                                                            }
+                                                            medium={medium}
+                                                        />
                                                     );
                                                 },
                                             )}
@@ -1083,51 +1149,22 @@ export default function QatPaper({
                                         />
                                         <div className="space-y-3">
                                             {group.sections.map((section) => (
-                                                <div
+                                                <QatPaperType
                                                     key={
                                                         section.question_type_id
                                                     }
-                                                >
-                                                    <QatTypeHeading
-                                                        medium={medium}
-                                                        section={section}
-                                                        number={
-                                                            subjectiveTypeNumbers.get(
-                                                                section,
-                                                            )!
-                                                        }
-                                                    />
-                                                    <div className="mt-2 space-y-2">
-                                                        {section.questions.map(
-                                                            (
-                                                                question,
-                                                                index,
-                                                            ) => (
-                                                                <QatPaperQuestion
-                                                                    medium={
-                                                                        medium
-                                                                    }
-                                                                    key={
-                                                                        question.id
-                                                                    }
-                                                                    question={
-                                                                        question
-                                                                    }
-                                                                    number={romanSection(
-                                                                        index +
-                                                                            1,
-                                                                    ).toLowerCase()}
-                                                                    showAnswers={
-                                                                        showAnswers
-                                                                    }
-                                                                    objectiveSettings={
-                                                                        objectiveSettings
-                                                                    }
-                                                                />
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                    section={section}
+                                                    typeNumber={
+                                                        subjectiveTypeNumbers.get(
+                                                            section,
+                                                        )!
+                                                    }
+                                                    showAnswers={showAnswers}
+                                                    objectiveSettings={
+                                                        objectiveSettings
+                                                    }
+                                                    medium={medium}
+                                                />
                                             ))}
                                         </div>
                                     </section>

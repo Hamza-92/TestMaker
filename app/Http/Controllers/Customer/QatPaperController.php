@@ -311,9 +311,18 @@ class QatPaperController extends Controller
                 'id' => (int) $question['id'], 'marks' => (float) $question['marks'],
             ])->all(),
         ];
-        $sectionLayout = json_decode(DB::table('qat_subjects')->where('id', $subject->id)->value('paper_section_layout') ?? 'null', true);
+        $layout = DB::table('qat_subjects')->where('id', $subject->id)->first(['paper_section_layout', 'hidden_type_headings']);
+        $sectionLayout = json_decode($layout?->paper_section_layout ?? 'null', true);
+        $hiddenTypeHeadings = json_decode($layout?->hidden_type_headings ?? '[]', true) ?: [];
         $papers = [];
         foreach ($prepared as $index => $sections) {
+            $sections = array_map(function (array $section) use ($hiddenTypeHeadings): array {
+                if (in_array((int) $section['question_type_id'], $hiddenTypeHeadings, true)) {
+                    $section['hide_heading'] = true;
+                }
+
+                return $section;
+            }, $sections);
             $name = trim($data['name']).(count($prepared) > 1 ? ' — Paper '.chr(65 + $index) : '');
             $questions = collect($sections)->flatMap(fn ($section) => $section['questions']);
             $papers[] = [

@@ -368,6 +368,42 @@ test('QAT paper sections can be configured per subject and are captured on gener
     $this->get($default)->assertOk()->assertInertia(fn ($page) => $page->where('paper.paper_data.section_layout', null));
 })->with(['manual', 'template', 'auto']);
 
+test('heading visibility is scoped and captured on each generated QAT paper', function () {
+    [$essayType, [$essayQuestion]] = addQatTypeToChapter($this->chapterId, 'Write a story', 120, 1);
+    [$unusedType] = addQatTypeToChapter($this->chapterId, 'Unassigned type', 130, 0);
+    $scope = ['catalogue_id' => DB::table('qat_catalogues')->value('id'), 'class_id' => $this->classId, 'subject_id' => $this->subjectId];
+    $index = route('superadmin.qat-question-headings.index', $scope);
+    $update = route('superadmin.qat-question-headings.update', $this->subjectId);
+    $delegate = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->admin->id]);
+    $this->actingAs($delegate)->get($index)->assertForbidden();
+    $this->putJson($update, ['hidden_type_ids' => [$essayType]])->assertForbidden();
+    $this->actingAs($this->admin)->putJson($update, ['hidden_type_ids' => [$unusedType]])
+        ->assertUnprocessable()->assertJsonValidationErrors('hidden_type_ids');
+    $this->put($update, ['hidden_type_ids' => [$essayType]])->assertRedirect()->assertSessionHasNoErrors();
+    $this->get($index)->assertOk()->assertInertia(fn ($page) => $page
+        ->component('superadmin/qat-question-headings')->where('scope', $scope)
+        ->has('types', 2)->where('hiddenTypeIds', [$essayType]));
+    $this->get(route('superadmin.qat-question-headings.index', [...$scope, 'class_id' => 0]))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('scope.subject_id', 0)->has('types', 0));
+
+    $payload = [...$this->payload, 'selection_method' => 'manual', 'sections' => [],
+        'manual_questions' => [...$this->payload['manual_questions'], ['id' => $essayQuestion, 'marks' => 5]],
+    ];
+    $preview = $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $payload)
+        ->assertCreated()->json('preview_url');
+    $this->get($preview)->assertOk()->assertInertia(fn ($page) => $page
+        ->missing('paper.paper_data.sections.0.hide_heading')
+        ->where('paper.paper_data.sections.1.hide_heading', true)
+        ->where('paper.paper_data.sections.1.questions.0.statement_en', 'Write a story 0'));
+    $saved = $this->postJson(route('customer.qat.previews.save', basename($preview)))->assertCreated()->json('paper_id');
+    $this->actingAs($this->admin)->put($update, ['hidden_type_ids' => []])->assertRedirect()->assertSessionHasNoErrors();
+    $this->actingAs($this->school)->get(route('customer.qat.papers.show', $saved))->assertOk()
+        ->assertInertia(fn ($page) => $page->where('paper.paper_data.sections.1.hide_heading', true));
+    $newPreview = $this->postJson(route('customer.qat.papers.store'), $payload)->assertCreated()->json('preview_url');
+    $this->get($newPreview)->assertOk()
+        ->assertInertia(fn ($page) => $page->missing('paper.paper_data.sections.1.hide_heading'));
+});
+
 test('subject question type settings control the customer pool and templates in every month', function () {
     [$partner] = addQatTypeToChapter($this->chapterId, 'Translation', 20, 1);
     [$hidden, [$hiddenQuestion]] = addQatTypeToChapter($this->chapterId, 'Extra type', 30, 1);
