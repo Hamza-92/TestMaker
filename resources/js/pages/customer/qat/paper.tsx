@@ -13,7 +13,7 @@ import {
     SaveIcon,
     SlidersHorizontalIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useQatTrial } from '@/components/qat/trial-status';
 import { Button } from '@/components/tm';
 import { Switch } from '@/components/ui/switch';
@@ -79,6 +79,7 @@ function QatObjectiveLayoutMenu({
 type PaperQuestion = QatQuestion & {
     marks: number;
     or_question?: QatQuestion & { marks: number };
+    or_questions?: (QatQuestion & { marks: number })[];
 };
 
 type PaperSection = {
@@ -88,6 +89,7 @@ type PaperSection = {
     heading_ur?: string | null;
     or_heading_en?: string | null;
     or_heading_ur?: string | null;
+    or_headings?: { heading_en?: string | null; heading_ur?: string | null }[];
     required_questions?: number;
     hide_heading?: boolean;
     questions: PaperQuestion[];
@@ -318,15 +320,34 @@ function QatTypeHeading({
     const urduOnly = medium === 'Urdu';
     const english = section.heading_en?.trim() || section.title;
     const urdu = medium === 'English' ? '' : section.heading_ur?.trim() || '';
-    const alternateEnglish = section.or_heading_en?.trim();
-    const alternateUrdu =
-        medium === 'English' ? '' : section.or_heading_ur?.trim();
+    const alternatives = section.or_headings ?? [
+        {
+            heading_en: section.or_heading_en,
+            heading_ur: section.or_heading_ur,
+        },
+    ];
+    const alternateEnglish = new Set(
+        alternatives
+            .map((heading) => heading.heading_en?.trim())
+            .filter((text): text is string =>
+                Boolean(text && text !== english),
+            ),
+    );
+    const alternateUrdu = new Set(
+        medium === 'English'
+            ? []
+            : alternatives
+                  .map((heading) => heading.heading_ur?.trim())
+                  .filter((text): text is string =>
+                      Boolean(text && text !== urdu),
+                  ),
+    );
 
     return (
         <div
             data-paper-heading
             className={
-                !urduOnly && (urdu || alternateUrdu)
+                !urduOnly && (urdu || alternateUrdu.size)
                     ? 'qat-type-heading grid break-after-avoid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
                     : 'qat-type-heading flex break-after-avoid items-center justify-between gap-3 border border-brand-300 bg-brand-100 px-1.5 py-1 text-xs font-bold text-brand-950'
             }
@@ -335,12 +356,11 @@ function QatTypeHeading({
                 <div dir="ltr" lang="en" className="min-w-0 text-left">
                     <span className="whitespace-nowrap">Q.{number}:-</span>{' '}
                     <QuestionContent value={english} inline />
-                    {alternateEnglish && alternateEnglish !== english && (
-                        <div>
-                            OR{' '}
-                            <QuestionContent value={alternateEnglish} inline />
+                    {[...alternateEnglish].map((heading) => (
+                        <div key={heading}>
+                            OR <QuestionContent value={heading} inline />
                         </div>
-                    )}
+                    ))}
                 </div>
             )}
             <div className="shrink-0 text-center">
@@ -348,7 +368,7 @@ function QatTypeHeading({
                     {typeMarksLabel(section, medium)}
                 </span>
             </div>
-            {(urduOnly || urdu || alternateUrdu) && (
+            {(urduOnly || urdu || alternateUrdu.size > 0) && (
                 <div
                     dir="rtl"
                     lang="ur"
@@ -358,14 +378,21 @@ function QatTypeHeading({
                         سوال نمبر {number}:-
                     </span>{' '}
                     {urdu && <QuestionContent value={urdu} inline />}
-                    {alternateUrdu && alternateUrdu !== urdu && (
-                        <div>
-                            یا <QuestionContent value={alternateUrdu} inline />
+                    {[...alternateUrdu].map((heading) => (
+                        <div key={heading}>
+                            یا <QuestionContent value={heading} inline />
                         </div>
-                    )}
+                    ))}
                 </div>
             )}
         </div>
+    );
+}
+
+function paperAlternatives(question: PaperQuestion) {
+    return (
+        question.or_questions ??
+        (question.or_question ? [question.or_question] : [])
     );
 }
 
@@ -380,7 +407,9 @@ function objectiveQuestionNumbers(sections: PaperSection[]) {
             nextNumber += Math.max(
                 1,
                 qatObjectivePassageItems(question).length,
-                qatObjectivePassageItems(question.or_question).length,
+                ...paperAlternatives(question).map(
+                    (item) => qatObjectivePassageItems(item).length,
+                ),
             );
         }
 
@@ -405,7 +434,7 @@ function QatPaperQuestion({
     objectiveSettings: QatObjectiveSettings;
     medium: QatMedium;
 }) {
-    const alternative = question.or_question;
+    const alternatives = paperAlternatives(question);
     const renderQuestion = (item: QatQuestion, mainNumber?: number) =>
         item.is_objective ? (
             <QatObjectiveQuestion
@@ -428,7 +457,7 @@ function QatPaperQuestion({
     return (
         <div
             data-paper-question
-            className={`qat-question px-2 ${alternative ? 'break-inside-avoid' : ''}`}
+            className={`qat-question px-2 ${alternatives.length ? 'break-inside-avoid' : ''}`}
         >
             {marksLabel ? (
                 <div className="flex items-start gap-2">
@@ -445,8 +474,8 @@ function QatPaperQuestion({
             ) : (
                 renderQuestion(question, typeNumber)
             )}
-            {alternative && (
-                <>
+            {alternatives.map((alternative) => (
+                <Fragment key={alternative.id}>
                     <div className="my-1 flex items-center justify-center gap-2 text-xs font-bold">
                         {medium !== 'Urdu' && <span lang="en">OR</span>}
                         {(medium === 'Urdu' ||
@@ -459,8 +488,8 @@ function QatPaperQuestion({
                         )}
                     </div>
                     {renderQuestion(alternative)}
-                </>
-            )}
+                </Fragment>
+            ))}
         </div>
     );
 }
@@ -506,8 +535,10 @@ function QatPaperType({
                     const hasNumberedPassage =
                         isObjective &&
                         (qatObjectivePassageItems(question).length > 0 ||
-                            qatObjectivePassageItems(question.or_question)
-                                .length > 0);
+                            paperAlternatives(question).some(
+                                (item) =>
+                                    qatObjectivePassageItems(item).length > 0,
+                            ));
                     const hideSubNumber =
                         hideHeading &&
                         section.questions.length === 1 &&
@@ -629,8 +660,8 @@ export default function QatPaper({
     const hasObjectiveOptions =
         objectiveQuestions.length > 0 ||
         subjectiveSections.some((section) =>
-            section.questions.some(
-                (question) => question.or_question?.is_objective,
+            section.questions.some((question) =>
+                paperAlternatives(question).some((item) => item.is_objective),
             ),
         );
     const chapters = paper.paper_data.chapters ?? [];

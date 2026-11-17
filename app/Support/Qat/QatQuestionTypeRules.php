@@ -18,13 +18,33 @@ final class QatQuestionTypeRules
 
     public readonly array $pairs;
 
+    public readonly array $randomGroups;
+
+    public readonly array $groups;
+
     private array $partners = [];
 
     public function __construct(?string $json)
     {
         $rules = json_decode($json ?? '', true) ?: [];
         $this->hiddenTypeIds = $rules['hidden_type_ids'] ?? [];
-        $this->pairs = $rules['or_pairs'] ?? [];
+        $this->groups = $rules['or_groups'] ?? [
+            ...array_map(fn ($pair) => [
+                'type_ids' => [$pair['type_id'], $pair['partner_id']],
+                'random_pick' => false,
+            ], $rules['or_pairs'] ?? []),
+            ...array_map(fn ($group) => [
+                'type_ids' => $group['type_ids'],
+                'random_pick' => true,
+            ], $rules['random_or_groups'] ?? []),
+        ];
+        $this->pairs = array_values(array_map(fn ($group) => [
+            'type_id' => $group['type_ids'][0],
+            'partner_id' => $group['type_ids'][1],
+        ], array_filter($this->groups, fn ($group) => count($group['type_ids']) === 2)));
+        $this->randomGroups = array_values(array_map(fn ($group) => [
+            'type_ids' => $group['type_ids'],
+        ], array_filter($this->groups, fn ($group) => $group['random_pick'])));
 
         foreach ($this->pairs as $pair) {
             $this->partners[$pair['type_id']] = $pair['partner_id'];
@@ -55,6 +75,23 @@ final class QatQuestionTypeRules
     public function partner(int $type): ?int
     {
         return $this->partners[$type] ?? null;
+    }
+
+    public function autoDistribution(Collection $sections, array $groups): Collection
+    {
+        $anchors = [];
+        foreach ($groups as $group) {
+            $ids = $group['type_ids'];
+            $anchor = $ids[0];
+            foreach ($ids as $id) {
+                $anchors[$id] = $anchor;
+                if (! $sections->has($anchor) && $sections->has($id)) {
+                    $sections->put($anchor, [...$sections->get($id), 'question_type_id' => $anchor]);
+                }
+            }
+        }
+
+        return $sections->reject(fn ($row, $id) => isset($anchors[$id]) && $anchors[$id] !== (int) $id);
     }
 
     public function validatePairs(array $pairs, array $availableTypes, bool $requireConfigured = true): array

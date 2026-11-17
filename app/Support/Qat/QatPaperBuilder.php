@@ -152,6 +152,26 @@ final class QatPaperBuilder
         return $sections->values()->all();
     }
 
+    public function orGroupSection(int $anchor, array $choices): array
+    {
+        $section = array_shift($choices);
+        $section['question_type_id'] = $anchor;
+        if ($choices === []) {
+            return $section;
+        }
+
+        $section['or_headings'] = array_map(fn (array $choice) => [
+            'heading_en' => $choice['heading_en'] ?? $choice['title'],
+            'heading_ur' => $choice['heading_ur'] ?? null,
+        ], $choices);
+        foreach ($section['questions'] as $index => &$question) {
+            $question['or_questions'] = array_map(fn (array $choice) => $choice['questions'][$index], $choices);
+        }
+        unset($question);
+
+        return $section;
+    }
+
     public function withTypeOrder(Builder $query, object $subject): Builder
     {
         return $query->leftJoin('question_type_orders as type_order', function (JoinClause $join) use ($subject): void {

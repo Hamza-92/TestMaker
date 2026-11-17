@@ -509,6 +509,96 @@ test('subject question type settings control the customer pool and templates in 
     ])->assertUnprocessable()->assertJsonValidationErrors('manual_questions');
 });
 
+test('automatic QAT OR groups share a template slot and reserve eligible questions for later variants', function () {
+    [$story, $stories] = addQatTypeToChapter($this->chapterId, 'Story', 210, 2);
+    $otherChapter = DB::table('qat_chapters')->where('qat_subject_id', $this->subjectId)->where('id', '!=', $this->chapterId)->value('id');
+    [$application] = addQatTypeToChapter($otherChapter, 'Application', 220, 2);
+    $group = ['type_ids' => [$this->type->id, $story, $application]];
+    $update = route('superadmin.qat-question-types.update', $this->subjectId);
+    $this->actingAs($this->admin)->putJson($update, [
+        'hidden_type_ids' => [], 'or_pairs' => [['type_id' => $this->type->id, 'partner_id' => $story]],
+        'random_or_groups' => [$group],
+    ])->assertUnprocessable()->assertJsonValidationErrors('random_or_groups');
+    $this->put($update, ['hidden_type_ids' => [], 'or_pairs' => [], 'random_or_groups' => [$group]])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $this->chapterId, 'month' => 4]);
+    $source = [
+        ...$this->payload, 'mode' => 'auto', 'syllabus' => 'qat', 'months' => [4],
+        'chapter_ids' => [], 'variants' => 2, 'allow_repeat' => false,
+        'sections' => [...$this->sections, ['question_type_id' => $story, 'quantity' => 1, 'marks' => 4]],
+    ];
+    $this->actingAs($this->school)->postJson(route('customer.qat.questions'), [
+        'subject_id' => $this->subjectId, 'syllabus' => 'qat', 'months' => [4],
+    ])->assertOk()->assertJsonPath('random_or_groups', [$group])
+        ->assertJsonCount(2, 'types');
+    $preview = $this->postJson(route('customer.qat.papers.store'), $source)->assertCreated()->json('preview_url');
+    $page = $this->get($preview)->assertOk()->viewData('page')['props'];
+    expect($page['variants'])->toHaveCount(2);
+    $used = [];
+    foreach ($page['variants'] as $paper) {
+        expect($paper['total_marks'])->toEqual(3)->and($paper['question_count'])->toBe(2);
+        $section = $paper['paper_data']['sections'][0];
+        expect($section['question_type_id'])->toBe($this->type->id)
+            ->and($section['questions'][0])->not->toHaveKey('or_questions');
+        $used = [...$used, ...array_column($section['questions'], 'id')];
+    }
+    expect($used)->toEqualCanonicalizing([...array_slice($this->questions, 0, 2), ...$stories]);
+    $saved = $this->postJson(route('customer.qat.previews.save', basename($preview)))->assertCreated()->json('paper_ids');
+    expect($saved)->toHaveCount(2);
+    $reopened = $this->get(route('customer.qat.papers.show', $saved[0]))->assertOk()->viewData('page')['props']['paper'];
+    expect(array_column($reopened['paper_data']['sections'][0]['questions'], 'id'))
+        ->toBe(array_column($page['variants'][0]['paper_data']['sections'][0]['questions'], 'id'));
+});
+
+test('QAT OR groups can be edited independently and the random toggle changes automatic selection', function () {
+    [$story] = addQatTypeToChapter($this->chapterId, 'Story', 230, 2);
+    [$application] = addQatTypeToChapter($this->chapterId, 'Application', 240, 2);
+    $scope = [
+        'catalogue_id' => DB::table('qat_catalogues')->value('id'),
+        'class_id' => $this->classId, 'subject_id' => $this->subjectId,
+    ];
+    DB::table('qat_subjects')->where('id', $this->subjectId)->update([
+        'question_type_rules' => json_encode(['or_pairs' => [['type_id' => $this->type->id, 'partner_id' => $story]]]),
+    ]);
+    $index = route('superadmin.qat-question-types.index', $scope);
+    $route = route('superadmin.qat-question-types.groups.update', $this->subjectId);
+    $legacy = ['type_ids' => [$this->type->id, $story], 'random_pick' => false];
+    $group = ['type_ids' => [$this->type->id, $story, $application], 'random_pick' => false];
+    $delegate = User::factory()->create(['user_type' => UserType::SuperAdmin, 'created_by' => $this->admin->id]);
+    $this->actingAs($delegate)->putJson($route, ['or_groups' => [$group]])->assertForbidden();
+    $this->actingAs($this->admin)->get($index)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('orGroups', [$legacy]));
+    $this->put($route, ['or_groups' => [$group]])->assertRedirect()->assertSessionHasNoErrors();
+    $this->put(route('superadmin.qat-question-types.update', $this->subjectId), [
+        'hidden_type_ids' => [$application],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    $this->get($index)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('orGroups', [$group])->where('hiddenTypeIds', [$application]));
+
+    DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $this->chapterId, 'month' => 4]);
+    $payload = [...$this->payload, 'mode' => 'auto', 'syllabus' => 'qat', 'months' => [4], 'chapter_ids' => []];
+    $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $payload)
+        ->assertUnprocessable()->assertJsonValidationErrors('sections');
+
+    $this->actingAs($this->admin)->put($route, ['or_groups' => [[...$group, 'random_pick' => true]]])
+        ->assertRedirect()->assertSessionHasNoErrors();
+    $this->get($index)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('orGroups.0.random_pick', true)->where('hiddenTypeIds', [$application]));
+    $random = $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $payload)->assertCreated()->json('preview_url');
+    $this->get($random)->assertOk()->assertInertia(fn ($page) => $page->where('paper.total_marks', 3));
+
+    $this->actingAs($this->admin)->put(route('superadmin.qat-question-types.update', $this->subjectId), [
+        'hidden_type_ids' => [],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    $this->put($route, ['or_groups' => [$group]])->assertRedirect()->assertSessionHasNoErrors();
+    $fixed = $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), $payload)->assertCreated()->json('preview_url');
+    $this->get($fixed)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('paper.question_count', 2)->where('paper.total_marks', 3)
+        ->where('paper.paper_data.sections.0.questions.0.or_questions.0.question_type_id', $story)
+        ->where('paper.paper_data.sections.0.questions.0.or_questions.1.question_type_id', $application));
+});
+
 test('QAT OR pairs generate one numbered choice and count marks once in each mode', function (string $journey) {
     [$partner, $alternatives] = addQatTypeToChapter($this->chapterId, 'Translation', 20, 2);
     $pair = ['type_id' => $this->type->id, 'partner_id' => $partner];

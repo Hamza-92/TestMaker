@@ -14,6 +14,7 @@ use App\Support\Qat\QatTrial;
 use App\Support\SubscriptionQuestionQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -82,6 +83,8 @@ class QatPaperController extends Controller
         return response()->json([
             'medium' => $subject->medium,
             'hidden_type_ids' => $rules->hiddenTypeIds,
+            'random_or_groups' => $rules->randomGroups,
+            'auto_or_groups' => $rules->groups,
             'types' => $types->map(fn ($type) => [
                 'id' => (int) $type->id,
                 'name' => $type->name ?: 'Question type '.$type->id,
@@ -188,12 +191,30 @@ class QatPaperController extends Controller
             $subject->medium,
         )->keyBy('id');
         $typeIds = $pool->pluck('question_type_id')->map(fn ($id) => (int) $id)->unique()->all();
-        $pairs = $rules->validatePairs($data['or_pairs'] ?? [], $typeIds);
+        $requestedPairs = $data['or_pairs'] ?? [];
+        if ($data['mode'] === 'auto') {
+            $randomMembers = array_merge([], ...array_column($rules->randomGroups, 'type_ids'));
+            $requestedPairs = array_filter($requestedPairs, fn ($pair) => array_intersect(
+                [$pair['type_id'], $pair['partner_id']], $randomMembers,
+            ) === []);
+        }
+        $pairs = $rules->validatePairs($requestedPairs, $typeIds);
         $layout = DB::table('qat_subjects')->where('id', $subject->id)
             ->first(['paper_section_layout', 'hidden_type_headings', 'heading_text_overrides']);
         $headingOverrides = json_decode($layout?->heading_text_overrides ?? '[]', true) ?: [];
         $typeHeadings = $builder->typeHeadings($subject, $typeIds, $headingOverrides);
         $distribution = collect($data['sections'] ?? [])->keyBy('question_type_id');
+        $autoGroups = collect();
+        if ($data['mode'] === 'auto') {
+            $paired = [...array_column($pairs, 'type_id'), ...array_column($pairs, 'partner_id')];
+            $groups = array_filter($rules->groups, fn ($group) => array_intersect($group['type_ids'], $paired) === []);
+            $distribution = $rules->autoDistribution($distribution, $groups);
+            $data['sections'] = $distribution->values()->all();
+            $autoGroups = collect($groups)->mapWithKeys(fn ($group) => [
+                $group['type_ids'][0] => $group,
+            ]);
+            $isPefPattern = $isPefPattern && $distribution->keys()->intersect($autoGroups->keys())->isEmpty();
+        }
         if ($usesTemplate) {
             foreach ($pairs as ['type_id' => $type, 'partner_id' => $partner]) {
                 if (! $distribution->has($type) || $distribution->has($partner)) {
@@ -209,6 +230,8 @@ class QatPaperController extends Controller
                 throw ValidationException::withMessages(['sections' => 'Choose up to 100 questions across the paper sections.']);
             }
             $used = [];
+            $poolByType = $pool->groupBy('question_type_id');
+            $allowRepeat = $data['allow_repeat'] ?? false;
             foreach (range(1, $variants) as $variant) {
                 $paperSections = [];
                 foreach ($distribution as $section) {
@@ -218,24 +241,36 @@ class QatPaperController extends Controller
                     if ($required < 1 || $required > $quantity) {
                         throw ValidationException::withMessages(['sections' => 'The required question count must be between 1 and the total for each section.']);
                     }
-                    $options = $pool->filter(fn ($row) => (int) $row->question_type_id === $typeId)->shuffle();
-                    if (! ($data['allow_repeat'] ?? false)) {
-                        $options = $options->reject(fn ($row) => in_array((int) $row->id, $used, true));
+                    $group = $autoGroups->get($typeId);
+                    $members = $group['type_ids'] ?? null;
+                    $candidates = collect($members ?? [$typeId])->mapWithKeys(fn (int $member) => [
+                        $member => $poolByType->get($member, collect())
+                            ->when(! $allowRepeat, fn ($rows) => $rows->reject(fn ($row) => isset($used[(int) $row->id]))),
+                    ]);
+                    $selectedTypes = ($group['random_pick'] ?? false)
+                        ? $this->pickRandomOrTypes($candidates, $quantity, $allowRepeat ? 0 : $variants - $variant)
+                        : ($members ?? [$typeId]);
+                    $choices = [];
+                    foreach ($selectedTypes as $member) {
+                        $picked = $candidates->get($member)->shuffle()->take($quantity);
+                        if ($picked->count() !== $quantity) {
+                            throw ValidationException::withMessages(['sections' => 'There are not enough eligible questions for every requested paper.']);
+                        }
+                        foreach ($picked as $row) {
+                            $used[(int) $row->id] = true;
+                        }
+
+                        $choices[] = [
+                            'question_type_id' => $member,
+                            'title' => $picked->first()->type_name ?: 'Question type '.$member,
+                            ...($typeHeadings[$member] ?? []),
+                            'required_questions' => $required,
+                            'questions' => $picked->map(fn ($row) => [
+                                ...$builder->presentQuestion($row, true), 'marks' => (float) $section['marks'],
+                            ])->values()->all(),
+                        ];
                     }
-                    $picked = $options->take($quantity);
-                    if ($picked->count() !== $quantity) {
-                        throw ValidationException::withMessages(['sections' => 'There are not enough eligible questions for every requested paper.']);
-                    }
-                    $used = [...$used, ...$picked->pluck('id')->map(fn ($id) => (int) $id)->all()];
-                    $paperSections[] = [
-                        'question_type_id' => $typeId,
-                        'title' => $picked->first()->type_name ?: 'Question type '.$typeId,
-                        ...($typeHeadings[$typeId] ?? []),
-                        'required_questions' => $required,
-                        'questions' => $picked->map(fn ($row) => [
-                            ...$builder->presentQuestion($row, true), 'marks' => (float) $section['marks'],
-                        ])->values()->all(),
-                    ];
+                    $paperSections[] = $members ? $builder->orGroupSection($typeId, $choices) : $choices[0];
                 }
                 $prepared[] = $paperSections;
             }
@@ -377,7 +412,7 @@ class QatPaperController extends Controller
                 $user,
                 'qat_'.$preview,
                 collect($prepared)->sum(fn ($sections) => collect($sections)
-                    ->sum(fn ($section) => collect($section['questions'])->sum(fn ($question) => isset($question['or_question']) ? 2 : 1))),
+                    ->sum(fn ($section) => collect($section['questions'])->sum(fn ($question) => 1 + count($question['or_questions'] ?? (isset($question['or_question']) ? [$question['or_question']] : []))))),
             );
         }
         $request->session()->put('qat_preview', [
@@ -488,6 +523,20 @@ class QatPaperController extends Controller
         $qatPaper->delete();
 
         return response()->json(['deleted' => true]);
+    }
+
+    private function pickRandomOrTypes(Collection $candidates, int $quantity, int $remainingVariants): array
+    {
+        $eligible = $candidates->filter(fn ($rows) => $rows->count() >= $quantity);
+        $capacity = $eligible->sum(fn ($rows) => intdiv($rows->count(), $quantity));
+        $maximum = min($eligible->count(), $capacity - $remainingVariants);
+        if ($maximum < 1) {
+            throw ValidationException::withMessages(['sections' => 'There are not enough eligible questions in the random OR group for every requested paper.']);
+        }
+
+        $selected = $eligible->keys()->shuffle()->take(random_int(1, $maximum))->all();
+
+        return $eligible->keys()->intersect($selected)->values()->all();
     }
 
     private function schoolDetails(Request $request): array

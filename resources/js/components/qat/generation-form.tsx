@@ -57,6 +57,7 @@ type PoolType = {
 };
 type Pool = {
     hidden_type_ids: number[];
+    auto_or_groups?: { type_ids: number[]; random_pick: boolean }[];
     types: PoolType[];
     questions: {
         data: QatQuestion[];
@@ -496,6 +497,16 @@ export default function QatGenerationForm({
     );
     const currentPool = poolScopeKey === questionScopeKey ? pool : null;
     const poolTypes = currentPool?.types ?? [];
+    const autoGroups = useMemo(
+        () =>
+            new Map(
+                (mode === 'auto'
+                    ? (currentPool?.auto_or_groups ?? [])
+                    : []
+                ).map((group) => [group.type_ids[0], group]),
+            ),
+        [currentPool, mode],
+    );
     const typesById = useMemo(
         () =>
             new Map((currentPool?.types ?? []).map((type) => [type.id, type])),
@@ -503,12 +514,12 @@ export default function QatGenerationForm({
     );
     const activePairs = useMemo(
         () =>
-            orPairs.filter(
+            (mode === 'auto' ? [] : orPairs).filter(
                 (pair) =>
                     typesById.get(pair.type_id)?.or_partner_id ===
                     pair.partner_id,
             ),
-        [orPairs, typesById],
+        [mode, orPairs, typesById],
     );
     const partnersByPrimary = useMemo(
         () =>
@@ -519,7 +530,7 @@ export default function QatGenerationForm({
         () => new Set(activePairs.map((pair) => pair.partner_id)),
         [activePairs],
     );
-    const orOptions = poolTypes.flatMap((type) => {
+    const orOptions = (mode === 'auto' ? [] : poolTypes).flatMap((type) => {
         const partner = typesById.get(type.or_partner_id ?? 0);
 
         if (!partner || suppressedTypes.has(type.id)) {
@@ -600,51 +611,102 @@ export default function QatGenerationForm({
             questionSearchIndex,
         ],
     );
-    const allAutoRows = useMemo(
-        () =>
-            [
-                ...autoSections.filter(
+    const allAutoRows = useMemo(() => {
+        const rows = new Map(
+            autoSections
+                .filter(
                     (row) =>
                         !currentPool?.hidden_type_ids.includes(
                             row.question_type_id,
-                        ),
-                ),
-                ...(currentPool?.types ?? [])
-                    .filter(
-                        (type) =>
-                            !autoSections.some(
-                                (row) => row.question_type_id === type.id,
-                            ),
-                    )
-                    .map((type) => ({
-                        question_type_id: type.id,
-                        quantity: 0,
-                        required_questions: 0,
-                        marks: type.is_objective ? 1 : 2,
-                        name: type.name,
-                    })),
-            ]
-                .map((section) => {
-                    const type = typesById.get(section.question_type_id);
+                        ) || autoGroups.has(row.question_type_id),
+                )
+                .map((row) => [row.question_type_id, row]),
+        );
+
+        for (const type of currentPool?.types ?? []) {
+            if (!rows.has(type.id)) {
+                rows.set(type.id, {
+                    question_type_id: type.id,
+                    quantity: 0,
+                    required_questions: 0,
+                    marks: type.is_objective ? 1 : 2,
+                    name: type.name,
+                });
+            }
+        }
+
+        for (const [anchor, { type_ids: ids }] of autoGroups) {
+            const configured = ids
+                .map((id) =>
+                    autoSections.find((row) => row.question_type_id === id),
+                )
+                .find((row) => row !== undefined);
+            const source =
+                configured ??
+                ids.map((id) => rows.get(id)).find((row) => row !== undefined);
+
+            for (const id of ids) {
+                rows.delete(id);
+            }
+
+            if (
+                source &&
+                !ids.every((id) => currentPool?.hidden_type_ids.includes(id))
+            ) {
+                rows.set(anchor, { ...source, question_type_id: anchor });
+            }
+        }
+
+        return Array.from(rows.values())
+            .map((section) => {
+                const type = typesById.get(section.question_type_id);
+                const group = autoGroups.get(section.question_type_id);
+                const members = group?.type_ids.map((id) => {
+                    const member = typesById.get(id);
 
                     return {
-                        ...section,
-                        id: section.question_type_id,
-                        name:
-                            type?.name ??
-                            questionTypeNames[section.question_type_id] ??
-                            section.name ??
-                            'Unavailable question type',
-                        available: type?.total ?? 0,
+                        name: currentPool?.hidden_type_ids.includes(id)
+                            ? undefined
+                            : (member?.name ?? questionTypeNames[id]),
+                        total: member?.total ?? 0,
                     };
-                })
-                .sort(
-                    (left, right) =>
-                        (typeRanks.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
-                        (typeRanks.get(right.id) ?? Number.MAX_SAFE_INTEGER),
-                ),
-        [autoSections, currentPool, questionTypeNames, typeRanks, typesById],
-    );
+                });
+                const names = members?.flatMap((member) =>
+                    member.name ? [member.name] : [],
+                );
+
+                return {
+                    ...section,
+                    id: section.question_type_id,
+                    name:
+                        (group
+                            ? names?.join(group.random_pick ? ' / ' : ' OR ') ||
+                              'Unavailable OR group'
+                            : null) ??
+                        type?.name ??
+                        questionTypeNames[section.question_type_id] ??
+                        section.name ??
+                        'Unavailable question type',
+                    available: members?.length
+                        ? (group?.random_pick ? Math.max : Math.min)(
+                              ...members.map((member) => member.total),
+                          )
+                        : (type?.total ?? 0),
+                };
+            })
+            .sort(
+                (left, right) =>
+                    (typeRanks.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+                    (typeRanks.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+            );
+    }, [
+        autoSections,
+        currentPool,
+        questionTypeNames,
+        autoGroups,
+        typeRanks,
+        typesById,
+    ]);
     const autoRows = useMemo(
         () =>
             allAutoRows
@@ -693,6 +755,7 @@ export default function QatGenerationForm({
         selectedTemplate !== null &&
         !selectedTemplate.has_hidden_types &&
         distributionPairs.length === 0 &&
+        !activeAutoRows.some((row) => autoGroups.has(row.id)) &&
         minutes === selectedTemplate.minutes &&
         JSON.stringify(normalizedSections(autoRows)) ===
             JSON.stringify(normalizedSections(selectedTemplate.sections));
@@ -715,10 +778,20 @@ export default function QatGenerationForm({
         activeAutoRows.reduce((sum, row) => sum + row.quantity, 0) <= 100;
     const variantsHaveEnoughQuestions =
         activeAutoRows.length > 0 &&
-        activeAutoRows.every(
-            (row) =>
-                row.available >= row.quantity * (allowRepeat ? 1 : variants),
-        );
+        activeAutoRows.every((row) => {
+            const group = autoGroups.get(row.id);
+
+            return group?.random_pick && !allowRepeat
+                ? group.type_ids.reduce(
+                      (capacity, id) =>
+                          capacity +
+                          Math.floor(
+                              (typesById.get(id)?.total ?? 0) / row.quantity,
+                          ),
+                      0,
+                  ) >= variants
+                : row.available >= row.quantity * (allowRepeat ? 1 : variants);
+        });
     const choicesByType = new Map<number, ManualChoice[]>();
 
     for (const choice of selectedManual) {
