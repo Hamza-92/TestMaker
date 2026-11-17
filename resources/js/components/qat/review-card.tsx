@@ -16,7 +16,10 @@ import {
     Trash2Icon,
 } from 'lucide-react';
 import type { QatReviewSelection } from '@/components/qat/generation-form';
-import { QatOrPartnerSelect } from '@/components/qat/or-partner-select';
+import {
+    QatAutoOrSelect,
+    QatOrPartnerSelect,
+} from '@/components/qat/or-partner-select';
 import { QatPastPaperCheckbox } from '@/components/qat/past-paper-checkbox';
 import { QatStepHeader } from '@/components/qat/step-header';
 
@@ -44,6 +47,7 @@ export function QatReviewCard({
     loading,
     orOptions,
     onPairChange,
+    onAutoOrChoice,
     rows,
     totalQuestions,
     totalMarks,
@@ -331,15 +335,26 @@ export function QatReviewCard({
                                                                     {row.name}
                                                                 </span>
                                                             </span>
-                                                            {partner && (
-                                                                <QatOrPartnerSelect
+                                                            {row.autoOr ? (
+                                                                <QatAutoOrSelect
                                                                     option={
-                                                                        partner
+                                                                        row.autoOr
                                                                     }
                                                                     onChange={
-                                                                        onPairChange
+                                                                        onAutoOrChoice
                                                                     }
                                                                 />
+                                                            ) : (
+                                                                partner && (
+                                                                    <QatOrPartnerSelect
+                                                                        option={
+                                                                            partner
+                                                                        }
+                                                                        onChange={
+                                                                            onPairChange
+                                                                        }
+                                                                    />
+                                                                )
                                                             )}
                                                         </div>
                                                     </th>

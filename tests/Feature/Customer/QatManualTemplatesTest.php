@@ -599,6 +599,42 @@ test('QAT OR groups can be edited independently and the random toggle changes au
         ->where('paper.paper_data.sections.0.questions.0.or_questions.1.question_type_id', $application));
 });
 
+test('matching automatic templates stay PEF and use the OR choices shown for each variant', function () {
+    [$story] = addQatTypeToChapter($this->chapterId, 'Story', 260, 2);
+    [$application] = addQatTypeToChapter($this->chapterId, 'Application', 270, 2);
+    $this->actingAs($this->admin)->put(route('superadmin.qat-question-types.groups.update', $this->subjectId), [
+        'or_groups' => [['type_ids' => [$this->type->id, $story, $application], 'random_pick' => true]],
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $this->chapterId, 'month' => 4]);
+    $choices = [
+        'question_type_id' => $this->type->id,
+        'variants' => [[$story], [$this->type->id, $application]],
+    ];
+    $payload = [
+        ...$this->payload, 'mode' => 'auto', 'syllabus' => 'qat', 'months' => [4],
+        'chapter_ids' => [], 'variants' => 2, 'auto_or_choices' => [$choices],
+    ];
+
+    $this->actingAs($this->school)->postJson(route('customer.qat.papers.store'), [
+        ...$payload, 'auto_or_choices' => [[...$choices, 'variants' => [[$story], [999999]]]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('auto_or_choices');
+    $this->postJson(route('customer.qat.papers.store'), [
+        ...$payload, 'auto_or_choices' => [[...$choices, 'variants' => [[$story], [$story]]]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('sections');
+    $preview = $this->postJson(route('customer.qat.papers.store'), $payload)->assertCreated()->json('preview_url');
+    $this->get($preview)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('variants.0.paper_data.is_pef_pattern', true)
+        ->where('variants.0.paper_data.sections.0.questions.0.question_type_id', $story)
+        ->missing('variants.0.paper_data.sections.0.questions.0.or_questions')
+        ->where('variants.1.paper_data.is_pef_pattern', true)
+        ->where('variants.1.paper_data.sections.0.questions.0.or_questions.0.question_type_id', $application)
+        ->where('paper.paper_data.generation_settings.auto_or_choices', [$choices]));
+
+    $edited = $this->postJson(route('customer.qat.papers.store'), [...$payload, 'minutes' => 45])
+        ->assertCreated()->json('preview_url');
+    $this->get($edited)->assertOk()->assertInertia(fn ($page) => $page->where('paper.paper_data.is_pef_pattern', false));
+});
+
 test('QAT OR pairs generate one numbered choice and count marks once in each mode', function (string $journey) {
     [$partner, $alternatives] = addQatTypeToChapter($this->chapterId, 'Translation', 20, 2);
     $pair = ['type_id' => $this->type->id, 'partner_id' => $partner];
@@ -632,7 +668,7 @@ test('QAT OR pairs generate one numbered choice and count marks once in each mod
         ->where('paper.question_count', 2)->has('paper.paper_data.sections', 1)
         ->where('paper.paper_data.sections.0.questions.0.or_question.question_type_id', $partner)
         ->where('paper.paper_data.sections.0.questions.1.or_question.marks', 3)
-        ->where('paper.paper_data.is_pef_pattern', false));
+        ->where('paper.paper_data.is_pef_pattern', $journey === 'auto'));
     $saved = $this->postJson(route('customer.qat.previews.save', $preview))->assertCreated()->json('paper_id');
     $this->get(route('customer.qat.create', ['mode' => $payload['mode'], 'paper' => $saved]))->assertOk()
         ->assertInertia(fn ($page) => $page->where('initialSelections.or_pairs', [$pair]));

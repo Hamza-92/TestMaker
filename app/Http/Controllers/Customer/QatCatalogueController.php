@@ -158,11 +158,10 @@ class QatCatalogueController extends Controller
         $templates = DB::table('qat_paper_templates')->whereIn('qat_subject_id', $subjects->pluck('id'))
             ->where('status', true)->orderBy('name')
             ->get(['id', 'qat_subject_id', 'name', 'category', 'minutes', 'sections'])
-            ->map(function ($template) use ($typeRules) {
-                $sections = json_decode($template->sections, true) ?: [];
+            ->map(function ($template) use ($typeRules, $mode) {
                 $rules = new QatQuestionTypeRules($typeRules->get($template->qat_subject_id));
-                $template->sections = array_values(array_filter($sections,
-                    fn ($section) => ! in_array((int) $section['question_type_id'], $rules->hiddenTypeIds, true)));
+                $sections = $rules->templateSections(json_decode($template->sections, true) ?: [], $mode === 'auto');
+                $template->sections = $rules->visibleTemplateSections($sections, $mode === 'auto');
                 $template->has_hidden_types = count($template->sections) !== count($sections);
 
                 return $template;

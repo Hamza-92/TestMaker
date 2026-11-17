@@ -14,6 +14,71 @@ export type OrPartnerOption = {
     selected: boolean;
 };
 
+export type AutoOrOption = {
+    typeId: number;
+    typeName: string;
+    value: string;
+    label: string;
+    defaultLabel: string;
+    defaultAvailable: boolean;
+    singleChoices: { id: number; name: string; available: boolean }[];
+};
+
+const triggerClass =
+    'w-auto max-w-full rounded-lg border-violet-200 bg-white text-xs font-semibold text-violet-800 hover:border-violet-400 dark:border-violet-800 dark:bg-slate-900 dark:text-violet-200';
+const contentClass =
+    'rounded-xl border-violet-200 bg-white dark:border-violet-800 dark:bg-slate-900';
+
+export function QatAutoOrSelect({
+    option,
+    onChange,
+}: {
+    option: AutoOrOption;
+    onChange: (typeId: number, memberId: number | null) => void;
+}) {
+    return (
+        <Select
+            value={option.value}
+            onValueChange={(value) =>
+                onChange(
+                    option.typeId,
+                    value === 'default' ? null : Number(value),
+                )
+            }
+        >
+            <SelectTrigger
+                aria-label={`OR choices for ${option.typeName}`}
+                size="sm"
+                className={triggerClass}
+                title={option.label}
+            >
+                <span className="min-w-0 truncate">
+                    <SelectValue>{option.label}</SelectValue>
+                </span>
+            </SelectTrigger>
+            <SelectContent align="end" className={contentClass}>
+                <SelectItem
+                    value="default"
+                    disabled={!option.defaultAvailable}
+                    className="text-xs"
+                >
+                    {option.defaultLabel}
+                </SelectItem>
+                {option.singleChoices.map(({ id, name, available }) => (
+                    <SelectItem
+                        key={id}
+                        value={String(id)}
+                        disabled={!available}
+                        className="text-xs"
+                    >
+                        {name} only
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
 export function QatOrPartnerSelect({
     option,
     onChange,
@@ -34,7 +99,7 @@ export function QatOrPartnerSelect({
             <SelectTrigger
                 aria-label={`OR partner for ${option.typeName}`}
                 size="sm"
-                className="w-auto max-w-full rounded-lg border-violet-200 bg-white text-xs font-semibold text-violet-800 hover:border-violet-400 dark:border-violet-800 dark:bg-slate-900 dark:text-violet-200"
+                className={triggerClass}
             >
                 <span className="min-w-0 truncate">
                     <SelectValue>
@@ -42,10 +107,7 @@ export function QatOrPartnerSelect({
                     </SelectValue>
                 </span>
             </SelectTrigger>
-            <SelectContent
-                align="start"
-                className="rounded-xl border-violet-200 bg-white dark:border-violet-800 dark:bg-slate-900"
-            >
+            <SelectContent align="start" className={contentClass}>
                 <SelectItem value="none" className="text-xs">
                     No partner
                 </SelectItem>

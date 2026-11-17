@@ -10,7 +10,18 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { OrPartnerOption } from '@/components/qat/or-partner-select';
+import {
+    canUseOrChoices,
+    defaultOrChoices,
+} from '@/components/qat/auto-or-choices';
+import type {
+    AutoOrChoice,
+    AutoOrGroup,
+} from '@/components/qat/auto-or-choices';
+import type {
+    AutoOrOption,
+    OrPartnerOption,
+} from '@/components/qat/or-partner-select';
 import { QatPastPaperCheckbox } from '@/components/qat/past-paper-checkbox';
 import { useQatTrial } from '@/components/qat/trial-status';
 import { Badge, Button, Card, EmptyState, PageHeader } from '@/components/tm';
@@ -57,7 +68,7 @@ type PoolType = {
 };
 type Pool = {
     hidden_type_ids: number[];
-    auto_or_groups?: { type_ids: number[]; random_pick: boolean }[];
+    auto_or_groups?: AutoOrGroup[];
     types: PoolType[];
     questions: {
         data: QatQuestion[];
@@ -105,6 +116,7 @@ type GenerationSelections = {
     past_paper?: boolean;
     manual_questions: { id: number; marks: number }[];
     or_pairs?: OrPair[];
+    auto_or_choices?: AutoOrChoice[];
 };
 
 function normalizedSections(sections: QatTemplate['sections']) {
@@ -265,7 +277,9 @@ export type QatReviewSelection = {
         required: number;
         marks: number;
         available: number;
+        autoOr?: AutoOrOption;
     }[];
+    onAutoOrChoice: (typeId: number, memberId: number | null) => void;
     totalQuestions: number;
     totalMarks: number;
     variantsHaveEnoughQuestions: boolean;
@@ -359,6 +373,15 @@ export default function QatGenerationForm({
     const [orPairs, setOrPairs] = useState<OrPair[]>(
         initialSelections?.or_pairs ?? [],
     );
+    const [orSeed, setOrSeed] = useState(() =>
+        Math.floor(Math.random() * 4294967296),
+    );
+    const [restoredOrChoices, setRestoredOrChoices] = useState(
+        initialSelections?.auto_or_choices ?? [],
+    );
+    const [orOverrides, setOrOverrides] = useState<
+        Record<number, { scope: string; memberId: number | null }>
+    >({});
     const [templateId, setTemplateId] = useState<number | null>(
         initialSelections?.template_id ?? null,
     );
@@ -492,6 +515,7 @@ export default function QatGenerationForm({
     const monthKey = months.join(',');
     const questionScopeKey = `${resolvedSubjectId ?? ''}|${targetChapterKey}|${syllabus}|${monthKey}|${mode}`;
     const restoreScopeKey = useRef(questionScopeKey);
+    const [initialOrScope] = useState(questionScopeKey);
     const pendingManualChoices = useRef(
         initialSelections?.manual_questions ?? [],
     );
@@ -688,9 +712,7 @@ export default function QatGenerationForm({
                         section.name ??
                         'Unavailable question type',
                     available: members?.length
-                        ? (group?.random_pick ? Math.max : Math.min)(
-                              ...members.map((member) => member.total),
-                          )
+                        ? Math.max(...members.map((member) => member.total))
                         : (type?.total ?? 0),
                 };
             })
@@ -755,10 +777,100 @@ export default function QatGenerationForm({
         selectedTemplate !== null &&
         !selectedTemplate.has_hidden_types &&
         distributionPairs.length === 0 &&
-        !activeAutoRows.some((row) => autoGroups.has(row.id)) &&
         minutes === selectedTemplate.minutes &&
         JSON.stringify(normalizedSections(autoRows)) ===
             JSON.stringify(normalizedSections(selectedTemplate.sections));
+    const autoOrOptions = new Map<number, AutoOrOption>();
+    const selectedOrChoices = new Map<number, number[][]>();
+
+    for (const row of autoRows) {
+        const group = autoGroups.get(row.id);
+
+        if (!group) {
+            continue;
+        }
+
+        const quantity = Math.max(row.quantity, 1);
+        const capacities = new Map(
+            group.type_ids.map((id) => {
+                const capacity = Math.floor(
+                    (typesById.get(id)?.total ?? 0) / quantity,
+                );
+
+                return [id, allowRepeat && capacity > 0 ? variants : capacity];
+            }),
+        );
+        const retained =
+            questionScopeKey === initialOrScope
+                ? restoredOrChoices.find(
+                      (choice) => choice.question_type_id === row.id,
+                  )?.variants
+                : undefined;
+        const defaults =
+            retained && canUseOrChoices(retained, capacities, variants)
+                ? retained
+                : defaultOrChoices(
+                      group,
+                      capacities,
+                      variants,
+                      orSeed ^ row.id,
+                  );
+        const override = orOverrides[row.id];
+        const single =
+            override?.scope === questionScopeKey ? override.memberId : null;
+        const singlePlan =
+            single === null
+                ? undefined
+                : Array.from({ length: variants }, () => [single]);
+        const choices = singlePlan
+            ? canUseOrChoices(singlePlan, capacities, variants)
+                ? singlePlan
+                : []
+            : defaults;
+        const names = (ids: number[]) =>
+            ids
+                .map(
+                    (id) =>
+                        typesById.get(id)?.name ??
+                        questionTypeNames[id] ??
+                        'Unavailable type',
+                )
+                .join(' OR ');
+        const defaultNames = defaults.map(names);
+        const defaultLabel = defaultNames.every(
+            (name) => name === defaultNames[0],
+        )
+            ? defaultNames[0]
+            : defaultNames
+                  .map(
+                      (name, index) =>
+                          `Paper ${String.fromCharCode(65 + index)} · ${name}`,
+                  )
+                  .join(' / ');
+        const selectedName =
+            single === null ? defaultLabel : `${names([single])} only`;
+
+        selectedOrChoices.set(row.id, choices);
+        autoOrOptions.set(row.id, {
+            typeId: row.id,
+            typeName: row.name,
+            value: single === null ? 'default' : String(single),
+            label: selectedName ? `OR · ${selectedName}` : 'OR',
+            defaultLabel: defaultLabel
+                ? `${group.random_pick ? 'Random' : 'Default'} · ${defaultLabel}`
+                : 'Default unavailable',
+            defaultAvailable: defaults.length > 0,
+            singleChoices: group.type_ids.flatMap((id) => {
+                const member = typesById.get(id);
+                const available = (capacities.get(id) ?? 0) >= variants;
+
+                return member && (available || id === single)
+                    ? [{ id, name: member.name, available }]
+                    : [];
+            }),
+        });
+    }
+
     const templateHasEnoughQuestions =
         activeAutoRows.length > 0 &&
         autoRows.every(
@@ -779,17 +891,10 @@ export default function QatGenerationForm({
     const variantsHaveEnoughQuestions =
         activeAutoRows.length > 0 &&
         activeAutoRows.every((row) => {
-            const group = autoGroups.get(row.id);
+            const choices = selectedOrChoices.get(row.id);
 
-            return group?.random_pick && !allowRepeat
-                ? group.type_ids.reduce(
-                      (capacity, id) =>
-                          capacity +
-                          Math.floor(
-                              (typesById.get(id)?.total ?? 0) / row.quantity,
-                          ),
-                      0,
-                  ) >= variants
+            return choices
+                ? choices.length === variants
                 : row.available >= row.quantity * (allowRepeat ? 1 : variants);
         });
     const choicesByType = new Map<number, ManualChoice[]>();
@@ -1149,6 +1254,9 @@ export default function QatGenerationForm({
         setTemplateId(template?.id ?? null);
         setAutoSections(normalizedSections(template?.sections ?? []));
         setOrPairs([]);
+        setOrOverrides({});
+        setRestoredOrChoices([]);
+        setOrSeed(Math.floor(Math.random() * 4294967296));
 
         if (template || mode === 'auto') {
             setMinutes(template?.minutes ?? 40);
@@ -1267,6 +1375,13 @@ export default function QatGenerationForm({
                         : activePairs.filter((pair) =>
                               choicesByType.has(pair.type_id),
                           ),
+                    auto_or_choices: activeAutoRows.flatMap((row) => {
+                        const choices = selectedOrChoices.get(row.id);
+
+                        return choices
+                            ? [{ question_type_id: row.id, variants: choices }]
+                            : [];
+                    }),
                     sections: usesDistribution
                         ? normalizedSections(activeAutoRows)
                         : [],
@@ -1436,10 +1551,16 @@ export default function QatGenerationForm({
                 loading: poolBusy,
                 orOptions,
                 onPairChange: updateOrPair,
+                onAutoOrChoice: (id, memberId) =>
+                    setOrOverrides((current) => ({
+                        ...current,
+                        [id]: { scope: questionScopeKey, memberId },
+                    })),
                 rows:
                     poolScopeKey === questionScopeKey
                         ? reviewRows.map((row) => ({
                               ...row,
+                              autoOr: autoOrOptions.get(row.id),
                               available:
                                   autoRows.find((item) => item.id === row.id)
                                       ?.available ?? 0,
@@ -1462,6 +1583,8 @@ export default function QatGenerationForm({
                     setTemplateId(null);
                     setAutoSections([]);
                     setOrPairs([]);
+                    setOrOverrides({});
+                    setRestoredOrChoices([]);
                     setTemplateRevision((revision) => revision + 1);
                     setMinutes(40);
                 },

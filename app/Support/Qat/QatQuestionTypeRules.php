@@ -14,6 +14,15 @@ final class QatQuestionTypeRules
         'or_pairs.*.partner_id' => ['required', 'integer'],
     ];
 
+    public const AUTO_CHOICE_RULES = [
+        'auto_or_choices' => ['sometimes', 'array', 'list', 'max:20'],
+        'auto_or_choices.*' => ['array:question_type_id,variants'],
+        'auto_or_choices.*.question_type_id' => ['required', 'integer', 'distinct'],
+        'auto_or_choices.*.variants' => ['required', 'array', 'list', 'between:1,2'],
+        'auto_or_choices.*.variants.*' => ['required', 'array', 'list', 'min:1'],
+        'auto_or_choices.*.variants.*.*' => ['required', 'integer'],
+    ];
+
     public readonly array $hiddenTypeIds;
 
     public readonly array $pairs;
@@ -92,6 +101,50 @@ final class QatQuestionTypeRules
         }
 
         return $sections->reject(fn ($row, $id) => isset($anchors[$id]) && $anchors[$id] !== (int) $id);
+    }
+
+    public function templateSections(array $sections, bool $automatic): array
+    {
+        return $automatic
+            ? $this->autoDistribution(collect($sections)->keyBy('question_type_id'), $this->groups)->values()->all()
+            : $sections;
+    }
+
+    public function visibleTemplateSections(array $sections, bool $automatic): array
+    {
+        $visibleAnchors = $automatic
+            ? array_column(array_filter($this->groups, fn ($group) => array_diff($group['type_ids'], $this->hiddenTypeIds) !== []), 'type_ids')
+            : [];
+        $anchors = array_column($visibleAnchors, 0);
+
+        return array_values(array_filter($sections, fn ($section) => in_array((int) $section['question_type_id'], $anchors, true)
+            || ! in_array((int) $section['question_type_id'], $this->hiddenTypeIds, true)));
+    }
+
+    public function validateAutoChoices(array $choices, Collection $groups, Collection $distribution, int $variants): array
+    {
+        $selected = [];
+        foreach ($choices as $choice) {
+            $anchor = (int) $choice['question_type_id'];
+            $members = $groups->get($anchor)['type_ids'] ?? [];
+            if ($members === [] || ! $distribution->has($anchor) || count($choice['variants']) !== $variants) {
+                throw ValidationException::withMessages([
+                    'auto_or_choices' => 'Refresh the OR choices for the current question distribution and paper variants.',
+                ]);
+            }
+
+            foreach ($choice['variants'] as $index => $types) {
+                $ids = array_map('intval', $types);
+                if (array_diff($ids, $members) !== [] || count(array_unique($ids)) !== count($ids)) {
+                    throw ValidationException::withMessages([
+                        'auto_or_choices' => 'Choose distinct question types from the configured OR group.',
+                    ]);
+                }
+                $selected[$anchor][$index] = $ids;
+            }
+        }
+
+        return $selected;
     }
 
     public function validatePairs(array $pairs, array $availableTypes, bool $requireConfigured = true): array

@@ -129,6 +129,7 @@ class QatPaperController extends Controller
             'sections.*.required_questions' => ['sometimes', 'required', 'integer', 'between:1,100'],
             'sections.*.marks' => ['required', 'numeric', 'between:0.5,20'],
             ...QatQuestionTypeRules::PAIR_RULES,
+            ...QatQuestionTypeRules::AUTO_CHOICE_RULES,
             'manual_questions' => ['array', 'max:200'],
             'manual_questions.*.id' => ['required', 'integer', 'distinct'],
             'manual_questions.*.marks' => ['required', 'numeric', 'between:0.5,20'],
@@ -142,7 +143,6 @@ class QatPaperController extends Controller
         $rules = QatQuestionTypeRules::forSubject((int) $subject->id);
         $template = null;
         $templateSections = [];
-        $isPefPattern = false;
         $usesTemplate = $data['mode'] === 'auto' || ($data['selection_method'] ?? 'manual') === 'template';
         if ($usesTemplate) {
             if (! empty($data['template_id'])) {
@@ -153,18 +153,10 @@ class QatPaperController extends Controller
                 if (! $template) {
                     throw ValidationException::withMessages(['template_id' => 'Select an active template for this QAT book.']);
                 }
-                $templateSections = json_decode($template->sections, true) ?: [];
+                $templateSections = $rules->templateSections(json_decode($template->sections, true) ?: [], $data['mode'] === 'auto');
             }
-            $data['sections'] = $data['sections'] ?? array_values(array_filter($templateSections,
-                fn ($section) => ! in_array((int) $section['question_type_id'], $rules->hiddenTypeIds, true)));
+            $data['sections'] = $data['sections'] ?? $rules->visibleTemplateSections($templateSections, $data['mode'] === 'auto');
             $data['minutes'] = $data['minutes'] ?? $template?->minutes;
-            $normalize = fn (array $sections) => collect($sections)->map(fn ($section) => [
-                'question_type_id' => (int) $section['question_type_id'],
-                'quantity' => (int) $section['quantity'],
-                'required_questions' => (int) ($section['required_questions'] ?? $section['quantity']),
-                'marks' => (float) $section['marks'],
-            ])->sortBy('question_type_id')->values()->all();
-            $isPefPattern = $template !== null && empty($data['or_pairs']) && (int) $data['minutes'] === (int) $template->minutes && $normalize($data['sections']) === $normalize($templateSections);
         }
         if (empty($data['minutes'])) {
             throw ValidationException::withMessages(['minutes' => 'Enter the paper duration.']);
@@ -213,8 +205,13 @@ class QatPaperController extends Controller
             $autoGroups = collect($groups)->mapWithKeys(fn ($group) => [
                 $group['type_ids'][0] => $group,
             ]);
-            $isPefPattern = $isPefPattern && $distribution->keys()->intersect($autoGroups->keys())->isEmpty();
         }
+        $isPefPattern = $template !== null
+            && ($data['mode'] === 'auto' || $pairs === [])
+            && (int) $data['minutes'] === (int) $template->minutes
+            && $this->normalizedDistribution($data['sections']) === $this->normalizedDistribution($templateSections);
+        $variants = $data['mode'] === 'auto' ? (int) ($data['variants'] ?? 1) : 1;
+        $selectedOrChoices = $rules->validateAutoChoices($data['auto_or_choices'] ?? [], $autoGroups, $distribution, $variants);
         if ($usesTemplate) {
             foreach ($pairs as ['type_id' => $type, 'partner_id' => $partner]) {
                 if (! $distribution->has($type) || $distribution->has($partner)) {
@@ -223,8 +220,8 @@ class QatPaperController extends Controller
                 $distribution->put($partner, [...$distribution->get($type), 'question_type_id' => $partner]);
             }
         }
-        $variants = $data['mode'] === 'auto' ? (int) ($data['variants'] ?? 1) : 1;
         $prepared = [];
+        $usedOrChoices = [];
         if ($data['mode'] === 'auto') {
             if ($distribution->isEmpty() || collect($data['sections'])->sum('quantity') > 100) {
                 throw ValidationException::withMessages(['sections' => 'Choose up to 100 questions across the paper sections.']);
@@ -247,9 +244,12 @@ class QatPaperController extends Controller
                         $member => $poolByType->get($member, collect())
                             ->when(! $allowRepeat, fn ($rows) => $rows->reject(fn ($row) => isset($used[(int) $row->id]))),
                     ]);
-                    $selectedTypes = ($group['random_pick'] ?? false)
+                    $selectedTypes = $selectedOrChoices[$typeId][$variant - 1] ?? (($group['random_pick'] ?? false)
                         ? $this->pickRandomOrTypes($candidates, $quantity, $allowRepeat ? 0 : $variants - $variant)
-                        : ($members ?? [$typeId]);
+                        : ($members ?? [$typeId]));
+                    if ($members) {
+                        $usedOrChoices[$typeId][] = $selectedTypes;
+                    }
                     $choices = [];
                     foreach ($selectedTypes as $member) {
                         $picked = $candidates->get($member)->shuffle()->take($quantity);
@@ -336,6 +336,9 @@ class QatPaperController extends Controller
             'minutes' => (int) $data['minutes'],
             'template_id' => $template ? (int) $template->id : null,
             'or_pairs' => $pairs,
+            'auto_or_choices' => collect($usedOrChoices)->map(fn ($choices, $typeId) => [
+                'question_type_id' => $typeId, 'variants' => $choices,
+            ])->values()->all(),
             'sections' => collect($data['sections'] ?? [])->map(fn ($section) => [
                 'question_type_id' => (int) $section['question_type_id'],
                 'quantity' => (int) $section['quantity'],
@@ -523,6 +526,16 @@ class QatPaperController extends Controller
         $qatPaper->delete();
 
         return response()->json(['deleted' => true]);
+    }
+
+    private function normalizedDistribution(array $sections): array
+    {
+        return collect($sections)->map(fn ($section) => [
+            'question_type_id' => (int) $section['question_type_id'],
+            'quantity' => (int) $section['quantity'],
+            'required_questions' => (int) ($section['required_questions'] ?? $section['quantity']),
+            'marks' => (float) $section['marks'],
+        ])->sortBy('question_type_id')->values()->all();
     }
 
     private function pickRandomOrTypes(Collection $candidates, int $quantity, int $remainingVariants): array
