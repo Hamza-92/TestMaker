@@ -34,7 +34,11 @@ import {
     storeQatObjectiveSettings,
     storeQatPaperSettings,
 } from './paper-settings';
-import { QatObjectiveQuestion, QatQuestionContent } from './question';
+import {
+    qatObjectivePassageItems,
+    QatObjectiveQuestion,
+    QatQuestionContent,
+} from './question';
 import type { QatMedium, QatObjectiveSettings, QatQuestion } from './question';
 
 const toolbarHoverClass =
@@ -365,6 +369,25 @@ function QatTypeHeading({
     );
 }
 
+function objectiveQuestionNumbers(sections: PaperSection[]) {
+    let nextNumber = 1;
+
+    return sections.map(({ questions }) => {
+        const numbers: number[] = [];
+
+        for (const question of questions) {
+            numbers.push(nextNumber);
+            nextNumber += Math.max(
+                1,
+                qatObjectivePassageItems(question).length,
+                qatObjectivePassageItems(question.or_question).length,
+            );
+        }
+
+        return numbers;
+    });
+}
+
 function QatPaperQuestion({
     question,
     number,
@@ -375,7 +398,7 @@ function QatPaperQuestion({
     medium,
 }: {
     question: PaperQuestion;
-    number?: string;
+    number?: number | string;
     typeNumber?: number;
     marksLabel?: string;
     showAnswers: boolean;
@@ -396,7 +419,7 @@ function QatPaperQuestion({
         ) : (
             <QatQuestionContent
                 question={item}
-                number={number}
+                number={number === undefined ? undefined : String(number)}
                 typeNumber={mainNumber}
                 displayMedium={medium}
             />
@@ -445,19 +468,19 @@ function QatPaperQuestion({
 function QatPaperType({
     section,
     typeNumber,
-    precedingObjectiveQuestions,
+    objectiveNumbers,
     showAnswers,
     objectiveSettings,
     medium,
 }: {
     section: PaperSection;
     typeNumber: number;
-    precedingObjectiveQuestions?: number;
+    objectiveNumbers?: number[];
     showAnswers: boolean;
     objectiveSettings: QatObjectiveSettings;
     medium: QatMedium;
 }) {
-    const isObjective = precedingObjectiveQuestions !== undefined;
+    const isObjective = objectiveNumbers !== undefined;
     const hideHeading = section.hide_heading === true;
 
     return (
@@ -480,12 +503,19 @@ function QatPaperType({
             >
                 {section.questions.map((question, index) => {
                     const startsType = hideHeading && index === 0;
-                    const number =
-                        hideHeading && section.questions.length === 1
-                            ? undefined
-                            : isObjective
-                              ? String(precedingObjectiveQuestions + index + 1)
-                              : romanSection(index + 1).toLowerCase();
+                    const hasNumberedPassage =
+                        isObjective &&
+                        (qatObjectivePassageItems(question).length > 0 ||
+                            qatObjectivePassageItems(question.or_question)
+                                .length > 0);
+                    const hideSubNumber =
+                        hideHeading &&
+                        section.questions.length === 1 &&
+                        !hasNumberedPassage;
+                    const number = hideSubNumber
+                        ? undefined
+                        : (objectiveNumbers?.[index] ??
+                          romanSection(index + 1).toLowerCase());
 
                     return (
                         <QatPaperQuestion
@@ -578,6 +608,8 @@ export default function QatPaper({
     const objectiveQuestions = objectiveSections.flatMap(
         (section) => section.questions,
     );
+    const objectiveNumbersBySection =
+        objectiveQuestionNumbers(objectiveSections);
     const sectionLayout = paper.paper_data.section_layout;
     const showObjectiveHeading =
         objectiveQuestions.length > 0 &&
@@ -1091,45 +1123,27 @@ export default function QatPaper({
                                         )}
                                         <div className="mt-2 space-y-4">
                                             {objectiveSections.map(
-                                                (section, sectionIndex) => {
-                                                    const preceding =
-                                                        objectiveSections
-                                                            .slice(
-                                                                0,
-                                                                sectionIndex,
-                                                            )
-                                                            .reduce(
-                                                                (
-                                                                    total,
-                                                                    previous,
-                                                                ) =>
-                                                                    total +
-                                                                    previous
-                                                                        .questions
-                                                                        .length,
-                                                                0,
-                                                            );
-
-                                                    return (
-                                                        <QatPaperType
-                                                            key={`${section.question_type_id}-${sectionIndex}`}
-                                                            section={section}
-                                                            typeNumber={
-                                                                sectionIndex + 1
-                                                            }
-                                                            precedingObjectiveQuestions={
-                                                                preceding
-                                                            }
-                                                            showAnswers={
-                                                                showAnswers
-                                                            }
-                                                            objectiveSettings={
-                                                                objectiveSettings
-                                                            }
-                                                            medium={medium}
-                                                        />
-                                                    );
-                                                },
+                                                (section, sectionIndex) => (
+                                                    <QatPaperType
+                                                        key={`${section.question_type_id}-${sectionIndex}`}
+                                                        section={section}
+                                                        typeNumber={
+                                                            sectionIndex + 1
+                                                        }
+                                                        objectiveNumbers={
+                                                            objectiveNumbersBySection[
+                                                                sectionIndex
+                                                            ]
+                                                        }
+                                                        showAnswers={
+                                                            showAnswers
+                                                        }
+                                                        objectiveSettings={
+                                                            objectiveSettings
+                                                        }
+                                                        medium={medium}
+                                                    />
+                                                ),
                                             )}
                                         </div>
                                     </section>

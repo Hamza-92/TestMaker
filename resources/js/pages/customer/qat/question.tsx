@@ -48,6 +48,14 @@ function records(value: unknown): Record<string, unknown>[] {
         : [];
 }
 
+export function qatObjectivePassageItems(question?: QatQuestion) {
+    return question?.is_objective &&
+        (question.schema_key === 'objective_passage_mcq' ||
+            !question.schema_key)
+        ? records(question.content?.items)
+        : [];
+}
+
 function sameText(first: string, second: string): boolean {
     const normalize = (value: string) =>
         value
@@ -480,7 +488,9 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     displayMedium: QatMedium;
 }) {
     const content = question.content ?? {};
-    const items = records(content.items);
+    const passageItems = qatObjectivePassageItems(question);
+    const isPassage = passageItems.length > 0;
+    const items = isPassage ? passageItems : records(content.items);
     const options = question.options.length
         ? question.options
         : records(content.options);
@@ -510,12 +520,18 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
     const extraDetailEn = sameText(detailEn, primaryEn) ? '' : detailEn;
     const extraDetailUr = sameText(detailUr, primaryUr) ? '' : detailUr;
     const primaryOptions = options.length ? options : trueFalseOptions;
-    const startWithItem = !primaryEn && !primaryUr && !primaryOptions.length;
+    const startWithItem =
+        isPassage || (!primaryEn && !primaryUr && !primaryOptions.length);
+    const passageStart = typeof number === 'number' ? number : 1;
 
     return (
         <div className="qat-objective-question space-y-2">
             <ObjectiveLine
-                number={number === undefined ? undefined : String(number)}
+                number={
+                    isPassage || number === undefined
+                        ? undefined
+                        : String(number)
+                }
                 typeNumber={startWithItem ? undefined : typeNumber}
                 en={primaryEn}
                 ur={primaryUr}
@@ -558,7 +574,11 @@ export const QatObjectiveQuestion = memo(function QatObjectiveQuestion({
             {items.map((item, index) => (
                 <ObjectiveLine
                     key={index}
-                    number={`${number === undefined ? '' : `${number}.`}${String.fromCharCode(97 + index)}`}
+                    number={
+                        isPassage
+                            ? String(passageStart + index)
+                            : `${number === undefined ? '' : `${number}.`}${String.fromCharCode(97 + index)}`
+                    }
                     typeNumber={
                         startWithItem && index === 0 ? typeNumber : undefined
                     }
