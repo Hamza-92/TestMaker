@@ -119,6 +119,8 @@ export const InlineQuestionsTemplate: SectionTemplate = ({
                         <span
                             key={question.id}
                             data-paper-question
+                            data-paper-section-id={section.id}
+                            data-paper-question-id={question.id}
                             className={
                                 question.sameStatement || question.verseLayout
                                     ? 'mr-4 inline-block w-full align-top'

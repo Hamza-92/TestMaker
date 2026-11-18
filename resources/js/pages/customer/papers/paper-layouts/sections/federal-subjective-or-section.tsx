@@ -139,7 +139,11 @@ function FederalQuestionCell({
     );
 
     return (
-        <td className="group/question relative px-2 py-1 align-top font-normal">
+        <td
+            data-paper-section-id={section.id}
+            data-paper-question-id={question.id}
+            className="group/question relative px-2 py-1 align-top font-normal"
+        >
             {singleMediumStatement ? (
                 <div
                     dir="ltr"
@@ -180,12 +184,23 @@ function FederalQuestionCell({
                 <img
                     src={question.imageUrl}
                     alt=""
+                    style={
+                        question.imageWidth && question.imageHeight
+                            ? {
+                                  width: question.imageWidth,
+                                  height: question.imageHeight,
+                                  maxWidth: '100%',
+                              }
+                            : undefined
+                    }
                     className={
-                        question.imageSize === 'sm'
-                            ? 'mx-auto mt-1 max-h-24 object-contain'
-                            : question.imageSize === 'lg'
-                              ? 'mx-auto mt-1 max-h-64 object-contain'
-                              : 'mx-auto mt-1 max-h-40 object-contain'
+                        question.imageWidth
+                            ? 'mx-auto mt-1 object-contain'
+                            : question.imageSize === 'sm'
+                              ? 'mx-auto mt-1 max-h-24 object-contain'
+                              : question.imageSize === 'lg'
+                                ? 'mx-auto mt-1 max-h-64 object-contain'
+                                : 'mx-auto mt-1 max-h-40 object-contain'
                     }
                 />
             )}

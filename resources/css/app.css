@@ -710,6 +710,10 @@ input[type='date']::-webkit-calendar-picker-indicator {
     break-inside: avoid;
 }
 
+[data-paper-shell]:not([data-paper-preview-only]) [data-print-paper] [data-paper-question-id] img {
+    cursor: pointer;
+}
+
 .tm-equation {
     display: inline-block;
     max-width: 100%;

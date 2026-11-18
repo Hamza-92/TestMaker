@@ -39,6 +39,8 @@ export interface GeneratedPaperQuestion {
     topicLabel: string | null;
     imageUrl: string | null;
     imageSize: PaperImageSize;
+    imageWidth?: number;
+    imageHeight?: number;
     options: PaperQuestionOption[];
     passageQuestions?: GeneratedPaperPassageQuestion[];
     answerLines: number;

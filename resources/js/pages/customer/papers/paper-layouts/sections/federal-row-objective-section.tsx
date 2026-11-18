@@ -131,6 +131,7 @@ export function FederalRowObjectiveSection(
                                             <FederalPassageQuestionRow
                                                 key={passageQuestion.id}
                                                 question={passageQuestion}
+                                                parentQuestionId={question.id}
                                                 number={number + passageIndex}
                                                 urduOnly={urduOnly}
                                                 optionIndexes={optionIndexes}
@@ -266,7 +267,12 @@ function PassageRow({
     const { section } = props;
 
     return (
-        <tr data-paper-question data-paper-passage-row>
+        <tr
+            data-paper-question
+            data-paper-passage-row
+            data-paper-section-id={section.id}
+            data-paper-question-id={question.id}
+        >
             <td
                 colSpan={columnCount}
                 className="group/question relative px-2 py-1.5 font-normal"
@@ -289,7 +295,20 @@ function PassageRow({
                     <img
                         src={question.imageUrl}
                         alt=""
-                        className="mx-auto mt-1 max-h-24 object-contain"
+                        style={
+                            question.imageWidth && question.imageHeight
+                                ? {
+                                      width: question.imageWidth,
+                                      height: question.imageHeight,
+                                      maxWidth: '100%',
+                                  }
+                                : undefined
+                        }
+                        className={
+                            question.imageWidth
+                                ? 'mx-auto mt-1 object-contain'
+                                : 'mx-auto mt-1 max-h-24 object-contain'
+                        }
                     />
                 )}
                 <QuestionHoverActions
@@ -339,7 +358,11 @@ function FederalRow({
     );
 
     return (
-        <tr data-paper-question>
+        <tr
+            data-paper-question
+            data-paper-section-id={section.id}
+            data-paper-question-id={question.id}
+        >
             {urduOnly && showBubbles && (
                 <BubbleCell
                     options={options}
@@ -390,7 +413,20 @@ function FederalRow({
                     <img
                         src={question.imageUrl}
                         alt=""
-                        className="mx-auto mt-1 max-h-24 object-contain"
+                        style={
+                            question.imageWidth && question.imageHeight
+                                ? {
+                                      width: question.imageWidth,
+                                      height: question.imageHeight,
+                                      maxWidth: '100%',
+                                  }
+                                : undefined
+                        }
+                        className={
+                            question.imageWidth
+                                ? 'mx-auto mt-1 object-contain'
+                                : 'mx-auto mt-1 max-h-24 object-contain'
+                        }
                     />
                 )}
                 <QuestionHoverActions
@@ -450,6 +486,7 @@ function FederalRow({
 
 function FederalPassageQuestionRow({
     question,
+    parentQuestionId,
     number,
     urduOnly,
     optionIndexes,
@@ -458,6 +495,7 @@ function FederalPassageQuestionRow({
     props,
 }: {
     question: GeneratedPaperPassageQuestion;
+    parentQuestionId: string;
     number: number;
     urduOnly: boolean;
     optionIndexes: number[];
@@ -470,7 +508,11 @@ function FederalPassageQuestionRow({
     );
 
     return (
-        <tr data-paper-question>
+        <tr
+            data-paper-question
+            data-paper-section-id={props.section.id}
+            data-paper-question-id={parentQuestionId}
+        >
             {urduOnly && showBubbles && (
                 <BubbleCell
                     options={options}

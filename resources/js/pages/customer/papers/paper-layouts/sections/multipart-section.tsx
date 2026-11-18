@@ -225,6 +225,8 @@ export function MultipartSection({
                             return (
                                 <div
                                     key={`${rowIndex}-${part.key}`}
+                                    data-paper-section-id={section.id}
+                                    data-paper-question-id={part.question.id}
                                     className="group/question relative break-inside-avoid"
                                 >
                                     {hasBilingualContent ? (

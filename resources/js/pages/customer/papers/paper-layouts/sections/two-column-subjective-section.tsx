@@ -189,6 +189,8 @@ function SubjectiveQuestionItem({
     return (
         <div
             data-paper-question
+            data-paper-section-id={section.id}
+            data-paper-question-id={question.id}
             className={`group/question relative text-sm leading-6 ${question.verseLayout ? 'pt-1.5' : ''}`}
         >
             <BilingualQuestionRow
@@ -215,12 +217,23 @@ function SubjectiveQuestionItem({
                             <img
                                 src={question.imageUrl}
                                 alt=""
+                                style={
+                                    question.imageWidth && question.imageHeight
+                                        ? {
+                                              width: question.imageWidth,
+                                              height: question.imageHeight,
+                                              maxWidth: '100%',
+                                          }
+                                        : undefined
+                                }
                                 className={
-                                    question.imageSize === 'sm'
-                                        ? 'max-h-24 object-contain'
-                                        : question.imageSize === 'lg'
-                                          ? 'max-h-64 object-contain'
-                                          : 'max-h-40 object-contain'
+                                    question.imageWidth
+                                        ? 'object-contain'
+                                        : question.imageSize === 'sm'
+                                          ? 'max-h-24 object-contain'
+                                          : question.imageSize === 'lg'
+                                            ? 'max-h-64 object-contain'
+                                            : 'max-h-40 object-contain'
                                 }
                             />
                             <div className="mt-1 flex gap-1 print:hidden">

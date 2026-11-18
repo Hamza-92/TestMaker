@@ -186,6 +186,7 @@ Route::middleware(['auth', 'verified', EnforceQatTrial::class])->group(function 
         });
 
         Route::middleware('teacher.feature:generate_papers,manage_own_papers')->group(function () {
+            Route::post('papers/images', [QuestionImageController::class, 'storeForPaper'])->name('customer.papers.images');
             Route::put('papers/{paper}', [PaperController::class, 'update'])->name('customer.papers.update');
         });
 

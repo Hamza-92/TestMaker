@@ -119,7 +119,11 @@ function BoardObjectiveTableRow({
     const urduOnly = Boolean(section.titleUrdu && !section.titleEnglish);
 
     return (
-        <tr data-paper-question>
+        <tr
+            data-paper-question
+            data-paper-section-id={section.id}
+            data-paper-question-id={question.id}
+        >
             <td className="px-1 py-1 text-center align-middle font-bold">
                 {number}.
             </td>
@@ -142,12 +146,23 @@ function BoardObjectiveTableRow({
                     <img
                         src={question.imageUrl}
                         alt=""
+                        style={
+                            question.imageWidth && question.imageHeight
+                                ? {
+                                      width: question.imageWidth,
+                                      height: question.imageHeight,
+                                      maxWidth: '100%',
+                                  }
+                                : undefined
+                        }
                         className={
-                            question.imageSize === 'sm'
-                                ? 'mx-auto mt-1 max-h-24 object-contain'
-                                : question.imageSize === 'lg'
-                                  ? 'mx-auto mt-1 max-h-64 object-contain'
-                                  : 'mx-auto mt-1 max-h-40 object-contain'
+                            question.imageWidth
+                                ? 'mx-auto mt-1 object-contain'
+                                : question.imageSize === 'sm'
+                                  ? 'mx-auto mt-1 max-h-24 object-contain'
+                                  : question.imageSize === 'lg'
+                                    ? 'mx-auto mt-1 max-h-64 object-contain'
+                                    : 'mx-auto mt-1 max-h-40 object-contain'
                         }
                     />
                 )}

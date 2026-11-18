@@ -93,6 +93,10 @@ import {
     variantForSet,
 } from './paper-layouts/paper-variant';
 import { PaperWatermark } from './paper-layouts/paper-watermark';
+import { updateQuestionImage } from './paper-layouts/questions/paper-image-edit';
+import type { PaperImageChange } from './paper-layouts/questions/paper-image-edit';
+import { PaperImageEditor } from './paper-layouts/questions/paper-image-editor';
+import type { PaperImageTarget } from './paper-layouts/questions/paper-image-editor';
 import {
     ArabicQuestionFontProvider,
     QuestionContent,
@@ -7351,7 +7355,36 @@ export default function GeneratePaper({
                               ? updateSectionQuestion(
                                     section,
                                     questionId,
-                                    (question) => ({ ...question, imageSize }),
+                                    (question) => ({
+                                        ...question,
+                                        imageSize,
+                                        imageWidth: undefined,
+                                        imageHeight: undefined,
+                                    }),
+                                )
+                              : section,
+                      ),
+                  }
+                : current,
+        );
+    }
+
+    function updatePaperQuestionImage(
+        sectionId: string,
+        questionId: string,
+        change: PaperImageChange,
+    ) {
+        setGeneratedPaper((current) =>
+            current
+                ? {
+                      ...current,
+                      sections: current.sections.map((section) =>
+                          section.id === sectionId
+                              ? updateSectionQuestion(
+                                    section,
+                                    questionId,
+                                    (question) =>
+                                        updateQuestionImage(question, change),
                                 )
                               : section,
                       ),
@@ -9266,6 +9299,7 @@ export default function GeneratePaper({
                         onBubbleSheetMediumChange={updateBubbleSheetMedium}
                         onAddSection={openAddPaperSectionModal}
                         onQuestionImageSizeChange={updatePaperQuestionImageSize}
+                        onQuestionImageChange={updatePaperQuestionImage}
                         onQuestionAnswerLinesChange={
                             updatePaperQuestionAnswerLines
                         }
@@ -14335,6 +14369,7 @@ export function GeneratedPaperView({
     onShuffleQuestions,
     onEditQuestion,
     onQuestionImageSizeChange,
+    onQuestionImageChange,
     onQuestionAnswerLinesChange,
     onQuestionAnswerLineSpacingChange,
     onRandomQuestion,
@@ -14406,6 +14441,11 @@ export function GeneratedPaperView({
         questionId: string,
         imageSize: PaperImageSize,
     ) => void;
+    onQuestionImageChange?: (
+        sectionId: string,
+        questionId: string,
+        change: PaperImageChange,
+    ) => void;
     onQuestionAnswerLinesChange: (
         sectionId: string,
         questionId: string,
@@ -14436,6 +14476,8 @@ export function GeneratedPaperView({
     const [isBubbleSheetMenuOpen, setIsBubbleSheetMenuOpen] = useState(false);
     const [isBubbleSheetHeadingEditorOpen, setIsBubbleSheetHeadingEditorOpen] =
         useState(false);
+    const [imageTarget, setImageTarget] = useState<PaperImageTarget | null>(null);
+    const imageSelectionSerial = useRef(0);
     const setsMenuRef = useRef<HTMLDivElement>(null);
     const bubbleSheetMenuRef = useRef<HTMLDivElement>(null);
     const activeViewMode: PaperViewMode =
@@ -16021,6 +16063,39 @@ export function GeneratedPaperView({
                 <style>{pageRule}</style>
                 <main
                     data-print-paper
+                    onDoubleClick={(event) => {
+                        if (previewOnly || !onQuestionImageChange) {
+                            return;
+                        }
+
+                        const target = event.target;
+
+                        if (
+                            !(target instanceof HTMLImageElement) ||
+                            target.closest('.katex')
+                        ) {
+                            return;
+                        }
+
+                        const question = target.closest<HTMLElement>(
+                            '[data-paper-section-id][data-paper-question-id]',
+                        );
+
+                        if (
+                            !question?.dataset.paperSectionId ||
+                            !question.dataset.paperQuestionId
+                        ) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        setImageTarget({
+                            selectionId: ++imageSelectionSerial.current,
+                            image: target,
+                            sectionId: question.dataset.paperSectionId,
+                            questionId: question.dataset.paperQuestionId,
+                        });
+                    }}
                     data-repeat-table-headers={
                         settings.repeatTableHeaders ? 'true' : undefined
                     }
@@ -16141,6 +16216,15 @@ export function GeneratedPaperView({
                         </div>
                     </div>
                 </main>
+
+                {imageTarget && onQuestionImageChange && (
+                    <PaperImageEditor
+                        key={imageTarget.selectionId}
+                        target={imageTarget}
+                        onSave={onQuestionImageChange}
+                        onClose={() => setImageTarget(null)}
+                    />
+                )}
 
                 {printAllSets && printJobs.length > 1 && (
                     <div data-print-set-list className="hidden print:block">
