@@ -2,8 +2,7 @@ import DOMPurify from 'dompurify';
 import katex from 'katex';
 
 const HTML_TAG_PATTERN = /<\/?[a-z][\s\S]*>/i;
-const HTML_ENTITY_PATTERN =
-    /&(?:#\d{1,7}|#x[0-9a-f]{1,6}|[a-z][a-z0-9]+);/gi;
+const HTML_ENTITY_PATTERN = /&(?:#\d{1,7}|#x[0-9a-f]{1,6}|[a-z][a-z0-9]+);/gi;
 const FALLBACK_HTML_ENTITIES: Record<string, string> = {
     '&amp;': '&',
     '&apos;': "'",
@@ -35,7 +34,7 @@ export function questionTextToHtml(value: string): string {
     }
 
     if (HTML_TAG_PATTERN.test(trimmed)) {
-        return sanitizeQuestionHtml(renderEquationsInHtml(trimmed));
+        return sanitizeQuestionHtml(trimmed);
     }
 
     return escapeHtml(decodedValue).replace(/\r?\n/g, '<br />');
@@ -104,8 +103,42 @@ function renderEquationsInHtml(html: string): string {
         return '';
     }
 
+    const convertedImages = new Set<HTMLElement>();
+
+    root.querySelectorAll<HTMLImageElement>('img[src]').forEach((image) => {
+        const latex = codecogsImageLatex(image.getAttribute('src') ?? '');
+
+        if (!latex) {
+            return;
+        }
+
+        try {
+            const rendered = katex.renderToString(latex, {
+                displayMode: false,
+                output: 'html',
+                strict: false,
+                throwOnError: true,
+                trust: false,
+            });
+            const equation = doc.createElement('span');
+            equation.className = 'tm-equation';
+            equation.dataset.latex = latex;
+            equation.dataset.display = 'inline';
+            equation.setAttribute('contenteditable', 'false');
+            equation.innerHTML = rendered;
+            image.replaceWith(equation);
+            convertedImages.add(equation);
+        } catch {
+            // Keep the original image if its legacy LaTeX uses unsupported syntax.
+        }
+    });
+
     root.querySelectorAll<HTMLElement>('.tm-equation[data-latex]').forEach(
         (node) => {
+            if (convertedImages.has(node)) {
+                return;
+            }
+
             const latex = node.dataset.latex ?? '';
             const displayMode = node.dataset.display === 'block';
 
@@ -117,6 +150,27 @@ function renderEquationsInHtml(html: string): string {
     );
 
     return root.innerHTML;
+}
+
+function codecogsImageLatex(source: string): string | null {
+    try {
+        const url = new URL(source, document.baseURI);
+
+        if (
+            url.hostname.toLowerCase() !== 'latex.codecogs.com' ||
+            !/^\/(?:svg|png|gif)\.(?:image|latex)$/i.test(url.pathname)
+        ) {
+            return null;
+        }
+
+        // The query is the equation itself. URLSearchParams would turn a
+        // literal + operator into a space, so decode it without form parsing.
+        const latex = decodeURIComponent(url.search.slice(1)).trim();
+
+        return latex && latex.length <= 4096 ? latex : null;
+    } catch {
+        return null;
+    }
 }
 
 function decodeHtmlEntities(value: string): string {
