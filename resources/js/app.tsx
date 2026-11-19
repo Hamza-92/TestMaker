@@ -17,6 +17,8 @@ createInertiaApp({
                 return null;
             case name === 'pricing':
                 return null;
+            case name === 'qat':
+                return null;
             case name === 'auth/register':
                 return null;
             case name === 'auth/login':
@@ -50,5 +52,3 @@ createInertiaApp({
 
 // This will set light / dark mode on load...
 initializeTheme();
-
-

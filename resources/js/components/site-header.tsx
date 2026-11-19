@@ -13,7 +13,15 @@ import { dashboard, login, register } from '@/routes';
 import type { Auth } from '@/types/auth';
 import type { SiteNavigation } from '@/types/site-cms';
 
-export default function SiteHeader({ auth }: { auth: Auth }) {
+export default function SiteHeader({
+    auth,
+    registerHref,
+    registerLabel = 'Sign Up Free',
+}: {
+    auth: Auth;
+    registerHref?: string;
+    registerLabel?: string;
+}) {
     const primaryNavigation = usePage<{ siteNavigation: SiteNavigation }>()
         .props.siteNavigation.header;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -128,13 +136,13 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                                     href={
                                         isAuthenticated
                                             ? dashboard()
-                                            : register()
+                                            : (registerHref ?? register())
                                     }
                                     className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-600 px-3 text-xs font-semibold text-white transition hover:bg-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:px-4 sm:text-sm"
                                 >
                                     {isAuthenticated
                                         ? 'Go to Dashboard'
-                                        : 'Sign Up Free'}
+                                        : registerLabel}
                                     <ArrowUpRight
                                         size={15}
                                         aria-hidden="true"
@@ -225,14 +233,14 @@ export default function SiteHeader({ auth }: { auth: Auth }) {
                                         href={
                                             isAuthenticated
                                                 ? dashboard()
-                                                : register()
+                                                : (registerHref ?? register())
                                         }
                                         onClick={closeMenu}
                                         className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[10px] bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700"
                                     >
                                         {isAuthenticated
                                             ? 'Go to Dashboard'
-                                            : 'Sign Up Free'}{' '}
+                                            : registerLabel}{' '}
                                         <ArrowUpRight size={15} />
                                     </Link>
                                 </div>

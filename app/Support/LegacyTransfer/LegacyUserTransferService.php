@@ -10,6 +10,7 @@ use App\Models\Subject;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Support\SubscriptionAccess;
+use App\Support\TemporaryAccountEmail;
 use Carbon\Carbon;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
@@ -309,22 +310,7 @@ class LegacyUserTransferService
 
     private function temporaryEmail(object $row): string
     {
-        $phone = Str::lower((string) preg_replace('/[^a-z0-9]+/i', '', trim((string) $row->phone)));
-        $base = $phone !== '' ? Str::limit($phone, 180, '') : 'legacy'.$row->id;
-        $candidate = $base.'@mail.com';
-
-        if (! User::withTrashed()->whereRaw('LOWER(email) = ?', [$candidate])->exists()) {
-            return $candidate;
-        }
-
-        $candidate = $base.'-legacy'.$row->id.'@mail.com';
-        $suffix = 1;
-        while (User::withTrashed()->whereRaw('LOWER(email) = ?', [$candidate])->exists()) {
-            $candidate = $base.'-legacy'.$row->id.'-'.$suffix.'@mail.com';
-            $suffix++;
-        }
-
-        return $candidate;
+        return TemporaryAccountEmail::forPhone((string) $row->phone, 'legacy'.$row->id);
     }
 
     private function sourceRow(int $sourceUserId): object

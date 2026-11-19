@@ -22,6 +22,7 @@ class SiteNavigation
                     $item('footer-features', 'Features', '/#features'),
                     $item('footer-process', 'How it works', '/#how-it-works'),
                     $item('footer-pricing', 'Pricing', '/pricing'),
+                    $item('footer-qat', 'QAT practice papers', '/qat'),
                     $item('footer-gallery', 'Gallery', '/#gallery'),
                 ]),
                 $item('schools', 'For schools', '/', [
@@ -40,6 +41,7 @@ class SiteNavigation
         return [
             $item('features', 'Features', '/#features'),
             $item('pricing', 'Pricing', '/pricing'),
+            $item('qat', 'QAT Papers', '/qat'),
             $item('process', 'How it Works', '/#how-it-works'),
             $item('resources', 'Resources', '/#resources', [
                 $item('resources-section', 'Resources', '/#resources'),
@@ -75,6 +77,12 @@ class SiteNavigation
                     }
                 }
             }
+        }
+
+        // Introduce the QAT link to existing menus while respecting an explicit hidden entry.
+        $headerItems = collect($items['header'])->flatMap(fn ($item) => [$item, ...($item['children'] ?? [])]);
+        if (! $headerItems->contains(fn ($item) => ($item['id'] ?? '') === 'qat' || ($item['url'] ?? '') === '/qat')) {
+            $items['header'][] = collect(self::defaults('header'))->firstWhere('id', 'qat');
         }
 
         $pages = SitePage::query()->whereIn('id', array_unique($pageIds))

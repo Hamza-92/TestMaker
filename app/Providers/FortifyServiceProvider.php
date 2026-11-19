@@ -5,6 +5,9 @@ namespace App\Providers;
 use App\Actions\Fortify\AuthenticateUser;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Models\TrialSetting;
+use App\Support\Qat\QatTrial;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -13,6 +16,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Controllers\RegisteredUserController as FortifyRegisteredUserController;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -21,7 +25,7 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(FortifyRegisteredUserController::class, RegisteredUserController::class);
     }
 
     /**
@@ -68,7 +72,11 @@ class FortifyServiceProvider extends ServiceProvider
             'status' => $request->session()->get('status'),
         ]));
 
-        Fortify::registerView(fn () => Inertia::render('auth/register'));
+        Fortify::registerView(fn (Request $request) => Inertia::render('auth/register', [
+            'trialType' => $request->query('trial') === 'qat' ? 'qat' : 'standard',
+            'trialLimit' => QatTrial::LIMIT,
+            'trialDurationDays' => TrialSetting::current()->trial_duration_days,
+        ]));
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/two-factor-challenge'));
 

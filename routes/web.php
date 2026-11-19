@@ -16,6 +16,7 @@ use App\Http\Controllers\Customer\TeacherController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PublicOnlineTestController;
 use App\Http\Controllers\PublicPricingController;
+use App\Http\Controllers\PublicQatController;
 use App\Http\Controllers\PublicSiteMediaController;
 use App\Http\Controllers\PublicSitePageController;
 use App\Http\Controllers\QuestionImageController;
@@ -87,6 +88,7 @@ Route::get('/', function (Request $request) {
 })->name('home');
 
 Route::get('/pricing', [PublicPricingController::class, 'index'])->name('pricing');
+Route::get('/qat', [PublicQatController::class, 'index'])->name('qat');
 Route::get('/site-media/{media}', [PublicSiteMediaController::class, 'show'])->name('site.media.show');
 
 Route::get('question-images/{image}', [QuestionImageController::class, 'show'])
