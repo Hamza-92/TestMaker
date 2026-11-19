@@ -8,6 +8,7 @@ interface HeaderLogoProps {
     initialSize: number;
     imageClassName: string;
     fallbackClassName: string;
+    square?: boolean;
 }
 
 const MIN_LOGO_SIZE = 32;
@@ -26,6 +27,7 @@ export function HeaderLogo({
     initialSize,
     imageClassName,
     fallbackClassName,
+    square = false,
 }: HeaderLogoProps) {
     const [failedUrl, setFailedUrl] = useState<string | null>(null);
     const [size, setSize] = useState(() =>
@@ -61,7 +63,8 @@ export function HeaderLogo({
 
         document.addEventListener('pointerdown', handlePointerDown);
 
-        return () => document.removeEventListener('pointerdown', handlePointerDown);
+        return () =>
+            document.removeEventListener('pointerdown', handlePointerDown);
     }, [isSelected]);
 
     function handleResizeStart(
@@ -90,7 +93,8 @@ export function HeaderLogo({
         const deltaY = event.clientY - active.startY;
         const horizontalDelta = active.corner.includes('e') ? deltaX : -deltaX;
         const verticalDelta = active.corner.includes('s') ? deltaY : -deltaY;
-        const nextSize = active.startSize + (horizontalDelta + verticalDelta) / 2;
+        const nextSize =
+            active.startSize + (horizontalDelta + verticalDelta) / 2;
 
         setSize(Math.min(Math.max(nextSize, MIN_LOGO_SIZE), MAX_LOGO_SIZE));
     }
@@ -110,7 +114,11 @@ export function HeaderLogo({
                 alt=""
                 draggable={false}
                 onError={() => setFailedUrl(logoUrl)}
-                className={'block size-full rounded-full object-cover ' + imageClassName}
+                className={
+                    'block size-full object-cover ' +
+                    (square ? '' : 'rounded-full ') +
+                    imageClassName
+                }
             />
         ) : (
             <div className={fallbackClassName + ' size-full'}>{initials}</div>
@@ -118,7 +126,9 @@ export function HeaderLogo({
 
     return (
         <div
-            className={'relative shrink-0 select-none ' + (isSelected ? 'z-20' : '')}
+            className={
+                'relative shrink-0 select-none ' + (isSelected ? 'z-20' : '')
+            }
             ref={logoRef}
             style={{ width: size, height: size }}
             onClick={(event) => {
@@ -129,7 +139,12 @@ export function HeaderLogo({
             {initialsOrLogo}
             {isSelected && (
                 <div className="pointer-events-none absolute inset-0 print:hidden">
-                    <div className="absolute inset-0 rounded-full ring-2 ring-brand-500 ring-offset-2" />
+                    <div
+                        className={
+                            'absolute inset-0 ring-2 ring-brand-500 ring-offset-2' +
+                            (square ? '' : ' rounded-full')
+                        }
+                    />
                     {(Object.keys(HANDLE_CLASS_NAMES) as ResizeCorner[]).map(
                         (corner) => (
                             <button

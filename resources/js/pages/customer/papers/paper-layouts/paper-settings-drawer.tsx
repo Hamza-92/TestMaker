@@ -49,6 +49,7 @@ import { DEFAULT_PAPER_SETTINGS } from './types';
 interface PaperSettingsDrawerProps {
     open: boolean;
     settings: PaperSettings;
+    defaultHeaderTemplate?: PaperHeaderTemplate | null;
     sectioningAvailable?: boolean;
     defaultWatermarkLogoUrl?: string;
     watermarkSchoolName?: string;
@@ -126,12 +127,14 @@ const URDU_FONT_OPTIONS: Array<FontOption<PaperUrduFont>> = [
     {
         value: 'noto-sans-arabic',
         label: 'Noto Sans Arabic',
-        previewFontFamily: '"Noto Sans Arabic", "Noto Naskh Arabic", sans-serif',
+        previewFontFamily:
+            '"Noto Sans Arabic", "Noto Naskh Arabic", sans-serif',
     },
     {
         value: 'noto-kufi-arabic',
         label: 'Noto Kufi Arabic',
-        previewFontFamily: '"Noto Kufi Arabic", "Noto Naskh Arabic", sans-serif',
+        previewFontFamily:
+            '"Noto Kufi Arabic", "Noto Naskh Arabic", sans-serif',
     },
 ];
 
@@ -225,11 +228,16 @@ const OR_GROUP_LABEL_OPTIONS: Array<FontOption<PaperOrGroupLabel>> = [
 ];
 
 const HEADER_TEMPLATE_OPTIONS: Array<FontOption<PaperHeaderTemplate>> = [
-    { value: 'classic', label: '1 – Classic', previewFontFamily: 'inherit' },
-    { value: 'banner', label: '2 – Banner', previewFontFamily: 'inherit' },
-    { value: 'formal', label: '3 – Formal', previewFontFamily: 'inherit' },
-    { value: 'centered', label: '4 – Centered', previewFontFamily: 'inherit' },
-    { value: 'tabular', label: '5 – Tabular', previewFontFamily: 'inherit' },
+    { value: 'classic', label: 'Layout 1', previewFontFamily: 'inherit' },
+    { value: 'banner', label: 'Layout 2', previewFontFamily: 'inherit' },
+    { value: 'formal', label: 'Layout 3', previewFontFamily: 'inherit' },
+    { value: 'centered', label: 'Layout 4', previewFontFamily: 'inherit' },
+    { value: 'tabular', label: 'Layout 5', previewFontFamily: 'inherit' },
+    ...Array.from({ length: 19 }, (_, index) => ({
+        value: `legacy-${index}` as PaperHeaderTemplate,
+        label: `Layout ${index + 6}`,
+        previewFontFamily: 'inherit',
+    })),
 ];
 
 const MARGIN_BOUNDS = { min: 0, max: 50 };
@@ -265,6 +273,7 @@ function readStoredDrawerWidth(): number {
 export function PaperSettingsDrawer({
     open,
     settings,
+    defaultHeaderTemplate,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
     watermarkSchoolName = '',
@@ -366,7 +375,7 @@ export function PaperSettingsDrawer({
                 aria-hidden={!open}
                 style={{ width }}
                 className={cn(
-                    'fixed top-0 right-0 z-50 flex h-full flex-col border-l border-slate-200 bg-white shadow-2xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 print:hidden',
+                    'fixed right-0 top-0 z-50 flex h-full flex-col border-l border-slate-200 bg-white shadow-2xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 print:hidden',
                     open ? 'translate-x-0' : 'translate-x-full',
                     isResizing
                         ? 'transition-none'
@@ -388,7 +397,7 @@ export function PaperSettingsDrawer({
                     }}
                     onDoubleClick={() => setWidth(DEFAULT_DRAWER_WIDTH)}
                     className={cn(
-                        'group absolute top-0 bottom-0 left-0 z-10 w-1.5 -translate-x-1/2 cursor-col-resize touch-none print:hidden',
+                        'group absolute bottom-0 left-0 top-0 z-10 w-1.5 -translate-x-1/2 cursor-col-resize touch-none print:hidden',
                         !open && 'pointer-events-none',
                     )}
                 >
@@ -405,7 +414,7 @@ export function PaperSettingsDrawer({
                             <SlidersHorizontalIcon className="size-4" />
                         </div>
                         <div>
-                            <h2 className="text-sm leading-tight font-semibold text-slate-900 dark:text-slate-100">
+                            <h2 className="text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100">
                                 Paper Settings
                             </h2>
                             <p className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
@@ -439,7 +448,9 @@ export function PaperSettingsDrawer({
                 </header>
 
                 <PaperSettingsPanel
+                    key={open ? 'open' : 'closed'}
                     settings={settings}
+                    defaultHeaderTemplate={defaultHeaderTemplate}
                     sectioningAvailable={sectioningAvailable}
                     defaultWatermarkLogoUrl={defaultWatermarkLogoUrl}
                     watermarkSchoolName={watermarkSchoolName}
@@ -453,6 +464,7 @@ export function PaperSettingsDrawer({
 
 export function PaperSettingsPanel({
     settings,
+    defaultHeaderTemplate,
     sectioningAvailable = false,
     defaultWatermarkLogoUrl = '',
     watermarkSchoolName = '',
@@ -473,7 +485,6 @@ export function PaperSettingsPanel({
                 inline={inline}
                 title={inline ? 'Page & Fonts' : 'General'}
                 icon={SlidersHorizontalIcon}
-                defaultOpen
             >
                 {/* Paper-wide font family — applied across header,
                 headings and questions via a single CSS cascade. */}
@@ -514,7 +525,9 @@ export function PaperSettingsPanel({
                                         : 'mb-1 text-[10px] font-medium text-slate-400 dark:text-slate-500'
                                 }
                             >
-                                {inline ? 'Urdu / Arabic Font' : 'Urdu / Arabic'}
+                                {inline
+                                    ? 'Urdu / Arabic Font'
+                                    : 'Urdu / Arabic'}
                             </p>
                             <FontPicker
                                 value={settings.urduFont}
@@ -762,6 +775,7 @@ export function PaperSettingsPanel({
                     <FontPicker
                         value={settings.headerTemplate}
                         options={HEADER_TEMPLATE_OPTIONS}
+                        badgeValue={defaultHeaderTemplate}
                         onChange={(v) => onChange({ headerTemplate: v })}
                     />
                 </div>
@@ -776,13 +790,19 @@ export function PaperSettingsPanel({
                         onChange({ headerLineHeight: v })
                     }
                 />
-                <div className={inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'}>
+                <div
+                    className={
+                        inline ? 'contents' : 'mt-4 grid grid-cols-2 gap-2'
+                    }
+                >
                     <LabeledStepper
                         label="School Name Size"
                         value={settings.schoolNameSize}
                         min={SIZE_BOUNDS.schoolName.min}
                         max={SIZE_BOUNDS.schoolName.max}
-                        onChange={(value) => onChange({ schoolNameSize: value })}
+                        onChange={(value) =>
+                            onChange({ schoolNameSize: value })
+                        }
                     />
                     <LabeledStepper
                         label="Address Size"
@@ -1056,7 +1076,6 @@ export function PaperSettingsPanel({
 function CollapsibleSection({
     title,
     icon: Icon,
-    defaultOpen = false,
     inline = false,
     className,
     contentClassName,
@@ -1064,13 +1083,12 @@ function CollapsibleSection({
 }: {
     title: string;
     icon: React.ElementType;
-    defaultOpen?: boolean;
     inline?: boolean;
     className?: string;
     contentClassName?: string;
     children: React.ReactNode;
 }) {
-    const [open, setOpen] = useState(!inline && defaultOpen);
+    const [open, setOpen] = useState(false);
 
     return (
         <section
@@ -1124,7 +1142,7 @@ function CollapsibleSection({
                         'border-t border-slate-100 dark:border-slate-800',
                         inline
                             ? 'grid grid-cols-1 items-start gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4'
-                            : 'px-3 pt-3 pb-3',
+                            : 'px-3 pb-3 pt-3',
                         contentClassName,
                     )}
                 >
@@ -1279,7 +1297,7 @@ function LabeledStepper({
                             onChange(clamp(next));
                         }
                     }}
-                    className="w-full min-w-0 [appearance:textfield] border-x border-slate-200 bg-white text-center text-sm font-semibold text-slate-900 outline-none [-moz-appearance:textfield] focus:bg-brand-50/50 focus:text-brand-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:bg-brand-500/10 dark:focus:text-brand-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="w-full min-w-0 border-x border-slate-200 bg-white text-center text-sm font-semibold text-slate-900 outline-none [-moz-appearance:textfield] [appearance:textfield] focus:bg-brand-50/50 focus:text-brand-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:bg-brand-500/10 dark:focus:text-brand-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
 
                 <StepperButton
@@ -1485,7 +1503,7 @@ function TextInput({
                 disabled={disabled}
                 value={value}
                 placeholder={placeholder}
-                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:ring-brand-400/20"
+                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-brand-400 dark:focus:ring-brand-400/20"
             />
         </div>
     );
@@ -1538,10 +1556,12 @@ function CheckboxField({
 function FontPicker<T extends string>({
     value,
     options,
+    badgeValue,
     onChange,
 }: {
     value: T;
     options: ReadonlyArray<FontOption<T>>;
+    badgeValue?: T | null;
     onChange: (next: T) => void;
 }) {
     const [query, setQuery] = useState('');
@@ -1575,7 +1595,7 @@ function FontPicker<T extends string>({
                     <ComboboxInput
                         ref={inputRef}
                         style={{ fontFamily: selected.previewFontFamily }}
-                        className="h-full w-full bg-transparent px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                        className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
                         displayValue={(v: T) =>
                             options.find((o) => o.value === v)?.label ?? ''
                         }
@@ -1592,11 +1612,16 @@ function FontPicker<T extends string>({
                             }
                         }}
                     />
+                    {badgeValue === value && (
+                        <span className="shrink-0 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                            Default
+                        </span>
+                    )}
                     <ComboboxButton
                         ref={buttonRef}
                         className="group/btn flex h-full w-9 cursor-pointer items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                     >
-                        <ChevronDownIcon className="size-4 transition-transform duration-150 group-data-open/btn:rotate-180" />
+                        <ChevronDownIcon className="group-data-open/btn:rotate-180 size-4 transition-transform duration-150" />
                     </ComboboxButton>
                 </div>
 
@@ -1604,7 +1629,7 @@ function FontPicker<T extends string>({
                     anchor="bottom start"
                     portal
                     transition
-                    className="z-[70] max-h-60 w-[var(--input-width)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 transition duration-100 ease-out outline-none [--anchor-gap:0.5rem] data-closed:scale-95 data-closed:opacity-0 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40"
+                    className="data-closed:scale-95 data-closed:opacity-0 z-[70] max-h-60 w-[var(--input-width)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 outline-none transition duration-100 ease-out [--anchor-gap:0.5rem] dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40"
                 >
                     {filtered.length === 0 && (
                         <div className="flex flex-col items-center gap-1.5 px-3 py-5 text-center">
@@ -1638,9 +1663,16 @@ function FontPicker<T extends string>({
                                     >
                                         {option.label}
                                     </span>
-                                    {selected && (
-                                        <CheckIcon className="size-4 text-brand-600 dark:text-brand-400" />
-                                    )}
+                                    <span className="flex shrink-0 items-center gap-1.5">
+                                        {option.value === badgeValue && (
+                                            <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                                                Default
+                                            </span>
+                                        )}
+                                        {selected && (
+                                            <CheckIcon className="size-4 text-brand-600 dark:text-brand-400" />
+                                        )}
+                                    </span>
                                 </>
                             )}
                         </ComboboxOption>

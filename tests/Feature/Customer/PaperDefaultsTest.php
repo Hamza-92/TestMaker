@@ -54,6 +54,19 @@ test('customers can save and reload their paper defaults without changing existi
     expect($page['props']['paperDefaults'])->toBeNull();
 });
 
+test('customers can save an old TestMaker header layout', function (string $layout) {
+    $customer = paperDefaultsCustomer();
+    $payload = paperDefaultsPayload();
+    $payload['settings']['headerTemplate'] = $layout;
+
+    $this->actingAs($customer)->put(route('customer.settings.update'), $payload)
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect(PaperDefault::where('user_id', $customer->id)->firstOrFail()->settings['headerTemplate'])
+        ->toBe($layout);
+})->with(['legacy-0', 'legacy-14', 'legacy-18']);
+
 test('customers can save an Arabic paper font', function (string $font) {
     $customer = paperDefaultsCustomer();
     $payload = paperDefaultsPayload();

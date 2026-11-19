@@ -11,6 +11,8 @@ interface TabularExamHeaderProps {
     logoUrl?: string;
     address?: string;
     showAddress?: boolean;
+    schoolNameSize: number;
+    addressSize: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
     paddingX: number;
     paddingY: number;
@@ -21,6 +23,8 @@ export function TabularExamHeader({
     logoUrl,
     address,
     showAddress,
+    schoolNameSize,
+    addressSize,
     onChange,
     paddingX,
     paddingY,
@@ -59,11 +63,14 @@ export function TabularExamHeader({
                     onChange={(e) => onChange('schoolName', e.target.value)}
                     readOnly
                     tabIndex={-1}
+                    style={{ fontSize: schoolNameSize }}
                     className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
                     placeholder="School Name"
                 />
                 {showAddress && address && (
-                    <p className="text-sm">( {address} )</p>
+                    <p className="text-sm" style={{ fontSize: addressSize }}>
+                        ( {address} )
+                    </p>
                 )}
             </div>
 

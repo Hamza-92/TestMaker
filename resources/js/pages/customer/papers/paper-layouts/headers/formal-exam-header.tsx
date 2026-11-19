@@ -9,6 +9,10 @@ import {
 interface FormalExamHeaderProps {
     header: GeneratedPaperHeader;
     logoUrl?: string;
+    address: string;
+    showAddress: boolean;
+    schoolNameSize: number;
+    addressSize: number;
     paddingX: number;
     paddingY: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
@@ -17,6 +21,10 @@ interface FormalExamHeaderProps {
 export function FormalExamHeader({
     header,
     logoUrl,
+    address,
+    showAddress,
+    schoolNameSize,
+    addressSize,
     paddingX,
     paddingY,
     onChange,
@@ -54,9 +62,19 @@ export function FormalExamHeader({
                         onChange={(e) => onChange('schoolName', e.target.value)}
                         readOnly
                         tabIndex={-1}
+                        style={{ fontSize: schoolNameSize }}
                         className="w-full bg-transparent text-center text-2xl font-extrabold uppercase outline-none"
                         placeholder="School Name"
                     />
+                    {showAddress && address.trim() && (
+                        <p
+                            className="whitespace-pre-line leading-tight"
+                            dir="auto"
+                            style={{ fontSize: addressSize }}
+                        >
+                            {address}
+                        </p>
+                    )}
                     <div className="mt-0.5 flex items-center gap-4">
                         <RichTextField
                             value={header.subject}
@@ -81,7 +99,7 @@ export function FormalExamHeader({
                     className="flex flex-col items-center justify-center gap-0.5 p-2 text-center"
                     style={{ direction: 'ltr' }}
                 >
-                    <span className="text-xs font-bold text-slate-500 uppercase">
+                    <span className="text-xs font-bold uppercase text-slate-500">
                         Marks
                     </span>
                     <input

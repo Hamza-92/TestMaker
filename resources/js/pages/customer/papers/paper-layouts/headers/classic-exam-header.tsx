@@ -10,6 +10,10 @@ interface ClassicExamHeaderProps {
     header: GeneratedPaperHeader;
     chapterNumbers: string;
     logoUrl?: string;
+    address: string;
+    showAddress: boolean;
+    schoolNameSize: number;
+    addressSize: number;
     paddingX: number;
     paddingY: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
@@ -36,6 +40,10 @@ export function ClassicExamHeader({
     header,
     chapterNumbers,
     logoUrl,
+    address,
+    showAddress,
+    schoolNameSize,
+    addressSize,
     paddingX,
     paddingY,
     onChange,
@@ -49,6 +57,22 @@ export function ClassicExamHeader({
             data-paper-header-padding-x={paddingX}
             data-paper-header-padding-y={paddingY}
         >
+            <div className="mb-1.5 text-center" dir="auto">
+                <div
+                    className="font-bold leading-tight"
+                    style={{ fontSize: schoolNameSize }}
+                >
+                    {header.schoolName}
+                </div>
+                {showAddress && address.trim() && (
+                    <div
+                        className="mt-0.5 whitespace-pre-line leading-tight"
+                        style={{ fontSize: addressSize }}
+                    >
+                        ({address})
+                    </div>
+                )}
+            </div>
             <table data-paper-header-table>
                 <colgroup>
                     <col className="w-48" />
@@ -67,7 +91,10 @@ export function ClassicExamHeader({
                                     <td
                                         rowSpan={
                                             leftFields.length +
-                                            (chapterNumbers || onChapterNumbersChange ? 1 : 0)
+                                            (chapterNumbers ||
+                                            onChapterNumbersChange
+                                                ? 1
+                                                : 0)
                                         }
                                         data-paper-header-cell
                                         className="p-3 align-middle"
@@ -131,7 +158,9 @@ export function ClassicExamHeader({
                             >
                                 <RichTextField
                                     value={chapterNumbers}
-                                    onChange={onChapterNumbersChange ?? (() => {})}
+                                    onChange={
+                                        onChapterNumbersChange ?? (() => {})
+                                    }
                                     ariaLabel="Chapters"
                                     readOnly={!onChapterNumbersChange}
                                 />

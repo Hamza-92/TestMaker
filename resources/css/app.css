@@ -858,6 +858,237 @@ input[type='date']::-webkit-calendar-picker-indicator {
     box-sizing: border-box;
 }
 
+/* Old TestMaker headers are isolated from the current five templates. */
+[data-print-paper] .tm-old-header {
+    width: 100%;
+    color: #000;
+    break-inside: avoid;
+    overflow-wrap: anywhere;
+}
+
+[data-print-paper] .tm-old-header table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+[data-print-paper] .tm-old-header td,
+[data-print-paper] .tm-old-header th {
+    border: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
+    padding: var(--paper-header-padding-y, 2px) var(--paper-header-padding-x, 4px);
+    vertical-align: middle;
+    min-width: 0;
+}
+
+[data-print-paper] .tm-old-header th {
+    text-align: left;
+    font-weight: 700;
+}
+
+[data-print-paper] .tm-old-header .tm-old-no-lines td,
+[data-print-paper] .tm-old-header .tm-old-no-lines th,
+[data-print-paper] .tm-old-header.tm-old-layout-10 td,
+[data-print-paper] .tm-old-header.tm-old-layout-13 td,
+[data-print-paper] .tm-old-header.tm-old-layout-18 td {
+    border: 0;
+}
+
+[data-print-paper] .tm-old-header .tm-old-school-block,
+[data-print-paper] .tm-old-header .tm-old-school {
+    text-align: center;
+}
+
+[data-print-paper] .tm-old-header .tm-old-school {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+[data-print-paper] .tm-old-header .tm-old-address {
+    text-align: center;
+    white-space: pre-line;
+}
+
+[data-print-paper] .tm-old-header .tm-old-logo-cell {
+    width: 15%;
+    text-align: center;
+}
+
+[data-print-paper] .tm-old-header .tm-old-logo {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+}
+
+[data-print-paper] .tm-old-header .tm-old-logo img {
+    display: block;
+    max-width: min(100%, 90px);
+    max-height: 90px;
+    object-fit: contain;
+}
+
+[data-print-paper] .tm-old-header .tm-old-cells {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+[data-print-paper] .tm-old-header .tm-old-cells > * {
+    flex: 1;
+    min-width: 0;
+}
+
+[data-print-paper] .tm-old-header .tm-old-field {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: baseline;
+    gap: 3px;
+}
+
+[data-print-paper] .tm-old-header .tm-old-label {
+    flex: none;
+    white-space: nowrap;
+}
+
+[data-print-paper] .tm-old-header .tm-old-value,
+[data-print-paper] .tm-old-header .tm-old-field input {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+}
+
+[data-print-paper] .tm-old-header .tm-old-field input {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    outline-offset: 1px;
+}
+
+[data-print-paper] .tm-old-header .tm-old-field-line {
+    width: 100%;
+}
+
+[data-print-paper] .tm-old-header .tm-old-field-line .tm-old-value,
+[data-print-paper] .tm-old-header .tm-old-field-line input {
+    min-height: 1em;
+    border-bottom: 1px solid currentColor;
+}
+
+[data-print-paper] .tm-old-header .tm-old-field-stacked {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 1px;
+}
+
+[data-print-paper] .tm-old-header .tm-old-field-stacked .tm-old-label {
+    font-weight: 400;
+    font-size: 0.85em;
+}
+
+[data-print-paper] .tm-old-header .tm-old-default {
+    display: grid;
+    grid-template-columns: 16% minmax(0, 1fr);
+    align-items: stretch;
+    border: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
+}
+
+[data-print-paper] .tm-old-header .tm-old-default-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
+}
+
+[data-print-paper] .tm-old-header .tm-old-default-content > * {
+    padding: var(--paper-header-padding-y, 2px) var(--paper-header-padding-x, 4px);
+}
+
+[data-print-paper] .tm-old-header .tm-old-default-content > * + * {
+    border-top: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
+}
+
+[data-print-paper] .tm-old-header .tm-old-dashed {
+    border-top-style: dashed;
+    border-bottom-style: dashed;
+}
+
+[data-print-paper] .tm-old-header .tm-old-rounded {
+    border: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
+    border-radius: 10px;
+    padding: 3px 6px;
+}
+
+[data-print-paper] .tm-old-header .tm-old-marks-badge,
+[data-print-paper] .tm-old-header.tm-old-layout-4 th {
+    background: #111;
+    color: #fff;
+}
+
+[data-print-paper] .tm-old-header .tm-old-office-title,
+[data-print-paper] .tm-old-header .tm-old-centered {
+    text-align: center;
+    font-weight: 700;
+}
+
+[data-print-paper] .tm-old-header .tm-old-score-grid th,
+[data-print-paper] .tm-old-header .tm-old-score-grid td {
+    padding: 2px 1px;
+    text-align: center;
+    font-size: 9px;
+}
+
+[data-print-paper] .tm-old-header .tm-old-score-grid th:first-child {
+    width: 14%;
+    text-align: left;
+}
+
+[data-print-paper] .tm-old-header .tm-old-underlined-school .tm-old-school {
+    font-style: italic;
+    text-decoration: underline;
+}
+
+[data-print-paper] .tm-old-header .tm-old-address-highlight {
+    background: #e8e8e8;
+}
+
+[data-print-paper] .tm-old-header .tm-old-left-school .tm-old-school,
+[data-print-paper] .tm-old-header .tm-old-school-left .tm-old-school {
+    text-align: left;
+}
+
+[data-print-paper] .tm-old-header .tm-old-floating-table td {
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+[data-print-paper] .tm-old-header .tm-old-fifteen-school {
+    text-align: center;
+    border-bottom: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
+}
+
+[data-print-paper] .tm-old-header.tm-old-layout-16 td {
+    border-style: dashed;
+}
+
+[data-print-paper] .tm-old-header.tm-old-layout-16 tr:last-child td {
+    border-style: solid;
+}
+
+[data-print-paper] .tm-old-header.tm-old-layout-17 .tm-old-score-grid {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+[data-print-paper] .tm-old-header.tm-old-layout-18 .tm-old-table {
+    border: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
+}
+
 /* Only compact the header in a side-by-side column. The classic template's
    fixed column widths otherwise overflow the narrower paper. */
 [data-print-paper][data-side-by-side-column] [data-paper-header-frame] {

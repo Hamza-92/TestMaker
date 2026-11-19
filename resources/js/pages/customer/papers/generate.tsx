@@ -82,6 +82,8 @@ import { BannerExamHeader } from './paper-layouts/headers/banner-exam-header';
 import { CenteredExamHeader } from './paper-layouts/headers/centered-exam-header';
 import { ClassicExamHeader } from './paper-layouts/headers/classic-exam-header';
 import { FormalExamHeader } from './paper-layouts/headers/formal-exam-header';
+import { LegacyExamHeader } from './paper-layouts/headers/legacy-exam-header';
+import type { LegacyHeaderTemplate } from './paper-layouts/headers/legacy-exam-header';
 import { formatPaperHeaderDate } from './paper-layouts/headers/paper-header-date';
 import { TabularExamHeader } from './paper-layouts/headers/tabular-exam-header';
 import { preferredPaperSettings } from './paper-layouts/paper-preferences';
@@ -3345,127 +3347,6 @@ function storageAssetUrl(value: unknown): string {
     return `/storage/${path}`;
 }
 
-function SchoolIdentity({
-    schoolName,
-    address,
-    schoolNameSize,
-    addressSize,
-    editable,
-    onSchoolNameChange,
-    onAddressChange,
-}: {
-    schoolName: string;
-    address: string;
-    schoolNameSize: number;
-    addressSize: number;
-    editable: boolean;
-    onSchoolNameChange?: (value: string) => void;
-    onAddressChange?: (value: string) => void;
-}) {
-    const [isEditing, setIsEditing] = useState(false);
-    const [draftName, setDraftName] = useState(schoolName);
-    const [draftAddress, setDraftAddress] = useState(address);
-    const visibleSchoolName = schoolName.trim();
-    const visibleAddress = address.trim();
-
-    if (visibleSchoolName === '' && visibleAddress === '' && !editable) {
-        return null;
-    }
-
-    function saveChanges() {
-        onSchoolNameChange?.(draftName.trim());
-        onAddressChange?.(draftAddress.trim());
-        setIsEditing(false);
-    }
-
-    return (
-        <div
-            data-paper-school-identity
-            className="relative mb-1.5 text-center"
-            dir="auto"
-        >
-            {visibleSchoolName !== '' && (
-                <div
-                    className="leading-tight font-bold"
-                    style={{ fontSize: `${schoolNameSize}px` }}
-                >
-                    {visibleSchoolName}
-                </div>
-            )}
-            {visibleAddress !== '' && (
-                <div
-                    className="mt-0.5 whitespace-pre-line leading-tight font-normal"
-                    style={{ fontSize: `${addressSize}px` }}
-                >
-                    ({visibleAddress})
-                </div>
-            )}
-            {editable && (
-                <button
-                    type="button"
-                    aria-label="Edit school name and address"
-                    title="Edit school name and address"
-                    onClick={() => {
-                        setDraftName(schoolName);
-                        setDraftAddress(address);
-                        setIsEditing(true);
-                    }}
-                    data-pdf-exclude
-                    className="absolute top-0 right-0 inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-brand-700 print:hidden"
-                >
-                    <PencilIcon className="size-3.5" />
-                </button>
-            )}
-            {editable && isEditing && (
-                <form
-                    data-pdf-exclude
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        saveChanges();
-                    }}
-                    className="absolute top-full left-1/2 z-30 mt-1 w-72 max-w-full -translate-x-1/2 space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-xl print:hidden"
-                >
-                    <label className="block text-xs font-medium text-slate-700">
-                        School name
-                        <input
-                            autoFocus
-                            dir="auto"
-                            value={draftName}
-                            onChange={(event) => setDraftName(event.target.value)}
-                            className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
-                        />
-                    </label>
-                    <label className="block text-xs font-medium text-slate-700">
-                        Address
-                        <textarea
-                            dir="auto"
-                            rows={2}
-                            value={draftAddress}
-                            onChange={(event) => setDraftAddress(event.target.value)}
-                            className="mt-1 w-full resize-y rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500"
-                        />
-                    </label>
-                    <div className="flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setIsEditing(false)}
-                            className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="rounded-md bg-brand-600 px-2 py-1 text-xs font-semibold text-white hover:bg-brand-700"
-                        >
-                            Save
-                        </button>
-                    </div>
-                </form>
-            )}
-        </div>
-    );
-}
-
 function PaperHeader({
     template,
     header,
@@ -3473,6 +3354,8 @@ function PaperHeader({
     logoUrl,
     address,
     showAddress,
+    schoolNameSize,
+    addressSize,
     paddingX,
     paddingY,
     onChange,
@@ -3484,6 +3367,8 @@ function PaperHeader({
     logoUrl: string;
     address: string;
     showAddress: boolean;
+    schoolNameSize: number;
+    addressSize: number;
     paddingX: number;
     paddingY: number;
     onChange: Parameters<typeof ClassicExamHeader>[0]['onChange'];
@@ -3503,11 +3388,32 @@ function PaperHeader({
         }
     };
 
+    if (template.startsWith('legacy-')) {
+        return (
+            <LegacyExamHeader
+                template={template as LegacyHeaderTemplate}
+                header={header}
+                chapterNumbers={chapterNumbers}
+                logoUrl={logoUrl}
+                address={address}
+                showAddress={showAddress}
+                schoolNameSize={schoolNameSize}
+                addressSize={addressSize}
+                onChange={onEditableChange}
+                onChapterNumbersChange={onChapterNumbersChange}
+            />
+        );
+    }
+
     if (template === 'banner') {
         return (
             <BannerExamHeader
                 header={header}
                 logoUrl={logoUrl || undefined}
+                address={address}
+                showAddress={showAddress}
+                schoolNameSize={schoolNameSize}
+                addressSize={addressSize}
                 paddingX={paddingX}
                 paddingY={paddingY}
                 onChange={onEditableChange}
@@ -3520,6 +3426,10 @@ function PaperHeader({
             <FormalExamHeader
                 header={header}
                 logoUrl={logoUrl || undefined}
+                address={address}
+                showAddress={showAddress}
+                schoolNameSize={schoolNameSize}
+                addressSize={addressSize}
                 paddingX={paddingX}
                 paddingY={paddingY}
                 onChange={onEditableChange}
@@ -3534,6 +3444,8 @@ function PaperHeader({
                 logoUrl={logoUrl || undefined}
                 address={address}
                 showAddress={showAddress}
+                schoolNameSize={schoolNameSize}
+                addressSize={addressSize}
                 paddingX={paddingX}
                 paddingY={paddingY}
                 onChange={onEditableChange}
@@ -3548,6 +3460,8 @@ function PaperHeader({
                 logoUrl={logoUrl || undefined}
                 address={address}
                 showAddress={showAddress}
+                schoolNameSize={schoolNameSize}
+                addressSize={addressSize}
                 paddingX={paddingX}
                 paddingY={paddingY}
                 onChange={onEditableChange}
@@ -3560,6 +3474,10 @@ function PaperHeader({
             header={header}
             chapterNumbers={chapterNumbers}
             logoUrl={logoUrl || undefined}
+            address={address}
+            showAddress={showAddress}
+            schoolNameSize={schoolNameSize}
+            addressSize={addressSize}
             paddingX={paddingX}
             paddingY={paddingY}
             onChange={onEditableChange}
@@ -9250,6 +9168,9 @@ export default function GeneratePaper({
                     <GeneratedPaperView
                         paper={variantForSet(generatedPaper, activeSetIndex)}
                         rawPaper={generatedPaper}
+                        defaultHeaderTemplate={
+                            paperDefaults?.settings?.headerTemplate
+                        }
                         fallbackChapterNumbers={selectedChapterNumbers.join(', ')}
                         activeSetIndex={activeSetIndex}
                         numSets={numSets}
@@ -14323,6 +14244,7 @@ function PaperSectionHeading({
 export function GeneratedPaperView({
     paper,
     rawPaper,
+    defaultHeaderTemplate,
     fallbackChapterNumbers = '',
     activeSetIndex,
     numSets,
@@ -14388,6 +14310,7 @@ export function GeneratedPaperView({
 }: {
     paper: GeneratedPaper;
     rawPaper: GeneratedPaper;
+    defaultHeaderTemplate?: PaperHeaderTemplate;
     fallbackChapterNumbers?: string;
     activeSetIndex: number;
     numSets: number;
@@ -16124,19 +16047,6 @@ export function GeneratedPaperView({
                         marginBottomMm={settings.marginBottom}
                     />
                     <div className="relative z-10">
-                        <SchoolIdentity
-                            schoolName={paper.header.schoolName}
-                            address={effectiveSchoolAddress}
-                            schoolNameSize={settings.schoolNameSize}
-                            addressSize={settings.addressSize}
-                            editable={false}
-                            onSchoolNameChange={(value) =>
-                                onHeaderChange('schoolName', value)
-                            }
-                            onAddressChange={(value) =>
-                                onHeaderChange('schoolAddress', value)
-                            }
-                        />
                         <PaperHeader
                             template={settings.headerTemplate}
                             chapterNumbers={
@@ -16155,6 +16065,8 @@ export function GeneratedPaperView({
                             logoUrl={defaultWatermarkLogoUrl}
                             address={effectiveSchoolAddress}
                             showAddress={effectiveSchoolAddress.trim() !== ''}
+                            schoolNameSize={settings.schoolNameSize}
+                            addressSize={settings.addressSize}
                             onChange={answersTitle ? () => {} : onHeaderChange}
                             onChapterNumbersChange={
                                 !answersTitle &&
@@ -16272,15 +16184,6 @@ export function GeneratedPaperView({
                                         marginBottomMm={settings.marginBottom}
                                     />
                                     <div className="relative z-10">
-                                        <SchoolIdentity
-                                            schoolName={
-                                                variantPaper.header.schoolName
-                                            }
-                                            address={effectiveSchoolAddress}
-                                            schoolNameSize={settings.schoolNameSize}
-                                            addressSize={settings.addressSize}
-                                            editable={false}
-                                        />
                                         <PaperHeader
                                             template={settings.headerTemplate}
                                             chapterNumbers={
@@ -16306,6 +16209,8 @@ export function GeneratedPaperView({
                                             logoUrl={defaultWatermarkLogoUrl}
                                             address={effectiveSchoolAddress}
                                             showAddress={effectiveSchoolAddress.trim() !== ''}
+                                            schoolNameSize={settings.schoolNameSize}
+                                            addressSize={settings.addressSize}
                                             onChange={() => {}}
                                             paddingX={settings.headerPaddingX}
                                             paddingY={settings.headerPaddingY}
@@ -16459,6 +16364,7 @@ export function GeneratedPaperView({
                     <PaperSettingsDrawer
                         open={isSettingsDrawerOpen}
                         settings={settings}
+                        defaultHeaderTemplate={defaultHeaderTemplate}
                         sectioningAvailable={
                             settings.paperLayout === 'federal-board' ||
                             Boolean(rawPaper.sectioning?.active)

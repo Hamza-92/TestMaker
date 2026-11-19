@@ -9,6 +9,10 @@ import {
 interface BannerExamHeaderProps {
     header: GeneratedPaperHeader;
     logoUrl?: string;
+    address: string;
+    showAddress: boolean;
+    schoolNameSize: number;
+    addressSize: number;
     paddingX: number;
     paddingY: number;
     onChange: (field: keyof GeneratedPaperHeader, value: string) => void;
@@ -17,6 +21,10 @@ interface BannerExamHeaderProps {
 export function BannerExamHeader({
     header,
     logoUrl,
+    address,
+    showAddress,
+    schoolNameSize,
+    addressSize,
     paddingX,
     paddingY,
     onChange,
@@ -47,9 +55,19 @@ export function BannerExamHeader({
                         onChange={(e) => onChange('schoolName', e.target.value)}
                         readOnly
                         tabIndex={-1}
+                        style={{ fontSize: schoolNameSize }}
                         className="w-full bg-transparent text-center text-xl font-bold uppercase outline-none print:font-extrabold"
                         placeholder="School Name"
                     />
+                    {showAddress && address.trim() && (
+                        <p
+                            className="whitespace-pre-line leading-tight"
+                            dir="auto"
+                            style={{ fontSize: addressSize }}
+                        >
+                            {address}
+                        </p>
+                    )}
                     <input
                         autoComplete="off"
                         value={header.exam}

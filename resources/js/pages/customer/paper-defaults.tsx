@@ -266,6 +266,9 @@ export default function PaperDefaults({
                 <PaperSettingsPanel
                     inline
                     settings={settings}
+                    defaultHeaderTemplate={
+                        paperDefaults?.settings?.headerTemplate
+                    }
                     defaultWatermarkLogoUrl={logoUrl}
                     watermarkSchoolName={header.schoolName}
                     canEditWatermark={canEditWatermark}

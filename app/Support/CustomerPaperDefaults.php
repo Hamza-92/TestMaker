@@ -103,7 +103,10 @@ class CustomerPaperDefaults
             'orGroupLayout' => ['stacked', 'side-by-side'],
             'orGroupDividerStyle' => ['line', 'badge', 'plain'],
             'orGroupLabel' => ['auto', 'english', 'urdu', 'bilingual'],
-            'headerTemplate' => ['classic', 'banner', 'formal', 'centered', 'tabular'],
+            'headerTemplate' => array_merge(
+                ['classic', 'banner', 'formal', 'centered', 'tabular'],
+                array_map(fn (int $index): string => "legacy-{$index}", range(0, 18)),
+            ),
             'bubbleSheetMode' => ['inline', 'separate-page', 'only'],
             'bubbleSheetNumberFormat' => ['number', 'question'],
         ] as $key => $values) {

@@ -438,7 +438,8 @@ export type PaperHeaderTemplate =
     | 'banner'
     | 'formal'
     | 'centered'
-    | 'tabular';
+    | 'tabular'
+    | `legacy-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18}`;
 
 export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
     paperLayout: 'standard',
@@ -561,6 +562,10 @@ const HEADER_TEMPLATE_VALUES = new Set<PaperHeaderTemplate>([
     'formal',
     'centered',
     'tabular',
+    ...Array.from(
+        { length: 19 },
+        (_, index) => `legacy-${index}` as PaperHeaderTemplate,
+    ),
 ]);
 
 function pickEnum<T extends string>(
@@ -849,12 +854,18 @@ export function normalizePaperSettings(raw: unknown): PaperSettings {
         watermarkTextSize:
             typeof source.watermarkTextSize === 'number' &&
             Number.isFinite(source.watermarkTextSize)
-                ? Math.min(Math.max(Math.round(source.watermarkTextSize), 16), 96)
+                ? Math.min(
+                      Math.max(Math.round(source.watermarkTextSize), 16),
+                      96,
+                  )
                 : DEFAULT_PAPER_SETTINGS.watermarkTextSize,
         watermarkLogoSize:
             typeof source.watermarkLogoSize === 'number' &&
             Number.isFinite(source.watermarkLogoSize)
-                ? Math.min(Math.max(Math.round(source.watermarkLogoSize), 10), 80)
+                ? Math.min(
+                      Math.max(Math.round(source.watermarkLogoSize), 10),
+                      80,
+                  )
                 : DEFAULT_PAPER_SETTINGS.watermarkLogoSize,
         watermarkOpacity:
             typeof source.watermarkOpacity === 'number'
