@@ -117,6 +117,11 @@ const QuestionEditModal = lazy(() =>
         default: module.QuestionEditModal,
     })),
 );
+const ESheetView = lazy(() =>
+    import('./paper-layouts/e-sheet/e-sheet-view').then((module) => ({
+        default: module.ESheetView,
+    })),
+);
 import { FederalSubjectiveOrSection } from './paper-layouts/sections/federal-subjective-or-section';
 import { MultipartSection } from './paper-layouts/sections/multipart-section';
 import { SectionEditModal } from './paper-layouts/sections/section-edit-modal';
@@ -14395,6 +14400,7 @@ export function GeneratedPaperView({
 }) {
     const [isConfirmingBack, setIsConfirmingBack] = useState(false);
     const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+    const [showESheet, setShowESheet] = useState(false);
     const [isSetsMenuOpen, setIsSetsMenuOpen] = useState(false);
     const [isBubbleSheetMenuOpen, setIsBubbleSheetMenuOpen] = useState(false);
     const [isBubbleSheetHeadingEditorOpen, setIsBubbleSheetHeadingEditorOpen] =
@@ -15209,6 +15215,24 @@ export function GeneratedPaperView({
         }
     }
 
+    if (showESheet && !isStandaloneBubbleSheet) {
+        return (
+            <Suspense
+                fallback={
+                    <div className="py-12 text-center text-sm text-slate-500">
+                        Loading E-Sheet…
+                    </div>
+                }
+            >
+                <ESheetView
+                    paper={paper}
+                    setIndex={activeSetIndex}
+                    onBack={() => setShowESheet(false)}
+                />
+            </Suspense>
+        );
+    }
+
     return (
         <ArabicQuestionFontProvider enabled={enableArabicFont}>
             <div
@@ -15228,6 +15252,16 @@ export function GeneratedPaperView({
                                     >
                                         <PlusIcon className="size-3.5" />
                                         Add Section
+                                    </button>
+                                )}
+                                {!previewOnly && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowESheet(true)}
+                                        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                                    >
+                                        <FileTextIcon className="size-3.5" />
+                                        E-Sheet
                                     </button>
                                 )}
                                 <button
