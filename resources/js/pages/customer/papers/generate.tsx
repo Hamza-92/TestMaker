@@ -15240,6 +15240,8 @@ export function GeneratedPaperView({
                     paper={paper}
                     setIndex={activeSetIndex}
                     scope={paper.scope ?? eSheetScope}
+                    settings={settings}
+                    schoolLogoUrl={defaultWatermarkLogoUrl}
                     onBack={() => setShowESheet(false)}
                 />
             </Suspense>

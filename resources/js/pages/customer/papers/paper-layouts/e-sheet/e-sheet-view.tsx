@@ -8,7 +8,8 @@ import { create as createQRCode } from 'qrcode';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { toast } from 'sonner';
-import type { GeneratedPaper } from '../types';
+import { PaperWatermark } from '../paper-watermark';
+import type { GeneratedPaper, PaperSettings } from '../types';
 import { formatQuestionLabel, objectiveSectionQuestionCount } from '../types';
 import { buildAnswerSpacePages } from './answer-space-pages';
 import type { AnswerSpacePage } from './answer-space-pages';
@@ -40,6 +41,34 @@ function box(
         ...(width === undefined ? {} : { width: `${width}mm` }),
         ...(height === undefined ? {} : { height: `${height}mm` }),
     };
+}
+
+interface ESheetWatermarkProps {
+    settings: PaperSettings;
+    schoolName: string;
+    logoUrl: string;
+}
+
+function ESheetWatermark({
+    settings,
+    schoolName,
+    logoUrl,
+}: ESheetWatermarkProps) {
+    return (
+        <PaperWatermark
+            type={settings.watermarkType}
+            schoolName={schoolName}
+            logoUrl={logoUrl}
+            textSize={settings.watermarkTextSize}
+            logoSize={settings.watermarkLogoSize}
+            opacity={
+                Math.max(0, Math.min(100, settings.watermarkOpacity)) / 100
+            }
+            pageHeightMm={297}
+            marginTopMm={0}
+            marginBottomMm={0}
+        />
+    );
 }
 
 function pageSerial(paper: GeneratedPaper, setIndex: number): string {
@@ -327,36 +356,44 @@ function ChoiceCell({
 function CoverPage({
     paper,
     serial,
+    schoolLogoUrl,
+    watermark,
 }: {
     paper: GeneratedPaper;
     serial: string;
+    schoolLogoUrl: string;
+    watermark: ESheetWatermarkProps;
 }) {
+    const schoolName = paper.header.schoolName.trim();
+    const schoolNameSize =
+        schoolName.length > 70 ? 11 : schoolName.length > 45 ? 13 : 16;
+
     return (
         <div className="e-sheet-page" data-e-sheet-page="1">
+            <ESheetWatermark {...watermark} />
             <PageMarks number={1} serial={serial} />
-            <img
-                className="e-sheet-crest"
-                style={box(41, 42, 24, 28)}
-                src="/images/e-sheet-board-crest.png"
-                alt="Board crest"
-            />
+            {schoolLogoUrl && (
+                <img
+                    className="e-sheet-school-logo"
+                    style={box(20, 38, 24, 24)}
+                    src={schoolLogoUrl}
+                    alt={`${schoolName} logo`}
+                />
+            )}
             <div
-                className="e-sheet-board-urdu"
-                style={box(81, 41, 93, 10)}
-                lang="ur"
-                dir="rtl"
+                className="e-sheet-school-name"
+                style={{
+                    ...box(50, 38, 110, 24),
+                    fontSize: `${schoolNameSize}pt`,
+                }}
+                dir="auto"
             >
-                بورڈ آف انٹرمیڈیٹ اینڈ سیکنڈری ایجوکیشن، لاہور
+                {schoolName}
             </div>
-            <div className="e-sheet-board-english" style={box(70, 53, 115, 16)}>
-                BOARD OF INTERMEDIATE &amp;
-                <br />
-                SECONDARY EDUCATION, LAHORE
-            </div>
-            <div className="e-sheet-subject" style={box(80, 76, 57, 8)}>
+            <div className="e-sheet-subject" style={box(76.5, 68, 57, 8)}>
                 {paper.header.subject || 'SUBJECT'}
             </div>
-            <div className="e-sheet-date" style={box(70, 89, 56, 12)}>
+            <div className="e-sheet-date" style={box(70, 81, 56, 12)}>
                 <span>Date:</span>
                 <div>
                     <div className="e-sheet-date-labels">
@@ -373,7 +410,7 @@ function CoverPage({
                     </div>
                 </div>
             </div>
-            <div className="e-sheet-session" style={box(127, 92, 20, 9)}>
+            <div className="e-sheet-session" style={box(127, 84, 20, 9)}>
                 Morning{' '}
                 <span className="e-sheet-choice-circle">
                     <span className="e-sheet-circle-label">M</span>
@@ -386,14 +423,14 @@ function CoverPage({
             </div>
             <div
                 className="e-sheet-side-urdu"
-                style={box(7, 224, 112, 8)}
+                style={box(7, 216, 112, 8)}
                 lang="ur"
                 dir="rtl"
             >
                 انتباہ: براہ کرم جوابی کاپی پر اضافی پین اور اضافی صفحات لگانے
                 سے اجتناب کریں۔
             </div>
-            <div className="e-sheet-left-details" style={box(26, 109, 29, 132)}>
+            <div className="e-sheet-left-details" style={box(26, 101, 29, 132)}>
                 <div>Date</div>
                 <div className="e-sheet-date-write" />
                 <ChoiceCell
@@ -427,7 +464,7 @@ function CoverPage({
                 title="Roll No."
                 columns={6}
                 x={75}
-                y={104}
+                y={96}
                 width={28}
                 height={55}
             />
@@ -435,19 +472,19 @@ function CoverPage({
                 title="Paper Code"
                 columns={4}
                 x={106}
-                y={104}
+                y={96}
                 width={20}
                 height={55}
             />
-            <div style={box(130, 102, 54, 63)}>
+            <div style={box(130, 94, 54, 63)}>
                 <UrduInstructions />
             </div>
-            <div style={box(75, 166, 108, 50)}>
+            <div style={box(75, 158, 108, 50)}>
                 <EnglishInstructions />
             </div>
             <div
                 className="e-sheet-candidate-fields"
-                style={box(75, 216, 108, 51)}
+                style={box(75, 208, 108, 51)}
             >
                 <div>Name:</div>
                 <div>Father’s Name:</div>
@@ -456,7 +493,7 @@ function CoverPage({
             </div>
             <div
                 className="e-sheet-deputy-signature"
-                style={box(87, 267, 83, 10)}
+                style={box(87, 259, 83, 10)}
             >
                 Signature of Deputy Superintendent:
             </div>
@@ -464,9 +501,18 @@ function CoverPage({
     );
 }
 
-function BlankBackPage({ number, serial }: { number: number; serial: string }) {
+function BlankBackPage({
+    number,
+    serial,
+    watermark,
+}: {
+    number: number;
+    serial: string;
+    watermark: ESheetWatermarkProps;
+}) {
     return (
         <div className="e-sheet-page" data-e-sheet-page={number}>
+            <ESheetWatermark {...watermark} />
             <PageMarks number={number} serial={serial} />
             <div className="e-sheet-do-not-write" style={box(23, 103, 145, 50)}>
                 <span>DON'T WRITE ON THIS PAGE</span>
@@ -547,9 +593,16 @@ function AwardColumn({
     );
 }
 
-function MarksPage({ serial }: { serial: string }) {
+function MarksPage({
+    serial,
+    watermark,
+}: {
+    serial: string;
+    watermark: ESheetWatermarkProps;
+}) {
     return (
         <div className="e-sheet-page" data-e-sheet-page="3">
+            <ESheetWatermark {...watermark} />
             <PageMarks number={3} serial={serial} />
             <div style={box(26, 39, 102, 42)}>
                 <EnglishInstructions compact />
@@ -617,13 +670,16 @@ function AnswerPage({
     number,
     serial,
     page,
+    watermark,
 }: {
     number: number;
     serial: string;
     page: AnswerSpacePage;
+    watermark: ESheetWatermarkProps;
 }) {
     return (
         <div className="e-sheet-page" data-e-sheet-page={number}>
+            <ESheetWatermark {...watermark} />
             <PageMarks number={number} serial={serial} />
             <div className="e-sheet-answer-heading" style={box(26, 34, 165, 6)}>
                 Section{' '}
@@ -662,11 +718,15 @@ export function ESheetView({
     setIndex,
     scope,
     onBack,
+    settings,
+    schoolLogoUrl,
 }: {
     paper: GeneratedPaper;
     setIndex: number;
     scope?: { patternId: number; classId: number; subjectId: number };
     onBack: () => void;
+    settings: PaperSettings;
+    schoolLogoUrl: string;
 }) {
     const serial = useMemo(
         () => pageSerial(paper, setIndex),
@@ -697,6 +757,11 @@ export function ESheetView({
         [paper, linesByType],
     );
     const canExport = !isLoadingSpaces && !spacesError && !exceedsCapacity;
+    const watermark = {
+        settings,
+        schoolName: paper.header.schoolName,
+        logoUrl: settings.watermarkLogoUrl.trim() || schoolLogoUrl,
+    };
 
     useEffect(() => {
         if (!patternId || !classId || !subjectId) {
@@ -874,10 +939,23 @@ export function ESheetView({
                 </div>
             )}
             <div ref={pagesRef} className="e-sheet-pages">
-                <CoverPage paper={paper} serial={serial} />
-                <BlankBackPage number={2} serial={serial} />
-                <MarksPage serial={serial} />
-                <BlankBackPage number={4} serial={serial} />
+                <CoverPage
+                    paper={paper}
+                    serial={serial}
+                    schoolLogoUrl={schoolLogoUrl}
+                    watermark={watermark}
+                />
+                <BlankBackPage
+                    number={2}
+                    serial={serial}
+                    watermark={watermark}
+                />
+                <MarksPage serial={serial} watermark={watermark} />
+                <BlankBackPage
+                    number={4}
+                    serial={serial}
+                    watermark={watermark}
+                />
                 {!isLoadingSpaces &&
                     !spacesError &&
                     answerPages.map((page, index) => (
@@ -886,6 +964,7 @@ export function ESheetView({
                             number={index + 5}
                             serial={serial}
                             page={page}
+                            watermark={watermark}
                         />
                     ))}
             </div>

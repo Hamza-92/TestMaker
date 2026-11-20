@@ -67,6 +67,7 @@
 
 .e-sheet-page {
     position: relative;
+    isolation: isolate;
     flex: none;
     width: 210mm;
     height: 297mm;
@@ -81,6 +82,9 @@
 }
 .e-sheet-page * {
     box-sizing: border-box;
+}
+.e-sheet-page > :not([data-paper-watermark]) {
+    z-index: 1;
 }
 .e-sheet-cross {
     width: 4mm;
@@ -109,24 +113,20 @@
     width: 100%;
     height: 100%;
 }
-.e-sheet-crest {
+.e-sheet-school-logo {
     object-fit: contain;
 }
-.e-sheet-board-urdu {
+.e-sheet-school-name {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
     font:
-        20pt/1.2 'Jameel Noori Nastaleeq',
-        serif;
-    text-align: center;
-    white-space: nowrap;
-}
-.e-sheet-board-english {
-    font:
-        700 17pt/1.05 'Bahnschrift Condensed',
-        'Bahnschrift',
-        Arial,
+        700 16pt/1.15 Arial,
+        'Jameel Noori Nastaleeq',
         sans-serif;
     text-align: center;
-    transform: scaleX(0.82);
+    overflow-wrap: anywhere;
 }
 .e-sheet-subject {
     display: flex;
