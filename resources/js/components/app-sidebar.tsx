@@ -230,6 +230,10 @@ export function AppSidebar() {
                               title: 'Question Columns',
                               href: '/superadmin/subjective-column-settings',
                           },
+                          {
+                              title: 'E-Sheet Answer Spaces',
+                              href: '/superadmin/e-sheet-answer-spaces',
+                          },
 
                           ...(can('questions.view')
                               ? [

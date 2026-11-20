@@ -5,11 +5,13 @@ import {
     PrinterIcon,
 } from 'lucide-react';
 import { create as createQRCode } from 'qrcode';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { toast } from 'sonner';
 import type { GeneratedPaper } from '../types';
-import { objectiveSectionQuestionCount } from '../types';
+import { formatQuestionLabel, objectiveSectionQuestionCount } from '../types';
+import { buildAnswerSpacePages } from './answer-space-pages';
+import type { AnswerSpacePage } from './answer-space-pages';
 import './e-sheet.css';
 
 const DIGIT_PATTERNS = [
@@ -611,13 +613,59 @@ function MarksPage({ serial }: { serial: string }) {
     );
 }
 
+function AnswerPage({
+    number,
+    serial,
+    page,
+}: {
+    number: number;
+    serial: string;
+    page: AnswerSpacePage;
+}) {
+    return (
+        <div className="e-sheet-page" data-e-sheet-page={number}>
+            <PageMarks number={number} serial={serial} />
+            <div className="e-sheet-answer-heading" style={box(26, 34, 165, 6)}>
+                Section{' '}
+                {formatQuestionLabel(
+                    page.sectionIndex - 1,
+                    'roman',
+                    'roman',
+                ).toUpperCase()}{' '}
+                - {page.sectionTitle}
+            </div>
+            <div className="e-sheet-answer-body" style={box(26, 40, 165, 241)}>
+                {page.blocks.map((block, index) => (
+                    <div
+                        className="e-sheet-answer-block"
+                        key={`${block.label}-${index}`}
+                    >
+                        <div className="e-sheet-answer-label">
+                            {block.label}
+                            {block.continued ? ' (continued)' : ''}
+                        </div>
+                        {Array.from({ length: block.lines }, (_, line) => (
+                            <div className="e-sheet-writing-line" key={line} />
+                        ))}
+                        <div className="e-sheet-answer-end">
+                            <span />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function ESheetView({
     paper,
     setIndex,
+    scope,
     onBack,
 }: {
     paper: GeneratedPaper;
     setIndex: number;
+    scope?: { patternId: number; classId: number; subjectId: number };
     onBack: () => void;
 }) {
     const serial = useMemo(
@@ -636,10 +684,78 @@ export function ESheetView({
         );
     const pagesRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [linesByType, setLinesByType] = useState<Record<number, number>>({});
+    const [isLoadingSpaces, setIsLoadingSpaces] = useState(Boolean(scope));
+    const [spacesError, setSpacesError] = useState<string | null>(null);
+    const [retryVersion, setRetryVersion] = useState(0);
+    const patternId = scope?.patternId;
+    const classId = scope?.classId;
+    const subjectId = scope?.subjectId;
     const exceedsCapacity = objectiveCount > 24;
+    const answerPages = useMemo(
+        () => buildAnswerSpacePages(paper, linesByType),
+        [paper, linesByType],
+    );
+    const canExport = !isLoadingSpaces && !spacesError && !exceedsCapacity;
+
+    useEffect(() => {
+        if (!patternId || !classId || !subjectId) {
+            setIsLoadingSpaces(false);
+            setSpacesError(null);
+            setLinesByType({});
+
+            return;
+        }
+
+        const controller = new AbortController();
+        const params = new URLSearchParams({
+            pattern_id: String(patternId),
+            class_id: String(classId),
+            subject_id: String(subjectId),
+        });
+        setIsLoadingSpaces(true);
+        setSpacesError(null);
+        fetch(`/papers/generate/e-sheet-answer-spaces?${params}`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+            signal: controller.signal,
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Could not load E-Sheet answer spaces.');
+                }
+
+                return response.json() as Promise<{
+                    linesByType: Record<number, number>;
+                }>;
+            })
+            .then((data) => {
+                if (!controller.signal.aborted) {
+                    setLinesByType(data.linesByType ?? {});
+                }
+            })
+            .catch((error: unknown) => {
+                if (controller.signal.aborted) {
+                    return;
+                }
+
+                setSpacesError(
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not load E-Sheet answer spaces.',
+                );
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) {
+                    setIsLoadingSpaces(false);
+                }
+            });
+
+        return () => controller.abort();
+    }, [patternId, classId, subjectId, retryVersion]);
 
     async function downloadPdf() {
-        if (!pagesRef.current || isDownloading || exceedsCapacity) {
+        if (!pagesRef.current || isDownloading || !canExport) {
             return;
         }
 
@@ -665,7 +781,7 @@ export function ESheetView({
             for (const [index, page] of Array.from(pages).entries()) {
                 const canvas = await toCanvas(page, {
                     backgroundColor: '#fff',
-                    pixelRatio: 2,
+                    pixelRatio: index < 4 ? 2 : 1.5,
                     cacheBust: false,
                 });
 
@@ -716,7 +832,7 @@ export function ESheetView({
                     <button
                         type="button"
                         onClick={() => void downloadPdf()}
-                        disabled={isDownloading || exceedsCapacity}
+                        disabled={isDownloading || !canExport}
                     >
                         {isDownloading ? (
                             <Loader2Icon className="size-4 animate-spin" />
@@ -728,7 +844,7 @@ export function ESheetView({
                     <button
                         type="button"
                         onClick={() => window.print()}
-                        disabled={exceedsCapacity}
+                        disabled={!canExport}
                     >
                         <PrinterIcon className="size-4" /> Print
                     </button>
@@ -741,11 +857,37 @@ export function ESheetView({
                     omitted.
                 </p>
             )}
+            {isLoadingSpaces && (
+                <p className="e-sheet-capacity">Loading answer spaces…</p>
+            )}
+            {spacesError && (
+                <div className="e-sheet-capacity" role="alert">
+                    {spacesError}{' '}
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setRetryVersion((current) => current + 1)
+                        }
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
             <div ref={pagesRef} className="e-sheet-pages">
                 <CoverPage paper={paper} serial={serial} />
                 <BlankBackPage number={2} serial={serial} />
                 <MarksPage serial={serial} />
                 <BlankBackPage number={4} serial={serial} />
+                {!isLoadingSpaces &&
+                    !spacesError &&
+                    answerPages.map((page, index) => (
+                        <AnswerPage
+                            key={index}
+                            number={index + 5}
+                            serial={serial}
+                            page={page}
+                        />
+                    ))}
             </div>
         </div>
     );

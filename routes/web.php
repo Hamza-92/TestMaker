@@ -31,6 +31,7 @@ use App\Http\Controllers\Superadmin\CustomerController;
 use App\Http\Controllers\Superadmin\CustomerSubscriptionController;
 use App\Http\Controllers\Superadmin\CustomPaperLayoutController;
 use App\Http\Controllers\Superadmin\DataTransferController;
+use App\Http\Controllers\Superadmin\ESheetAnswerSpaceController;
 use App\Http\Controllers\Superadmin\ExpenseController;
 use App\Http\Controllers\Superadmin\LegacyExportController;
 use App\Http\Controllers\Superadmin\MultipartQuestionSettingController;
@@ -182,6 +183,7 @@ Route::middleware(['auth', 'verified', EnforceQatTrial::class])->group(function 
             Route::get('papers/generate', [GeneratePaperController::class, 'index'])->name('customer.papers.generate');
             Route::get('papers/generate/chapters', [GeneratePaperController::class, 'chapters'])->name('customer.papers.generate.chapters');
             Route::get('papers/generate/question-types', [GeneratePaperController::class, 'questionTypes'])->name('customer.papers.generate.question-types');
+            Route::get('papers/generate/e-sheet-answer-spaces', [GeneratePaperController::class, 'eSheetAnswerSpaces'])->name('customer.papers.generate.e-sheet-answer-spaces');
             Route::get('papers/generate/questions', [GeneratePaperController::class, 'questions'])->name('customer.papers.generate.questions');
             Route::post('papers/generate/charge', [GeneratePaperController::class, 'chargeQuestions'])->name('customer.papers.generate.charge');
             Route::post('papers', [PaperController::class, 'store'])->name('customer.papers.store');
@@ -496,6 +498,8 @@ Route::middleware(['auth', 'verified', EnforceQatTrial::class])->group(function 
         Route::get('superadmin/multipart-question-settings', [MultipartQuestionSettingController::class, 'index'])->name('superadmin.multipart-question-settings')->middleware('permission:question_types.view');
         Route::get('superadmin/subjective-column-settings', [SubjectiveColumnSettingController::class, 'index'])->name('superadmin.subjective-column-settings')->middleware('permission:question_types.view');
         Route::put('superadmin/subjective-column-settings', [SubjectiveColumnSettingController::class, 'update'])->name('superadmin.subjective-column-settings.update')->middleware('permission:question_types.edit');
+        Route::get('superadmin/e-sheet-answer-spaces', [ESheetAnswerSpaceController::class, 'index'])->name('superadmin.e-sheet-answer-spaces')->middleware('permission:question_types.view');
+        Route::put('superadmin/e-sheet-answer-spaces', [ESheetAnswerSpaceController::class, 'update'])->name('superadmin.e-sheet-answer-spaces.update')->middleware('permission:question_types.edit');
         Route::get('superadmin/smart-syllabus', [SmartSyllabusController::class, 'index'])->name('superadmin.smart-syllabus')->middleware('permission:patterns.view');
         Route::get('superadmin/smart-syllabus/chapters', [SmartSyllabusController::class, 'chapters'])->name('superadmin.smart-syllabus.chapters')->middleware('permission:patterns.view');
         Route::put('superadmin/smart-syllabus', [SmartSyllabusController::class, 'update'])->name('superadmin.smart-syllabus.update')->middleware('permission:patterns.edit');

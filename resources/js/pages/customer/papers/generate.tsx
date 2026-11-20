@@ -6314,6 +6314,11 @@ export default function GeneratePaper({
 
             const newPaper: GeneratedPaper = {
                 id: createPaperGenerationId(),
+                scope: pattern && klass && subject ? {
+                    patternId: Number(pattern.id),
+                    classId: Number(klass.id),
+                    subjectId: Number(subject.id),
+                } : undefined,
                 selectedChapterNumbers,
                 header: {
                     schoolName: defaultSchoolName,
@@ -9173,6 +9178,11 @@ export default function GeneratePaper({
                     <GeneratedPaperView
                         paper={variantForSet(generatedPaper, activeSetIndex)}
                         rawPaper={generatedPaper}
+                        eSheetScope={pattern && klass && subject ? {
+                            patternId: Number(pattern.id),
+                            classId: Number(klass.id),
+                            subjectId: Number(subject.id),
+                        } : undefined}
                         defaultHeaderTemplate={
                             paperDefaults?.settings?.headerTemplate
                         }
@@ -14249,6 +14259,7 @@ function PaperSectionHeading({
 export function GeneratedPaperView({
     paper,
     rawPaper,
+    eSheetScope,
     defaultHeaderTemplate,
     fallbackChapterNumbers = '',
     activeSetIndex,
@@ -14315,6 +14326,7 @@ export function GeneratedPaperView({
 }: {
     paper: GeneratedPaper;
     rawPaper: GeneratedPaper;
+    eSheetScope?: { patternId: number; classId: number; subjectId: number };
     defaultHeaderTemplate?: PaperHeaderTemplate;
     fallbackChapterNumbers?: string;
     activeSetIndex: number;
@@ -15227,6 +15239,7 @@ export function GeneratedPaperView({
                 <ESheetView
                     paper={paper}
                     setIndex={activeSetIndex}
+                    scope={paper.scope ?? eSheetScope}
                     onBack={() => setShowESheet(false)}
                 />
             </Suspense>

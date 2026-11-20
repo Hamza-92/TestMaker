@@ -961,6 +961,8 @@ export function resolveOrGroupLabel(
 
 export interface GeneratedPaper {
     id: string;
+    /** Content scope for E-Sheet answer-space rules; older papers use saved selection metadata. */
+    scope?: { patternId: number; classId: number; subjectId: number };
     /** Standalone answer sheets bypass the normal question-selection workflow. */
     documentKind?: 'paper' | 'bubble-sheet';
     header: GeneratedPaperHeader;

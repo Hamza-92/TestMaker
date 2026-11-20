@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Chapter;
 use App\Models\ClassSubject;
 use App\Models\CustomPaperLayout;
+use App\Models\ESheetAnswerSpace;
 use App\Models\MultipartQuestionSetting;
 use App\Models\PaperLayoutAssignment;
 use App\Models\PaperQuestionSection;
@@ -44,6 +45,33 @@ class GeneratePaperController extends Controller
         return response()->json([
             'question_count' => $count,
             'quota' => SubscriptionQuestionQuota::charge($request->user(), $data['generation_key'], $count),
+        ]);
+    }
+
+    public function eSheetAnswerSpaces(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'pattern_id' => ['required', 'integer', 'exists:patterns,id'],
+            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            'subject_id' => ['required', 'integer', 'exists:subjects,id'],
+        ]);
+        $patternId = (int) $data['pattern_id'];
+        $classId = (int) $data['class_id'];
+        $subjectId = (int) $data['subject_id'];
+        $access = AppUserAccess::resolve($request->user());
+
+        abort_unless(
+            AppUserAccess::allowsSubject($access, $patternId, $classId, $subjectId)
+                && DB::table('class_subjects')->where('pattern_id', $patternId)
+                    ->where('class_id', $classId)->where('subject_id', $subjectId)->exists(),
+            403,
+        );
+
+        return response()->json([
+            'linesByType' => ESheetAnswerSpace::query()
+                ->where('pattern_id', $patternId)->where('class_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->pluck('lines', 'question_type_id'),
         ]);
     }
 
