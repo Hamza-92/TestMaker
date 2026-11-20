@@ -186,7 +186,7 @@ export default function QatLanding() {
         },
         {
             question: 'How do I activate my subscription?',
-            answer: `The QAT annual subscription costs ${qatAnnualFee}. Pay through Easy Paisa, JazzCash or Meezan Bank, then send your receipt and school name on WhatsApp using the upgrade page. Access is activated after payment verification.`,
+            answer: `The QAT 6-month subscription costs ${qatAnnualFee}. Pay through Easy Paisa, JazzCash or Meezan Bank, then send your receipt and school name on WhatsApp using the upgrade page. Access is activated after payment verification.`,
         },
         {
             question:
@@ -200,7 +200,7 @@ export default function QatLanding() {
             <Head title="QAT practice papers for PEF schools">
                 <meta
                     name="description"
-                    content={`Create PEF QAT practice papers with automatic and manual generation, English and Urdu support, and answer keys. Try ${trialLimit} papers free. Annual subscription ${qatAnnualFee}.`}
+                    content={`Create PEF QAT practice papers with automatic and manual generation, English and Urdu support, and answer keys. Try ${trialLimit} papers free. 6-month subscription ${qatAnnualFee}.`}
                 />
             </Head>
             <div
@@ -482,12 +482,12 @@ export default function QatLanding() {
                                         aria-hidden="true"
                                         className="size-4"
                                     />
-                                    QAT annual subscription
+                                    QAT 6-month subscription
                                 </div>
                                 <p className="mt-5 font-display text-4xl font-extrabold tracking-tight">
                                     {qatAnnualFee}
                                     <span className="ml-2 text-sm font-normal text-sky-200">
-                                        / year
+                                        / 6 months
                                     </span>
                                 </p>
                                 <ul className="mt-6 space-y-3 border-t border-white/15 pt-6 text-sm text-sky-50">
