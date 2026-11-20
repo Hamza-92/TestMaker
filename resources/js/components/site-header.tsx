@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import SiteContactBar from '@/components/site-contact-bar';
+import { cn } from '@/lib/utils';
 import { dashboard, login, register } from '@/routes';
 import type { Auth } from '@/types/auth';
 import type { SiteNavigation } from '@/types/site-cms';
@@ -75,7 +76,13 @@ export default function SiteHeader({
                                     >
                                         <a
                                             href={item.href}
-                                            className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                                            className={cn(
+                                                'inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70',
+                                                item.id === 'qat' ||
+                                                    item.href === '/qat'
+                                                    ? 'bg-brand-600 px-3 font-semibold text-white shadow-sm hover:bg-brand-500'
+                                                    : 'text-white/85 hover:bg-white/10 hover:text-white',
+                                            )}
                                         >
                                             {item.label}
                                             {item.children.length > 0 && (
@@ -197,7 +204,13 @@ export default function SiteHeader({
                                             <a
                                                 href={item.href}
                                                 onClick={closeMenu}
-                                                className="flex min-h-12 items-center justify-between rounded-[10px] px-3 text-base font-medium text-slate-800 transition hover:bg-brand-50 hover:text-brand-700"
+                                                className={cn(
+                                                    'flex min-h-12 items-center justify-between rounded-[10px] px-3 text-base font-medium transition',
+                                                    item.id === 'qat' ||
+                                                        item.href === '/qat'
+                                                        ? 'bg-brand-600 font-semibold text-white hover:bg-brand-700'
+                                                        : 'text-slate-800 hover:bg-brand-50 hover:text-brand-700',
+                                                )}
                                             >
                                                 {item.label}
                                                 {item.children.length > 0 ? (

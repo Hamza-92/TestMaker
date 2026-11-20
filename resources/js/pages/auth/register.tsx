@@ -169,6 +169,7 @@ export default function Register({
                                                 {
                                                     value: 'qat',
                                                     label: 'QAT papers',
+                                                    emphasis: true,
                                                 },
                                             ]}
                                             value={selectedTrial}

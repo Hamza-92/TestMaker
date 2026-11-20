@@ -4,6 +4,8 @@ import { CONTROL_H } from './input';
 export interface TabItem<T extends string> {
     value: T;
     label: string;
+    /** Highlight a single choice without changing other segmented controls. */
+    emphasis?: boolean;
     /** Optional count pill. Omit rather than passing 0 if it is not useful. */
     count?: number;
 }
@@ -48,11 +50,15 @@ export function Tabs<T extends string>({
                         aria-selected={active}
                         onClick={() => onChange(item.value)}
                         className={cn(
-                            'flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-3 text-[13px] font-medium whitespace-nowrap transition-colors outline-none',
+                            'flex h-7 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium outline-none transition-colors',
                             'focus-visible:ring-2 focus-visible:ring-brand-500',
-                            active
-                                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
-                                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
+                            item.emphasis
+                                ? active
+                                    ? 'bg-brand-600 font-semibold text-white shadow-sm hover:bg-brand-700 dark:bg-brand-500 dark:text-white'
+                                    : 'bg-brand-100 font-semibold text-brand-700 hover:bg-brand-200 dark:bg-brand-500/20 dark:text-brand-200 dark:hover:bg-brand-500/30'
+                                : active
+                                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
                         )}
                     >
                         {item.label}
