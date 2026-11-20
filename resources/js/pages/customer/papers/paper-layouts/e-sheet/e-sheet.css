@@ -221,8 +221,20 @@
     height: 4mm;
     border: 0.22mm solid #111;
     border-radius: 50%;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 7pt;
     font-weight: 700;
+    line-height: 1;
+}
+.e-sheet-circle-label {
+    display: block;
+    flex: none;
+    width: 100%;
+    line-height: 1;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    transform: translateY(0.12mm);
 }
 .e-sheet-session .e-sheet-choice-circle {
     width: 3.2mm;
@@ -291,6 +303,7 @@
     font:
         7.5pt/1 Arial,
         sans-serif;
+    padding: 0;
 }
 
 .e-sheet-urdu-instructions {
@@ -543,6 +556,8 @@
     color: #666;
     font-size: 8pt;
     font-weight: 700;
+    line-height: 1;
+    padding: 0;
 }
 .e-sheet-award {
     border: 0.25mm solid #111;

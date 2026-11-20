@@ -209,7 +209,9 @@ function DigitGrid({
                     >
                         {Array.from({ length: columns }, (_, index) => (
                             <span className="e-sheet-digit-circle" key={index}>
-                                {digit}
+                                <span className="e-sheet-circle-label">
+                                    {digit}
+                                </span>
                             </span>
                         ))}
                     </div>
@@ -311,7 +313,9 @@ function ChoiceCell({
             {choices.map(({ label, circle }) => (
                 <div className="e-sheet-choice-row" key={label}>
                     <span>{label}</span>
-                    <span className="e-sheet-choice-circle">{circle}</span>
+                    <span className="e-sheet-choice-circle">
+                        <span className="e-sheet-circle-label">{circle}</span>
+                    </span>
                 </div>
             ))}
         </div>
@@ -368,9 +372,15 @@ function CoverPage({
                 </div>
             </div>
             <div className="e-sheet-session" style={box(127, 92, 20, 9)}>
-                Morning <span className="e-sheet-choice-circle">M</span>
+                Morning{' '}
+                <span className="e-sheet-choice-circle">
+                    <span className="e-sheet-circle-label">M</span>
+                </span>
                 <br />
-                Evening <span className="e-sheet-choice-circle">E</span>
+                Evening{' '}
+                <span className="e-sheet-choice-circle">
+                    <span className="e-sheet-circle-label">E</span>
+                </span>
             </div>
             <div
                 className="e-sheet-side-urdu"
@@ -482,7 +492,9 @@ function McqResponses() {
                                         className="e-sheet-answer-circle"
                                         key={option}
                                     >
-                                        {option}
+                                        <span className="e-sheet-circle-label">
+                                            {option}
+                                        </span>
                                     </span>
                                 ))}
                             </div>
@@ -521,7 +533,9 @@ function AwardColumn({
                     >
                         {Array.from({ length: digits }, (_, index) => (
                             <span className="e-sheet-digit-circle" key={index}>
-                                {digit}
+                                <span className="e-sheet-circle-label">
+                                    {digit}
+                                </span>
                             </span>
                         ))}
                     </div>
@@ -666,6 +680,8 @@ export function ESheetView({
                     0,
                     210,
                     297,
+                    undefined,
+                    'FAST',
                 );
             }
 
