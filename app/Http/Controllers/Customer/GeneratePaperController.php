@@ -67,11 +67,13 @@ class GeneratePaperController extends Controller
             403,
         );
 
+        $settings = ESheetAnswerSpace::query()
+            ->where('pattern_id', $patternId)->where('class_id', $classId)
+            ->where('subject_id', $subjectId)->get(['question_type_id', 'lines', 'page_break']);
+
         return response()->json([
-            'linesByType' => ESheetAnswerSpace::query()
-                ->where('pattern_id', $patternId)->where('class_id', $classId)
-                ->where('subject_id', $subjectId)
-                ->pluck('lines', 'question_type_id'),
+            'linesByType' => $settings->pluck('lines', 'question_type_id'),
+            'pageBreakTypeIds' => $settings->where('page_break', true)->pluck('question_type_id')->values(),
         ]);
     }
 

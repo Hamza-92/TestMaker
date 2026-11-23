@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { FloatingCombobox } from '@/components/ui/floating-combobox';
 import type { ComboboxOptionItem } from '@/components/ui/floating-combobox';
+import { Switch } from '@/components/ui/switch';
 import { usePermission } from '@/hooks/use-permission';
 
 interface ScopeCatalog {
@@ -29,6 +30,7 @@ interface QuestionTypeRow {
     name: string;
     name_ur: string | null;
     lines: number;
+    page_break: boolean;
 }
 
 function findOption(options: ComboboxOptionItem[], id: number | null) {
@@ -59,6 +61,7 @@ export default function ESheetAnswerSpaces({
         Object.fromEntries(questionTypes.map((type) => [type.id, type.lines])),
     );
     const [saving, setSaving] = useState(false);
+    const [pageBreaks, setPageBreaks] = useState<Record<number, boolean>>({});
 
     const patternOptions = useMemo<ComboboxOptionItem[]>(
         () =>
@@ -96,6 +99,7 @@ export default function ESheetAnswerSpaces({
         setClassId(schoolClass);
         setSubjectId(subject);
         setValues({});
+        setPageBreaks({});
 
         if (pattern && schoolClass && subject) {
             router.get(
@@ -125,6 +129,7 @@ export default function ESheetAnswerSpaces({
                 settings: questionTypes.map((type) => ({
                     question_type_id: type.id,
                     lines: values[type.id] ?? type.lines,
+                    page_break: pageBreaks[type.id] ?? type.page_break,
                 })),
             },
             {
@@ -205,14 +210,15 @@ export default function ESheetAnswerSpaces({
 
             {loaded && (
                 <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                    <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-4 border-b bg-muted/40 px-5 py-3 text-sm font-medium">
+                    <div className="grid grid-cols-[minmax(0,1fr)_4rem_5rem] gap-3 border-b bg-muted/40 px-5 py-3 text-sm font-medium sm:grid-cols-[minmax(0,1fr)_7rem_6rem]">
                         <span>Subjective question type</span>
                         <span>Lines</span>
+                        <span>Page break</span>
                     </div>
                     {questionTypes.map((type) => (
                         <div
                             key={type.id}
-                            className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-4 border-b px-5 py-3 last:border-b-0"
+                            className="grid grid-cols-[minmax(0,1fr)_4rem_5rem] items-center gap-3 border-b px-5 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_6rem]"
                         >
                             <div className="min-w-0 text-sm font-medium">
                                 {type.name}
@@ -237,6 +243,17 @@ export default function ESheetAnswerSpaces({
                                     }))
                                 }
                                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-brand-500 disabled:opacity-50"
+                            />
+                            <Switch
+                                aria-label={`Start ${type.name} on a new page`}
+                                checked={pageBreaks[type.id] ?? type.page_break}
+                                disabled={!canEdit}
+                                onCheckedChange={(checked) =>
+                                    setPageBreaks((current) => ({
+                                        ...current,
+                                        [type.id]: checked,
+                                    }))
+                                }
                             />
                         </div>
                     ))}

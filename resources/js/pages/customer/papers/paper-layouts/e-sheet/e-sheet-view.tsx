@@ -745,6 +745,7 @@ export function ESheetView({
     const pagesRef = useRef<HTMLDivElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
     const [linesByType, setLinesByType] = useState<Record<number, number>>({});
+    const [pageBreakTypeIds, setPageBreakTypeIds] = useState<number[]>([]);
     const [isLoadingSpaces, setIsLoadingSpaces] = useState(Boolean(scope));
     const [spacesError, setSpacesError] = useState<string | null>(null);
     const [retryVersion, setRetryVersion] = useState(0);
@@ -753,8 +754,8 @@ export function ESheetView({
     const subjectId = scope?.subjectId;
     const exceedsCapacity = objectiveCount > 24;
     const answerPages = useMemo(
-        () => buildAnswerSpacePages(paper, linesByType),
-        [paper, linesByType],
+        () => buildAnswerSpacePages(paper, linesByType, pageBreakTypeIds),
+        [paper, linesByType, pageBreakTypeIds],
     );
     const canExport = !isLoadingSpaces && !spacesError && !exceedsCapacity;
     const watermark = {
@@ -768,6 +769,7 @@ export function ESheetView({
             setIsLoadingSpaces(false);
             setSpacesError(null);
             setLinesByType({});
+            setPageBreakTypeIds([]);
 
             return;
         }
@@ -792,11 +794,13 @@ export function ESheetView({
 
                 return response.json() as Promise<{
                     linesByType: Record<number, number>;
+                    pageBreakTypeIds: number[];
                 }>;
             })
             .then((data) => {
                 if (!controller.signal.aborted) {
                     setLinesByType(data.linesByType ?? {});
+                    setPageBreakTypeIds(data.pageBreakTypeIds ?? []);
                 }
             })
             .catch((error: unknown) => {

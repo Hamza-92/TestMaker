@@ -48,8 +48,12 @@ function sectionTitle(
 export function buildAnswerSpacePages(
     paper: GeneratedPaper,
     linesByType: Record<number, number>,
+    pageBreakTypeIds: number[] = [],
 ): AnswerSpacePage[] {
-    const entries: Omit<AnswerSpaceBlock, 'continued'>[] = [];
+    const entries: Array<
+        Omit<AnswerSpaceBlock, 'continued'> & { pageBreak: boolean }
+    > = [];
+    const pageBreakTypes = new Set(pageBreakTypeIds);
     const medium = paper.sectioning?.medium;
     let questionNumber = paper.sections.some(
         (section) => section.category === 'Objective Questions',
@@ -79,21 +83,38 @@ export function buildAnswerSpacePages(
 
         sectionIndex++;
         const title = sectionTitle(section, medium);
-        const add = (index: number, lines: number, suffix = '') => {
+        const add = (
+            index: number,
+            lines: number,
+            pageBreak: boolean,
+            suffix = '',
+        ) => {
             entries.push({
                 label: `Q. No. ${currentNumber} (${formatQuestionLabel(index, 'roman', 'roman')})${suffix}`,
                 lines,
                 sectionTitle: title,
                 sectionIndex,
+                pageBreak,
             });
         };
 
         if (section.multipart) {
+            const startedTypes = new Set<number>();
             section.multipart.rows.forEach((row, rowIndex) => {
                 row.parts.forEach((part) => {
+                    const pageBreak =
+                        part.typeId !== null &&
+                        pageBreakTypes.has(part.typeId) &&
+                        !startedTypes.has(part.typeId);
+
+                    if (part.typeId !== null) {
+                        startedTypes.add(part.typeId);
+                    }
+
                     add(
                         rowIndex,
                         linesForType(part.typeId, linesByType),
+                        pageBreak,
                         ` (${part.key})`,
                     );
                 });
@@ -110,6 +131,10 @@ export function buildAnswerSpacePages(
             ...members.map((member) => member.questions.length),
             0,
         );
+        const pageBreak = members.some(
+            ({ questionTypeId }) =>
+                questionTypeId !== null && pageBreakTypes.has(questionTypeId),
+        );
 
         for (let index = 0; index < count; index++) {
             add(
@@ -119,6 +144,7 @@ export function buildAnswerSpacePages(
                         linesForType(member.questionTypeId, linesByType),
                     ),
                 ),
+                index === 0 && pageBreak,
             );
         }
     }
@@ -127,7 +153,11 @@ export function buildAnswerSpacePages(
     let page: AnswerSpacePage | null = null;
     let usedHeight = 0;
 
-    for (const entry of entries) {
+    for (const { pageBreak, ...entry } of entries) {
+        if (pageBreak) {
+            page = null;
+        }
+
         let remaining = entry.lines;
         let continued = false;
 

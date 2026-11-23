@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Superadmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CustomPaperLayout;
 use App\Models\ESheetAnswerSpace;
+use App\Models\PaperQuestionSection;
+use App\Models\PaperQuestionSectionScope;
 use App\Models\Pattern;
 use App\Models\QuestionType;
 use Illuminate\Http\Request;
@@ -25,11 +28,10 @@ class ESheetAnswerSpaceController extends Controller
         $types = collect();
         $settings = collect();
         if ($selected !== null) {
-            $types = $this->typesInScope($patternId, $classId, $subjectId)
-                ->orderBy('name')->get(['id', 'name', 'name_ur']);
+            $types = $this->orderedTypes($patternId, $classId, $subjectId);
             $settings = ESheetAnswerSpace::query()
                 ->where('pattern_id', $patternId)->where('class_id', $classId)
-                ->where('subject_id', $subjectId)->get(['question_type_id', 'lines'])
+                ->where('subject_id', $subjectId)->get(['question_type_id', 'lines', 'page_break'])
                 ->keyBy('question_type_id');
         }
 
@@ -51,6 +53,7 @@ class ESheetAnswerSpaceController extends Controller
                 'name' => $type->name,
                 'name_ur' => $type->name_ur,
                 'lines' => $settings->get($type->id)?->lines ?? 10,
+                'page_break' => $settings->get($type->id)?->page_break ?? false,
             ])->values(),
         ]);
     }
@@ -64,6 +67,7 @@ class ESheetAnswerSpaceController extends Controller
             'settings' => ['required', 'array', 'min:1'],
             'settings.*.question_type_id' => ['required', 'integer', 'distinct', 'exists:question_types,id'],
             'settings.*.lines' => ['required', 'integer', 'between:1,30'],
+            'settings.*.page_break' => ['sometimes', 'boolean'],
         ]);
         $patternId = (int) $data['pattern_id'];
         $classId = (int) $data['class_id'];
@@ -83,11 +87,46 @@ class ESheetAnswerSpaceController extends Controller
                     'class_id' => $classId,
                     'subject_id' => $subjectId,
                     'question_type_id' => $setting['question_type_id'],
-                ], ['lines' => $setting['lines']]);
+                ], [
+                    'lines' => $setting['lines'],
+                    ...array_intersect_key($setting, ['page_break' => true]),
+                ]);
             }
         });
 
         return back()->with('success', 'E-Sheet answer spaces saved.');
+    }
+
+    private function orderedTypes(int $patternId, int $classId, int $subjectId)
+    {
+        $scope = ['pattern_id' => $patternId, 'class_id' => $classId, 'subject_id' => $subjectId];
+        $orders = DB::table('question_type_orders')->where($scope)->pluck('sort_order', 'question_type_id');
+        $layout = CustomPaperLayout::query()->where($scope)->where('is_active', true)->with('sections.items')->first();
+        $groupOrder = [];
+
+        if ($layout !== null) {
+            foreach ($layout->sections as $sectionIndex => $section) {
+                foreach ($section->items as $itemIndex => $item) {
+                    $groupOrder[$item->question_type_id] = $sectionIndex;
+                    $orders[$item->question_type_id] = $itemIndex;
+                }
+            }
+        } elseif (PaperQuestionSectionScope::query()->where($scope)->where('is_active', true)->exists()) {
+            $sections = PaperQuestionSection::query()->where($scope)->with('members')->orderBy('sort_order')->get();
+            foreach ($sections as $sectionIndex => $section) {
+                foreach ($section->members as $member) {
+                    $groupOrder[$member->question_type_id] ??= $sectionIndex;
+                }
+            }
+        }
+
+        return $this->typesInScope($patternId, $classId, $subjectId)
+            ->get(['id', 'name', 'name_ur'])
+            ->sortBy(fn (QuestionType $type) => [
+                $groupOrder[$type->id] ?? PHP_INT_MAX,
+                $orders[$type->id] ?? PHP_INT_MAX,
+                $type->id,
+            ])->values();
     }
 
     private function typesInScope(int $patternId, int $classId, int $subjectId)

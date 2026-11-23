@@ -51,22 +51,38 @@ it('saves answer lines only for subjective types in the selected scope and serve
         'statement_en' => 'Explain photosynthesis.', 'source' => Question::SOURCE_EXERCISE, 'status' => 1,
     ]);
     $scope = ['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id];
+    $orderedType = QuestionType::create([
+        'name' => 'Structured Questions', 'heading_en' => 'Structured Questions', 'is_objective' => false,
+        'schema_key' => 'subjective_standard', 'status' => 1,
+    ]);
+    Question::create([
+        'question_type_id' => $orderedType->id, 'chapter_id' => $chapter->id,
+        'statement_en' => 'Describe the process.', 'source' => Question::SOURCE_EXERCISE, 'status' => 1,
+    ]);
+    DB::table('question_type_orders')->insert([
+        ...$scope, 'question_type_id' => $orderedType->id, 'sort_order' => 1,
+    ]);
 
     $this->actingAs($admin)->get(route('superadmin.e-sheet-answer-spaces', $scope))
         ->assertOk()->assertInertia(fn ($page) => $page
         ->component('superadmin/e-sheet-answer-spaces')
-        ->where('questionTypes.0.lines', 10));
+        ->where('questionTypes.0.id', $orderedType->id)
+        ->where('questionTypes.1.id', $type->id)
+        ->where('questionTypes.1.lines', 10)
+        ->where('questionTypes.1.page_break', false));
 
     $this->actingAs($admin)->put(route('superadmin.e-sheet-answer-spaces.update'), [
-        ...$scope, 'settings' => [['question_type_id' => $type->id, 'lines' => 14]],
+        ...$scope, 'settings' => [['question_type_id' => $type->id, 'lines' => 14, 'page_break' => true]],
     ])->assertSessionHasNoErrors();
     expect(ESheetAnswerSpace::sole()->lines)->toBe(14);
+    expect(ESheetAnswerSpace::sole()->page_break)->toBeTrue();
 
     $this->actingAs($customer)->getJson(route('customer.papers.generate.e-sheet-answer-spaces', $scope))
-        ->assertOk()->assertJsonPath("linesByType.{$type->id}", 14);
+        ->assertOk()->assertJsonPath("linesByType.{$type->id}", 14)
+        ->assertJsonPath('pageBreakTypeIds', [$type->id]);
     $this->getJson(route('customer.papers.generate.e-sheet-answer-spaces', [
         ...$scope, 'subject_id' => $otherSubject->id,
-    ]))->assertOk()->assertExactJson(['linesByType' => []]);
+    ]))->assertOk()->assertExactJson(['linesByType' => [], 'pageBreakTypeIds' => []]);
 
     $this->actingAs($admin)->put(route('superadmin.e-sheet-answer-spaces.update'), [
         ...$scope, 'settings' => [['question_type_id' => $otherType->id, 'lines' => 12]],
