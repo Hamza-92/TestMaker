@@ -23,6 +23,7 @@ export function useQatTrial() {
 export function QatTrialBanner() {
     const trial = useQatTrial();
     const hasTrial = trial !== null;
+    const trialLocked = trial?.locked === true;
 
     useEffect(() => {
         if (!hasTrial) {
@@ -35,12 +36,20 @@ export function QatTrialBanner() {
             }
         }
 
+        function leaveFinishedTrial() {
+            if (trialLocked) {
+                window.location.replace('/qa-tests/upgrade');
+            }
+        }
+
         window.addEventListener('pageshow', revalidateRestoredPage);
+        window.addEventListener('popstate', leaveFinishedTrial);
 
         return () => {
             window.removeEventListener('pageshow', revalidateRestoredPage);
+            window.removeEventListener('popstate', leaveFinishedTrial);
         };
-    }, [hasTrial]);
+    }, [hasTrial, trialLocked]);
 
     if (!trial) {
         return null;

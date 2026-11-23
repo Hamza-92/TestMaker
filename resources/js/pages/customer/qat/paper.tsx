@@ -589,6 +589,8 @@ export default function QatPaper({
 }) {
     const { collapsed: sidebarCollapsed } = useCustomerSidebar();
     const trial = useQatTrial();
+    const trialFinished = finalTrialPreview || trial?.locked === true;
+    const resolvedBackUrl = trialFinished ? '/qa-tests/upgrade' : backUrl;
     const [activeVariant, setActiveVariant] = useState(0);
     const [saving, setSaving] = useState(false);
     const [savedInPreview, setSavedInPreview] = useState(false);
@@ -1227,9 +1229,9 @@ export default function QatPaper({
                     variant="secondary"
                     className={`h-10 rounded-lg ${toolbarHoverClass}`}
                 >
-                    <Link href={backUrl}>
+                    <Link href={resolvedBackUrl} replace={trialFinished}>
                         <ArrowLeftIcon />{' '}
-                        {finalTrialPreview ? 'Back to Home' : 'Back'}
+                        {trialFinished ? 'Back to Home' : 'Back'}
                     </Link>
                 </Button>
             </div>

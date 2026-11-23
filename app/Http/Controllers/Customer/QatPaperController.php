@@ -427,6 +427,7 @@ class QatPaperController extends Controller
 
         return response()->json([
             'preview_url' => route('customer.qat.previews.show', $preview),
+            'final_trial_preview' => $finalTrialPreview,
         ], 201);
     }
 

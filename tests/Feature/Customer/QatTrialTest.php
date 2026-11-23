@@ -132,6 +132,73 @@ test('leaving an unsaved third preview or reaching the trial end locks the accou
         ->assertInertia(fn ($page) => $page->where('auth.school_context.qat_trial.expired', true));
 });
 
+test('each generation after editing selections counts and the third paper returns home for payment', function (string $mode) {
+    $store = route('customer.qat.papers.store');
+    $upgrade = route('customer.qat.upgrade');
+    $payload = $this->{$mode};
+    $staleSchool = clone $this->school;
+    $this->actingAs($this->school);
+
+    $first = $this->postJson($store, $payload)->assertCreated()
+        ->assertJsonPath('final_trial_preview', false)->json('preview_url');
+    expect($this->school->fresh()->qat_trial_papers_used)->toBe(1);
+    $firstEdit = $this->get($first)->assertOk()->viewData('page')['props']['backUrl'];
+    $this->get($firstEdit)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('initialSelections.subject_id', $payload['subject_id'])
+        ->where('auth.school_context.qat_trial.remaining', 2));
+
+    $class = DB::table('qat_classes')->insertGetId([
+        'qat_catalogue_id' => DB::table('qat_catalogues')->value('id'),
+        'source_class_id' => 11, 'name' => 'Class 6', 'status' => true,
+    ]);
+    $subject = DB::table('qat_subjects')->insertGetId([
+        'qat_class_id' => $class, 'qat_catalogue_id' => DB::table('qat_catalogues')->value('id'),
+        'class_id' => 11, 'class_name' => 'Class 6', 'subject_id' => 21, 'subject_name' => 'Science',
+        'source_pattern_id' => 30, 'source_pattern_name' => 'Source', 'status' => true,
+    ]);
+    $chapter = DB::table('qat_chapters')->insertGetId([
+        'qat_subject_id' => $subject, 'source_chapter_id' => 201, 'name' => 'Science chapter',
+        'chapter_number' => 1, 'status' => true,
+    ]);
+    DB::table('qat_chapter_months')->insert(['qat_chapter_id' => $chapter, 'month' => 4]);
+    $question = DB::table('qat_questions')->insertGetId([
+        'qat_chapter_id' => $chapter, 'source_question_id' => 201,
+        'question_type_id' => $this->auto['sections'][0]['question_type_id'], 'status' => true,
+        'question_data' => json_encode(['statement_en' => 'Choose the science answer.']),
+    ]);
+    $changed = [...$payload, 'class_ids' => [$class], 'subject_id' => $subject];
+    if ($mode === 'manual') {
+        $changed['chapter_ids'] = [$chapter];
+        $changed['manual_questions'] = [['id' => $question, 'marks' => 1]];
+    }
+
+    $second = $this->postJson($store, $changed)->assertCreated()
+        ->assertJsonPath('final_trial_preview', false)->json('preview_url');
+    expect($this->school->fresh()->qat_trial_papers_used)->toBe(2);
+    $secondEdit = $this->get($second)->assertOk()->viewData('page')['props']['backUrl'];
+    $this->get($secondEdit)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('initialSelections.subject_id', $subject)
+        ->where('initialSelections.class_ids', [$class])
+        ->where('auth.school_context.qat_trial.remaining', 1));
+
+    $third = $this->postJson($store, $payload)->assertCreated()
+        ->assertJsonPath('final_trial_preview', true)->json('preview_url');
+    $this->get($third)->assertOk()->assertInertia(fn ($page) => $page
+        ->where('backUrl', $upgrade)->where('finalTrialPreview', true)
+        ->where('auth.school_context.qat_trial.remaining', 0));
+    $this->get($secondEdit)->assertRedirect($upgrade);
+    $this->get($upgrade)->assertOk()->assertInertia(fn ($page) => $page
+        ->component('customer/qat/upgrade'));
+    $this->get(route('customer.qat.create', $mode))->assertRedirect($upgrade);
+    $this->postJson($store, $changed)->assertStatus(423)->assertJsonPath('redirect_url', $upgrade);
+
+    // A cached form or another tab cannot rely on an older allowance to generate again.
+    $this->actingAs($staleSchool)->postJson($store, $payload)
+        ->assertStatus(423)->assertJsonPath('redirect_url', $upgrade);
+    expect($this->school->fresh()->qat_trial_papers_used)->toBe(3)
+        ->and(QatPaper::query()->count())->toBe(0);
+})->with(['auto', 'manual']);
+
 test('a trial with more than three previously generated papers remains locked', function () {
     $this->school->forceFill(['qat_trial_papers_used' => 4])->save();
 

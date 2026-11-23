@@ -1410,6 +1410,7 @@ export default function QatGenerationForm({
             }
 
             router.visit(body.preview_url, {
+                replace: body.final_trial_preview === true,
                 onFinish: () => setSaving(false),
             });
         } catch (error) {
