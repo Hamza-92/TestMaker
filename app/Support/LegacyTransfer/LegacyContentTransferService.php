@@ -157,7 +157,7 @@ class LegacyContentTransferService
             ->leftJoin('pk_question as question', function ($join) use ($afaq, $sourcePattern): void {
                 $join->on('question.chapter_id', '=', 'chapter.id')
                     ->where('question.afaq', '=', $afaq)
-                    ->where('question.status', '=', 1);
+                    ->whereIn('question.status', $this->sourceQuestionStatuses($sourcePattern));
                 if ($sourcePattern === 'pef') {
                     $join->where('question.status_pef', '=', 1);
                 }
@@ -221,7 +221,7 @@ class LegacyContentTransferService
             ->leftJoin('pk_question as question', function ($join) use ($afaq, $sourcePattern): void {
                 $join->on('question.chapter_id', '=', 'chapter.id')
                     ->where('question.afaq', '=', $afaq)
-                    ->where('question.status', '=', 1);
+                    ->whereIn('question.status', $this->sourceQuestionStatuses($sourcePattern));
                 if ($sourcePattern === 'pef') {
                     $join->where('question.status_pef', '=', 1);
                 }
@@ -247,7 +247,7 @@ class LegacyContentTransferService
             ->leftJoin('pk_question as question', function ($join) use ($afaq, $sourcePattern): void {
                 $join->on('question.topic_id', '=', 'topic.id')
                     ->where('question.afaq', '=', $afaq)
-                    ->where('question.status', '=', 1);
+                    ->whereIn('question.status', $this->sourceQuestionStatuses($sourcePattern));
                 if ($sourcePattern === 'pef') {
                     $join->where('question.status_pef', '=', 1);
                 }
@@ -608,7 +608,7 @@ class LegacyContentTransferService
                 ->where('chapter.afaq', $afaq)
                 ->where("chapter.{$statusColumn}", 1)
                 ->where('question.afaq', $afaq)
-                ->where('question.status', 1)
+                ->whereIn('question.status', $this->sourceQuestionStatuses($sourcePattern))
                 ->where('question.type_id', '!=', 332)
                 ->when($sourceChapterIds !== [], fn ($query) => $query->whereIn('chapter.id', $sourceChapterIds))
                 ->when($sourceTopicIds !== [], fn ($query) => $query->whereIn('question.topic_id', $sourceTopicIds))
@@ -680,6 +680,7 @@ class LegacyContentTransferService
         ];
         $languagePresence = ['english' => false, 'urdu' => false];
         $isTopicWiseSubject = $subjectType === 'topic-wise';
+        $skipUnnamedExercises = $sourcePattern === 'ss' && $convertExercisesToTopics;
 
         $sourceChapters = $this->source()
             ->table('pk_chapter')
@@ -748,11 +749,12 @@ class LegacyContentTransferService
 
             $exerciseTopicMap = [];
             if ($convertExercisesToTopics) {
+                // An exercise can consist entirely of inactive questions.
                 $exerciseNames = $this->source()
                     ->table('pk_question')
                     ->where('chapter_id', $sourceChapter->id)
                     ->where('afaq', $afaq)
-                    ->where('status', 1)
+                    ->whereIn('status', $this->sourceQuestionStatuses($sourcePattern))
                     ->when($exerciseQuestion !== null, fn ($query) => $query->where('exercise_question', $exerciseQuestion))
                     ->where('type_id', '!=', 332)
                     ->when($sourcePattern === 'pef', fn ($query) => $query->where('status_pef', 1))
@@ -760,6 +762,7 @@ class LegacyContentTransferService
                     ->orderBy('id')
                     ->pluck('exercise')
                     ->map(fn ($exercise) => $this->legacyExerciseTopicKey($exercise))
+                    ->reject(fn (string $exercise) => $skipUnnamedExercises && $exercise === '__other__')
                     ->unique()
                     ->values();
 
@@ -817,7 +820,7 @@ class LegacyContentTransferService
                 ->table('pk_question')
                 ->where('chapter_id', $sourceChapter->id)
                 ->where('afaq', $afaq)
-                ->where('status', 1)
+                ->whereIn('status', $this->sourceQuestionStatuses($sourcePattern))
                 ->when($exerciseQuestion !== null, fn ($query) => $query->where('exercise_question', $exerciseQuestion))
                 ->where('type_id', '!=', 332)
                 ->when($sourcePattern === 'pef', fn ($query) => $query->where('status_pef', 1))
@@ -827,6 +830,11 @@ class LegacyContentTransferService
                 ->get();
 
             foreach ($sourceQuestions as $sourceQuestion) {
+                $exerciseKey = $this->legacyExerciseTopicKey($sourceQuestion->exercise ?? null);
+                if ($skipUnnamedExercises && $exerciseKey === '__other__') {
+                    continue;
+                }
+
                 $sourceOptions = $this->source()
                     ->table('pk_options')
                     ->where('question_id', $sourceQuestion->id)
@@ -857,7 +865,7 @@ class LegacyContentTransferService
                     questionType: $questionType,
                     targetChapterId: $chapter->id,
                     targetTopicId: $convertExercisesToTopics
-                        ? ($exerciseTopicMap[$this->legacyExerciseTopicKey($sourceQuestion->exercise ?? null)] ?? null)
+                        ? ($exerciseTopicMap[$exerciseKey] ?? null)
                         : ($topicMap[(int) ($sourceQuestion->topic_id ?? 0)] ?? null),
                     creatorId: $creatorId,
                 );
@@ -1576,7 +1584,7 @@ class LegacyContentTransferService
             ->join('pk_question as question', function ($join) use ($afaq, $sourcePattern): void {
                 $join->on('question.topic_id', '=', 'topic.id')
                     ->where('question.afaq', '=', $afaq)
-                    ->where('question.status', '=', 1);
+                    ->whereIn('question.status', $this->sourceQuestionStatuses($sourcePattern));
                 if ($sourcePattern === 'pef') {
                     $join->where('question.status_pef', '=', 1);
                 }
@@ -1616,7 +1624,7 @@ class LegacyContentTransferService
             ->where('chapter.afaq', $afaq)
             ->where("chapter.{$statusColumn}", 1)
             ->where('question.afaq', $afaq)
-            ->where('question.status', 1)
+            ->whereIn('question.status', $this->sourceQuestionStatuses($sourcePattern))
             ->when($sourcePattern === 'pef', fn ($query) => $query->where('question.status_pef', 1))
             ->selectRaw("count(distinct question.id) as questions_count, count(distinct case when trim(coalesce(question.exercise, '')) <> '' then question.id end) as exercise_questions_count")
             ->first();
@@ -1672,6 +1680,11 @@ class LegacyContentTransferService
     private function sourceChapterStatusColumn(string $sourcePattern): string
     {
         return $sourcePattern === 'pef' ? 'status_pef' : 'status';
+    }
+
+    private function sourceQuestionStatuses(string $sourcePattern): array
+    {
+        return $sourcePattern === 'ss' ? [0, 1] : [1];
     }
 
     private function source(): ConnectionInterface

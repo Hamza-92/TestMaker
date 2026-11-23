@@ -9,6 +9,7 @@ use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Models\User;
+use App\Support\LegacyTransfer\LegacyContentTransferService;
 use App\Support\LegacyTransfer\LegacyExportService;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Database\Schema\Blueprint;
@@ -134,6 +135,50 @@ function legacyExportContext(): array
 
     return [$admin, $pattern, $class, $subject, $chapter, $question];
 }
+
+it('scopes inactive questions and unnamed exercise handling to Smart Syllabus', function (string $sourcePattern, int $legacyPattern): void {
+    [$admin, $pattern, $class, $subject] = legacyExportContext();
+    Schema::connection('legacy_mysql')->table('pk_subject', function (Blueprint $table): void {
+        $table->integer('status_punjab')->default(1);
+        $table->integer('status_smart')->default(1);
+    });
+    DB::connection('legacy_mysql')->table('pk_chapter')->where('id', 1)->update(['afaq' => $legacyPattern]);
+    app(LegacyExportService::class)->export([
+        'mode' => 'subject', 'pattern_id' => $pattern->id, 'class_id' => $class->id,
+        'subject_id' => $subject->id, 'legacy_afaq' => $legacyPattern, 'legacy_class_id' => 5,
+        'legacy_subject_id' => 7, 'ids' => [],
+    ], $admin->id);
+
+    $legacyQuestions = DB::connection('legacy_mysql')->table('pk_question');
+    $legacyQuestion = (array) $legacyQuestions->sole();
+    $legacyChapterId = $legacyQuestion['chapter_id'];
+    $legacyQuestions->update(['exercise' => 'Exercise 1.3 with Example', 'status' => 0]);
+    unset($legacyQuestion['id']);
+    $legacyQuestions->insert([
+        ...$legacyQuestion, 'statement_en' => 'A question with no exercise.',
+        'exercise' => " \t ", 'status' => 1,
+    ]);
+
+    $transfer = app(LegacyContentTransferService::class);
+    $sourceChapter = collect($transfer->sourceChapters($sourcePattern, 5, 7))->firstWhere('id', $legacyChapterId);
+    expect($sourceChapter['questions_count'])->toBe($sourcePattern === 'ss' ? 2 : 1);
+
+    $transfer->transfer([
+        'source_pattern' => $sourcePattern, 'source_class_id' => 5, 'source_subject_id' => 7,
+        'source_chapter_ids' => [$legacyChapterId], 'convert_exercises_to_topics' => true,
+        'target_pattern_name' => 'Imported exercises', 'target_class_name' => 'Imported grade',
+    ], $admin->id);
+
+    $expectedTopic = $sourcePattern === 'ss' ? 'Exercise 1.3 with Example' : 'Other Questions';
+    $topic = Topic::query()->sole();
+    expect($topic->name)->toBe($expectedTopic);
+    expect((int) $topic->status)->toBe(1);
+    expect(Question::query()->where('chapter_id', $topic->chapter_id)->count())->toBe(1);
+    expect((int) Question::query()->where('topic_id', $topic->id)->sole()->status)->toBe($sourcePattern === 'ss' ? 0 : 1);
+})->with([
+    'Smart Syllabus' => ['ss', 8],
+    'Federal' => ['fedral', 4],
+]);
 
 it('exports a selected subject and safely retries and updates its questions', function (): void {
     [$admin, $pattern, $class, $subject, $chapter, $question] = legacyExportContext();
