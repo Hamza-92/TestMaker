@@ -282,7 +282,7 @@ class QuestionController extends Controller
         $chapters = Chapter::query()->where('pattern_id', $scope['pattern_id'])
             ->where('class_id', $scope['class_id'])->where('subject_id', $scope['subject_id'])
             ->with(['subject', 'schoolClass:id,name', 'pattern:id,name,short_name'])
-            ->orderBy('group_name')->orderBy('group_heading')->orderBy('sort_id')->orderBy('chapter_number')->orderBy('name')->orderBy('id')->get();
+            ->orderBy('group_name')->orderBy('group_heading')->orderBy('chapter_number')->orderBy('sort_id')->orderBy('name')->orderBy('id')->get();
         $subjectTypes = $this->subjectTypesForChapters($chapters);
 
         return $chapters->map(fn (Chapter $chapter) => $this->questionFilterChapter($chapter, $subjectTypes->get((string) $chapter->id)));

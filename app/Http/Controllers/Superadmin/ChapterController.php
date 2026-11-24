@@ -53,6 +53,8 @@ class ChapterController extends Controller
 
     private function createChapter(Request $request, Subject $subject, int $patternId, int $classId): RedirectResponse
     {
+        $this->normalizeChapterNumber($request);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'name_ur' => ['nullable', 'string', 'max:150'],
@@ -89,6 +91,8 @@ class ChapterController extends Controller
     {
         abort_if($chapter->subject_id !== $subject->id, 403);
 
+        $this->normalizeChapterNumber($request);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'name_ur' => ['nullable', 'string', 'max:150'],
@@ -124,6 +128,15 @@ class ChapterController extends Controller
         $chapter->delete();
 
         return back()->with('success', 'Chapter deleted.');
+    }
+
+    private function normalizeChapterNumber(Request $request): void
+    {
+        $number = $request->input('chapter_number');
+
+        if (is_string($number) && preg_match('/\A0[0-9]+\z/', $number)) {
+            $request->merge(['chapter_number' => ltrim($number, '0') ?: '0']);
+        }
     }
 
     private function nullableString(mixed $value): ?string

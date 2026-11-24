@@ -92,6 +92,36 @@ it('loads scoped chapters without topics and fetches topics separately in order'
     $this->getJson(route('superadmin.questions.filter-options', ['level' => 'subjects', 'pattern_id' => $context['pattern']->id]))->assertUnprocessable()->assertJsonValidationErrors('class_id');
 });
 
+it('orders numbered chapters before considering their saved sort position within a group', function () {
+    ['admin' => $admin, 'pattern' => $pattern, 'class' => $class, 'subject' => $subject, 'chapter' => $first] = questionLoadingContext();
+    $scope = ['pattern_id' => $pattern->id, 'class_id' => $class->id, 'subject_id' => $subject->id];
+    $first->update(['group_name' => 'Group A']);
+    $tenth = Chapter::create($scope + ['name' => 'Chapter 10', 'chapter_number' => 10, 'sort_id' => 2, 'status' => 1, 'group_name' => 'Group A']);
+    $second = Chapter::create($scope + ['name' => 'Chapter 2', 'chapter_number' => 2, 'sort_id' => 3, 'status' => 1, 'group_name' => 'Group A']);
+
+    $this->actingAs($admin)->get(route('superadmin.questions.browse.chapters', [$pattern, $class, $subject]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('rows', 3)->where('rows.0.id', $first->id)->where('rows.1.id', $second->id)->where('rows.2.id', $tenth->id));
+
+    $this->getJson(route('superadmin.questions.filter-options', ['level' => 'chapters'] + $scope))
+        ->assertOk()->assertJsonCount(3, 'options')
+        ->assertJsonPath('options.0.id', $first->id)->assertJsonPath('options.1.id', $second->id)->assertJsonPath('options.2.id', $tenth->id);
+});
+
+it('normalizes a padded chapter number before validating and saving an edit', function () {
+    ['admin' => $admin, 'subject' => $subject, 'chapter' => $chapter] = questionLoadingContext();
+    $editUrl = route('superadmin.subjects.chapters.update', [$subject, $chapter]);
+    $payload = ['name' => $chapter->name, 'status' => 1];
+
+    $this->actingAs($admin)->put($editUrl, $payload + ['chapter_number' => '08'])
+        ->assertRedirect()->assertSessionHasNoErrors();
+    expect($chapter->refresh()->chapter_number)->toBe(8);
+
+    $this->put($editUrl, $payload + ['chapter_number' => '00'])
+        ->assertSessionHasErrors('chapter_number');
+    expect($chapter->refresh()->chapter_number)->toBe(8);
+});
+
 it('adds a chapter from the questions browse scope without trusting posted scope fields', function () {
     $context = questionLoadingContext();
     $other = questionLoadingContext();
@@ -108,7 +138,7 @@ it('adds a chapter from the questions browse scope without trusting posted scope
             ->where('createChapterHref', parse_url($storeUrl, PHP_URL_PATH)));
 
     $this->from($browseUrl)->post($storeUrl, [
-        'chapter_number' => 2,
+        'chapter_number' => '02',
         'name' => 'New chapter',
         'name_ur' => 'نیا باب',
         'group_name' => 'Group A',
@@ -132,7 +162,7 @@ it('adds a chapter from the questions browse scope without trusting posted scope
     $this->get($browseUrl)->assertOk()->assertInertia(fn (Assert $page) => $page->has('rows', 2));
 
     $this->from($browseUrl)->post($storeUrl, [
-        'chapter_number' => 2,
+        'chapter_number' => '02',
         'name' => 'Duplicate number',
     ])->assertSessionHasErrors('chapter_number');
 

@@ -76,8 +76,8 @@ class QuestionBrowseController extends Controller
         $this->ensureSubject($pattern, $schoolClass, $subject);
         $chapters = Chapter::query()->where('pattern_id', $pattern->id)
             ->where('class_id', $schoolClass->id)->where('subject_id', $subject->id)
-            ->orderBy('group_name')->orderBy('group_heading')->orderBy('sort_id')
-            ->orderBy('chapter_number')->orderBy('name')->orderBy('id')
+            ->orderBy('group_name')->orderBy('group_heading')->orderBy('chapter_number')
+            ->orderBy('sort_id')->orderBy('name')->orderBy('id')
             ->get(['id', 'name', 'name_ur', 'chapter_number', 'group_name']);
 
         return $this->browse('chapters', $subject->name_eng, $chapters
