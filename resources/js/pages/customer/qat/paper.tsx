@@ -219,9 +219,15 @@ function QatSectionHeading({
     labelUrdu?: string | null;
 }) {
     const numeral = romanSection(number);
-    const showUrdu =
-        medium === 'Urdu' ||
-        (medium === 'Both' && Boolean(labelEnglish || labelUrdu));
+    const english = labelEnglish?.trim();
+    const urdu = labelUrdu?.trim();
+    const hasCustomLabel = Boolean(english || urdu);
+    const showEnglish = hasCustomLabel
+        ? Boolean(english && (medium !== 'Urdu' || !urdu))
+        : medium !== 'Urdu';
+    const showUrdu = hasCustomLabel
+        ? Boolean(urdu && (medium !== 'English' || !english))
+        : medium === 'Urdu';
 
     return (
         <h2
@@ -229,9 +235,9 @@ function QatSectionHeading({
             data-paper-section-heading
             className="qat-section-heading flex break-after-avoid flex-wrap items-baseline justify-center gap-x-3 text-center text-sm font-bold"
         >
-            {medium !== 'Urdu' && (
+            {showEnglish && (
                 <span dir="ltr" lang="en">
-                    {labelEnglish || (
+                    {english || (
                         <>
                             Section <bdi>{numeral}</bdi>
                         </>
@@ -240,7 +246,7 @@ function QatSectionHeading({
             )}
             {showUrdu && (
                 <span dir="rtl" lang="ur">
-                    {labelUrdu || (
+                    {urdu || (
                         <>
                             حصہ <bdi>{numeral}</bdi>
                         </>
@@ -802,7 +808,7 @@ export default function QatPaper({
             <style>{`
                 @page { size: ${width}mm ${height}mm; margin: ${pageMargins}; }
                 [data-qat-sheet] { font-family: ${englishFont}; }
-                [data-qat-sheet][lang="ur"] > header, [data-qat-sheet][lang="ur"] .qat-section-heading, [data-qat-sheet] .qat-section-heading [lang="ur"] { font-family: ${urduFont}; }
+                [data-qat-sheet][lang="ur"] > header, [data-qat-sheet] .qat-section-heading [lang="ur"] { font-family: ${urduFont}; }
                 [data-qat-sheet] .qat-objective-question, [data-qat-sheet] .qat-question .space-y-2.text-sm { font-size: ${questionSize}px; line-height: ${questionLineHeight}; }
                 [data-qat-sheet] .qat-question [lang="ur"], [data-qat-sheet] .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: ${urduFont} !important; font-size: ${questionSize * urduMetrics.sizeScale}px !important; line-height: ${questionLineHeight * urduMetrics.lineHeightScale} !important; }
                 [data-qat-sheet] .qat-question [lang="ur"] { transform: translateY(${urduMetrics.verticalOffsetEm}em); }

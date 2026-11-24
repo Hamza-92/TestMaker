@@ -124,8 +124,9 @@ function SectionSettings({
                     </label>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                    Applies to all months for this subject. Leave a label blank
-                    to use its default. Unassigned question types share a final
+                    Applies to all months for this subject. Enter one label to
+                    show it on its own, or leave both blank to use the default
+                    section heading. Unassigned question types share a final
                     section.
                 </p>
             </Card>
