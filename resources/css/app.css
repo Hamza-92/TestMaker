@@ -1018,6 +1018,26 @@ input[type='date']::-webkit-calendar-picker-indicator {
     border-bottom-style: dashed;
 }
 
+[data-print-paper] .tm-old-header .tm-old-one {
+    font-weight: 700;
+}
+
+[data-print-paper] .tm-old-header .tm-old-one .tm-old-dashed {
+    border-style: dashed;
+}
+
+[data-print-paper] .tm-old-header .tm-old-one tr:nth-child(2) > * {
+    border-top-style: none;
+}
+
+[data-print-paper] .tm-old-header .tm-old-one .tm-old-logo-cell {
+    width: auto;
+}
+
+[data-print-paper] .tm-old-header .tm-old-one .tm-old-field {
+    display: flex;
+}
+
 [data-print-paper] .tm-old-header .tm-old-rounded {
     border: var(--paper-header-border-width, 1px) var(--paper-header-border-style, solid) #000;
     border-radius: 10px;

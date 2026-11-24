@@ -113,11 +113,13 @@ function Logo() {
 function Field({
     name,
     label,
+    ariaLabel = label,
     line = false,
     stacked = false,
 }: {
     name: LegacyField;
     label?: string;
+    ariaLabel?: string;
     line?: boolean;
     stacked?: boolean;
 }) {
@@ -145,7 +147,7 @@ function Field({
             {label && <strong className="tm-old-label">{label}</strong>}
             {editable ? (
                 <input
-                    aria-label={label ?? name}
+                    aria-label={ariaLabel ?? name}
                     autoComplete="off"
                     value={displayValue}
                     onChange={(event) => {
@@ -167,7 +169,7 @@ function Field({
                 <RichTextField
                     value={value}
                     onChange={() => {}}
-                    ariaLabel={label ?? name}
+                    ariaLabel={ariaLabel ?? name}
                     readOnly
                     className="tm-old-value tm-old-rich-value"
                 />
@@ -317,48 +319,62 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
             );
         case 1:
             return (
-                <table className="tm-old-table tm-old-one">
+                <table className="tm-old-table tm-old-one" dir="ltr">
+                    <colgroup>
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '10%' }} />
+                        <col style={{ width: '7.5%' }} />
+                        <col style={{ width: '11.2%' }} />
+                        <col style={{ width: '32.7%' }} />
+                        <col style={{ width: '6.6%' }} />
+                        <col style={{ width: '12%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '8%' }} />
+                    </colgroup>
                     <tbody>
                         <tr>
-                            <td colSpan={3} className="tm-old-dashed">
+                            <td colSpan={9} className="tm-old-dashed">
                                 <SchoolBlock />
                             </td>
                         </tr>
                         <tr>
-                            <td>
-                                <Field
-                                    name="studentName"
-                                    label="Student Name:"
-                                    line
-                                />
+                            <th colSpan={2}>Student Name:</th>
+                            <td colSpan={2}>
+                                <Field name="studentName" />
                             </td>
                             <td rowSpan={3} className="tm-old-logo-cell">
                                 <Logo />
                             </td>
-                            <td>
-                                <Field name="className" label="Class:" />
+                            <th colSpan={2}>Class:</th>
+                            <td colSpan={2}>
+                                <Field name="className" ariaLabel="Class" />
                             </td>
                         </tr>
                         <tr>
-                            <td>
-                                <Field
-                                    name="fatherName"
-                                    label="Father Name:"
-                                    line
-                                />
+                            <th colSpan={2}>Father Name</th>
+                            <td colSpan={2}>
+                                <Field name="fatherName" />
                             </td>
-                            <td>
+                            <td colSpan={4}>
                                 <Field name="chapters" label="CH#:" />
                             </td>
                         </tr>
                         <tr>
+                            <th>Time:</th>
                             <td>
-                                <Field name="duration" label="Time:" />{' '}
-                                <Field name="type" label="Term:" />
+                                <Field name="duration" ariaLabel="Time" />
                             </td>
+                            <th>Term</th>
                             <td>
-                                <Field name="subject" label="Subject:" />{' '}
-                                <Field name="marks" label="Marks:" />
+                                <Field name="type" ariaLabel="Term" />
+                            </td>
+                            <th>Subject:</th>
+                            <td>
+                                <Field name="subject" ariaLabel="Subject" />
+                            </td>
+                            <th>Marks:</th>
+                            <td>
+                                <Field name="marks" />
                             </td>
                         </tr>
                     </tbody>
