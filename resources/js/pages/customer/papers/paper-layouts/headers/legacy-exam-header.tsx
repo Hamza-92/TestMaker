@@ -325,10 +325,10 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
                         <col style={{ width: '10%' }} />
                         <col style={{ width: '7.5%' }} />
                         <col style={{ width: '11.2%' }} />
-                        <col style={{ width: '32.7%' }} />
-                        <col style={{ width: '6.6%' }} />
+                        <col style={{ width: '31.1%' }} />
+                        <col style={{ width: '7.4%' }} />
                         <col style={{ width: '12%' }} />
-                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '6.8%' }} />
                         <col style={{ width: '8%' }} />
                     </colgroup>
                     <tbody>

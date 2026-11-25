@@ -61,6 +61,7 @@
         "dompurify": "^3.4.8",
         "globals": "^15.14.0",
         "html-to-image": "^1.11.13",
+        "html2canvas": "1.4.1",
         "input-otp": "^1.4.2",
         "jspdf": "^4.2.1",
         "katex": "^0.17.0",

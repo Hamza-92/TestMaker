@@ -7,6 +7,9 @@ import type { PaperSettings } from './types';
 
 const PX_PER_MM = 96 / 25.4;
 const FULL_PIXEL_RATIO = 300 / 96;
+const FAST_PIXEL_RATIO = 2;
+const MAX_FAST_CANVAS_PIXELS = 16_000_000;
+const MAX_FAST_CANVAS_SIDE = 8192;
 const TRANSPARENT_IMAGE =
     'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 const IMAGE_LOAD_TIMEOUT_MS = 12000;
@@ -313,6 +316,51 @@ function measure(root: HTMLElement) {
     return { blocks, lines, forcedBreaks };
 }
 
+function slicePaperCanvas(
+    source: HTMLCanvasElement,
+    watermark: HTMLCanvasElement | undefined,
+    rules: HTMLCanvasElement | undefined,
+    height: number,
+    sourceTop: number,
+    destinationTop: number,
+    end: number,
+): HTMLCanvasElement {
+    const page = document.createElement('canvas');
+    page.width = source.width;
+    page.height = Math.floor(height * FAST_PIXEL_RATIO);
+    const context = page.getContext('2d');
+
+    if (!context) {
+        throw new Error('Could not create the PDF page canvas.');
+    }
+
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, page.width, page.height);
+
+    if (watermark) {
+        context.drawImage(watermark, 0, 0);
+    }
+
+    const sliceHeight = (end - sourceTop) * FAST_PIXEL_RATIO;
+    context.drawImage(
+        source,
+        0,
+        sourceTop * FAST_PIXEL_RATIO,
+        source.width,
+        sliceHeight,
+        0,
+        destinationTop * FAST_PIXEL_RATIO,
+        source.width,
+        sliceHeight,
+    );
+
+    if (rules) {
+        context.drawImage(rules, 0, 0);
+    }
+
+    return page;
+}
+
 interface ExportOptions {
     papers: HTMLElement[];
     settings: PaperSettings;
@@ -395,6 +443,8 @@ export async function downloadPaperPdf({
     });
     pdf.setProperties({ title: name, creator: 'TestMaker' });
     let pageCount = 0;
+    let paperCanvas: HTMLCanvasElement | undefined;
+    let watermarkCanvas: HTMLCanvasElement | undefined;
 
     try {
         // Printed copies of a set use the same questions and layout. Capture
@@ -497,13 +547,14 @@ export async function downloadPaperPdf({
             );
             preserveSingleLineHeadings(holder);
         };
+        prepareLegacyStyles();
+
         let fontEmbedCSS: string | undefined;
         const prepareEmbeddedFonts = async () => {
             if (fontEmbedCSS !== undefined) {
                 return fontEmbedCSS;
             }
 
-            prepareLegacyStyles();
             const css = await timeout(
                 getFontEmbedCSS(holder),
                 'Could not prepare the paper fonts. Please retry.',
@@ -520,7 +571,59 @@ export async function downloadPaperPdf({
             return css;
         };
 
-        await prepareEmbeddedFonts();
+        const capturePaper = async (
+            element: HTMLElement,
+            captureHeight: number,
+            backgroundColor: string | null,
+        ) => {
+            const { default: html2canvas } = await import('html2canvas');
+
+            return timeout(
+                html2canvas(element, {
+                    width,
+                    height: captureHeight,
+                    scale: FAST_PIXEL_RATIO,
+                    useCORS: true,
+                    logging: false,
+                    imageTimeout: IMAGE_LOAD_TIMEOUT_MS,
+                    backgroundColor,
+                    onclone: (_, target) => {
+                        target.style.backgroundColor =
+                            backgroundColor ?? 'transparent';
+                    },
+                }),
+                'A PDF paper took too long to render. Try fewer sets.',
+            );
+        };
+
+        const capturePage = async (
+            element: HTMLElement,
+            captureHeight: number,
+            pixelRatio: number,
+            backgroundColor?: string,
+            fonts?: string,
+        ) => {
+            const fontCss = fonts ?? (await prepareEmbeddedFonts());
+
+            return timeout(
+                toCanvas(element, {
+                    width,
+                    height: captureHeight,
+                    pixelRatio,
+                    backgroundColor,
+                    imagePlaceholder: TRANSPARENT_IMAGE,
+                    onImageErrorHandler: () => undefined,
+                    fontEmbedCSS: fontCss,
+                    includeStyleProperties: captureStyleProperties,
+                    style: {
+                        margin: '0',
+                        transform: 'none',
+                        background: backgroundColor ?? 'transparent',
+                    },
+                }),
+                'A PDF page took too long to render. Try fewer sets.',
+            );
+        };
 
         const sharedWatermark = holder
             .querySelector('[data-paper-watermark]')
@@ -614,6 +717,39 @@ export async function downloadPaperPdf({
                       };
                   })
                 : [];
+
+            // html2canvas can shift the text baseline inside compact cells
+            // and option bubbles. Keep browser-rendered text for these layouts
+            // and for single-page papers, which already need only one capture.
+            if (
+                reusePdfPages &&
+                needsPageBreak &&
+                !geometry.forcedBreaks.length &&
+                !tableHeaders.length &&
+                !clone.querySelector(
+                    '[data-paper-legacy-layout], [data-paper-option-bubble], [data-paper-bilingual-option]',
+                ) &&
+                width * FAST_PIXEL_RATIO <= MAX_FAST_CANVAS_SIDE &&
+                Math.ceil(totalHeight) * FAST_PIXEL_RATIO <=
+                    MAX_FAST_CANVAS_SIDE &&
+                width * Math.ceil(totalHeight) * FAST_PIXEL_RATIO ** 2 <=
+                    MAX_FAST_CANVAS_PIXELS
+            ) {
+                onProgress?.('Rendering paper…');
+
+                try {
+                    paperCanvas = await capturePaper(
+                        clone,
+                        Math.ceil(totalHeight),
+                        null,
+                    );
+                } catch {
+                    // Devices with lower canvas limits can still export one
+                    // page at a time.
+                    paperCanvas = undefined;
+                }
+            }
+
             let start = 0;
 
             while (start < totalHeight - 0.5) {
@@ -644,6 +780,27 @@ export async function downloadPaperPdf({
                     geometry.lines,
                     geometry.forcedBreaks,
                 );
+                // The old page renderer hides the preceding question during
+                // the overlap. Drop those pixels when slicing a shared image.
+                const sourceTop = questionBounds.reduce(
+                    (top, question) =>
+                        question.bottom <= start + 0.5
+                            ? Math.max(top, Math.min(question.bottom, start))
+                            : top,
+                    Math.max(0, start - bleed),
+                );
+                let sliceSource =
+                    paperCanvas &&
+                    !geometry.lines.some(
+                        (line) =>
+                            (line.top < sourceTop - 0.5 &&
+                                line.bottom > sourceTop + 0.5) ||
+                            (end < totalHeight - 0.5 &&
+                                line.top < end - 0.5 &&
+                                line.bottom > end + 0.5),
+                    )
+                        ? paperCanvas
+                        : undefined;
                 const page = document.createElement('div');
 
                 // Keep capture styling consistent with the measured paper. QAT
@@ -673,58 +830,87 @@ export async function downloadPaperPdf({
                         left: '0',
                         height: `${height}px`,
                     });
-                    page.append(pageWatermark);
+
+                    if (!sliceSource) {
+                        page.append(pageWatermark);
+                    } else if (!watermarkCanvas) {
+                        page.append(pageWatermark);
+                        holder.append(page);
+
+                        try {
+                            watermarkCanvas = await capturePaper(
+                                page,
+                                height,
+                                '#ffffff',
+                            );
+                            pageWatermark.remove();
+                        } catch {
+                            // A watermark that html2canvas cannot render should
+                            // still be included by the per-page renderer.
+                            sliceSource.width = 0;
+                            paperCanvas = undefined;
+                            sliceSource = undefined;
+                        } finally {
+                            page.remove();
+                        }
+                    }
                 }
 
-                const viewport = document.createElement('div');
-                Object.assign(viewport.style, {
-                    position: 'absolute',
-                    top: repeatedTableHeaderHeight + 'px',
-                    left: '0',
-                    width: `${width}px`,
-                    height: `${end - start + bleed}px`,
-                    overflow: 'hidden',
-                });
-                const content = clone.cloneNode(true) as HTMLElement;
-                Object.assign(content.style, {
-                    position: 'absolute',
-                    top: `${-start + bleed}px`,
-                    left: '0',
-                    background: 'transparent',
-                });
+                if (!sliceSource) {
+                    const viewport = document.createElement('div');
+                    Object.assign(viewport.style, {
+                        position: 'absolute',
+                        top: repeatedTableHeaderHeight + 'px',
+                        left: '0',
+                        width: `${width}px`,
+                        height: `${end - start + bleed}px`,
+                        overflow: 'hidden',
+                    });
+                    const content = clone.cloneNode(true) as HTMLElement;
+                    Object.assign(content.style, {
+                        position: 'absolute',
+                        top: `${-start + bleed}px`,
+                        left: '0',
+                        background: 'transparent',
+                    });
 
-                // The overlap used to protect Urdu ascenders must not bring
-                // the previous bubble sheet's bottom border onto this page.
-                if (
-                    geometry.forcedBreaks.some((point) => point <= start + 0.5)
-                ) {
-                    content
-                        .querySelectorAll<HTMLElement>(
-                            '[data-bubble-sheet-page="separate"]',
+                    // The overlap used to protect Urdu ascenders must not bring
+                    // the previous bubble sheet's bottom border onto this page.
+                    if (
+                        geometry.forcedBreaks.some(
+                            (point) => point <= start + 0.5,
                         )
-                        .forEach((sheet) => {
-                            sheet.style.visibility = 'hidden';
-                        });
+                    ) {
+                        content
+                            .querySelectorAll<HTMLElement>(
+                                '[data-bubble-sheet-page="separate"]',
+                            )
+                            .forEach((sheet) => {
+                                sheet.style.visibility = 'hidden';
+                            });
+                    }
+
+                    if (needsPageBreak) {
+                        content
+                            .querySelectorAll<HTMLElement>(
+                                '[data-paper-question]',
+                            )
+                            .forEach((question, index) => {
+                                const bounds = questionBounds[index];
+
+                                if (
+                                    bounds &&
+                                    (bounds.bottom <= start + 0.5 ||
+                                        bounds.top >= end - 0.5)
+                                ) {
+                                    question.style.visibility = 'hidden';
+                                }
+                            });
+                    }
+
+                    viewport.append(content);
+                    page.append(viewport);
                 }
-
-                if (needsPageBreak) {
-                    content
-                        .querySelectorAll<HTMLElement>('[data-paper-question]')
-                        .forEach((question, index) => {
-                            const bounds = questionBounds[index];
-
-                            if (
-                                bounds &&
-                                (bounds.bottom <= start + 0.5 ||
-                                    bounds.top >= end - 0.5)
-                            ) {
-                                question.style.visibility = 'hidden';
-                            }
-                        });
-                }
-
-                viewport.append(content);
-                page.append(viewport);
 
                 // Clipping removes the horizontal edge of a question group
                 // that continues onto another page. Collapsed table borders
@@ -821,24 +1007,40 @@ export async function downloadPaperPdf({
                 );
 
                 try {
-                    const captureWithEmbeddedFonts = async () =>
-                        timeout(
-                            toCanvas(page, {
-                                width,
-                                height,
-                                pixelRatio: FULL_PIXEL_RATIO,
-                                backgroundColor: '#ffffff',
-                                imagePlaceholder: TRANSPARENT_IMAGE,
-                                onImageErrorHandler: () => undefined,
-                                fontEmbedCSS: await prepareEmbeddedFonts(),
-                                includeStyleProperties: captureStyleProperties,
-                                preferredFontFormat: 'woff2',
-                                // The capture tree stays on-screen inside the serialized SVG.
-                                style: { margin: '0', transform: 'none' },
-                            }),
-                            'A PDF page took too long to render. Try fewer sets.',
-                        );
-                    const canvas = await captureWithEmbeddedFonts();
+                    const rules =
+                        sliceSource && page.childElementCount > 0
+                            ? await capturePage(
+                                  page,
+                                  height,
+                                  FAST_PIXEL_RATIO,
+                                  undefined,
+                                  '',
+                              )
+                            : undefined;
+                    let canvas: HTMLCanvasElement;
+
+                    try {
+                        canvas = sliceSource
+                            ? slicePaperCanvas(
+                                  sliceSource,
+                                  watermarkCanvas,
+                                  rules,
+                                  height,
+                                  sourceTop,
+                                  bleed - (start - sourceTop),
+                                  end,
+                              )
+                            : await capturePage(
+                                  page,
+                                  height,
+                                  FULL_PIXEL_RATIO,
+                                  '#ffffff',
+                              );
+                    } finally {
+                        if (rules) {
+                            rules.width = 0;
+                        }
+                    }
 
                     if (reusePdfPages) {
                         pageImages.push(canvas.toDataURL('image/jpeg', 0.94));
@@ -893,6 +1095,16 @@ export async function downloadPaperPdf({
 
                 start = end;
                 await new Promise<void>((resolve) => setTimeout(resolve, 0));
+            }
+
+            if (paperCanvas) {
+                paperCanvas.width = 0;
+                paperCanvas = undefined;
+            }
+
+            if (watermarkCanvas) {
+                watermarkCanvas.width = 0;
+                watermarkCanvas = undefined;
             }
 
             if (reusePdfPages) {
@@ -964,6 +1176,14 @@ export async function downloadPaperPdf({
 
         return pdf;
     } finally {
+        if (paperCanvas) {
+            paperCanvas.width = 0;
+        }
+
+        if (watermarkCanvas) {
+            watermarkCanvas.width = 0;
+        }
+
         holder.remove();
     }
 }

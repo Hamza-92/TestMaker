@@ -6967,7 +6967,7 @@ export default function GeneratePaper({
         pdfDownloadBusy.current = true;
         setIsDownloadingPdf(true);
         const name = savedPaperName || defaultPaperName() || 'Paper';
-        const progress = toast.loading('Preparing PDF…');
+        const progress = toast.loading('Downloading PDF…');
         let missingImages = 0;
 
         try {
@@ -6988,8 +6988,6 @@ export default function GeneratePaper({
                 sideBySidePairs: sideBySide ? settings.printCopies : 0,
                 copiesPerPaper: sideBySide ? 1 : settings.printCopies,
                 fastPdf: true,
-                onProgress: (message) =>
-                    toast.loading(message, { id: progress }),
                 onMissingImages: (count) => {
                     missingImages = count;
                 },
@@ -15997,7 +15995,7 @@ export function GeneratedPaperView({
                                 <DownloadIcon className="size-3.5" />
                             )}
                             {isDownloadingPdf
-                                ? 'Preparing PDF'
+                                ? 'Downloading PDF…'
                                 : 'Download PDF'}
                         </button>
                         <button
