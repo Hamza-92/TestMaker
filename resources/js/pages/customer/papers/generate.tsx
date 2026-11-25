@@ -219,6 +219,26 @@ interface Chapter {
     topics: Topic[];
 }
 
+function splitChapterColumns<T>(
+    items: T[],
+    estimateHeight: (item: T) => number,
+): [T[], T[]] {
+    const heights = items.map(estimateHeight);
+    const halfHeight = heights.reduce((sum, height) => sum + height, 0) / 2;
+    let splitIndex = 1;
+    let firstColumnHeight = heights[0] ?? 0;
+
+    while (
+        splitIndex < heights.length - 1 &&
+        firstColumnHeight + heights[splitIndex] / 2 < halfHeight
+    ) {
+        firstColumnHeight += heights[splitIndex];
+        splitIndex++;
+    }
+
+    return [items.slice(0, splitIndex), items.slice(splitIndex)];
+}
+
 function chapterNumbersForSelection(
     chapters: Chapter[] | null,
     selectedChapterIds: number[],
@@ -4197,61 +4217,23 @@ export default function GeneratePaper({
         />
     );
 
-    const directChapterColumns = useMemo<
-        [ChapterGroup[], ChapterGroup[]]
-    >(() => {
-        const columns: [ChapterGroup[], ChapterGroup[]] = [[], []];
+    const directChapterColumns = useMemo(
+        () =>
+            splitChapterColumns(
+                chapterGroups,
+                (group) => 48 + group.items.length * 44,
+            ),
+        [chapterGroups],
+    );
 
-        if (chapterGroups.length === 0) {
-            return columns;
-        }
-
-        const estimatedGroupHeight = (group: ChapterGroup) =>
-            48 + group.items.length * 44;
-        const firstGroup = chapterGroups[0];
-        const heights: [number, number] = [estimatedGroupHeight(firstGroup), 0];
-        let activeColumn: 0 | 1 = 1;
-
-        columns[0].push(firstGroup);
-
-        for (const group of chapterGroups.slice(1)) {
-            const groupHeight = estimatedGroupHeight(group);
-            const otherColumn: 0 | 1 = activeColumn === 0 ? 1 : 0;
-
-            if (heights[activeColumn] + groupHeight > heights[otherColumn]) {
-                activeColumn = otherColumn;
-            }
-
-            columns[activeColumn].push(group);
-            heights[activeColumn] += groupHeight;
-        }
-
-        return columns;
-    }, [chapterGroups]);
-
-    const topicWiseColumns = useMemo<[Chapter[], Chapter[]]>(() => {
-        const topicWiseChapters = chapterGroups.flatMap((group) => group.items);
-        const columns: [Chapter[], Chapter[]] = [[], []];
-        const heights: [number, number] = [0, 0];
-        let activeColumn: 0 | 1 = 0;
-
-        for (const chapter of topicWiseChapters) {
-            const chapterHeight = 68 + Math.max(chapter.topics.length, 1) * 34;
-            const otherColumn: 0 | 1 = activeColumn === 0 ? 1 : 0;
-
-            if (
-                columns[0].length > 0 &&
-                heights[activeColumn] + chapterHeight > heights[otherColumn]
-            ) {
-                activeColumn = otherColumn;
-            }
-
-            columns[activeColumn].push(chapter);
-            heights[activeColumn] += chapterHeight;
-        }
-
-        return columns;
-    }, [chapterGroups]);
+    const topicWiseColumns = useMemo(
+        () =>
+            splitChapterColumns(
+                chapterGroups.flatMap((group) => group.items),
+                (chapter) => 68 + Math.max(chapter.topics.length, 1) * 34,
+            ),
+        [chapterGroups],
+    );
 
     useEffect(() => {
         const sentinel = footerSentinelRef.current;
@@ -17461,7 +17443,7 @@ function QuestionSelectionCard({
                         )}
                     >
                         <NumberField
-                            label="Choice"
+                            label="Choose Questions"
                             value={row.choiceQuestions}
                             placeholder="0"
                             max={availableForQuestionRow(
@@ -17478,7 +17460,7 @@ function QuestionSelectionCard({
                             }
                         />
                         <NumberField
-                            label="Required"
+                            label="Solve"
                             value={row.requiredQuestions}
                             placeholder="0"
                             max={toNumber(row.choiceQuestions)}
