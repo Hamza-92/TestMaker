@@ -4191,6 +4191,10 @@ export default function GeneratePaper({
         chapters !== null &&
         chapters.length > 0 &&
         chapters.every((chapter) => chapter.topics.length === 0);
+    const isUngroupedChapterList =
+        isChapterWiseSubject &&
+        chapterGroups.length === 1 &&
+        chapterGroups[0].heading === null;
     const isUrduChapterMedium = chapterMedium === 'Urdu';
 
     const renderChapterCard = (chapter: Chapter) => (
@@ -9471,7 +9475,12 @@ export default function GeneratePaper({
                                             chapters &&
                                             chapters.length > 0 && (
                                                 <>
-                                                    {isChapterWiseSubject ? (
+                                                    {isUngroupedChapterList ? (
+                                                        renderDirectChapterGroup(
+                                                            chapterGroups[0],
+                                                            0,
+                                                        )
+                                                    ) : isChapterWiseSubject ? (
                                                         <>
                                                             <div
                                                                 className="space-y-4 lg:hidden"
