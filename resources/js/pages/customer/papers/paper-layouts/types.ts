@@ -122,6 +122,7 @@ export interface GeneratedPaperSection {
     orLabel?: string | null;
     /** True when the Federal Board layout created this same-type OR companion. */
     federalAutoOr?: boolean;
+    federalSingleQuestion?: boolean;
     multipart?: GeneratedMultipartSection | null;
     /** Stable grouping key used only to place the visible Section A/B/C heading. */
     paperSectionKey?: string | null;

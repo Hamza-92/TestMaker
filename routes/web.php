@@ -433,6 +433,8 @@ Route::middleware(['auth', 'verified', EnforceQatTrial::class])->group(function 
         // Paper Layouts
         Route::get('superadmin/paper-layouts', [PaperLayoutController::class, 'index'])->name('superadmin.paper-layouts')->middleware('permission:patterns.view');
         Route::put('superadmin/paper-layouts/assignments', [PaperLayoutController::class, 'updateAssignments'])->name('superadmin.paper-layouts.assignments')->middleware('permission:patterns.edit');
+        Route::get('superadmin/paper-layouts/federal-or', [PaperLayoutController::class, 'federalOrIndex'])->name('superadmin.paper-layouts.federal-or.index')->middleware('permission:patterns.view');
+        Route::put('superadmin/paper-layouts/federal-or/{classSubject}', [PaperLayoutController::class, 'updateFederalOr'])->name('superadmin.paper-layouts.federal-or')->middleware('permission:patterns.edit');
         Route::get('superadmin/objective-layouts', [ObjectiveLayoutController::class, 'index'])->name('superadmin.objective-layouts')->middleware('permission:patterns.view');
         Route::put('superadmin/objective-layouts', [ObjectiveLayoutController::class, 'update'])->name('superadmin.objective-layouts.update')->middleware('permission:patterns.edit');
         Route::get('superadmin/circular-labels', [CircularLabelController::class, 'index'])->name('superadmin.circular-labels')->middleware('permission:patterns.view');

@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import {
     CheckCircle2Icon,
     ChevronDownIcon,
@@ -119,25 +119,32 @@ export default function PaperLayouts({
                     <div>
                         <h1 className="h1-semibold">Paper Layouts</h1>
                     </div>
-                    {canEdit && (
-                        <Button
-                            type="submit"
-                            form="paper-layout-assignments"
-                            disabled={!isDirty || processing}
-                            className="gap-2"
-                        >
-                            {recentlySuccessful ? (
-                                <CheckCircle2Icon className="size-4" />
-                            ) : (
-                                <SaveIcon className="size-4" />
-                            )}
-                            {processing
-                                ? 'Saving…'
-                                : recentlySuccessful
-                                  ? 'Saved'
-                                  : 'Save assignments'}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" asChild>
+                            <Link href="/superadmin/paper-layouts/federal-or">
+                                Federal OR pairing
+                            </Link>
                         </Button>
-                    )}
+                        {canEdit && (
+                            <Button
+                                type="submit"
+                                form="paper-layout-assignments"
+                                disabled={!isDirty || processing}
+                                className="gap-2"
+                            >
+                                {recentlySuccessful ? (
+                                    <CheckCircle2Icon className="size-4" />
+                                ) : (
+                                    <SaveIcon className="size-4" />
+                                )}
+                                {processing
+                                    ? 'Saving…'
+                                    : recentlySuccessful
+                                      ? 'Saved'
+                                      : 'Save assignments'}
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 <form

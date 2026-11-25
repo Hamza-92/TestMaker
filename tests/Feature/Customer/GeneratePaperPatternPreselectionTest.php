@@ -545,6 +545,38 @@ test('paper generator returns question types in the saved pattern class subject 
         ->assertJsonPath('paperSectioning.groups.0.labelEnglish', 'Part II')
         ->assertJsonPath('paperSectioning.groups.0.labelUrdu', 'حصہ دوم');
 
+    PaperLayoutAssignment::create([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'paper_layout' => PaperLayoutRegistry::FEDERAL_BOARD,
+    ]);
+    ClassSubject::query()->where([
+        'pattern_id' => $pattern->id,
+        'class_id' => $class->id,
+        'subject_id' => $subject->id,
+    ])->firstOrFail()->update(['federal_single_question_type_ids' => [$first->id]]);
+
+    $this->getJson(route('customer.papers.generate.question-types', [
+        'chapter_ids' => [$chapter->id],
+        'sources' => [Question::SOURCE_EXERCISE],
+    ]))
+        ->assertOk()
+        ->assertJsonCount(0, 'groups')
+        ->assertJsonCount(2, 'sections')
+        ->assertJsonPath('sections.1.questionTypeId', $first->id);
+
+    $this->get(route('customer.papers.generate'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('classSubjects.0.federal_single_question_type_ids', [$first->id]));
+
+    $this->postJson(route('customer.papers.generate.charge'), [
+        'generation_key' => 'federal-single-question-test',
+        'scope' => ['patternId' => $pattern->id, 'classId' => $class->id, 'subjectId' => $subject->id],
+        'sections' => [['questionTypeId' => $first->id, 'orRole' => 'primary']],
+    ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('paper');
+
     $customLayout = CustomPaperLayout::create([
         'pattern_id' => $pattern->id,
         'class_id' => $class->id,

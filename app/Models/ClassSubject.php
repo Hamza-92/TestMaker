@@ -19,7 +19,13 @@ class ClassSubject extends Model
         'subject_id',
         'subject_type',
         'medium_id',
+        'federal_single_question_type_ids',
     ];
+
+    protected function casts(): array
+    {
+        return ['federal_single_question_type_ids' => 'array'];
+    }
 
     public function effectiveSubjectType(): string
     {

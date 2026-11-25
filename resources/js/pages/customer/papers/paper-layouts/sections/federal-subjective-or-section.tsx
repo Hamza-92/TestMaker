@@ -9,7 +9,7 @@ import { QuestionHoverActions, SectionControls } from './section-actions';
 
 interface FederalSubjectiveOrSectionProps {
     primary: SectionTemplateProps;
-    alternative: SectionTemplateProps;
+    alternative?: SectionTemplateProps;
 }
 
 export function FederalSubjectiveOrSection({
@@ -17,7 +17,6 @@ export function FederalSubjectiveOrSection({
     alternative,
 }: FederalSubjectiveOrSectionProps) {
     const section = primary.section;
-    const alternativeSection = alternative.section;
 
     return (
         <section className="paper-section" data-federal-subjective-section>
@@ -36,11 +35,15 @@ export function FederalSubjectiveOrSection({
             <table data-paper-federal-or-table>
                 <colgroup>
                     <col style={{ width: '6%' }} />
-                    <col style={{ width: '37%' }} />
-                    <col style={{ width: '6%' }} />
-                    <col style={{ width: '7%' }} />
-                    <col style={{ width: '37%' }} />
-                    <col style={{ width: '7%' }} />
+                    <col style={{ width: alternative ? '37%' : '87%' }} />
+                    <col style={{ width: alternative ? '6%' : '7%' }} />
+                    {alternative && (
+                        <>
+                            <col style={{ width: '7%' }} />
+                            <col style={{ width: '37%' }} />
+                            <col style={{ width: '7%' }} />
+                        </>
+                    )}
                 </colgroup>
                 <thead>
                     <tr>
@@ -51,13 +54,19 @@ export function FederalSubjectiveOrSection({
                         <th className="px-1 py-1 text-center font-bold">
                             Marks
                         </th>
-                        <th className="px-1 py-1 text-center font-bold">OR</th>
-                        <th className="px-2 py-1 text-center font-bold">
-                            Question
-                        </th>
-                        <th className="px-1 py-1 text-center font-bold">
-                            Marks
-                        </th>
+                        {alternative && (
+                            <>
+                                <th className="px-1 py-1 text-center font-bold">
+                                    OR
+                                </th>
+                                <th className="px-2 py-1 text-center font-bold">
+                                    Question
+                                </th>
+                                <th className="px-1 py-1 text-center font-bold">
+                                    Marks
+                                </th>
+                            </>
+                        )}
                     </tr>
                 </thead>
                 <tbody>
@@ -73,22 +82,28 @@ export function FederalSubjectiveOrSection({
                             <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
                                 {section.marksEach}
                             </td>
-                            <td className="px-1 py-1 text-center align-middle font-bold">
-                                OR
-                            </td>
-                            {alternativeSection.questions[index] ? (
-                                <FederalQuestionCell
-                                    question={
-                                        alternativeSection.questions[index]
-                                    }
-                                    props={alternative}
-                                />
-                            ) : (
-                                <td className="px-2 py-1" />
+                            {alternative && (
+                                <>
+                                    <td className="px-1 py-1 text-center align-middle font-bold">
+                                        OR
+                                    </td>
+                                    {alternative.section.questions[index] ? (
+                                        <FederalQuestionCell
+                                            question={
+                                                alternative.section.questions[
+                                                    index
+                                                ]
+                                            }
+                                            props={alternative}
+                                        />
+                                    ) : (
+                                        <td className="px-2 py-1" />
+                                    )}
+                                    <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
+                                        {section.marksEach}
+                                    </td>
+                                </>
                             )}
-                            <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
-                                {section.marksEach}
-                            </td>
                         </tr>
                     ))}
                 </tbody>

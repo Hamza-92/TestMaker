@@ -19,6 +19,7 @@ use App\Models\QuestionTypeOrGroup;
 use App\Models\SubjectiveColumnSetting;
 use App\Support\AppUserAccess;
 use App\Support\CustomerPaperDefaults;
+use App\Support\PaperLayouts\PaperLayoutRegistry;
 use App\Support\Questions\QuestionTypeHeadingResolver;
 use App\Support\Questions\QuestionTypeSchemaRegistry;
 use App\Support\Questions\SubjectMediumResolver;
@@ -29,6 +30,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class GeneratePaperController extends Controller
@@ -38,7 +40,37 @@ class GeneratePaperController extends Controller
         $data = $request->validate([
             'generation_key' => ['required', 'string', 'max:100'],
             'sections' => ['required', 'array'],
+            'scope' => ['sometimes', 'array:patternId,classId,subjectId', 'required_array_keys:patternId,classId,subjectId'],
+            'scope.patternId' => ['required_with:scope', 'integer'],
+            'scope.classId' => ['required_with:scope', 'integer'],
+            'scope.subjectId' => ['required_with:scope', 'integer'],
         ]);
+
+        if (isset($data['scope'])) {
+            $scope = (object) [
+                'pattern_id' => (int) $data['scope']['patternId'],
+                'class_id' => (int) $data['scope']['classId'],
+                'subject_id' => (int) $data['scope']['subjectId'],
+            ];
+            abort_unless(AppUserAccess::allowsSubject(
+                AppUserAccess::resolve($request->user()),
+                $scope->pattern_id,
+                $scope->class_id,
+                $scope->subject_id,
+            ), 403);
+
+            $singleIds = $this->federalSingleQuestionTypeIds($scope);
+            if ($singleIds !== [] && $this->customPaperLayout($scope) === null) {
+                $invalid = collect($data['sections'])->contains(fn ($section) => is_array($section)
+                    && in_array((int) ($section['questionTypeId'] ?? 0), $singleIds, true)
+                    && (! empty($section['orGroupId']) || ! empty($section['orRole'])));
+                if ($invalid) {
+                    throw ValidationException::withMessages([
+                        'paper' => 'A question type in this subject is set to Single question. Refresh the paper settings and try again.',
+                    ]);
+                }
+            }
+        }
 
         $count = SubscriptionQuestionQuota::countSections($data['sections']);
 
@@ -149,6 +181,7 @@ class GeneratePaperController extends Controller
                 'class_subjects.class_id',
                 'class_subjects.pattern_id',
                 'class_subjects.subject_id',
+                'class_subjects.federal_single_question_type_ids',
                 'subjects.name_eng as name',
                 'subjects.name_ur',
                 'subjects.color',
@@ -442,6 +475,10 @@ class GeneratePaperController extends Controller
             ->pluck('id')
             ->map(fn ($id) => (int) $id);
 
+        $pairableTypeIds = $customLayout === null
+            ? $availableSubjectiveTypeIds->diff($this->federalSingleQuestionTypeIds($scope))
+            : $availableSubjectiveTypeIds;
+
         $groups = $customLayout !== null ? collect($customLayout['orGroups']) : QuestionTypeOrGroup::query()
             ->with('members')
             ->where('pattern_id', (int) $scope->pattern_id)
@@ -452,7 +489,7 @@ class GeneratePaperController extends Controller
             ->get()
             ->filter(fn (QuestionTypeOrGroup $group) => $group->members->isNotEmpty()
                 && $group->members->every(
-                    fn ($member) => $availableSubjectiveTypeIds->contains($member->question_type_id),
+                    fn ($member) => $pairableTypeIds->contains($member->question_type_id),
                 ))
             ->map(fn (QuestionTypeOrGroup $group) => [
                 'id' => $group->id,
@@ -471,6 +508,23 @@ class GeneratePaperController extends Controller
             'multipart' => $this->multipartSetting($scope, $availableSubjectiveTypeIds),
             'paperSectioning' => $customLayout['sectioning'] ?? $this->paperSectioning($scope),
         ]);
+    }
+
+    private function federalSingleQuestionTypeIds(object $scope): array
+    {
+        if (! PaperLayoutAssignment::query()
+            ->where('pattern_id', $scope->pattern_id)
+            ->where('class_id', $scope->class_id)
+            ->where('paper_layout', PaperLayoutRegistry::FEDERAL_BOARD)
+            ->exists()) {
+            return [];
+        }
+
+        return ClassSubject::query()
+            ->where('pattern_id', $scope->pattern_id)
+            ->where('class_id', $scope->class_id)
+            ->where('subject_id', $scope->subject_id)
+            ->value('federal_single_question_type_ids') ?? [];
     }
 
     private function customPaperLayout(object $scope): ?array

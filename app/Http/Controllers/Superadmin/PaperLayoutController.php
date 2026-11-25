@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Superadmin;
 use App\Enums\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\ClassSubject;
 use App\Models\PaperLayoutAssignment;
 use App\Models\Pattern;
+use App\Models\QuestionType;
 use App\Support\PaperLayouts\PaperLayoutRegistry;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -73,6 +76,104 @@ class PaperLayoutController extends Controller
             'layouts' => $layouts,
             'patterns' => $patterns,
         ]);
+    }
+
+    public function federalOrIndex(Request $request)
+    {
+        $federalSubjects = $this->federalSubjectScopes()
+            ->with(['pattern:id,name', 'schoolClass:id,name'])
+            ->join('subjects', 'subjects.id', '=', 'class_subjects.subject_id')
+            ->orderBy('subjects.name_eng')
+            ->get(['class_subjects.*', 'subjects.name_eng as name', 'subjects.name_ur as name_ur']);
+        $selectedSubject = $federalSubjects->find($request->integer('federal_subject'));
+
+        return Inertia::render('superadmin/federal-or-settings', [
+            'federalSubjects' => $federalSubjects->map(fn (ClassSubject $subject) => [
+                'id' => $subject->id,
+                'patternId' => $subject->pattern_id,
+                'patternName' => $subject->pattern->name,
+                'classId' => $subject->class_id,
+                'className' => $subject->schoolClass->name,
+                'name' => $subject->name ?: $subject->name_ur,
+            ])->values(),
+            'federalOr' => $selectedSubject === null ? null : [
+                'subjectId' => $selectedSubject->id,
+                'questionTypes' => $this->federalQuestionTypes($selectedSubject)->orderBy('name')->get(['id', 'name', 'name_ur'])
+                    ->map(fn (QuestionType $type) => ['id' => $type->id, 'name' => $type->name ?: $type->name_ur]),
+                'singleQuestionTypeIds' => $selectedSubject->federal_single_question_type_ids ?? [],
+            ],
+        ]);
+    }
+
+    public function updateFederalOr(Request $request, ClassSubject $classSubject)
+    {
+        abort_unless($this->federalSubjectScopes()->where('class_subjects.id', $classSubject->id)->exists(), 404);
+
+        $data = $request->validate([
+            'single_question_type_ids' => ['present', 'array', 'list'],
+            'single_question_type_ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+        $singleIds = array_map('intval', $data['single_question_type_ids']);
+        $allowedIds = $this->federalQuestionTypes($classSubject)->pluck('id')->all();
+
+        if (array_diff($singleIds, $allowedIds) !== []) {
+            throw ValidationException::withMessages([
+                'single_question_type_ids' => 'Select subjective question types for this subject.',
+            ]);
+        }
+
+        sort($singleIds);
+        $previous = $classSubject->federal_single_question_type_ids ?? [];
+        if ($previous !== $singleIds) {
+            $classSubject->update(['federal_single_question_type_ids' => $singleIds ?: null]);
+            AuditLog::record(
+                model: $classSubject,
+                event: AuditEvent::Updated,
+                oldValues: ['federal_single_question_type_ids' => $previous],
+                newValues: ['federal_single_question_type_ids' => $singleIds],
+                notes: 'Federal OR pairing settings updated.',
+            );
+        }
+
+        return redirect()->route('superadmin.paper-layouts.federal-or.index', ['federal_subject' => $classSubject->id])
+            ->with('success', 'Federal OR settings saved successfully.');
+    }
+
+    private function federalSubjectScopes(): Builder
+    {
+        return ClassSubject::query()
+            ->join('paper_layout_assignments', function ($join): void {
+                $join->on('paper_layout_assignments.pattern_id', '=', 'class_subjects.pattern_id')
+                    ->on('paper_layout_assignments.class_id', '=', 'class_subjects.class_id');
+            })
+            ->where('paper_layout_assignments.paper_layout', PaperLayoutRegistry::FEDERAL_BOARD)
+            ->whereNotExists(function ($query): void {
+                $query->selectRaw('1')
+                    ->from('custom_paper_layouts')
+                    ->whereColumn('custom_paper_layouts.pattern_id', 'class_subjects.pattern_id')
+                    ->whereColumn('custom_paper_layouts.class_id', 'class_subjects.class_id')
+                    ->whereColumn('custom_paper_layouts.subject_id', 'class_subjects.subject_id')
+                    ->where('custom_paper_layouts.is_active', true);
+            });
+    }
+
+    private function federalQuestionTypes(ClassSubject $subject): Builder
+    {
+        $scope = $subject->only(['pattern_id', 'class_id', 'subject_id']);
+
+        return QuestionType::query()
+            ->where('is_objective', false)
+            ->where('status', 1)
+            ->where(function ($query) use ($scope): void {
+                $query->whereIn('question_types.id', DB::table('question_type_orders')->where($scope)->select('question_type_id'))
+                    ->orWhereIn('question_types.id', DB::table('questions')
+                        ->join('chapters', 'chapters.id', '=', 'questions.chapter_id')
+                        ->where('chapters.pattern_id', $scope['pattern_id'])
+                        ->where('chapters.class_id', $scope['class_id'])
+                        ->where('chapters.subject_id', $scope['subject_id'])
+                        ->where('questions.status', 1)
+                        ->select('questions.question_type_id'));
+            });
     }
 
     public function updateAssignments(Request $request)
