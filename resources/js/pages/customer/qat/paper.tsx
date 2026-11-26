@@ -14,6 +14,7 @@ import {
     SlidersHorizontalIcon,
 } from 'lucide-react';
 import { Fragment, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useQatTrial } from '@/components/qat/trial-status';
 import { Button } from '@/components/tm';
 import { Switch } from '@/components/ui/switch';
@@ -314,14 +315,41 @@ function typeMarksLabel(section: PaperSection, medium: QatMedium) {
         : `(${marks} ${medium === 'Urdu' ? 'نمبر' : 'Marks'})`;
 }
 
+function QatOrPair({
+    medium,
+    primary,
+    alternative,
+}: {
+    medium: QatMedium;
+    primary: ReactNode;
+    alternative: ReactNode;
+}) {
+    return (
+        <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-start gap-x-2">
+            <div className="min-w-0 break-words">{primary}</div>
+            <div className="grid justify-items-center self-center whitespace-nowrap text-xs font-bold">
+                {medium !== 'Urdu' && <span lang="en">OR</span>}
+                {medium !== 'English' && (
+                    <span lang="ur" dir="rtl">
+                        یا
+                    </span>
+                )}
+            </div>
+            <div className="min-w-0 break-words">{alternative}</div>
+        </div>
+    );
+}
+
 function QatTypeHeading({
     section,
     number,
     medium,
+    pairedAlternative,
 }: {
     section: PaperSection;
     number: number;
     medium: QatMedium;
+    pairedAlternative?: QatQuestion;
 }) {
     const urduOnly = medium === 'Urdu';
     const english = section.heading_en?.trim() || section.title;
@@ -332,6 +360,53 @@ function QatTypeHeading({
             heading_ur: section.or_heading_ur,
         },
     ];
+
+    if (pairedAlternative) {
+        const heading = alternatives[0];
+        const renderHeading = (englishText: string, urduText: string) => (
+            <>
+                {!urduOnly && (
+                    <div dir="ltr" lang="en" className="text-left">
+                        <span className="whitespace-nowrap">Q.{number}:-</span>{' '}
+                        <QuestionContent value={englishText} inline />
+                    </div>
+                )}
+                {(urduOnly || (medium === 'Both' && urduText)) && (
+                    <div dir="rtl" lang="ur" className="text-right">
+                        <span className="whitespace-nowrap">
+                            سوال نمبر {number}:-
+                        </span>{' '}
+                        <QuestionContent value={urduText} inline />
+                    </div>
+                )}
+            </>
+        );
+
+        return (
+            <div
+                data-paper-heading
+                className="qat-type-heading break-after-avoid border border-brand-300 bg-brand-100 px-2 py-1 text-xs font-bold text-brand-950"
+            >
+                <QatOrPair
+                    medium={medium}
+                    primary={renderHeading(
+                        english,
+                        urdu || (urduOnly ? section.title : ''),
+                    )}
+                    alternative={renderHeading(
+                        heading?.heading_en?.trim() ||
+                            pairedAlternative.type_name,
+                        heading?.heading_ur?.trim() ||
+                            (urduOnly ? pairedAlternative.type_name : ''),
+                    )}
+                />
+                <div dir="ltr" className="text-center">
+                    {typeMarksLabel(section, medium)}
+                </div>
+            </div>
+        );
+    }
+
     const alternateEnglish = new Set(
         alternatives
             .map((heading) => heading.heading_en?.trim())
@@ -431,6 +506,7 @@ function QatPaperQuestion({
     showAnswers,
     objectiveSettings,
     medium,
+    sideBySide,
 }: {
     question: PaperQuestion;
     number?: number | string;
@@ -439,6 +515,7 @@ function QatPaperQuestion({
     showAnswers: boolean;
     objectiveSettings: QatObjectiveSettings;
     medium: QatMedium;
+    sideBySide: boolean;
 }) {
     const alternatives = paperAlternatives(question);
     const renderQuestion = (item: QatQuestion, mainNumber?: number) =>
@@ -459,6 +536,26 @@ function QatPaperQuestion({
                 displayMedium={medium}
             />
         );
+
+    if (sideBySide && alternatives[0]) {
+        return (
+            <div
+                data-paper-question
+                className="qat-question break-inside-avoid px-2"
+            >
+                <QatOrPair
+                    medium={medium}
+                    primary={renderQuestion(question, typeNumber)}
+                    alternative={renderQuestion(alternatives[0])}
+                />
+                {marksLabel && (
+                    <div dir="ltr" className="text-center text-xs font-bold">
+                        {marksLabel}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div
@@ -517,6 +614,14 @@ function QatPaperType({
 }) {
     const isObjective = objectiveNumbers !== undefined;
     const hideHeading = section.hide_heading === true;
+    const [firstQuestion] = section.questions;
+    const pairedAlternative =
+        firstQuestion &&
+        section.questions.every(
+            (question) => paperAlternatives(question).length === 1,
+        )
+            ? paperAlternatives(firstQuestion)[0]
+            : undefined;
 
     return (
         <div className={isObjective ? 'space-y-3' : undefined}>
@@ -525,6 +630,7 @@ function QatPaperType({
                     section={section}
                     number={typeNumber}
                     medium={medium}
+                    pairedAlternative={pairedAlternative}
                 />
             )}
             <div
@@ -568,6 +674,7 @@ function QatPaperType({
                             showAnswers={showAnswers}
                             objectiveSettings={objectiveSettings}
                             medium={medium}
+                            sideBySide={Boolean(pairedAlternative)}
                         />
                     );
                 })}
