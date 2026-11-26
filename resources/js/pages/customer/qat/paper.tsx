@@ -234,7 +234,7 @@ function QatSectionHeading({
         <h2
             data-paper-heading
             data-paper-section-heading
-            className="qat-section-heading flex break-after-avoid flex-wrap items-baseline justify-center gap-x-3 text-center text-sm font-bold"
+            className={`qat-section-heading flex break-after-avoid flex-wrap items-baseline justify-center gap-x-3 text-center text-sm font-bold ${showUrdu ? 'pb-1.5' : ''}`}
         >
             {showEnglish && (
                 <span dir="ltr" lang="en">
@@ -363,6 +363,7 @@ function QatTypeHeading({
 
     if (pairedAlternative) {
         const heading = alternatives[0];
+        const marks = typeMarksLabel(section, medium);
         const renderHeading = (englishText: string, urduText: string) => (
             <>
                 {!urduOnly && (
@@ -381,6 +382,11 @@ function QatTypeHeading({
                 )}
             </>
         );
+        const alternateHeading = renderHeading(
+            heading?.heading_en?.trim() || pairedAlternative.type_name,
+            heading?.heading_ur?.trim() ||
+                (urduOnly ? pairedAlternative.type_name : ''),
+        );
 
         return (
             <div
@@ -393,16 +399,29 @@ function QatTypeHeading({
                         english,
                         urdu || (urduOnly ? section.title : ''),
                     )}
-                    alternative={renderHeading(
-                        heading?.heading_en?.trim() ||
-                            pairedAlternative.type_name,
-                        heading?.heading_ur?.trim() ||
-                            (urduOnly ? pairedAlternative.type_name : ''),
-                    )}
+                    alternative={
+                        medium === 'Both' ? (
+                            alternateHeading
+                        ) : (
+                            <div className="flex items-baseline justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                    {alternateHeading}
+                                </div>
+                                <span
+                                    dir="ltr"
+                                    className="shrink-0 whitespace-nowrap"
+                                >
+                                    {marks}
+                                </span>
+                            </div>
+                        )
+                    }
                 />
-                <div dir="ltr" className="text-center">
-                    {typeMarksLabel(section, medium)}
-                </div>
+                {medium === 'Both' && (
+                    <div dir="ltr" className="text-center">
+                        {marks}
+                    </div>
+                )}
             </div>
         );
     }
@@ -920,6 +939,7 @@ export default function QatPaper({
                 [data-qat-sheet] .qat-question [lang="ur"], [data-qat-sheet] .qat-question [lang="ur"] .paper-rich-text :not(.katex, .katex *) { font-family: ${urduFont} !important; font-size: ${questionSize * urduMetrics.sizeScale}px !important; line-height: ${questionLineHeight * urduMetrics.lineHeightScale} !important; }
                 [data-qat-sheet] .qat-question [lang="ur"] { transform: translateY(${urduMetrics.verticalOffsetEm}em); }
                 [data-qat-sheet] .qat-question-number { font-family: ${englishFont}; font-size: ${questionSize}px; line-height: ${questionLineHeight}; transform: none; }
+                [data-qat-sheet] .qat-question .qat-urdu-question-line { align-items: baseline; }
                 [data-qat-sheet] .qat-urdu-type-number { font-family: ${urduFont}; }
                 [data-qat-sheet] .qat-section-heading { font-size: ${sectionHeadingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.sectionHeadingLineHeight}; }
                 [data-qat-sheet] .qat-type-heading { font-size: ${headingSize}px; line-height: ${DEFAULT_PAPER_SETTINGS.headingLineHeight}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

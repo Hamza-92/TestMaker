@@ -680,7 +680,7 @@ function LocalizedText({
                 <div
                     dir="rtl"
                     lang="ur"
-                    className="flex min-w-0 items-start gap-1.5 text-right"
+                    className="qat-urdu-question-line flex min-w-0 items-start gap-1.5 text-right"
                 >
                     <QatQuestionNumber
                         number={number}
