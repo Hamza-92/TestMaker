@@ -6917,15 +6917,6 @@ export default function GeneratePaper({
 
         sideBySidePrintBusy.current = true;
         flushSync(() => setPrintAllSets(true));
-        const dimensions = getPageDimensions(
-            settings.paperSize,
-            settings.orientation,
-        );
-        const contentWidth =
-            dimensions.width - settings.marginLeft - settings.marginRight;
-        const contentHeight =
-            dimensions.height - settings.marginTop - settings.marginBottom;
-        const columnWidth = (contentWidth - 3 - 2) / 2;
         const root = document.createElement('div');
         root.setAttribute('data-side-by-side-print-root', '');
         const imageUrls: string[] = [];
@@ -6969,25 +6960,11 @@ export default function GeneratePaper({
                     imageUrls.push(url);
                     const page = document.createElement('div');
                     page.setAttribute('data-side-by-side-print-page', '');
-                    Object.assign(page.style, {
-                        position: 'relative',
-                        width: `${contentWidth}mm`,
-                        height: `${contentHeight}mm`,
-                        overflow: 'hidden',
-                        background: '#ffffff',
-                    });
 
                     for (let index = 0; index < copies; index++) {
                         const image = document.createElement('img');
                         image.src = url;
                         image.alt = '';
-                        Object.assign(image.style, {
-                            position: 'absolute',
-                            top: '0',
-                            left: `${1 + index * (columnWidth + 3)}mm`,
-                            width: `${columnWidth}mm`,
-                            height: `${contentHeight}mm`,
-                        });
                         page.append(image);
                     }
 
