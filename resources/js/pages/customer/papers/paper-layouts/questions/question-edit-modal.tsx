@@ -2,6 +2,7 @@ import { Editor } from '@tinymce/tinymce-react';
 import { XIcon } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { Editor as TinyMCEEditor } from 'tinymce';
+import { optionLetter } from '../paper-variant';
 import type { GeneratedPaperQuestion } from '../types';
 import {
     createEquationHtml,
@@ -9,12 +10,19 @@ import {
     sanitizeQuestionHtml,
 } from './question-html';
 
+export interface QuestionOptionEdit {
+    optionId: string;
+    passageQuestionId?: string;
+    text: string;
+}
+
 interface QuestionEditModalProps {
-    question: Pick<GeneratedPaperQuestion, 'text'>;
+    question: Pick<GeneratedPaperQuestion, 'text'> &
+        Partial<Pick<GeneratedPaperQuestion, 'options' | 'passageQuestions'>>;
     title?: string;
     saveLabel?: string;
     onClose: () => void;
-    onSave: (value: string) => void;
+    onSave: (value: string, optionEdits: QuestionOptionEdit[]) => void;
     imageUploadUrl?: string;
 }
 
@@ -112,9 +120,35 @@ export function QuestionEditModal({
 }: QuestionEditModalProps) {
     const editorRef = useRef<TinyMCEEditor | null>(null);
     const editingEquationRef = useRef<HTMLElement | null>(null);
-    const [initialValue] = useState(() =>
+    const editorInitialHtml = useRef('');
+    const drafts = useRef(new Map<number, string>());
+    const [activeField, setActiveField] = useState(0);
+    const [initialValue, setInitialValue] = useState(() =>
         questionTextToEditorHtml(question.text),
     );
+    const fields: {
+        label: string;
+        text: string;
+        target?: Omit<QuestionOptionEdit, 'text'>;
+    }[] = [
+        { label: 'Question', text: question.text },
+        ...(question.options ?? []).map((option, index) => ({
+            label: 'Option ' + optionLetter(index),
+            text: option.text,
+            target: { optionId: option.id },
+        })),
+        ...(question.passageQuestions ?? []).flatMap((part, partIndex) =>
+            part.options.map((option, index) => ({
+                label:
+                    'Passage question ' +
+                    (partIndex + 1) +
+                    ' · Option ' +
+                    optionLetter(index),
+                text: option.text,
+                target: { optionId: option.id, passageQuestionId: part.id },
+            })),
+        ),
+    ];
     const [equationDialog, setEquationDialog] =
         useState<EquationDialogState | null>(null);
     const [editorStatus, setEditorStatus] = useState<
@@ -189,6 +223,25 @@ export function QuestionEditModal({
         setEquationDialog(null);
     }
 
+    function rememberEditorContent() {
+        const html = editorRef.current?.getContent();
+
+        if (html !== undefined && html !== editorInitialHtml.current) {
+            drafts.current.set(activeField, html);
+        }
+    }
+
+    function selectField(nextField: number) {
+        rememberEditorContent();
+        editorRef.current = null;
+        setActiveField(nextField);
+        setInitialValue(
+            questionTextToEditorHtml(
+                drafts.current.get(nextField) ?? fields[nextField].text,
+            ),
+        );
+    }
+
     async function handleSave() {
         const editor = editorRef.current;
         setSaveError('');
@@ -199,9 +252,20 @@ export function QuestionEditModal({
                 await editor.uploadImages();
             }
 
-            const html = sanitizeQuestionHtml(
-                editor?.getContent() ?? initialValue,
-            );
+            rememberEditorContent();
+            const html =
+                drafts.current.has(0) || fields.length === 1
+                    ? sanitizeQuestionHtml(
+                          drafts.current.get(0) ?? initialValue,
+                      )
+                    : question.text;
+            const optionEdits = fields.flatMap(({ target }, index) => {
+                const value = drafts.current.get(index);
+
+                return target && value !== undefined
+                    ? [{ ...target, text: sanitizeQuestionHtml(value) }]
+                    : [];
+            });
 
             if (
                 imageUploadUrl &&
@@ -210,7 +274,7 @@ export function QuestionEditModal({
                 throw new Error('An image is still waiting to upload.');
             }
 
-            onSave(html);
+            onSave(html, optionEdits);
         } catch {
             setSaveError('An image could not be uploaded. Please retry.');
         } finally {
@@ -249,6 +313,25 @@ export function QuestionEditModal({
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                    {fields.length > 1 && (
+                        <label className="mb-4 flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Editing
+                            <select
+                                value={activeField}
+                                onChange={(event) =>
+                                    selectField(Number(event.target.value))
+                                }
+                                disabled={saving || Boolean(equationDialog)}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950"
+                            >
+                                {fields.map(({ label }, index) => (
+                                    <option key={index} value={index}>
+                                        {label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
                     {editorStatus === 'loading' && (
                         <div
                             role="status"
@@ -277,10 +360,12 @@ export function QuestionEditModal({
                     )}
                     {editorStatus === 'ready' && (
                         <Editor
+                            key={activeField}
                             licenseKey="gpl"
                             initialValue={initialValue}
                             onInit={(_event, editor) => {
                                 editorRef.current = editor;
+                                editorInitialHtml.current = editor.getContent();
                             }}
                             init={{
                                 branding: false,

@@ -103,6 +103,7 @@ import {
     ArabicQuestionFontProvider,
     QuestionContent,
 } from './paper-layouts/questions/question-content';
+import type { QuestionOptionEdit } from './paper-layouts/questions/question-edit-modal';
 import { SaveAsTemplateModal } from './paper-layouts/save-as-template-modal';
 import type { SaveAsTemplateValues } from './paper-layouts/save-as-template-modal';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
@@ -799,6 +800,22 @@ function updateSectionQuestion(
               }
             : section.multipart,
     };
+}
+
+function applyOptionEdits(
+    options: PaperQuestionOption[],
+    edits: QuestionOptionEdit[],
+    passageQuestionId?: string,
+): PaperQuestionOption[] {
+    return options.map((option) => {
+        const edit = edits.find(
+            (item) =>
+                item.optionId === option.id &&
+                item.passageQuestionId === passageQuestionId,
+        );
+
+        return edit ? { ...option, text: edit.text } : option;
+    });
 }
 
 function usesFederalQuestionCell(
@@ -4131,7 +4148,8 @@ export default function GeneratePaper({
             return null;
         }
 
-        const section = generatedPaper.sections.find(
+        const displayedPaper = variantForSet(generatedPaper, activeSetIndex);
+        const section = displayedPaper.sections.find(
             (item) => item.id === paperQuestionEditorTarget.sectionId,
         );
         const match = findSectionQuestion(
@@ -4150,7 +4168,7 @@ export default function GeneratePaper({
                 usesFederalQuestionCell(generatedPaper, section) &&
                 Boolean(match.question.federalStatement),
         };
-    }, [generatedPaper, paperQuestionEditorTarget]);
+    }, [generatedPaper, paperQuestionEditorTarget, activeSetIndex]);
     const filteredPaperPickerQuestions = useMemo(() => {
         if (!activePaperPickerContext?.questionTypeId) {
             return [];
@@ -7258,11 +7276,12 @@ export default function GeneratePaper({
         );
     }
 
-    function updatePaperQuestionText(
+    function updatePaperQuestionContent(
         sectionId: string,
         questionId: string,
         value: string,
         updateFederalStatement = false,
+        optionEdits: QuestionOptionEdit[] = [],
     ) {
         setGeneratedPaper((current) =>
             current
@@ -7276,6 +7295,28 @@ export default function GeneratePaper({
                                     (question) => ({
                                         ...question,
                                         text: value,
+                                        ...(section.category ===
+                                            'Objective Questions' &&
+                                        optionEdits.length > 0
+                                            ? {
+                                                  options: applyOptionEdits(
+                                                      question.options,
+                                                      optionEdits,
+                                                  ),
+                                                  passageQuestions:
+                                                      question.passageQuestions?.map(
+                                                          (part) => ({
+                                                              ...part,
+                                                              options:
+                                                                  applyOptionEdits(
+                                                                      part.options,
+                                                                      optionEdits,
+                                                                      part.id,
+                                                                  ),
+                                                          }),
+                                                      ),
+                                              }
+                                            : {}),
                                         ...(updateFederalStatement
                                             ? { federalStatement: value }
                                             : {}),
@@ -7397,16 +7438,20 @@ export default function GeneratePaper({
         setPaperQuestionEditorTarget(null);
     }
 
-    function savePaperQuestionEdit(value: string) {
+    function savePaperQuestionEdit(
+        value: string,
+        optionEdits: QuestionOptionEdit[],
+    ) {
         if (!activePaperQuestionEditorContext) {
             return;
         }
 
-        updatePaperQuestionText(
+        updatePaperQuestionContent(
             activePaperQuestionEditorContext.section.id,
             activePaperQuestionEditorContext.question.id,
             value,
             activePaperQuestionEditorContext.usesFederalStatement,
+            optionEdits,
         );
         closePaperQuestionEditor();
     }
@@ -9295,10 +9340,25 @@ export default function GeneratePaper({
                                     activePaperQuestionEditorContext.question.id
                                 }
                                 question={{
+                                    ...(activePaperQuestionEditorContext.section
+                                        .category === 'Objective Questions'
+                                        ? {
+                                              options:
+                                                  activePaperQuestionEditorContext
+                                                      .question.options,
+                                              passageQuestions:
+                                                  activePaperQuestionEditorContext
+                                                      .question
+                                                      .passageQuestions,
+                                          }
+                                        : {}),
                                     text: activePaperQuestionEditorContext.usesFederalStatement
-                                        ? activePaperQuestionEditorContext.question.federalStatement ??
-                                          activePaperQuestionEditorContext.question.text
-                                        : activePaperQuestionEditorContext.question.text,
+                                        ? (activePaperQuestionEditorContext
+                                              .question.federalStatement ??
+                                          activePaperQuestionEditorContext
+                                              .question.text)
+                                        : activePaperQuestionEditorContext
+                                              .question.text,
                                 }}
                                 onClose={closePaperQuestionEditor}
                                 onSave={savePaperQuestionEdit}
