@@ -371,11 +371,6 @@ interface ExportOptions {
     copiesPerPaper?: number;
     /** Use the quicker customer paper download path. */
     fastPdf?: boolean;
-    /** Receives each paired page before its capture canvas is released. */
-    onSideBySidePage?: (
-        canvas: HTMLCanvasElement,
-        copies: number,
-    ) => Promise<void> | void;
     onProgress?: (message: string) => void;
     onMissingImages?: (count: number) => void;
     /** Used by browser regression checks without triggering a download. */
@@ -390,7 +385,6 @@ export async function downloadPaperPdf({
     sideBySidePairs = 0,
     copiesPerPaper = 1,
     fastPdf = false,
-    onSideBySidePage,
     onProgress,
     onMissingImages,
     save = true,
@@ -449,7 +443,7 @@ export async function downloadPaperPdf({
     try {
         // Printed copies of a set use the same questions and layout. Capture
         // that set once, then reuse its pages in the requested copy order.
-        const reusePdfPages = fastPdf && !onSideBySidePage;
+        const reusePdfPages = fastPdf;
         const paperRuns: Array<{ source: HTMLElement; repetitions: number }> =
             [];
 
@@ -1002,9 +996,7 @@ export async function downloadPaperPdf({
                 }
 
                 holder.append(page);
-                onProgress?.(
-                    `${onSideBySidePage ? 'Preparing print' : 'Creating PDF'} page ${capturedPageCount + 1}…`,
-                );
+                onProgress?.(`Creating PDF page ${capturedPageCount + 1}…`);
 
                 try {
                     const rules =
@@ -1080,10 +1072,6 @@ export async function downloadPaperPdf({
                         }
 
                         pageCount++;
-                    }
-
-                    if (paired) {
-                        await onSideBySidePage?.(canvas, copies);
                     }
 
                     canvas.width = 0;

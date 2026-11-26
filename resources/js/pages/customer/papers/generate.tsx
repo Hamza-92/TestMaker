@@ -6940,66 +6940,77 @@ export default function GeneratePaper({
         flushSync(() => setPrintAllSets(true));
         const root = document.createElement('div');
         root.setAttribute('data-side-by-side-print-root', '');
-        const imageUrls: string[] = [];
         const progress = toast.loading('Preparing side by side print…');
         const cleanup = () => {
             window.removeEventListener('afterprint', cleanup);
             root.remove();
             document.body.removeAttribute('data-side-by-side-print');
-            imageUrls.forEach((url) => URL.revokeObjectURL(url));
             setPrintAllSets(false);
             sideBySidePrintBusy.current = false;
         };
 
         try {
-            const { downloadPaperPdf } = await import(
-                './paper-layouts/download-paper-pdf'
-            );
             const papers = printablePapers().filter(
                 (paper) => paper.dataset.paperCopyIndex === '0',
             );
 
-            await downloadPaperPdf({
-                papers,
-                settings,
-                name: savedPaperName || defaultPaperName() || 'Paper',
-                save: false,
-                sideBySidePairs: settings.printCopies,
-                onProgress: (message) =>
-                    toast.loading(message, { id: progress }),
-                onSideBySidePage: async (canvas, copies) => {
-                    const blob = await new Promise<Blob>((resolve, reject) => {
-                        canvas.toBlob((value) =>
-                            value
-                                ? resolve(value)
-                                : reject(
-                                      new Error('Could not prepare a print page.'),
-                                  ),
-                        );
+            if (papers.length === 0) {
+                throw new Error('The paper is not ready to print.');
+            }
+
+            for (const paper of papers) {
+                const column = paper.cloneNode(true) as HTMLElement;
+                column.setAttribute('data-side-by-side-column', '');
+                column
+                    .querySelectorAll('[data-paper-watermark]')
+                    .forEach((watermark) => watermark.remove());
+                column
+                    .querySelectorAll<HTMLInputElement>(
+                        '[data-paper-header] input',
+                    )
+                    .forEach((input) => {
+                        const value = document.createElement('span');
+                        value.textContent = input.value;
+                        value.className = input.className;
+                        value.style.whiteSpace = 'normal';
+                        value.style.overflowWrap = 'anywhere';
+                        input.replaceWith(value);
                     });
-                    const url = URL.createObjectURL(blob);
-                    imageUrls.push(url);
-                    const page = document.createElement('div');
-                    page.setAttribute('data-side-by-side-print-page', '');
 
-                    for (let index = 0; index < copies; index++) {
-                        const image = document.createElement('img');
-                        image.src = url;
-                        image.alt = '';
-                        page.append(image);
-                    }
+                for (let copy = 0; copy < settings.printCopies; copy++) {
+                    const pair = document.createElement('table');
+                    pair.setAttribute('data-side-by-side-print-pair', '');
+                    const row = pair.createTBody().insertRow();
+                    row.insertCell().append(column.cloneNode(true));
+                    row.insertCell().append(column.cloneNode(true));
+                    root.append(pair);
+                }
+            }
 
-                    root.append(page);
-                },
+            const watermark = papers[0]
+                .querySelector('[data-paper-watermark]')
+                ?.cloneNode(true) as HTMLElement | undefined;
+
+            if (watermark) {
+                // The browser repeats this layer on each sheet it lays out.
+                const layer = document.createElement('div');
+                layer.setAttribute('data-side-by-side-print-watermarks', '');
+                watermark.style.removeProperty('top');
+                watermark.style.removeProperty('height');
+                layer.append(watermark, watermark.cloneNode(true));
+                root.append(layer);
+            }
+
+            const images = Array.from(root.querySelectorAll('img'));
+            images.forEach((image) => {
+                image.loading = 'eager';
             });
-
             document.body.append(root);
             document.body.setAttribute('data-side-by-side-print', '');
-            await Promise.all(
-                Array.from(root.querySelectorAll('img'), (image) =>
-                    image.decode(),
-                ),
-            );
+            await Promise.allSettled([
+                document.fonts.ready,
+                ...images.map((image) => image.decode()),
+            ]);
             toast.dismiss(progress);
             window.addEventListener('afterprint', cleanup);
             window.print();
@@ -14716,7 +14727,10 @@ export function GeneratedPaperView({
         return '@bottom-center';
     })();
     const pageRule = [
-        `@page { size: ${pageDims.width}mm ${pageDims.height}mm; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm;`,
+        '@page {',
+        printAllSets && settings.sideBySideCopiesEnabled
+            ? `size: ${settings.orientation};`
+            : `size: ${pageDims.width}mm ${pageDims.height}mm; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm;`,
         pageNumberContent
             ? `${pageNumberSlot} { content: ${pageNumberContent}; font-size: 10pt; }`
             : '',
@@ -16144,7 +16158,11 @@ export function GeneratedPaperView({
                         <button
                             type="button"
                             onClick={onPrintAllSets}
-                            title="Print now, or choose Save as PDF in the browser dialog"
+                            title={
+                                settings.sideBySideCopiesEnabled
+                                    ? 'Adjust Scale in the print dialog'
+                                    : 'Print now, or choose Save as PDF in the browser dialog'
+                            }
                             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:text-white"
                         >
                             <PrinterIcon className="size-3.5" />
