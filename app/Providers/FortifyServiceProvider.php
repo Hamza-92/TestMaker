@@ -73,7 +73,7 @@ class FortifyServiceProvider extends ServiceProvider
         ]));
 
         Fortify::registerView(fn (Request $request) => Inertia::render('auth/register', [
-            'trialType' => $request->query('trial') === 'qat' ? 'qat' : 'standard',
+            'trialType' => $request->routeIs('register.qat') ? 'qat' : 'standard',
             'trialLimit' => QatTrial::LIMIT,
             'trialDurationDays' => TrialSetting::current()->trial_duration_days,
         ]));

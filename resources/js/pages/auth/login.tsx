@@ -1,11 +1,18 @@
-﻿import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck } from 'lucide-react';
+﻿import { Form, Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    ArrowLeft,
+    ArrowRight,
+    CheckCircle2,
+    ClipboardCheck,
+} from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import type { RegistrationCredentials } from '@/lib/registration';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
 
@@ -15,6 +22,22 @@ type Props = {
 };
 
 export default function Login({ status, canRegister }: Props) {
+    const credentials = usePage().flash.registrationCredentials as
+        | RegistrationCredentials
+        | undefined;
+    const phoneInput = useRef<HTMLInputElement>(null);
+    const passwordInput = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!credentials || !phoneInput.current || !passwordInput.current) {
+            return;
+        }
+
+        phoneInput.current.value = credentials.phone;
+        passwordInput.current.value = credentials.password;
+        router.flash('registrationCredentials', undefined);
+    }, [credentials]);
+
     return (
         <>
             <Head title="Log in to TestMaker" />
@@ -23,27 +46,132 @@ export default function Login({ status, canRegister }: Props) {
                     <div className="pointer-events-none absolute left-1/2 top-[-12rem] h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-brand-100/70 blur-3xl" />
                     <div className="pointer-events-none absolute left-1/2 top-0 h-36 w-36 -translate-x-1/2 opacity-45 [background-image:radial-gradient(#93c5fd_1.5px,transparent_1.5px)] [background-size:13px_13px]" />
                     <section className="relative w-full max-w-[460px]">
-                        <div className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.1)] sm:p-9"><Link href="/" className="mb-5 inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm font-semibold text-slate-500 transition hover:text-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/20"><ArrowLeft size={15} /> Back to home</Link>
+                        <div className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_22px_60px_rgba(15,23,42,0.1)] sm:p-9">
+                            <Link
+                                href="/"
+                                className="mb-5 inline-flex items-center gap-2 rounded-lg px-1 py-1 text-sm font-semibold text-slate-500 transition hover:text-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/20"
+                            >
+                                <ArrowLeft size={15} /> Back to home
+                            </Link>
                             <div className="absolute inset-x-0 top-0 h-1 bg-brand-600" />
                             <div className="mb-7 pt-2 text-center">
-                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] bg-brand-50 text-brand-600"><ClipboardCheck size={24} /></div>
-                                <h1 className="mt-4 font-display text-3xl font-extrabold tracking-[-0.05em] text-slate-900">Welcome back</h1>
-                                <p className="mt-2 text-sm text-slate-500">Log in to continue to TestMaker.</p>
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] bg-brand-50 text-brand-600">
+                                    <ClipboardCheck size={24} />
+                                </div>
+                                <h1 className="mt-4 font-display text-3xl font-extrabold tracking-[-0.05em] text-slate-900">
+                                    Welcome back
+                                </h1>
+                                <p className="mt-2 text-sm text-slate-500">
+                                    Log in to continue to TestMaker.
+                                </p>
                             </div>
-                            {status && <div className="mb-5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">{status}</div>}
-                            <Form {...store.form()} resetOnSuccess={['password']} disableWhileProcessing autoComplete="off" className="grid gap-4">
+                            {status && (
+                                <div className="mb-5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">
+                                    {status}
+                                </div>
+                            )}
+                            <Form
+                                {...store.form()}
+                                resetOnSuccess={['password']}
+                                disableWhileProcessing
+                                autoComplete="off"
+                                className="grid gap-4"
+                            >
                                 {({ processing, errors }) => (
                                     <>
-                                        <div className="grid gap-2"><Label htmlFor="email">Email or phone number</Label><Input id="email" type="text" name="email" required autoFocus tabIndex={1} autoComplete="username" placeholder="Email or 03xx xxxxxxx" className="h-12 rounded-[10px] border-slate-300 bg-white" /><InputError message={errors.email} /></div>
-                                        <div className="grid gap-2"><Label htmlFor="password">Password</Label><PasswordInput id="password" name="password" required tabIndex={2} autoComplete="current-password" placeholder="Enter your password" className="h-12 rounded-[10px] border-slate-300 bg-white" /><InputError message={errors.password} /></div>
-                                        <label className="-mt-3 flex items-center gap-3 text-sm text-slate-600"><input id="remember" type="checkbox" name="remember" tabIndex={3} style={{ accentColor: '#2563eb' }} className="h-4 w-4 rounded border border-slate-300 bg-white" /><span>Remember me</span></label>
-                                        <Button type="submit" className="mt-1 h-12 w-full rounded-[10px] bg-brand-600 text-sm font-bold text-white hover:bg-brand-700" tabIndex={4} disabled={processing} data-test="login-button">{processing && <Spinner />} Log in <ArrowRight size={16} /></Button>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="email">
+                                                Email or phone number
+                                            </Label>
+                                            <Input
+                                                ref={phoneInput}
+                                                id="email"
+                                                type="text"
+                                                name="email"
+                                                required
+                                                autoFocus
+                                                tabIndex={1}
+                                                autoComplete="username"
+                                                placeholder="Email or 03xx xxxxxxx"
+                                                className="h-12 rounded-[10px] border-slate-300 bg-white"
+                                            />
+                                            <InputError
+                                                message={errors.email}
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="password">
+                                                Password
+                                            </Label>
+                                            <PasswordInput
+                                                ref={passwordInput}
+                                                id="password"
+                                                name="password"
+                                                required
+                                                tabIndex={2}
+                                                autoComplete="current-password"
+                                                placeholder="Enter your password"
+                                                className="h-12 rounded-[10px] border-slate-300 bg-white"
+                                            />
+                                            <InputError
+                                                message={errors.password}
+                                            />
+                                        </div>
+                                        <label className="-mt-3 flex items-center gap-3 text-sm text-slate-600">
+                                            <input
+                                                id="remember"
+                                                type="checkbox"
+                                                name="remember"
+                                                tabIndex={3}
+                                                style={{
+                                                    accentColor: '#2563eb',
+                                                }}
+                                                className="h-4 w-4 rounded border border-slate-300 bg-white"
+                                            />
+                                            <span>Remember me</span>
+                                        </label>
+                                        <Button
+                                            type="submit"
+                                            className="mt-1 h-12 w-full rounded-[10px] bg-brand-600 text-sm font-bold text-white hover:bg-brand-700"
+                                            tabIndex={4}
+                                            disabled={processing}
+                                            data-test="login-button"
+                                        >
+                                            {processing && <Spinner />} Log in{' '}
+                                            <ArrowRight size={16} />
+                                        </Button>
                                     </>
                                 )}
                             </Form>
-                            {canRegister && <p className="mt-6 text-center text-sm text-slate-500">Don&apos;t have an account? <Link href={register()} className="font-bold text-brand-700 transition hover:text-brand-900" tabIndex={5}>Create one</Link></p>}
+                            {canRegister && (
+                                <p className="mt-6 text-center text-sm text-slate-500">
+                                    Don&apos;t have an account?{' '}
+                                    <Link
+                                        href={register()}
+                                        className="font-bold text-brand-700 transition hover:text-brand-900"
+                                        tabIndex={5}
+                                    >
+                                        Create one
+                                    </Link>
+                                </p>
+                            )}
                         </div>
-                        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500"><span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-600" /> Secure workspace</span><span className="flex items-center gap-1.5"><ClipboardCheck size={14} className="text-brand-600" /> Built for schools</span></div>
+                        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500">
+                            <span className="flex items-center gap-1.5">
+                                <CheckCircle2
+                                    size={14}
+                                    className="text-emerald-600"
+                                />{' '}
+                                Secure workspace
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <ClipboardCheck
+                                    size={14}
+                                    className="text-brand-600"
+                                />{' '}
+                                Built for schools
+                            </span>
+                        </div>
                     </section>
                 </main>
             </div>
@@ -52,5 +180,3 @@ export default function Login({ status, canRegister }: Props) {
 }
 
 Login.layout = null;
-
-

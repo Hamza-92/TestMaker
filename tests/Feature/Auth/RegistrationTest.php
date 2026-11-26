@@ -19,10 +19,22 @@ beforeEach(function () {
     ];
 });
 
-test('registration screen can be rendered', function () {
-    $response = $this->get(route('register'));
+test('the standard registration page can be rendered', function () {
+    $this->get(route('register'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('auth/register')
+            ->where('trialType', 'standard'));
+});
 
-    $response->assertOk();
+test('the previous QAT registration URL redirects to the dedicated page', function () {
+    $this->get(route('register', ['trial' => 'qat']))->assertRedirectToRoute('register.qat');
+});
+
+test('the QAT registration page requires guest access and enabled registration', function () {
+    config(['fortify.features' => []]);
+    $this->get(route('register.qat'))->assertNotFound();
+
+    config(['fortify.features' => [Features::registration()]]);
+    $this->actingAs(User::factory()->create())->get(route('register.qat'))->assertRedirect();
 });
 
 test('new schools can register for a trial', function () {
@@ -58,7 +70,7 @@ test('new schools can register for a trial', function () {
 
 test('QAT registration creates a school with the configured expiry and three paper access', function () {
     TrialSetting::current()->update(['trial_duration_days' => 17]);
-    $this->get(route('register', ['trial' => 'qat']))->assertOk()
+    $this->get(route('register.qat'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('auth/register')
             ->where('trialType', 'qat')->where('trialLimit', 3)->where('trialDurationDays', 17));
 

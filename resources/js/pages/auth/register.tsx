@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
@@ -6,19 +6,15 @@ import {
     ClipboardCheck,
     UserRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
-import {
-    Button,
-    Card,
-    Checkbox,
-    Input,
-    PageHeader,
-    Tabs,
-} from '@/components/tm';
+import { Button, Card, Checkbox, Input, PageHeader } from '@/components/tm';
 import { Spinner } from '@/components/ui/spinner';
-import { login } from '@/routes';
+import { qatRegistrationPath } from '@/lib/registration';
+import type { RegistrationCredentials } from '@/lib/registration';
+import { cn } from '@/lib/utils';
+import { login, register } from '@/routes';
 import { store } from '@/routes/register';
 
 type RegisterProps = {
@@ -66,14 +62,19 @@ const schoolFields = [
     },
 ];
 
+const trialPages = [
+    { type: 'standard', label: 'Standard papers', href: register.url() },
+    { type: 'qat', label: 'QAT trial', href: qatRegistrationPath },
+] as const;
+
 export default function Register({
     trialType,
     trialLimit,
     trialDurationDays,
 }: RegisterProps) {
-    const [selectedTrial, setSelectedTrial] = useState(trialType);
     const [termsAccepted, setTermsAccepted] = useState(false);
-    const isQat = selectedTrial === 'qat';
+    const submittedCredentials = useRef<RegistrationCredentials | null>(null);
+    const isQat = trialType === 'qat';
     const labelClass =
         'block text-xs font-semibold text-slate-700 dark:text-slate-300';
     const fieldClass =
@@ -88,7 +89,7 @@ export default function Register({
             />
             <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
                 <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                    <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+                    <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
                         <Link
                             href="/"
                             className="inline-flex items-center gap-2.5 rounded-lg font-semibold tracking-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500"
@@ -107,6 +108,31 @@ export default function Register({
                                 </span>
                             </span>
                         </Link>
+                        <nav
+                            aria-label="Trial registration pages"
+                            className="order-last flex w-full flex-wrap gap-2 sm:order-none sm:w-auto"
+                        >
+                            {trialPages.map(({ type, label, href }) => (
+                                <Link
+                                    key={type}
+                                    href={href}
+                                    aria-current={
+                                        type === trialType ? 'page' : undefined
+                                    }
+                                    className={cn(
+                                        'rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500',
+                                        type === trialType
+                                            ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200'
+                                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                                    )}
+                                >
+                                    {label}
+                                    <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">
+                                        {href}
+                                    </span>
+                                </Link>
+                            ))}
+                        </nav>
                         <Button asChild variant="ghost">
                             <Link href={isQat ? '/qat' : '/'}>
                                 <ArrowLeft aria-hidden="true" />
@@ -136,51 +162,51 @@ export default function Register({
                     />
 
                     <Form
+                        key={trialType}
                         {...store.form()}
                         resetOnSuccess={['password', 'password_confirmation']}
                         disableWhileProcessing
                         className="space-y-5"
+                        onBefore={({ data }) => {
+                            const phone =
+                                data instanceof FormData
+                                    ? data.get('phone')
+                                    : data.phone;
+                            const password =
+                                data instanceof FormData
+                                    ? data.get('password')
+                                    : data.password;
+                            submittedCredentials.current =
+                                typeof phone === 'string' &&
+                                typeof password === 'string'
+                                    ? { phone, password }
+                                    : null;
+                        }}
+                        onSuccess={(page) => {
+                            if (
+                                page.component === 'auth/login' &&
+                                page.props.status &&
+                                submittedCredentials.current
+                            ) {
+                                // Client-side Inertia flash is excluded from browser history.
+                                router.flash(
+                                    'registrationCredentials',
+                                    submittedCredentials.current,
+                                );
+                            }
+                        }}
+                        onFinish={() => {
+                            submittedCredentials.current = null;
+                        }}
                     >
                         {({ processing, errors }) => (
                             <>
                                 <input
                                     type="hidden"
                                     name="trial_type"
-                                    value={selectedTrial}
+                                    value={trialType}
                                 />
-                                <Card>
-                                    <div className="flex flex-wrap items-center justify-between gap-4">
-                                        <div>
-                                            <h2 className="text-sm font-semibold">
-                                                Choose your trial
-                                            </h2>
-                                            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                                {isQat
-                                                    ? `${trialLimit} QAT papers with automatic and manual generation.`
-                                                    : 'Explore standard paper generation for your school.'}
-                                            </p>
-                                        </div>
-                                        <Tabs
-                                            items={[
-                                                {
-                                                    value: 'standard',
-                                                    label: 'Standard papers',
-                                                },
-                                                {
-                                                    value: 'qat',
-                                                    label: 'QAT papers',
-                                                    emphasis: true,
-                                                },
-                                            ]}
-                                            value={selectedTrial}
-                                            onChange={setSelectedTrial}
-                                        />
-                                    </div>
-                                    <InputError
-                                        message={errors.trial_type}
-                                        className="mt-2"
-                                    />
-                                </Card>
+                                <InputError message={errors.trial_type} />
 
                                 <div className="grid items-start gap-5 lg:grid-cols-2">
                                     <Card

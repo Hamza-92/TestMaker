@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Customer\ActivityController;
 use App\Http\Controllers\Customer\AnnouncementController as CustomerAnnouncementController;
 use App\Http\Controllers\Customer\GeneratePaperController;
@@ -90,6 +91,9 @@ Route::get('/', function (Request $request) {
 
 Route::get('/pricing', [PublicPricingController::class, 'index'])->name('pricing');
 Route::get('/qat', [PublicQatController::class, 'index'])->name('qat');
+Route::get('/register/qat', [RegisteredUserController::class, 'createQat'])
+    ->middleware('guest:'.config('fortify.guard'))
+    ->name('register.qat');
 Route::get('/site-media/{media}', [PublicSiteMediaController::class, 'show'])->name('site.media.show');
 
 Route::get('question-images/{image}', [QuestionImageController::class, 'show'])

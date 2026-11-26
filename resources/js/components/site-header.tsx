@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import SiteContactBar from '@/components/site-contact-bar';
+import { qatRegistrationPath } from '@/lib/registration';
 import { cn } from '@/lib/utils';
 import { dashboard, login, register } from '@/routes';
 import type { Auth } from '@/types/auth';
@@ -23,11 +24,19 @@ export default function SiteHeader({
     registerHref?: string;
     registerLabel?: string;
 }) {
-    const primaryNavigation = usePage<{ siteNavigation: SiteNavigation }>()
-        .props.siteNavigation.header;
+    const { canRegister = true, siteNavigation } = usePage<{
+        canRegister?: boolean;
+        siteNavigation: SiteNavigation;
+    }>().props;
+    const primaryNavigation = siteNavigation.header;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [showBackToTop, setShowBackToTop] = useState(false);
     const isAuthenticated = Boolean(auth?.user);
+    const isQatSignup = registerHref === qatRegistrationPath;
+    const alternateSignupHref = isQatSignup
+        ? register.url()
+        : qatRegistrationPath;
+    const alternateSignupLabel = isQatSignup ? 'Standard trial' : 'QAT trial';
 
     useEffect(() => {
         const closeOnEscape = (event: KeyboardEvent) => {
@@ -139,6 +148,14 @@ export default function SiteHeader({
                                         Login
                                     </Link>
                                 )}
+                                {!isAuthenticated && canRegister && (
+                                    <Link
+                                        href={alternateSignupHref}
+                                        className="hidden min-h-11 items-center rounded-lg px-2 text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 lg:inline-flex"
+                                    >
+                                        {alternateSignupLabel}
+                                    </Link>
+                                )}
                                 <Link
                                     href={
                                         isAuthenticated
@@ -240,6 +257,15 @@ export default function SiteHeader({
                                             className="min-h-12 rounded-[10px] px-4 py-3 text-center text-sm font-semibold text-slate-800 hover:bg-slate-50"
                                         >
                                             Login
+                                        </Link>
+                                    )}
+                                    {!isAuthenticated && canRegister && (
+                                        <Link
+                                            href={alternateSignupHref}
+                                            onClick={closeMenu}
+                                            className="min-h-12 rounded-[10px] border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                                        >
+                                            {alternateSignupLabel}
                                         </Link>
                                     )}
                                     <Link

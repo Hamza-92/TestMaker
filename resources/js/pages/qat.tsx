@@ -17,6 +17,7 @@ import { useState } from 'react';
 import PublicSiteFooter from '@/components/public-site-footer';
 import { qatAnnualFee } from '@/components/qat/trial-status';
 import SiteHeader from '@/components/site-header';
+import { qatRegistrationPath } from '@/lib/registration';
 import type { Auth } from '@/types/auth';
 
 type Props = {
@@ -161,7 +162,7 @@ export default function QatLanding() {
     const ctaHref = signedIn
         ? '/dashboard'
         : canRegister
-          ? '/register?trial=qat'
+          ? qatRegistrationPath
           : '/login';
     const ctaText = signedIn
         ? 'Open your workspace'
@@ -209,9 +210,7 @@ export default function QatLanding() {
             >
                 <SiteHeader
                     auth={auth}
-                    registerHref={
-                        canRegister ? '/register?trial=qat' : '/login'
-                    }
+                    registerHref={canRegister ? qatRegistrationPath : '/login'}
                     registerLabel={canRegister ? 'Start QAT trial' : 'Log in'}
                 />
                 <main>

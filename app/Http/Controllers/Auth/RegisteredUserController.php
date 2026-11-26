@@ -9,11 +9,23 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 use Laravel\Fortify\Contracts\RegisterViewResponse;
+use Laravel\Fortify\Features;
 
 class RegisteredUserController extends Controller
 {
-    public function create(): RegisterViewResponse
+    public function create(Request $request): RegisterViewResponse|RedirectResponse
     {
+        if ($request->query('trial') === 'qat') {
+            return to_route('register.qat');
+        }
+
+        return app(RegisterViewResponse::class);
+    }
+
+    public function createQat(): RegisterViewResponse
+    {
+        abort_unless(config('fortify.views') && Features::enabled(Features::registration()), 404);
+
         return app(RegisterViewResponse::class);
     }
 
