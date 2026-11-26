@@ -103,7 +103,10 @@ import {
     ArabicQuestionFontProvider,
     QuestionContent,
 } from './paper-layouts/questions/question-content';
-import type { QuestionOptionEdit } from './paper-layouts/questions/question-edit-modal';
+import type {
+    PassageQuestionEdit,
+    QuestionOptionEdit,
+} from './paper-layouts/questions/question-edit-modal';
 import { SaveAsTemplateModal } from './paper-layouts/save-as-template-modal';
 import type { SaveAsTemplateValues } from './paper-layouts/save-as-template-modal';
 import { SavePaperModal } from './paper-layouts/save-paper-modal';
@@ -7282,6 +7285,7 @@ export default function GeneratePaper({
         value: string,
         updateFederalStatement = false,
         optionEdits: QuestionOptionEdit[] = [],
+        passageEdits: PassageQuestionEdit[] = [],
     ) {
         setGeneratedPaper((current) =>
             current
@@ -7297,7 +7301,8 @@ export default function GeneratePaper({
                                         text: value,
                                         ...(section.category ===
                                             'Objective Questions' &&
-                                        optionEdits.length > 0
+                                        (optionEdits.length > 0 ||
+                                            passageEdits.length > 0)
                                             ? {
                                                   options: applyOptionEdits(
                                                       question.options,
@@ -7307,6 +7312,13 @@ export default function GeneratePaper({
                                                       question.passageQuestions?.map(
                                                           (part) => ({
                                                               ...part,
+                                                              text:
+                                                                  passageEdits.find(
+                                                                      (edit) =>
+                                                                          edit.passageQuestionId ===
+                                                                          part.id,
+                                                                  )?.text ??
+                                                                  part.text,
                                                               options:
                                                                   applyOptionEdits(
                                                                       part.options,
@@ -7441,6 +7453,7 @@ export default function GeneratePaper({
     function savePaperQuestionEdit(
         value: string,
         optionEdits: QuestionOptionEdit[],
+        passageEdits: PassageQuestionEdit[],
     ) {
         if (!activePaperQuestionEditorContext) {
             return;
@@ -7452,6 +7465,7 @@ export default function GeneratePaper({
             value,
             activePaperQuestionEditorContext.usesFederalStatement,
             optionEdits,
+            passageEdits,
         );
         closePaperQuestionEditor();
     }
@@ -9339,10 +9353,20 @@ export default function GeneratePaper({
                                 key={
                                     activePaperQuestionEditorContext.question.id
                                 }
+                                objectiveMedium={
+                                    activePaperQuestionEditorContext.section
+                                        .category === 'Objective Questions'
+                                        ? (generatedPaper.sectioning?.medium ??
+                                          'Both')
+                                        : undefined
+                                }
                                 question={{
                                     ...(activePaperQuestionEditorContext.section
                                         .category === 'Objective Questions'
                                         ? {
+                                              optionsOnly:
+                                                  activePaperQuestionEditorContext
+                                                      .question.optionsOnly,
                                               options:
                                                   activePaperQuestionEditorContext
                                                       .question.options,
