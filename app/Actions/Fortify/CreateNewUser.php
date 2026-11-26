@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Models\TrialSetting;
 use App\Models\User;
+use App\Support\Qat\QatTrial;
 use App\Support\TemporaryAccountEmail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -74,7 +75,7 @@ class CreateNewUser implements CreatesNewUsers
 
         return DB::transaction(function () use ($validated): User {
             // Ensure the configured trial access is ready for this new school.
-            $trialSettings = TrialSetting::current();
+            TrialSetting::current();
 
             return User::create([
                 'name' => $validated['name'],
@@ -88,8 +89,9 @@ class CreateNewUser implements CreatesNewUsers
                 'user_type' => UserType::Customer->value,
                 'status' => UserStatus::Active->value,
                 'account_type' => AccountType::Trial->value,
+                // The expiry date is inclusive, so signup counts as day one.
                 'qat_trial_ends_on' => ($validated['trial_type'] ?? 'standard') === 'qat'
-                    ? now('Asia/Karachi')->addDays($trialSettings->trial_duration_days)->toDateString()
+                    ? now('Asia/Karachi')->addDays(QatTrial::DURATION_DAYS - 1)->toDateString()
                     : null,
             ]);
         });

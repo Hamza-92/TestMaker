@@ -20,9 +20,11 @@ beforeEach(function () {
 });
 
 test('the standard registration page can be rendered', function () {
+    TrialSetting::current()->update(['trial_duration_days' => 17]);
+
     $this->get(route('register'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('auth/register')
-            ->where('trialType', 'standard'));
+            ->where('trialType', 'standard')->where('trialDurationDays', 17));
 });
 
 test('the previous QAT registration URL redirects to the dedicated page', function () {
@@ -68,11 +70,12 @@ test('new schools can register for a trial', function () {
         ->and(TrialSetting::query()->exists())->toBeTrue();
 });
 
-test('QAT registration creates a school with the configured expiry and three paper access', function () {
+test('QAT registration grants three calendar days and three papers', function () {
+    $this->freezeTime();
     TrialSetting::current()->update(['trial_duration_days' => 17]);
     $this->get(route('register.qat'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('auth/register')
-            ->where('trialType', 'qat')->where('trialLimit', 3)->where('trialDurationDays', 17));
+            ->where('trialType', 'qat')->where('trialLimit', 3)->where('trialDurationDays', 3));
 
     $this->post(route('register.store'), [
         'name' => 'QAT Owner', 'email' => 'qat-owner@example.test',
@@ -84,7 +87,7 @@ test('QAT registration creates a school with the configured expiry and three pap
     ])->assertRedirectToRoute('login');
 
     $school = User::where('email', 'qat-owner@example.test')->firstOrFail();
-    expect($school->qat_trial_ends_on->toDateString())->toBe(now('Asia/Karachi')->addDays(17)->toDateString())
+    expect($school->qat_trial_ends_on->toDateString())->toBe(now('Asia/Karachi')->addDays(2)->toDateString())
         ->and($school->qat_trial_papers_used)->toBe(0)
         ->and($school->account_type->value)->toBe('trial')
         ->and($school->user_type->value)->toBe('customer')

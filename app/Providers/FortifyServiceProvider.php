@@ -75,7 +75,9 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::registerView(fn (Request $request) => Inertia::render('auth/register', [
             'trialType' => $request->routeIs('register.qat') ? 'qat' : 'standard',
             'trialLimit' => QatTrial::LIMIT,
-            'trialDurationDays' => TrialSetting::current()->trial_duration_days,
+            'trialDurationDays' => $request->routeIs('register.qat')
+                ? QatTrial::DURATION_DAYS
+                : TrialSetting::current()->trial_duration_days,
         ]));
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/two-factor-challenge'));

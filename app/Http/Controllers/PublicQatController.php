@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TrialSetting;
 use App\Support\Qat\QatTrial;
 use App\Support\SiteNavigation;
 use Inertia\Inertia;
@@ -16,7 +15,7 @@ class PublicQatController extends Controller
         return Inertia::render('qat', [
             'canRegister' => Features::enabled(Features::registration()),
             'trialLimit' => QatTrial::LIMIT,
-            'trialDurationDays' => TrialSetting::current()->trial_duration_days,
+            'trialDurationDays' => QatTrial::DURATION_DAYS,
             'siteNavigation' => SiteNavigation::published(),
         ]);
     }

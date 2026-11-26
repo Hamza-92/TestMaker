@@ -13,7 +13,7 @@ test('visitors can discover QAT and start a three paper trial', function () {
 
     $this->get(route('qat'))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('qat')->where('canRegister', true)
-        ->where('trialLimit', 3)->where('trialDurationDays', 14)
+        ->where('trialLimit', 3)->where('trialDurationDays', 3)
         ->where('siteNavigation.header.2.href', '/qat'));
     $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('welcome')->where('siteNavigation.header.2.href', '/qat'));

@@ -13,7 +13,6 @@ import { Button, Card, Checkbox, Input, PageHeader } from '@/components/tm';
 import { Spinner } from '@/components/ui/spinner';
 import { qatRegistrationPath } from '@/lib/registration';
 import type { RegistrationCredentials } from '@/lib/registration';
-import { cn } from '@/lib/utils';
 import { login, register } from '@/routes';
 import { store } from '@/routes/register';
 
@@ -110,7 +109,7 @@ export default function Register({
                         </Link>
                         <nav
                             aria-label="Trial registration pages"
-                            className="order-last flex w-full flex-wrap gap-2 sm:order-none sm:w-auto"
+                            className="order-last flex w-full flex-wrap gap-x-6 sm:order-none sm:w-auto"
                         >
                             {trialPages.map(({ type, label, href }) => (
                                 <Link
@@ -119,17 +118,9 @@ export default function Register({
                                     aria-current={
                                         type === trialType ? 'page' : undefined
                                     }
-                                    className={cn(
-                                        'rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500',
-                                        type === trialType
-                                            ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200'
-                                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-                                    )}
+                                    className="inline-flex min-h-10 items-center rounded-sm text-sm text-slate-600 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-500 aria-[current=page]:font-semibold aria-[current=page]:text-slate-900 dark:text-slate-300 dark:aria-[current=page]:text-slate-100"
                                 >
                                     {label}
-                                    <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">
-                                        {href}
-                                    </span>
                                 </Link>
                             ))}
                         </nav>

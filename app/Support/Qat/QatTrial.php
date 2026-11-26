@@ -12,6 +12,8 @@ final class QatTrial
 {
     public const LIMIT = 3;
 
+    public const DURATION_DAYS = 3;
+
     public static function school(User $user): ?User
     {
         $school = $user->schoolOwner();
