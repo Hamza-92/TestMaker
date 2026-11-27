@@ -1055,7 +1055,8 @@ input[type='date']::-webkit-calendar-picker-indicator {
     max-width: 100%;
 }
 
-[data-print-paper] .tm-old-header .tm-old-two-content {
+[data-print-paper] .tm-old-header .tm-old-two-content,
+[data-print-paper] .tm-old-header .tm-old-three {
     display: grid;
     row-gap: 4px;
     container-type: inline-size;
@@ -1081,14 +1082,48 @@ input[type='date']::-webkit-calendar-picker-indicator {
         var(--paper-header-border-style, solid) #000;
 }
 
-[data-print-paper] .tm-old-two-summary > :last-child .tm-old-value {
+[data-print-paper] .tm-old-two-summary > :last-child .tm-old-value,
+[data-print-paper] .tm-old-three-summary > :last-child .tm-old-value {
     min-width: 1.5em;
 }
 
-[data-print-paper] .tm-old-header .tm-old-two-fields {
+[data-print-paper] .tm-old-header .tm-old-three-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    text-align: center;
+    font-weight: 700;
+}
+
+[data-print-paper] .tm-old-header .tm-old-three-summary > div {
+    display: grid;
+    place-items: center;
+    padding: max(4px, var(--paper-header-padding-y, 2px))
+        var(--paper-header-padding-x, 4px);
+}
+
+[data-print-paper] .tm-old-header .tm-old-three-summary > :first-child,
+[data-print-paper] .tm-old-header .tm-old-three-summary > :last-child {
+    background: #000;
+    color: #fff;
+}
+
+[data-print-paper] .tm-old-header .tm-old-three-summary > :first-child {
+    border-radius: 2em 0;
+}
+
+[data-print-paper] .tm-old-header .tm-old-three-summary > :last-child {
+    border-radius: 0 2em;
+}
+
+[data-print-paper] .tm-old-header .tm-old-three-summary > :nth-child(2) {
+    border-block: var(--paper-header-border-width, 1px)
+        var(--paper-header-border-style, solid) currentColor;
+}
+
+[data-print-paper] .tm-old-header .tm-old-underlined-fields {
     display: grid;
     align-items: end;
-    column-gap: 3px;
+    gap: 4px 3px;
     padding-block: var(--paper-header-padding-y, 2px);
 }
 
@@ -1103,31 +1138,41 @@ input[type='date']::-webkit-calendar-picker-indicator {
     grid-template-columns: repeat(3, minmax(0, 18fr)) minmax(0, 46fr);
 }
 
+[data-print-paper] .tm-old-header .tm-old-three-fields {
+    grid-template-columns: repeat(2, minmax(0, 2fr)) repeat(2, minmax(0, 1fr));
+}
+
 @container (max-width: 28em) {
-    [data-print-paper] .tm-old-header .tm-old-two-fields {
+    [data-print-paper] .tm-old-header .tm-old-underlined-fields {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        row-gap: 4px;
     }
 }
 
-[data-print-paper] .tm-old-header .tm-old-two .tm-old-label {
+@container (max-width: 42em) {
+    [data-print-paper] .tm-old-header .tm-old-three-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+[data-print-paper] .tm-old-header .tm-old-two .tm-old-label,
+[data-print-paper] .tm-old-header .tm-old-three .tm-old-label {
     flex-shrink: 1;
     font-weight: inherit;
     white-space: normal;
 }
 
-[data-print-paper] .tm-old-two-fields .tm-old-field > :last-child {
+[data-print-paper] .tm-old-underlined-fields .tm-old-field > :last-child {
     min-width: 0;
     flex: 1;
 }
 
 [data-print-paper] .tm-old-two-summary > :last-child .tm-old-value,
-[data-print-paper] .tm-old-two-fields .tm-old-field > :last-child {
+[data-print-paper] .tm-old-three-summary > :last-child .tm-old-value,
+[data-print-paper] .tm-old-underlined-fields .tm-old-field > :last-child {
     min-height: 1em;
     border-bottom: 1px solid currentColor;
 }
 
-[data-print-paper] .tm-old-header .tm-old-marks-badge,
 [data-print-paper] .tm-old-header.tm-old-layout-4 th {
     background: #111;
     color: #fff;

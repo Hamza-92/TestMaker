@@ -397,13 +397,13 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
                                 <Field name="marks" label="Maximum Marks:" />
                             </div>
                         </div>
-                        <div className="tm-old-two-fields tm-old-two-student">
+                        <div className="tm-old-underlined-fields tm-old-two-student">
                             <Field name="studentName" label="Name:" />
                             <Field name="fatherName" label="Father Name:" />
                             <Field name="rollNo" label="Roll No:" />
                             <Field name="section" label="Section:" />
                         </div>
-                        <div className="tm-old-two-fields tm-old-two-exam">
+                        <div className="tm-old-underlined-fields tm-old-two-exam">
                             <Field name="duration" label="Time:" />
                             <Field name="date" label="Date:" />
                             <Field name="type" label="Exam:" />
@@ -414,58 +414,33 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
             );
         case 3:
             return (
-                <table className="tm-old-table tm-old-three">
-                    <tbody>
-                        <tr>
-                            <td className="tm-old-logo-cell">
-                                <Logo />
-                            </td>
-                            <td colSpan={2}>
-                                <SchoolBlock />
-                            </td>
-                            <td className="tm-old-marks-badge">
-                                <Field name="marks" label="Maximum Marks:" />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <Field name="subject" label="Subject:" />
-                            </td>
-                            <td>
-                                <Field name="className" label="Class:" />
-                            </td>
-                            <td>
-                                <Field name="duration" label="Time:" />
-                            </td>
-                            <td>
-                                <Field name="type" label="Exam:" />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <Field name="studentName" label="Name:" line />
-                            </td>
-                            <td>
-                                <Field
-                                    name="fatherName"
-                                    label="Father Name:"
-                                    line
-                                />
-                            </td>
-                            <td>
-                                <Field name="rollNo" label="Roll No:" line />
-                            </td>
-                            <td>
-                                <Field name="date" label="Date:" />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colSpan={4}>
-                                <Field name="chapters" label="CH#:" />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div className="tm-old-three">
+                    <Logo />
+                    <SchoolBlock />
+                    <div className="tm-old-three-summary">
+                        <div>
+                            <Field name="subject" label="Subject:" />
+                        </div>
+                        <div>
+                            <Field name="className" label="Class:" />
+                        </div>
+                        <div>
+                            <Field name="marks" label="Maximum Marks:" />
+                        </div>
+                    </div>
+                    <div className="tm-old-underlined-fields tm-old-three-fields">
+                        <Field name="studentName" label="Name:" />
+                        <Field name="fatherName" label="Father Name:" />
+                        <Field name="section" label="Section:" />
+                        <Field name="rollNo" label="Roll No:" />
+                    </div>
+                    <div className="tm-old-underlined-fields tm-old-three-fields">
+                        <Field name="duration" label="Time:" />
+                        <Field name="chapters" label="CH#" />
+                        <Field name="type" label="Exam:" />
+                        <Field name="date" label="Date:" />
+                    </div>
+                </div>
             );
         case 4:
             return (
