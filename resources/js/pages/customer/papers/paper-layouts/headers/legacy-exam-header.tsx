@@ -196,6 +196,13 @@ function ScoreGrid({ kind }: { kind: 'office' | 'subjective' }) {
 
     return (
         <table className="tm-old-score-grid" aria-label="Marks record">
+            {kind === 'office' && (
+                <colgroup>
+                    <col style={{ width: '14.6%' }} />
+                    <col span={count} style={{ width: '3.9%' }} />
+                    <col span={2} style={{ width: '13.45%' }} />
+                </colgroup>
+            )}
             <tbody>
                 {kind === 'subjective' && (
                     <tr>
@@ -573,83 +580,76 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
         case 6:
             return (
                 <div className="tm-old-six">
-                    <table className="tm-old-table">
-                        <tbody>
-                            <tr>
-                                <td className="tm-old-logo-cell">
-                                    <Logo />
-                                </td>
-                                <td>
-                                    <SchoolName />
-                                </td>
-                                <td>
-                                    <Field
-                                        name="className"
-                                        label="Class:"
-                                        stacked
-                                    />
-                                    <Field
-                                        name="subject"
-                                        label="Subject:"
-                                        stacked
-                                    />
-                                    <Field
-                                        name="chapters"
-                                        label="CH#:"
-                                        stacked
-                                    />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colSpan={3} className="tm-old-office-title">
-                                    FOR OFFICE USE ONLY
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <Field
-                                        name="fatherName"
-                                        label="Rechecked By:"
-                                        line
-                                    />
-                                </td>
-                                <td>
-                                    <Field
-                                        name="supervisor"
-                                        label="Invigilator:"
-                                        line
-                                    />
-                                </td>
-                                <td>
+                    <div className="tm-old-six-branding">
+                        <Logo />
+                        <SchoolName />
+                        <div className="tm-old-six-course">
+                            <div className="tm-old-six-box">
+                                <Field name="className" label="Class:" />
+                            </div>
+                            <div className="tm-old-six-box">
+                                <Field name="subject" label="Subject:" />
+                                <Field name="chapters" label="CH#" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="tm-old-six-office">
+                        <div className="tm-old-office-title">
+                            FOR OFFICE USE ONLY
+                        </div>
+                        <div className="tm-old-six-office-details">
+                            <div className="tm-old-six-signatures">
+                                {[
+                                    'Rechecked By:',
+                                    'Invigilator:',
+                                    'Marked By:',
+                                    "Teacher's Name:",
+                                ].map((label) => (
+                                    <div key={label}>
+                                        <span>{label}</span>
+                                        <span aria-hidden="true" />
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="tm-old-six-timing">
+                                <div className="tm-old-six-box">
                                     <Field
                                         name="duration"
                                         label="Time Allowed:"
                                     />
+                                </div>
+                                <div className="tm-old-six-box">
                                     <Field name="marks" label="Total Marks:" />
-                                </td>
-                            </tr>
+                                </div>
+                            </div>
+                        </div>
+                        <ScoreGrid kind="office" />
+                    </div>
+                    <table className="tm-old-six-student">
+                        <colgroup>
+                            <col style={{ width: '14.6%' }} />
+                            <col style={{ width: '31.2%' }} />
+                            <col style={{ width: '11.7%' }} />
+                            <col style={{ width: '15.6%' }} />
+                            <col span={2} style={{ width: '13.45%' }} />
+                        </colgroup>
+                        <tbody>
                             <tr>
+                                <th>Student Name:</th>
                                 <td>
-                                    <Field
-                                        name="fatherName"
-                                        label="Marked By:"
-                                        line
-                                    />
+                                    <Field name="studentName" />
                                 </td>
+                                <th>Section:</th>
                                 <td>
-                                    <Field
-                                        name="supervisor"
-                                        label="Teacher's Name:"
-                                        line
-                                    />
+                                    <Field name="section" />
                                 </td>
+                                <th>Date:</th>
                                 <td>
-                                    <Field name="date" label="Date:" />
+                                    <Field name="date" ariaLabel="Date" />
                                 </td>
                             </tr>
                         </tbody>
                     </table>
-                    <ScoreGrid kind="office" />
                 </div>
             );
         default:

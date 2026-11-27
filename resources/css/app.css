@@ -1299,7 +1299,170 @@ input[type='date']::-webkit-calendar-picker-indicator {
     }
 }
 
-[data-print-paper] .tm-old-header .tm-old-office-title,
+[data-print-paper] .tm-old-header .tm-old-six {
+    container-type: inline-size;
+}
+
+[data-print-paper] .tm-old-six-branding,
+[data-print-paper] .tm-old-six-office-details,
+[data-print-paper] .tm-old-six-signatures {
+    display: grid;
+    align-items: center;
+}
+
+[data-print-paper] .tm-old-six-branding {
+    grid-template-columns: 15% minmax(0, 1fr) 27%;
+    margin-bottom: 4px;
+}
+
+[data-print-paper] .tm-old-six-branding > .tm-old-logo {
+    justify-content: start;
+}
+
+[data-print-paper] .tm-old-six-course {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    font-weight: 700;
+}
+
+[data-print-paper] .tm-old-six-office {
+    border: max(2px, calc(var(--paper-header-border-width, 1px) * 1.5)) dashed
+        #000;
+}
+
+[data-print-paper] .tm-old-six .tm-old-office-title {
+    text-decoration: underline;
+}
+
+[data-print-paper] .tm-old-six-office-details {
+    grid-template-columns: minmax(0, 73fr) minmax(0, 27fr);
+    padding-block: var(--paper-header-padding-y, 2px);
+    gap: 4px;
+}
+
+[data-print-paper] .tm-old-six-signatures {
+    grid-template-columns: minmax(0, 57fr) minmax(0, 43fr);
+    gap: 6px 4px;
+}
+
+[data-print-paper] .tm-old-six-signatures > div {
+    display: grid;
+    grid-template-columns: 35% 39%;
+    align-items: end;
+    gap: 4px;
+}
+
+[data-print-paper] .tm-old-six-signatures [aria-hidden='true'] {
+    min-height: 1em;
+    border-bottom: 1px solid currentColor;
+}
+
+[data-print-paper] .tm-old-six-timing,
+[data-print-paper] .tm-old-six-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 3px;
+}
+
+[data-print-paper] .tm-old-six-box {
+    min-width: 0;
+    max-width: 100%;
+    border: var(--paper-header-border-width, 1px)
+        var(--paper-header-border-style, solid) currentColor;
+    padding-inline: 2px;
+}
+
+[data-print-paper] .tm-old-six-box .tm-old-field + .tm-old-field {
+    border-inline-start: 1px solid currentColor;
+    padding-inline-start: 3px;
+}
+
+[data-print-paper] .tm-old-six-box .tm-old-label {
+    font-weight: inherit;
+    white-space: normal;
+}
+
+[data-print-paper] .tm-old-six-box .tm-old-field input {
+    width: auto;
+    min-width: 3ch;
+    field-sizing: content;
+}
+
+[data-print-paper] .tm-old-header .tm-old-six .tm-old-score-grid :is(th, td) {
+    padding: 1px;
+    font-size: 0.9em;
+}
+
+[data-print-paper] .tm-old-six .tm-old-score-grid th {
+    background: #eee;
+    font-weight: 400;
+}
+
+[data-print-paper] .tm-old-six .tm-old-score-grid tr:last-child > * {
+    border-bottom-width: 0;
+}
+
+[data-print-paper] .tm-old-six-student :is(th, td) {
+    border-top-width: 0;
+}
+
+[data-print-paper] .tm-old-six .tm-old-six-student th {
+    font-weight: 400;
+}
+
+[data-print-paper] .tm-old-six-student td > .tm-old-field {
+    width: 100%;
+}
+
+@container (max-width: 36em) {
+    [data-print-paper] .tm-old-six-branding {
+        grid-template-columns: 60px minmax(0, 1fr);
+        row-gap: 4px;
+    }
+
+    [data-print-paper] .tm-old-six-course {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    [data-print-paper] .tm-old-six-office-details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    [data-print-paper] .tm-old-six-signatures > div {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    [data-print-paper]
+        .tm-old-header
+        .tm-old-six
+        .tm-old-score-grid
+        :is(th, td) {
+        font-size: min(0.9em, 2.65cqi);
+    }
+
+    [data-print-paper] .tm-old-six-student,
+    [data-print-paper] .tm-old-six-student tbody {
+        display: block;
+    }
+
+    [data-print-paper] .tm-old-six-student colgroup {
+        display: none;
+    }
+
+    [data-print-paper] .tm-old-six-student tr {
+        display: grid;
+        grid-template-columns: 35% minmax(0, 1fr);
+    }
+
+    [data-print-paper] .tm-old-six-student th {
+        border-inline-end-width: 0;
+    }
+}
+
 [data-print-paper] .tm-old-header .tm-old-centered {
     text-align: center;
     font-weight: 700;
