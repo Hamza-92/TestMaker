@@ -39,6 +39,7 @@ export function QuestionTypeHeading({
         : titleUrdu?.trim() || '';
     const visibleTitle = hideInternalSchemaLabel(title) ? '' : title;
     const isBilingual = english !== '' && urdu !== '';
+    const showMarks = !hideMarks && marksEach > 0;
     const totalMarks = Number((requiredQuestions * marksEach).toFixed(2));
     const showRequiredChoice = requiredQuestions < choiceQuestions;
     const englishChoiceLabel = showRequiredChoice
@@ -132,7 +133,7 @@ export function QuestionTypeHeading({
                         </>
                     )}
                 </div>
-                {!hideMarks && (
+                {showMarks && (
                     <div className="shrink-0 whitespace-nowrap">
                         ({requiredQuestions}x{marksEach}={totalMarks})
                     </div>
@@ -145,9 +146,9 @@ export function QuestionTypeHeading({
         <div
             data-paper-heading
             className={
-                hideMarks
-                    ? 'grid grid-cols-2 items-start gap-x-3 px-2 py-1 text-sm font-bold'
-                    : 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 px-2 py-1 text-sm font-bold'
+                showMarks
+                    ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3 px-2 py-1 text-sm font-bold'
+                    : 'grid grid-cols-2 items-start gap-x-3 px-2 py-1 text-sm font-bold'
             }
         >
             <div className="min-w-0 text-left" dir="ltr">
@@ -166,7 +167,7 @@ export function QuestionTypeHeading({
                     </span>
                 )}
             </div>
-            {!hideMarks && (
+            {showMarks && (
                 <div className="shrink-0 self-start text-center whitespace-nowrap">
                     ({requiredQuestions}x{marksEach}={totalMarks})
                 </div>

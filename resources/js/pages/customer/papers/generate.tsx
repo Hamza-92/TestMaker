@@ -1390,9 +1390,15 @@ function rowTarget(row: QuestionSelectionRow): number {
     return toNumber(row.choiceQuestions);
 }
 
+function rowRequiredQuestions(row: QuestionSelectionRow): number {
+    const required = toNumber(row.requiredQuestions);
+
+    return required > 0 ? required : rowTarget(row);
+}
+
 function lineTotal(row: QuestionSelectionRow): number {
     return roundMarks(
-        toNumber(row.requiredQuestions) * toNumber(row.marksPerQuestion),
+        rowRequiredQuestions(row) * toNumber(row.marksPerQuestion),
     );
 }
 
@@ -1419,7 +1425,7 @@ function normalizeQuestionRow(
             typeof row.chapterNumbers === 'string' ? row.chapterNumbers : '',
         requiredQuestions,
         marksPerQuestion:
-            toNumber(requiredQuestions) === 0 ? '' : row.marksPerQuestion,
+            toNumber(choiceQuestions) === 0 ? '' : row.marksPerQuestion,
         choiceQuestions,
     };
 
@@ -4017,41 +4023,11 @@ export default function GeneratePaper({
     const isManualSelectionComplete = manualPickerRows.every(
         (item) => item.selectedQuestionIds.length === item.target,
     );
-    const standardSelectionReady =
-        questionSelectionRows.length > 0 &&
-        questionSelectionRows.every(
-            (item) =>
-                toNumber(item.row.requiredQuestions) > 0 &&
-                toNumber(item.row.marksPerQuestion) > 0,
-        );
     const multipartSelections = questionSelection.multipart ?? [];
     const multipartGroups = multipartSelectionGroups(questionSelection);
     const configuredMultipartSelections = multipartSelections.filter(
         multipartSelectionHasInput,
     );
-    const multipartReady =
-        !multipartConfig ||
-        configuredMultipartSelections.every(
-            (selection) =>
-                selection.rows.length >= 1 &&
-                selection.rows.every(
-                    (row) =>
-                        typeof row.questionTypeId === 'number' &&
-                        toNumber(row.marksPerQuestion) > 0,
-                ),
-        );
-    const multipartChoiceHasMismatch =
-        multipartChoiceMarksMismatch(questionSelection);
-    const isQuestionSelectionReady =
-        (standardSelectionReady || configuredMultipartSelections.length > 0) &&
-        multipartReady;
-    const canGeneratePaper =
-        !loadingQuestionSections &&
-        questionSelection.totalMarks > 0 &&
-        isQuestionSelectionReady &&
-        isManualSelectionComplete &&
-        multipartReady &&
-        !multipartChoiceHasMismatch;
     const activeManualQuestionTypeId =
         activeManualPickerRow?.questionTypeId ?? null;
     const activeManualSelectedQuestionIds = useMemo(
@@ -5933,7 +5909,7 @@ export default function GeneratePaper({
     }
 
     async function handleGeneratePaper() {
-        if (!canGeneratePaper || generatingPaper) {
+        if (generatingPaper) {
             return;
         }
 
@@ -5941,6 +5917,37 @@ export default function GeneratePaper({
         setPaperGenerationError(null);
 
         try {
+            if (loadingQuestionSections) {
+                throw new Error(
+                    'Wait for the question counts to finish loading.',
+                );
+            }
+
+            if (
+                multipartConfig &&
+                configuredMultipartSelections.some((selection) =>
+                    selection.rows.some(
+                        (row) => typeof row.questionTypeId !== 'number',
+                    ),
+                )
+            ) {
+                throw new Error(
+                    'Select a question type for each multipart part.',
+                );
+            }
+
+            if (!isManualSelectionComplete) {
+                throw new Error(
+                    'Pick the requested number of questions for each manual selection.',
+                );
+            }
+
+            if (multipartChoiceMarksMismatch(questionSelection)) {
+                throw new Error(
+                    'Multipart questions with a choice must have equal marks.',
+                );
+            }
+
             const usesCustomLayout =
                 paperSectioning.custom === true ||
                 questionSelection.sections.some(
@@ -5979,13 +5986,18 @@ export default function GeneratePaper({
                             row,
                             target: rowTarget(row),
                         }))
-                        .filter(
-                            (item) =>
-                                item.target > 0 &&
-                                toNumber(item.row.requiredQuestions) > 0 &&
-                                toNumber(item.row.marksPerQuestion) > 0,
-                        ),
+                        .filter((item) => item.target > 0),
                 );
+
+            if (
+                activeRows.length === 0 &&
+                (!multipartConfig || configuredMultipartSelections.length === 0)
+            ) {
+                throw new Error(
+                    'Enter how many questions to choose for at least one type.',
+                );
+            }
+
             const multipartTypeIds = multipartConfig
                 ? [
                       ...new Set(
@@ -6111,7 +6123,7 @@ export default function GeneratePaper({
                               sourceSection.title
                             : null,
                     questionTextRtl: sourceSection.questionTextRtl,
-                    requiredQuestions: toNumber(row.requiredQuestions),
+                    requiredQuestions: rowRequiredQuestions(row),
                     totalQuestions: rowTarget(row),
                     marksEach: toNumber(row.marksPerQuestion),
                     questions: selectedQuestions.map((question) =>
@@ -10098,13 +10110,11 @@ export default function GeneratePaper({
                                     </button>
                                     <button
                                         type="button"
-                                        disabled={
-                                            !canGeneratePaper || generatingPaper
-                                        }
+                                        disabled={generatingPaper}
                                         onClick={handleGeneratePaper}
                                         className={cn(
                                             'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition-colors',
-                                            !canGeneratePaper || generatingPaper
+                                            generatingPaper
                                                 ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                                                 : 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 dark:bg-brand-500 dark:text-white dark:hover:bg-brand-400',
                                         )}
@@ -14331,7 +14341,7 @@ function PaperSectionHeading({
     const closingBracket =
         !federal && settings.sectionHeadingBrackets ? ')' : '';
     const marksFormula =
-        typeof totalMarks === 'number'
+        typeof totalMarks === 'number' && totalMarks > 0
             ? typeof questionCount === 'number' && typeof marksEach === 'number'
                 ? `${questionCount}x${marksEach} = ${totalMarks} Marks`
                 : `${totalMarks} Marks`
@@ -14755,11 +14765,12 @@ export function GeneratedPaperView({
             !targetPaper.sectioning?.custom;
 
         if (section.multipart) {
+            const multipart = section.multipart;
             const firstMultipartIndex = targetPaper.sections.findIndex(
                 (candidate) =>
                     candidate.multipart !== null &&
                     candidate.multipart !== undefined &&
-                    candidate.multipart.groupId === section.multipart?.groupId,
+                    candidate.multipart.groupId === multipart.groupId,
             );
 
             return (
@@ -14770,6 +14781,17 @@ export function GeneratedPaperView({
                         sectionIndex,
                     )}
                     showHeading={sectionIndex === firstMultipartIndex}
+                    showChoiceMarks={
+                        multipart.marksEach > 0 &&
+                        targetPaper.sections.every(
+                            (candidate) =>
+                                !candidate.multipart ||
+                                candidate.multipart.groupId !==
+                                    multipart.groupId ||
+                                candidate.multipart.marksEach ===
+                                    multipart.marksEach,
+                        )
+                    }
                     interactive={interactive}
                     onEditQuestion={onEditQuestion}
                     onRandomQuestion={onRandomQuestion}
@@ -14976,7 +14998,7 @@ export function GeneratedPaperView({
                     </span>
                     <span>
                         <strong>Marks: </strong>
-                        {paperTotalMarks(targetPaper)}
+                        {paperTotalMarks(targetPaper) || null}
                     </span>
                     <span>
                         <strong>Time: </strong>
@@ -16247,7 +16269,7 @@ export function GeneratedPaperView({
                             }
                             header={{
                                 ...paper.header,
-                                marks: totalMarks,
+                                marks: totalMarks || null,
                                 type: answersTitle
                                     ? `${answersTitle}${numSets > 1 ? ` — Set ${setLabelFor(activeSetIndex)}` : ''}`
                                     : paper.header.type,
@@ -16387,7 +16409,7 @@ export function GeneratedPaperView({
                                             }
                                             header={{
                                                 ...variantPaper.header,
-                                                marks: totalMarks,
+                                                marks: totalMarks || null,
                                                 type: numSets === 1
                                                     ? (answersTitle ?? variantPaper.header.type)
                                                     : answersTitle
@@ -17650,7 +17672,7 @@ function QuestionSelectionCard({
                             decimal
                             value={row.marksPerQuestion}
                             placeholder="0"
-                            disabled={toNumber(row.requiredQuestions) === 0}
+                            disabled={rowTarget(row) === 0}
                             onChange={(value) =>
                                 onChange(
                                     section.id,

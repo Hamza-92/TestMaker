@@ -224,7 +224,7 @@ export interface GeneratedPaperHeader {
     type: string;
     date: string;
     duration: string;
-    marks: number;
+    marks: number | null;
     passingMarks: number;
     rollNo: string;
 }

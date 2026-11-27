@@ -12,6 +12,7 @@ interface Props {
     section: GeneratedPaperSection;
     headingNumber: number | null;
     showHeading: boolean;
+    showChoiceMarks: boolean;
     interactive: boolean;
     onEditQuestion: SectionTemplateProps['onEditQuestion'];
     onRandomQuestion: SectionTemplateProps['onRandomQuestion'];
@@ -24,6 +25,7 @@ export function MultipartSection({
     section,
     headingNumber,
     showHeading,
+    showChoiceMarks,
     interactive,
     onEditQuestion,
     onRandomQuestion,
@@ -56,7 +58,7 @@ export function MultipartSection({
         groupChoiceCount > 0 &&
         groupChoiceCount <= groupQuestionCount;
     const choiceMarks =
-        showChoice && typeof groupChoiceCount === 'number'
+        showChoiceMarks && showChoice && typeof groupChoiceCount === 'number'
             ? Number((groupChoiceCount * multipart.marksEach).toFixed(2))
             : null;
     const choiceMarksLabel =

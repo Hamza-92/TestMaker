@@ -17,6 +17,9 @@ export function FederalSubjectiveOrSection({
     alternative,
 }: FederalSubjectiveOrSectionProps) {
     const section = primary.section;
+    const showMarks = section.marksEach > 0;
+    const showAlternativeMarks =
+        alternative && alternative.section.marksEach > 0;
 
     return (
         <section className="paper-section" data-federal-subjective-section>
@@ -35,13 +38,17 @@ export function FederalSubjectiveOrSection({
             <table data-paper-federal-or-table>
                 <colgroup>
                     <col style={{ width: '6%' }} />
-                    <col style={{ width: alternative ? '37%' : '87%' }} />
-                    <col style={{ width: alternative ? '6%' : '7%' }} />
+                    <col />
+                    {showMarks && (
+                        <col style={{ width: alternative ? '6%' : '7%' }} />
+                    )}
                     {alternative && (
                         <>
                             <col style={{ width: '7%' }} />
-                            <col style={{ width: '37%' }} />
-                            <col style={{ width: '7%' }} />
+                            <col />
+                            {showAlternativeMarks && (
+                                <col style={{ width: '7%' }} />
+                            )}
                         </>
                     )}
                 </colgroup>
@@ -51,9 +58,11 @@ export function FederalSubjectiveOrSection({
                         <th className="px-2 py-1 text-left font-bold">
                             Question
                         </th>
-                        <th className="px-1 py-1 text-center font-bold">
-                            Marks
-                        </th>
+                        {showMarks && (
+                            <th className="px-1 py-1 text-center font-bold">
+                                Marks
+                            </th>
+                        )}
                         {alternative && (
                             <>
                                 <th className="px-1 py-1 text-center font-bold">
@@ -62,9 +71,11 @@ export function FederalSubjectiveOrSection({
                                 <th className="px-2 py-1 text-center font-bold">
                                     Question
                                 </th>
-                                <th className="px-1 py-1 text-center font-bold">
-                                    Marks
-                                </th>
+                                {showAlternativeMarks && (
+                                    <th className="px-1 py-1 text-center font-bold">
+                                        Marks
+                                    </th>
+                                )}
                             </>
                         )}
                     </tr>
@@ -79,9 +90,11 @@ export function FederalSubjectiveOrSection({
                                 question={question}
                                 props={primary}
                             />
-                            <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
-                                {section.marksEach}
-                            </td>
+                            {showMarks && (
+                                <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
+                                    {section.marksEach}
+                                </td>
+                            )}
                             {alternative && (
                                 <>
                                     <td className="px-1 py-1 text-center align-middle font-bold">
@@ -99,9 +112,11 @@ export function FederalSubjectiveOrSection({
                                     ) : (
                                         <td className="px-2 py-1" />
                                     )}
-                                    <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
-                                        {section.marksEach}
-                                    </td>
+                                    {showAlternativeMarks && (
+                                        <td className="px-1 py-1 text-center align-middle font-normal tabular-nums">
+                                            {alternative.section.marksEach}
+                                        </td>
+                                    )}
                                 </>
                             )}
                         </tr>

@@ -74,6 +74,7 @@ export function BilingualQuestionRow({
     verseLayout = false,
 }: BilingualQuestionRowProps) {
     const parts = splitBilingualParts(value);
+    const showMarks = !hideMarks && marks > 0;
     const sharedParts = sameStatement
         ? splitBilingualParts(sameStatement)
         : null;
@@ -271,9 +272,9 @@ export function BilingualQuestionRow({
     return (
         <div
             className={
-                hideMarks
-                    ? 'grid min-w-0 grid-cols-2 items-start gap-x-3'
-                    : 'grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3'
+                showMarks
+                    ? 'grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-3'
+                    : 'grid min-w-0 grid-cols-2 items-start gap-x-3'
             }
         >
             <div dir="ltr" className="flex min-w-0 items-baseline text-left">
@@ -289,7 +290,7 @@ export function BilingualQuestionRow({
                 />
             </div>
 
-            {!hideMarks && (
+            {showMarks && (
                 <span className="self-start px-1 text-center text-xs font-semibold">
                     ({marks})
                 </span>
