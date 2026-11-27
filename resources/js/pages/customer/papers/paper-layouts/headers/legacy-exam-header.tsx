@@ -114,12 +114,14 @@ function Field({
     name,
     label,
     ariaLabel = label,
+    emptyValue = '\u00a0',
     line = false,
     stacked = false,
 }: {
     name: LegacyField;
     label?: string;
     ariaLabel?: string;
+    emptyValue?: string;
     line?: boolean;
     stacked?: boolean;
 }) {
@@ -175,7 +177,7 @@ function Field({
                 />
             ) : (
                 <span className="tm-old-value" dir="auto">
-                    {displayValue || '\u00a0'}
+                    {displayValue || emptyValue}
                 </span>
             )}
         </span>
@@ -713,9 +715,15 @@ function LegacyLayoutLater({ layout }: { layout: number }): ReactNode {
         case 8:
             return (
                 <table className="tm-old-table tm-old-eight">
+                    <colgroup>
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '36%' }} />
+                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '21%' }} />
+                    </colgroup>
                     <tbody>
                         <tr>
-                            <td rowSpan={4} className="tm-old-logo-cell">
+                            <td rowSpan={4}>
                                 <Logo />
                             </td>
                             <td colSpan={3}>
@@ -727,8 +735,10 @@ function LegacyLayoutLater({ layout }: { layout: number }): ReactNode {
                                 <Field name="className" label="Class:" />
                             </td>
                             <td>
-                                <Field name="subject" label="Subject:" />{' '}
-                                <Field name="chapters" label="CH#:" />
+                                <div className="tm-old-eight-subject">
+                                    <Field name="subject" label="Subject:" />
+                                    <Field name="chapters" label="CH#" />
+                                </div>
                             </td>
                             <td>
                                 <Field name="marks" label="Maximum Marks:" />
@@ -739,14 +749,21 @@ function LegacyLayoutLater({ layout }: { layout: number }): ReactNode {
                                 <Field
                                     name="studentName"
                                     label="Student Name:"
-                                    line
                                 />
                             </td>
                             <td>
-                                <Field name="section" label="Section:" line />
+                                <Field
+                                    name="section"
+                                    label="Section:"
+                                    emptyValue="_____"
+                                />
                             </td>
                             <td>
-                                <Field name="rollNo" label="Roll No.:" line />
+                                <Field
+                                    name="rollNo"
+                                    label="Roll No.:"
+                                    emptyValue="_____"
+                                />
                             </td>
                         </tr>
                         <tr>
@@ -760,7 +777,7 @@ function LegacyLayoutLater({ layout }: { layout: number }): ReactNode {
                                 <Field
                                     name="obtainedMarks"
                                     label="Obtained Marks:"
-                                    line
+                                    emptyValue="_____"
                                 />
                             </td>
                         </tr>
