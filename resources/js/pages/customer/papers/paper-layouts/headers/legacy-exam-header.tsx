@@ -458,7 +458,7 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
                     <tbody>
                         <tr>
                             <td colSpan={8}>
-                                <div className="tm-old-four-school">
+                                <div className="tm-old-left-logo">
                                     <Logo />
                                     <SchoolBlock />
                                 </div>
@@ -511,48 +511,64 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
             );
         case 5:
             return (
-                <table className="tm-old-table tm-old-five">
-                    <tbody>
-                        <tr>
-                            <td className="tm-old-logo-cell">
-                                <Logo />
-                            </td>
-                            <td colSpan={3}>
-                                <SchoolBlock />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <Field name="studentName" label="Name:" line />
-                            </td>
-                            <td>
-                                <Field name="rollNo" label="Roll#:" line />
-                            </td>
-                            <td>
-                                <Field name="className" label="Class:" />
-                            </td>
-                            <td>
-                                <Field name="marks" label="Total marks:" />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <Field name="subject" label="Subject:" />
-                            </td>
-                            <td>
-                                <Field name="date" label="Date:" />
-                            </td>
-                            <td colSpan={2}>
-                                <Field name="duration" label="Time:" />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colSpan={4}>
-                                <Field name="chapters" label="Syllabus:" />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <>
+                    <div className="tm-old-left-logo tm-old-five-school">
+                        <Logo />
+                        <SchoolBlock />
+                    </div>
+                    <table className="tm-old-table tm-old-five">
+                        <colgroup>
+                            <col style={{ width: '8%' }} />
+                            <col style={{ width: '32%' }} />
+                            <col style={{ width: '8%' }} />
+                            <col style={{ width: '12%' }} />
+                            <col style={{ width: '8%' }} />
+                            <col style={{ width: '17%' }} />
+                            <col style={{ width: '15%' }} />
+                        </colgroup>
+                        <tbody>
+                            <tr>
+                                <th>Name:</th>
+                                <td>
+                                    <Field name="studentName" />
+                                </td>
+                                <th>Roll#:</th>
+                                <td>
+                                    <Field name="rollNo" />
+                                </td>
+                                <th>Class:</th>
+                                <td>
+                                    <Field name="className" ariaLabel="Class" />
+                                </td>
+                                <td>
+                                    <Field name="marks" label="Total marks:" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Subject:</th>
+                                <td colSpan={3}>
+                                    <Field name="subject" ariaLabel="Subject" />
+                                </td>
+                                <th>Date:</th>
+                                <td>
+                                    <Field name="date" ariaLabel="Date" />
+                                </td>
+                                <td>
+                                    <Field name="duration" label="Time:" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Syllabus:</th>
+                                <td colSpan={6}>
+                                    <Field
+                                        name="chapters"
+                                        ariaLabel="Syllabus"
+                                    />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </>
             );
         case 6:
             return (

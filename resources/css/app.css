@@ -1189,21 +1189,25 @@ input[type='date']::-webkit-calendar-picker-indicator {
     background: #fff;
 }
 
-[data-print-paper] .tm-old-header .tm-old-four td > .tm-old-field {
+[data-print-paper] .tm-old-header .tm-old-four td > .tm-old-field,
+[data-print-paper] .tm-old-header .tm-old-five td > .tm-old-field {
     width: 100%;
 }
 
-[data-print-paper] .tm-old-header .tm-old-four-school {
+[data-print-paper] .tm-old-header .tm-old-left-logo {
     display: grid;
-    grid-template-columns: max(10%, 60px) minmax(0, 1fr);
+    grid-template-columns:
+        max(var(--legacy-logo-column-width, 10%), 60px)
+        minmax(0, 1fr);
     align-items: center;
 }
 
-[data-print-paper] .tm-old-header .tm-old-four-school > .tm-old-logo {
+[data-print-paper] .tm-old-header .tm-old-left-logo > .tm-old-logo {
     justify-content: start;
 }
 
-[data-print-paper] .tm-old-header.tm-old-layout-4 {
+[data-print-paper] .tm-old-header.tm-old-layout-4,
+[data-print-paper] .tm-old-header.tm-old-layout-5 {
     container-type: inline-size;
 }
 
@@ -1243,6 +1247,55 @@ input[type='date']::-webkit-calendar-picker-indicator {
 
     [data-print-paper] .tm-old-four tr:last-child > :nth-last-child(-n + 4) {
         border-bottom-width: 0;
+    }
+}
+
+[data-print-paper] .tm-old-header .tm-old-five-school {
+    --legacy-logo-column-width: 8%;
+    margin-bottom: 4px;
+}
+
+[data-print-paper] .tm-old-header .tm-old-five th,
+[data-print-paper] .tm-old-header .tm-old-five .tm-old-label {
+    font-weight: 400;
+}
+
+@container (max-width: 36em) {
+    [data-print-paper] .tm-old-five,
+    [data-print-paper] .tm-old-five > tbody {
+        display: block;
+    }
+
+    [data-print-paper] .tm-old-five > colgroup {
+        display: none;
+    }
+
+    [data-print-paper] .tm-old-five > tbody > tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr) minmax(0, 1.4fr));
+    }
+
+    [data-print-paper] .tm-old-five td[colspan] {
+        grid-column: 2 / -1;
+    }
+
+    [data-print-paper] .tm-old-five tr:not(:last-child) > td:last-child {
+        grid-column: 3 / -1;
+    }
+
+    [data-print-paper] .tm-old-five :is(th, td) {
+        border-right-width: 0;
+        border-bottom-width: 0;
+    }
+
+    [data-print-paper] .tm-old-five tr > :last-child,
+    [data-print-paper] .tm-old-five td[colspan],
+    [data-print-paper] .tm-old-five tr:first-child > :nth-child(4) {
+        border-right-width: var(--paper-header-border-width, 1px);
+    }
+
+    [data-print-paper] .tm-old-five tr:last-child > * {
+        border-bottom-width: var(--paper-header-border-width, 1px);
     }
 }
 
