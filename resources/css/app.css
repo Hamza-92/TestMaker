@@ -1173,9 +1173,77 @@ input[type='date']::-webkit-calendar-picker-indicator {
     border-bottom: 1px solid currentColor;
 }
 
-[data-print-paper] .tm-old-header.tm-old-layout-4 th {
-    background: #111;
+[data-print-paper] .tm-old-header .tm-old-four {
+    border: calc(var(--paper-header-border-width, 1px) * 1.5)
+        var(--paper-header-border-style, solid) #000;
+    font-weight: 700;
+}
+
+[data-print-paper] .tm-old-header .tm-old-four th {
+    border-color: #808080;
+    background: #000;
     color: #fff;
+}
+
+[data-print-paper] .tm-old-header .tm-old-four td {
+    background: #fff;
+}
+
+[data-print-paper] .tm-old-header .tm-old-four td > .tm-old-field {
+    width: 100%;
+}
+
+[data-print-paper] .tm-old-header .tm-old-four-school {
+    display: grid;
+    grid-template-columns: max(10%, 60px) minmax(0, 1fr);
+    align-items: center;
+}
+
+[data-print-paper] .tm-old-header .tm-old-four-school > .tm-old-logo {
+    justify-content: start;
+}
+
+[data-print-paper] .tm-old-header.tm-old-layout-4 {
+    container-type: inline-size;
+}
+
+@container (max-width: 36em) {
+    [data-print-paper] .tm-old-four,
+    [data-print-paper] .tm-old-four > tbody,
+    [data-print-paper] .tm-old-four > tbody > tr:first-child > td {
+        display: block;
+    }
+
+    [data-print-paper] .tm-old-four > colgroup {
+        display: none;
+    }
+
+    [data-print-paper] .tm-old-four > tbody > tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr) minmax(0, 1.4fr));
+    }
+
+    [data-print-paper] .tm-old-four > tbody > tr:first-child > td {
+        grid-column: 1 / -1;
+    }
+
+    [data-print-paper] .tm-old-four td[colspan='3'] {
+        grid-column: 2 / -1;
+    }
+
+    [data-print-paper] .tm-old-four :is(th, td) {
+        border-top-width: 0;
+        border-left-width: 0;
+    }
+
+    [data-print-paper] .tm-old-four tr > :is(:last-child, [colspan='3']),
+    [data-print-paper] .tm-old-four tr:nth-child(3) > :nth-child(4) {
+        border-right-width: 0;
+    }
+
+    [data-print-paper] .tm-old-four tr:last-child > :nth-last-child(-n + 4) {
+        border-bottom-width: 0;
+    }
 }
 
 [data-print-paper] .tm-old-header .tm-old-office-title,

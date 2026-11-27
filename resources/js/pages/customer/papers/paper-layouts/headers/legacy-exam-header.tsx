@@ -445,54 +445,66 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
         case 4:
             return (
                 <table className="tm-old-table tm-old-four">
+                    <colgroup>
+                        <col style={{ width: '18%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '11%' }} />
+                        <col style={{ width: '15.5%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '13.5%' }} />
+                        <col style={{ width: '8%' }} />
+                    </colgroup>
                     <tbody>
                         <tr>
-                            <td className="tm-old-logo-cell">
-                                <Logo />
-                            </td>
-                            <td colSpan={3}>
-                                <SchoolBlock />
+                            <td colSpan={8}>
+                                <div className="tm-old-four-school">
+                                    <Logo />
+                                    <SchoolBlock />
+                                </div>
                             </td>
                         </tr>
                         <tr>
                             <th>Name:</th>
-                            <td>
-                                <Field name="studentName" line />
+                            <td colSpan={3}>
+                                <Field name="studentName" />
                             </td>
                             <th>Roll No.</th>
                             <td>
-                                <Field name="rollNo" line />
+                                <Field name="rollNo" />
                             </td>
-                        </tr>
-                        <tr>
                             <th>Class:</th>
                             <td>
-                                <Field name="className" />
-                            </td>
-                            <th>Subject:</th>
-                            <td>
-                                <Field name="subject" />
+                                <Field name="className" ariaLabel="Class" />
                             </td>
                         </tr>
                         <tr>
+                            <th>Subject:</th>
+                            <td>
+                                <Field name="subject" ariaLabel="Subject" />
+                            </td>
                             <th>Date:</th>
                             <td>
-                                <Field name="date" />
+                                <Field name="date" ariaLabel="Date" />
                             </td>
                             <th>T.Marks:</th>
                             <td>
                                 <Field name="marks" />
                             </td>
-                        </tr>
-                        <tr>
                             <th>P.Time:</th>
                             <td>
-                                <Field name="duration" />
+                                <Field name="duration" ariaLabel="Paper time" />
                             </td>
-                            <th>CH#:</th>
-                            <td>
-                                <Field name="chapters" />
+                        </tr>
+                        <tr>
+                            <th>CH#</th>
+                            <td colSpan={3}>
+                                <Field name="chapters" ariaLabel="Chapters" />
                             </td>
+                            <th>Round:</th>
+                            <td />
+                            <th>Phase:</th>
+                            <td />
                         </tr>
                     </tbody>
                 </table>
