@@ -382,66 +382,35 @@ function LegacyLayout({ layout }: { layout: number }): ReactNode {
             );
         case 2:
             return (
-                <table className="tm-old-table tm-old-two">
-                    <tbody>
-                        <tr>
-                            <td rowSpan={4} className="tm-old-logo-cell">
-                                <Logo />
-                            </td>
-                            <td colSpan={3}>
-                                <SchoolBlock />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colSpan={3}>
-                                <div className="tm-old-rounded">
-                                    <Cells>
-                                        <Field
-                                            name="className"
-                                            label="Class:"
-                                        />
-                                        <Field name="subject" />
-                                        <Field
-                                            name="marks"
-                                            label="Maximum Marks:"
-                                        />
-                                    </Cells>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <Field name="studentName" label="Name:" line />
-                            </td>
-                            <td>
-                                <Field
-                                    name="fatherName"
-                                    label="Father Name:"
-                                    line
-                                />
-                            </td>
-                            <td>
-                                <Field name="rollNo" label="Roll No:" line />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <Field name="duration" label="Time:" />
-                            </td>
-                            <td>
-                                <Field name="date" label="Date:" />
-                            </td>
-                            <td>
-                                <Field name="type" label="Exam Format:" />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colSpan={4}>
-                                <Field name="chapters" label="CH#:" />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div className="tm-old-two">
+                    <Logo />
+                    <div className="tm-old-two-content">
+                        <SchoolBlock />
+                        <div className="tm-old-two-summary">
+                            <div>
+                                <Field name="className" label="Class:" />
+                            </div>
+                            <div>
+                                <Field name="subject" ariaLabel="Subject" />
+                            </div>
+                            <div>
+                                <Field name="marks" label="Maximum Marks:" />
+                            </div>
+                        </div>
+                        <div className="tm-old-two-fields tm-old-two-student">
+                            <Field name="studentName" label="Name:" />
+                            <Field name="fatherName" label="Father Name:" />
+                            <Field name="rollNo" label="Roll No:" />
+                            <Field name="section" label="Section:" />
+                        </div>
+                        <div className="tm-old-two-fields tm-old-two-exam">
+                            <Field name="duration" label="Time:" />
+                            <Field name="date" label="Date:" />
+                            <Field name="type" label="Exam:" />
+                            <Field name="chapters" label="Ch:" />
+                        </div>
+                    </div>
+                </div>
             );
         case 3:
             return (

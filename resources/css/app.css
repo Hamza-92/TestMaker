@@ -1044,6 +1044,89 @@ input[type='date']::-webkit-calendar-picker-indicator {
     padding: 3px 6px;
 }
 
+[data-print-paper] .tm-old-header .tm-old-two {
+    display: grid;
+    grid-template-columns: 13% minmax(0, 1fr);
+    align-items: center;
+    column-gap: 1%;
+}
+
+[data-print-paper] .tm-old-header .tm-old-two > .tm-old-logo > div {
+    max-width: 100%;
+}
+
+[data-print-paper] .tm-old-header .tm-old-two-content {
+    display: grid;
+    row-gap: 4px;
+    container-type: inline-size;
+}
+
+[data-print-paper] .tm-old-header .tm-old-two-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: var(--paper-header-border-width, 1px)
+        var(--paper-header-border-style, solid) #000;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 700;
+}
+
+[data-print-paper] .tm-old-header .tm-old-two-summary > div {
+    padding: var(--paper-header-padding-y, 2px)
+        var(--paper-header-padding-x, 4px);
+}
+
+[data-print-paper] .tm-old-header .tm-old-two-summary > div + div {
+    border-inline-start: var(--paper-header-border-width, 1px)
+        var(--paper-header-border-style, solid) #000;
+}
+
+[data-print-paper] .tm-old-two-summary > :last-child .tm-old-value {
+    min-width: 1.5em;
+}
+
+[data-print-paper] .tm-old-header .tm-old-two-fields {
+    display: grid;
+    align-items: end;
+    column-gap: 3px;
+    padding-block: var(--paper-header-padding-y, 2px);
+}
+
+[data-print-paper] .tm-old-header .tm-old-two-student {
+    grid-template-columns: minmax(0, 18fr) minmax(0, 36fr) repeat(
+            2,
+            minmax(0, 23fr)
+        );
+}
+
+[data-print-paper] .tm-old-header .tm-old-two-exam {
+    grid-template-columns: repeat(3, minmax(0, 18fr)) minmax(0, 46fr);
+}
+
+@container (max-width: 28em) {
+    [data-print-paper] .tm-old-header .tm-old-two-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 4px;
+    }
+}
+
+[data-print-paper] .tm-old-header .tm-old-two .tm-old-label {
+    flex-shrink: 1;
+    font-weight: inherit;
+    white-space: normal;
+}
+
+[data-print-paper] .tm-old-two-fields .tm-old-field > :last-child {
+    min-width: 0;
+    flex: 1;
+}
+
+[data-print-paper] .tm-old-two-summary > :last-child .tm-old-value,
+[data-print-paper] .tm-old-two-fields .tm-old-field > :last-child {
+    min-height: 1em;
+    border-bottom: 1px solid currentColor;
+}
+
 [data-print-paper] .tm-old-header .tm-old-marks-badge,
 [data-print-paper] .tm-old-header.tm-old-layout-4 th {
     background: #111;
